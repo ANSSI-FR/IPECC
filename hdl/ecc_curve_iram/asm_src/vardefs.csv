@@ -1,0 +1,177 @@
+# address of variables (in ecc_fp_dram)
+# main variables (shared by several programs)
+p,0
+a,1
+b,2
+q,3
+XR1,6
+YR1,7
+XR0,4
+YR0,5
+ZR01,26
+one,30
+zero,31
+R,29
+Rmodp,29
+kb0,4
+kb1,5
+phi0,10
+phi1,11
+kap0,12
+kap1,13
+kapP0,14
+kapP1,15
+R2modp,19
+XPBK,27
+YPBK,28
+ZPBK,22
+inverse,21
+dtmp,20
+XmXU,18
+twop,24
+red,22
+# variables used specifically by <eucl-inv.s>
+dy1,15
+dy2,16
+dx1,23
+dx2,17
+du,25
+dv,26
+dx,27
+dy,28
+r0,25
+r1,26
+two,23
+pmtwo,17
+idx,15
+# variables used specifically by <check-on-curve.s>
+aX,15
+right,15
+mustbezero,15
+YY,16
+left,16
+XX,17
+XXX,17
+XR,17
+R3modp,18
+# variables used specifically by <adpa.s>
+mu0,26
+mu1,27
+kap0msk,8
+kap1msk,9
+kapP0msk,16
+kapP1msk,17
+phi0msk,20
+phi1msk,21
+# variables used specifically by <blinding.s>
+qsh0,8
+qsh1,9
+btmp0,10
+btmp1,11
+alf,12
+m0,10
+m1,11
+alfmsk,15
+# variables used specifically by <setup.s>
+ZZ,8
+ZZZZ,8
+aZZZZ,8
+2YR1,8
+M,9
+MpSmT,9
+Q,9
+YYYY,16
+QQ,16
+S,17
+SmT,17
+X1YY,18
+lambdasq,22
+MM,22
+lambda,21
+lambdacu,21
+Y1Z1,21
+Zsav,20
+# variables used by both <zadd[uc].s>
+A,8
+BmX,8
+F,8
+C,9
+CmB,9
+BpC,9
+H,9
+J,9
+YmY,16
+XADD,17
+D,17
+K,16
+YADD,16
+DmB,17
+Xtmp,20
+Ytmp,21
+# variables used specifically by <zaddc.s>
+XmXC,21
+G,20
+B,23
+Ec,25
+CCmB,25
+XSUB,8
+YSUB,16
+BmXC,8
+# variables used specifically by <zdbl.s>
+MD,8
+Msq,21
+N,8
+Nsq,18
+E,9
+L,16
+XpE,20
+BpL,17
+twoB,21
+threeB,23
+EpN,25
+YpZ,21
+YpZsq,21
+twoS,18
+Xup,8
+Yup,9
+Ztmp,25
+# variables used specifically by <zneg.s>
+Yopp,21
+Ykeep,16
+Xkeep,18
+# variables used specifically by <subtractP.s>
+XR0tmp,16
+YR0tmp,17
+ZPBKsq,14
+ZPBKcu,14
+ZR01sq,21
+ZR01cu,21
+ZR01END,25
+# variables used specifically by <exit.s>
+XR1tmp,18
+YR1tmp,20
+invsq,10
+invcu,11
+# variable used for on-the-fly patch feature (value does no matter actually)
+patchme,21
+# variables used specifically by <addition.s>
+HH,10
+tHH,10
+Ia,10
+I,12
+Ja,9
+# YmY,16
+r,11
+V,10
+rsq,12
+JpV,13
+Jp2V,13
+YmJ,9
+tYmJ,9
+VmX,10
+rVmX,10
+XR0bk,14
+YR0bk,15
+XR1bk,28
+YR1bk,18
+YpY,20

@@ -1,0 +1,51 @@
+	FS = "\t"
+	OFS = " "
+	ad = 0
+}
+
+{
+	if ($1 ~ /#+/ ) {
+		gsub("#","\\#", $1)
+		gsub("&","\\\\&", $1)
+		gsub("\\^","\\^{}", $1)
+		gsub("%","\\%", $1)
+		gsub(" ","\\ ", $1)
+		# gsub("_","\\char`_", $1)
+		printf "\\multicolumn{7}{l}{\\gray{%s}} \\\\\n", $0
+	} else if ( $1 ~ /^\.[^ ]+L:/) {
+		printf " & & \\br{%s} & & & & \\\\\n", $1
+	} else if ( $1 ~ /^\.[^ ]+L\\char`_export:/) {
+		printf " & & \\br{%s} & & & & \\\\\n", $1
+	} else if ( $2 ~ /NOP/ || $2 ~ /NNADD/ || $2 ~ /NNSUB/ || $2 ~ /NNSRL/ || $2 ~ /NNSLL/ || $2 ~ /NNRND/ || $2 ~ /NNXOR/ || $2 ~ /FPREDC/ || $2 ~ /TESTPAR/ || $2 ~ /NNDIV2/) {
+		# opc
+		if ($5 == "%mu0") {$5 = "\\%mu0"}
+		if ($5 == "%kb0") {$5 = "\\%kb0"}
+		if ($5 == "%par") {$5 = "\\%par"}
+		if ($5 == "%kap") {$5 = "\\%kap"}
+		if ($5 == "%kapP") {$5 = "\\%kapP"}
+		# opa
+		if ($3 == "%par") {$3 = "\\%par"}
+		if ($3 == "%kap") {$3 = "\\%kap"}
+		if ($3 == "%kapP") {$3 = "\\%kapP"}
+		printf "0x%03x & {\\tiny (%03d)} & & \\blue{%s} & $\\text{%s}_{\\text{\\gray{\\scalebox{.8}{%s}}}}$ \\hspace{.35cm} & $\\text{%s}_{\\text{\\gray{\\scalebox{.8}{%s}}}}$ \\hspace{.35cm} & $\\text{%s}_{\\text{\\gray{\\scalebox{.8}{%s}}}}$ \\hspace{.35cm} \\\\\n", ad, ad, $2, $3, addr[$3], $4, addr[$4], $5, addr[$5]
+		ad++
+	} else if ($2 ~ /NNMOV/) {
+		printf "0x%03x & {\\tiny (%03d)} & & \\blue{%s} & $\\text{%s}_{\\text{\\gray{\\scalebox{.8}{%s}}}}$ \\hspace{.35cm} & & $\\text{%s}_{\\text{\\gray{\\scalebox{.8}{%s}}}}$ \\hspace{.35cm} \\\\\n", ad, ad, $2, $3, addr[$3], $5, addr[$5]
+		ad++
+	} else if ($2 ~ /NNCLR/) {
+		printf "0x%03x & {\\tiny (%03d)} & & \\blue{%s} & & & $\\text{%s}_{\\text{\\gray{\\scalebox{.8}{%s}}}}$ \\hspace{.35cm} \\\\\n", ad, ad, $2, $5, addr[$5]
+		ad++
+	} else if ( $2 == "CALL" || $2 == "CALLsn" || $2 == "JL" || $2 == "JLsn" || $2 == "Jkap" || $2 == "Jodd" || $2 == "Jsn" || $2 == "Jz" || $2 == "J" ) {
+		printf "0x%03x & {\\tiny (%03d)} & & \\gn{%s} & \\br{%s} & %s & $\\text{%s}_{\\text{\\gray{\\scalebox{.8}{%s}}}}$ \\\\\n", ad, ad, $2, $3, $4, $5, addr[$5]
+		ad++
+	} else if ( $2 == "RET" ) {
+		printf "0x%03x & {\\tiny (%03d)} & & \\vi{%s} & \\br{%s} & %s & %s \\\\\n", ad, ad, $2, $3, $4, $5
+		ad++
+	} else if ( $2 == "BARRIER" ) {
+		printf " & & & \\oj{BARRIER} & & &  \\\\\n"
+	} else if ( $2 == "STOP" ) {
+		printf " & & & \\red{STOP} & & & \\\\\n"
+	} else {
+		print $0
+	}
+}

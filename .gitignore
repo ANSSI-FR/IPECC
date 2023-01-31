@@ -1,0 +1,15 @@
+ecc_addr.vhd
+ecc_curve_iram.s
+ecc_curve_iram.vhd
+hdl/ecc_curve_iram/latex/*.part
+hdl/ecc_curve_iram/latex/all-progs.tex
+hdl/ecc_curve_iram/latex/all-progs.tex.pre
+hdl/ecc_curve_iram/latex/assembly.awk.vardefs
+hdl/ecc_curve_iram/latex/ecc_curve_iram.aux
+hdl/ecc_curve_iram/latex/ecc_curve_iram.log
+hdl/ecc_curve_iram/latex/ecc_curve_iram.pdf
+hdl/ecc_curve_iram/latex/texify.awk
+*.aux
+*.log
+*.html
+*.pdf
