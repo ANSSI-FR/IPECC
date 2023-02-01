@@ -73,6 +73,9 @@ The main features of IPECC are:
 
 ## Hardware
 
+This section will be completed with more information about the hardware architecture,
+targets and VHDL synthesis.
+
 ## Software
 
 ### The IPECC driver
@@ -114,6 +117,11 @@ test file in emulation mode using the `make emulator` target: this will compile 
 Welcome to the driver test!
 ```
 
+**NOTE**: although the driver is ready for production use with IPECC, the debug features
+are still a work in progress as we have mainly focused on the core functionalities.
+More specifically, breakpoints and IP internal memory dumping as well
+as TRNG debugging are not fully implemented nor tested: this will be integrated in future
+updates.
 
 ### The IPECC integration with libecc
 
