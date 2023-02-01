@@ -53,7 +53,7 @@ The main features of IPECC are:
 
     2. Optional
 
-        1. Scalar blinding ($k' = k + \alpha{}q$) with configurable size of $\alpha$ (up to ``nn``)
+        1. Scalar blinding ($k' = k + \alpha \times q$) with configurable size of $\alpha$ (up to ``nn``)
 
         2. Memory shuffling between each scalar bit processing
 
@@ -63,7 +63,7 @@ The main features of IPECC are:
 
 6. Customizable number of multiplier-accumulators within each Montgomery multiplier
 
-7. Built-in TRNG design (ES-TRNG from [KU-Leuven, CHES'2018])
+7. Built-in TRNG design (ES-TRNG from [KU-Leuven, CHES'2018](https://tches.iacr.org/index.php/TCHES/article/view/7276))
 
 8. Automatic computation of Montgomery constants
 
@@ -87,7 +87,8 @@ of setting curve parameters, points doubling, addition, negation, scalar multipl
 
 The [driver/hw_accelerator_driver_ipecc_platform.c](driver/hw_accelerator_driver_ipecc_platform.c) contains
 the platform adherence: the driver can be compiled for a standalone mode (i.e. direct mapping of the IP
-to a physical address), or a Linux compatible mode using `DEVMEM` (`/dev/mem`) mappings or `UIO` mappings.
+to a physical address), or a Linux compatible mode using `DEVMEM` (`/dev/mem`) mappings or `UIO` mappings (see [here](https://www.kernel.org/doc/html/v4.12/driver-api/uio-howto.html)
+for more information on the User IO interface).
 
 The [driver/test_driver.c](driver/test_driver.c) file contains basic tests of the IP for the various
 APIs. In order to compile this use the `make` command (you will need `arm-linux-gnueabihf-gcc` or equivalent
@@ -117,11 +118,19 @@ test file in emulation mode using the `make emulator` target: this will compile 
 Welcome to the driver test!
 ```
 
-**NOTE**: although the driver is ready for production use with IPECC, the debug features
+**NOTE1**: although the driver is ready for production use with IPECC, the debug features
 are still a work in progress as we have mainly focused on the core functionalities.
 More specifically, breakpoints and IP internal memory dumping as well
 as TRNG debugging are not fully implemented nor tested: this will be integrated in future
 updates.
+
+**NOTE2**: the driver has been fully tested in 32-bit mode with a 32-bit IP on Zynq 32-bit
+platforms. Other modes (in the matrix of 32-bit or 64-bit software with 32-bit or 64-bit IP)
+are a work in progress: although the software and hardware are ready to be compiled in each mode, some
+dependencies with the AXI interface bus width must be taken into consideration (this is related to how
+the bus controller splits memory accesses). The IPECC repository will be updated when all the test cases
+are covered and validated.
+
 
 ### The IPECC integration with libecc
 
