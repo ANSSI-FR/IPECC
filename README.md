@@ -53,7 +53,7 @@ The main features of IPECC are:
 
     2. Optional
 
-        1. Scalar blinding (${k'} = k + \alpha{} \times{} q$) with configurable size of $\alpha$ (up to ``nn``)
+        1. Scalar blinding ( $k' = k + \alpha \times q$ ) with configurable size of $\alpha$ (up to ``nn``)
 
         2. Memory shuffling between each scalar bit processing
 
