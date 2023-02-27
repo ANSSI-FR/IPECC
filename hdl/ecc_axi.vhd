@@ -13,7 +13,6 @@
 --  See LICENSE file at the root folder of the project.
 --
 
-
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -138,7 +137,7 @@ entity ecc_axi is
 		nndyn_wmin_excp : out std_logic;
 		nndyn_mask_wm2 : out std_logic;
 		nndyn_nnm3 : out unsigned(log2(nn) - 1 downto 0);
-		-- general busy signal
+		-- busy signal for [k]P computation
 		kppending : out std_logic;
 		-- debug features (interface with ecc_scalar)
 		dbgpgmstate : in std_logic_vector(3 downto 0);
@@ -188,7 +187,7 @@ architecture rtl of ecc_axi is
 	constant CST_AXI_RESP_OKAY : std_logic_vector(1 downto 0) := "00";
 
 	type state_type is
-		(idle, writebn, readbn, -- 'bn' stands for "big-number"
+		(idle, writeln, readln, -- ln stands for large number
 		 newnn, -- used only when nn_dynamic = TRUE
 		 readraw); -- stands for raw random numbers (vs 'internal' in AIS31 terms)
 
@@ -320,7 +319,7 @@ architecture rtl of ecc_axi is
 		y_set : std_logic;
 		read_forbidden : std_logic;
 		-- pragma translate_off
-		wlock0, wlock1 : std_logic;
+		wlock : std_logic;
 		busy : std_logic;
 		-- pragma translate_on
 		aerr_inpt_ack : std_logic;
@@ -343,8 +342,6 @@ architecture rtl of ecc_axi is
 		valnnm3 : unsigned(log2(nn) - 1 downto 0);
 		valw, valwtmp : unsigned(log2(w) - 1 downto 0);
 		valwerr : std_logic;
-		--valwm1 : unsigned(log2(w) - 1 downto 0);
-		--val2wm1 : unsigned(log2(w) downto 0);
 		mask, masktmp : std_logic_vector(ww - 1 downto 0);
 		shrcnt : unsigned(log2(ww) - 1 downto 0);
 		shlcnt : unsigned(log2(ww) - 1 downto 0);
@@ -394,21 +391,6 @@ architecture rtl of ecc_axi is
 		exception : std_logic;
 	end record;
 
-	--type irn_reg_type is record
-	--	raddr : std_logic_vector(log2(irn_ram_size - 1) - 1 downto 0);
-	--	--bitsi : unsigned(log2(irn_wsize - 1) - 1 downto 0);
-	--	--bitsaxi : unsigned(axiw - 1 downto 0);
-	--	--shdatai : std_logic_vector(irn_wsize - 1 downto 0);
-	--	--shdataicanbeemptied : std_logic;
-	--	--re : std_logic;
-	--	--resh : std_logic_vector(3 downto 0);
-	--	--arpending : std_logic;
-	--	--rdatax : std_logic_vector(C_S_AXI_DATA_WIDTH - 1 downto 0);
-	--	--rdataxcanbefilled : std_logic;
-	--	--availx : std_logic;
-	--	--lastwordx : std_logic;
-	--end record;
-
 	type raw_reg_type is record
 		raddr : std_logic_vector(log2(raw_ram_size - 1) - 1 downto 0);
 	end record;
@@ -419,7 +401,6 @@ architecture rtl of ecc_axi is
 		rawreset : std_logic;
 		irnreset : std_logic;
 		raw : raw_reg_type;
-		--irn : irn_reg_type;
 		ppdeact : std_logic;
 		completebypass : std_logic;
 		vonneuman : std_logic;
@@ -441,8 +422,6 @@ architecture rtl of ecc_axi is
 		nbopcodes : std_logic_vector(15 downto 0);
 		dosomeopcodes : std_logic;
 		resume : std_logic;
-		--halted : std_logic;
-		--halted_b : std_logic;
 		trng : trng_reg_type;
 		fpwdata : std_logic_vector(ww - 1 downto 0);
 		halt : std_logic;
@@ -467,7 +446,6 @@ architecture rtl of ecc_axi is
 	signal nndyn_wm1_s : unsigned(log2(w - 1) - 1 downto 0);
 	signal nndyn_wm2_s : unsigned(log2(w - 1) - 1 downto 0);
 	signal nndyn_2wm1_s : unsigned(log2(2*w - 1) - 1 downto 0);
-	signal nndyn_2wm2_s : unsigned(log2(2*w - 1) - 1 downto 0); -- TODO: remove
 
 	--signal nndyn_shlcnt_s : unsigned(log2(ww) - 1 downto 0);
 	signal nndyn_mask_wm2_s : std_logic;
@@ -540,18 +518,14 @@ begin
 
 	-- (s144), see (s145)
 	assert (ww <= C_S_AXI_DATA_WIDTH)
-		report "in debug mode ww must be smaller than or equal to C_S_AXI_DATA_WIDTH"
+		report "in debug mode ww must be smaller than or equal to "
+		     & "C_S_AXI_DATA_WIDTH"
 			severity FAILURE;
 
 	-- (s146), see (s147)
 	assert (nbopcodes <= 2**16)
 		report "in debug mode nbopcodes must be smaller than or equal to 65536"
 			severity FAILURE;
-
-	-- (s148), see (s149)
-	--assert (OPCODE_SZ <= 2**16) -- let be serious this can't happen
-	--	report "in debug mode size of opcodes must be smaller than or equal to 16 bit"
-	--		severity FAILURE;
 
 	-- (s150), see (s151)
 	assert (log2(raw_ram_size) <= C_S_AXI_DATA_WIDTH)
@@ -578,31 +552,31 @@ begin
 	              s_axi_awaddr, s_axi_awprot, s_axi_awvalid,
 	              s_axi_wdata, s_axi_wvalid, s_axi_bready,
 	              s_axi_araddr, s_axi_arprot, s_axi_arvalid,
-	              s_axi_rready, ardy, aerr_inpt_not_on_curve, aerr_outpt_not_on_curve,
+	              s_axi_rready, ardy, aerr_inpt_not_on_curve,
+	              aerr_outpt_not_on_curve,
 	              kpdone, mtydone, popdone, aopdone, yes, yesen, xrdata,
 								trngvalid, trngdata, initdone,
-								trngaxiirncount, trngefpirncount, trngcurirncount, trngshfirncount,
+								trngaxiirncount, trngefpirncount, trngcurirncount,
+								trngshfirncount,
 								ar01zien, ar0zi, ar1zi, amtydone, force_reset,
 	              -- debug features
 								dbghalted, dbgdecodepc, dbgbreakpointid, dbgremainingopcodes,
 								dbgpdops,
-	              dbgpgmstate, dbgnbbits, dbgirdata, dbgbreakpointhit, --dbgtime
+	              dbgpgmstate, dbgnbbits, dbgirdata, dbgbreakpointhit,
 	              dbgtrngrawfull, dbgtrngrawwaddr,
 	              dbgtrngrawdata, dbgtrngrawduration
-								-- nndyn_x_s signals "relooped" for AXI register reads
-                , nndyn_wm2_s, nndyn_wm1_s,
-                nndyn_2wm2_s, nndyn_2wm1_s,
+								-- nndyn_x_s signals looped back for AXI register reads
+                , nndyn_wm2_s, nndyn_wm1_s, nndyn_2wm1_s,
                 nndyn_mask_is_zero_s, nndyn_mask_is_all1_but_msb_s,
                 nndyn_mask_wm2_s,
                 nndyn_wmin_s, nndyn_nnrnd_zerowm1_s, nndyn_nnm3_s,
                 small_k_sz_en_ack, small_k_sz_kpdone)
 		variable v : reg_type;
 		variable vbk : natural range 0 to 3;
-		variable v_nn_mod_ww_sub : unsigned(log2(ww) downto 0); -- log2(ww)+1 bits
-		--variable v_nndyn_testnn : unsigned(log2(nn) downto 0); -- log2(nn)+1 bits
+		variable v_nn_mod_ww_sub : unsigned(log2(ww) downto 0); -- log2(ww) + 1 bits
 		variable v_nndyn_testnn : unsigned(31 - CAP_NNMAX_LSB downto 0);
 		variable v_debug_not_prod : std_logic;
-		variable v_write_rnd_kmasked : unsigned(ww downto 0); -- ww+1 bit
+		variable v_write_rnd_kmasked : unsigned(ww downto 0); -- ww + 1 bit
 		constant v_size : natural := max(log2(irn_fifo_size_axi),log2(w)) + 3;
 		variable v_rnd_required_qty : unsigned(log2(w) + 1 downto 0);
 		variable v_diff : unsigned(v_size - 1 downto 0);
@@ -615,10 +589,7 @@ begin
 		variable vtmp5 : unsigned(log2(w) + 1 downto 0);
 		variable dw : std_logic_vector(C_S_AXI_DATA_WIDTH - 1 downto 0);
 		variable v_pop_possible, v_kp_possible : boolean;
-		variable v_busy, v_wlock0, v_wlock1 : boolean;
-		--variable vtmp6 : unsigned(log2(nn) downto 0);
-		--variable vtmp7 : unsigned(log2(nn) downto 0);
-		--variable v_blindiff : unsigned(log2(nn) downto 0);
+		variable v_busy, v_wlock : boolean;
 		variable vtmp6 : unsigned(31 - BLD_BITS_LSB downto 0);
 		variable vtmp7 : unsigned(31 - BLD_BITS_LSB downto 0);
 		variable v_blindiff : unsigned(31 - BLD_BITS_LSB downto 0);
@@ -631,8 +602,17 @@ begin
 
 		v.debug.halt := '0'; -- (s154)
 
-		-- v_pop_possible must be always defined here to avoid spurious
-		-- latch inference
+		-- v_pop_possible must be always defined to avoid spurious latch inference
+		--   TODO: set multicycle constraint on the following paths (which all go
+		--         through combinational signals v_pop_possible & v_kp_possible):
+		--     r.ctrl.[pab]_set -> r.ctrl.agokp (see (s174))
+		--                      -> r.ctrl.lockaxi (see (s68))
+		--                      -> r.ctrl.ierrid (see (s176)-(s176))
+		--     r.ctrl.[pa]_set_and_mty -> r.ctrl.agokp
+		--                             -> r.ctrl.lockaxi
+		--                             -> r.ctrl.ierrid
+		--   The max number of cycles for the constraint should match the minimum
+		--   nb of cycles to be expected between 2 AXI transactions
 		if (r.ctrl.p_set and r.ctrl.p_set_and_mty and r.ctrl.a_set and
 			r.ctrl.a_set_and_mty and r.ctrl.b_set) = '1'
 		then
@@ -641,43 +621,65 @@ begin
 			v_pop_possible := FALSE;
 		end if;
 
-		-- v_kp_possible must be always defined here to avoid spurious
-		-- latch inference
+		-- v_kp_possible must be always defined to avoid spurious latch inference
+		--   TODO: set multicycle constraint on these paths (which all go through
+		--         combinational signal v_kp_possible):
+		--     r.ctrl.doblinding -> r.ctrl.agokp
+		--                       -> r.ctrl.lockaxi
+		--                       -> r.ctrl.ierrid
+		--     r.ctrl.[kq]_set -> r.ctrl.agokp
+		--                     -> r.ctrl.lockaxi
+		--                     -> r.ctrl.ierrid
+		--     r.nndyn.valwerr -> r.ctrl.agokp
+		--                     -> r.ctrl.lockaxi
+		--                     -> r.ctrl.ierrid
 		v_kp_possible := v_pop_possible and r.ctrl.k_set = '1' -- (s114)
 			and ((not nn_dynamic) or (nn_dynamic and r.nndyn.valwerr = '0')) and
 		  (r.ctrl.doblinding = '0' or (r.ctrl.doblinding and r.ctrl.q_set) = '1');
 
-		-- (s30) v_wlock[01] are used to filter out the write accesses to registers
-		-- should the conditions to do it not be gathered
-		-- Simply put:
-		--      - we are in the process of writing or reading a big number
-		--   or - we are still in the process of computing Montgomery constants
-		--   or - we are still in the process of computing a [k]P product,
-		--   or - we are still in the process of computing signals associated
-		--        to a new value of nn (prime size)
-		--   or - we are 
-		--   or - debug features are present (debug = TRUE) but [k]P
-		--        computation is not currently halted
-		--   or - nn_dynamic feature is activated and last value set for
-		--        nn was erroneous
-		-- then the write currently attempted at CTRL register is
-		-- simply ignored
-		-- see also (s99) for WRITE_CONFIG register
+		-- (s30) v_busy determines the value of the BUSY bit in R_STATUS register,
+		--       see (s160)
+		-- Simply put, if:
+		--      - we are computing a [k]P product
+		--   or - we are computing Montgomery constants
+		--   or - we are processing a point or Fp operation
+		--   or - we are writing or reading portion of a large number
+		--   or - we are in the process of computing signals associated
+		--        to a new value of nn (prime size, nn_dynamic = TRUE)
+		--   or - we are reading TRNG data (debug = TRUE)
+		--   or - AXI interface is briefly "locked" to avoid race condition
+		-- then the BUSY bit in R_STATUS register is set and software is not
+		-- supposed to perform any action other than polling the BUSY bit
+		-- until it is low (or wait for the asynchronous irq if it programmed one).
+		-- Note: difference between r.write.active and r.write.busy is that the
+		-- the former is asserted high during the whole process of reading or
+		-- writing a complete large number (which requires several AXI data
+		-- 32/64 bit transfers given cryptographic number sizes), while the
+		-- latter is asserted high only during the processing of one AXI data
+		-- transfer (among the several ones which are involved in the writing
+		-- or the reading of the same one large number), which is why it appears
+		-- in computation of v_busy. Register r.write.busy appearing here instead
+		-- of r.write.active allows software to poll R_STATUS register inbetween
+		-- the different single 32 (or 64) bit data transfers involved in one
+		-- large number read or write.
 		v_busy := (initdone = '0') or r.ctrl.kppending = '1'
-		         or r.ctrl.mtypending = '1' or r.ctrl.agocstmty = '1' --or r.ctrl.newp = '1'
-		         or r.ctrl.amtypending = '1' or r.ctrl.agomtya = '1' --or r.ctrl.newa = '1'
+		         or r.ctrl.mtypending = '1' or r.ctrl.agocstmty = '1'
+		         or r.ctrl.amtypending = '1' or r.ctrl.agomtya = '1'
 		         or r.ctrl.poppending = '1' or r.ctrl.aoppending = '1'
-		         --or r.write.active = '1' or r.read.active = '1'
 		         or r.write.busy = '1' or r.read.busy = '1'
 		         or (nn_dynamic and r.nndyn.active = '1')
 		         or r.read.trngreading = '1'
 		         or r.ctrl.lockaxi = '1';
-		v_wlock0 := v_busy; -- or r.write.active = '1' or r.read.active = '1';
-		v_wlock1 := v_wlock0 or (nn_dynamic and r.nndyn.valwerr = '1');
+		-- (s161) compared to v_busy, v_wlock adds the condition that the last
+		-- prime size set by software did not incur an error - thus preventing
+		-- software from performing undesirable actions when nn is not set properly
+		-- yet, namely by not accessing the following write registers:
+		-- W_CTRL, W_R[01]_NULL, W_BLINDING, W_SHUFFLE, W_IRQ & W_SMALL_SCALAR,
+		-- see (s162) - (s168).
+		v_wlock := v_busy or (nn_dynamic and r.nndyn.valwerr = '1');
 
 		-- pragma translate_off
-		if v_wlock0 then v.ctrl.wlock0 := '1'; else v.ctrl.wlock0 := '0'; end if;
-		if v_wlock1 then v.ctrl.wlock1 := '1'; else v.ctrl.wlock1 := '0'; end if;
+		if v_wlock then v.ctrl.wlock := '1'; else v.ctrl.wlock := '0'; end if;
 		if v_busy then v.ctrl.busy := '1'; else v.ctrl.busy := '0'; end if;
 		-- pragma translate_on
 
@@ -737,7 +739,6 @@ begin
 		-- ------------------------------------------------------------------
 		if r.ctrl.do_ksz_test = '1' then
 			-- small k size transmitted by software must be greater (or equal) to 3
-			--vtmp8 := '0' & r.axi.ksz_test;
 			vtmp8 := '0' & unsigned(r.axi.wdatax(log2(nn) - 1 downto 0));
 			vtmp9 := to_unsigned(3, log2(nn) + 1);
 			vtmp10 := vtmp8 - vtmp9;
@@ -745,7 +746,7 @@ begin
 			-- to dynamic value of nn
 			vtmp11 := resize(r.nndyn.valnn, log2(nn) + 1);
 			vtmp12 := vtmp11 - vtmp8;
-			-- now test that bot subtract results are positive or null
+			-- now test that the results of both subtractions are positive or null
 			if vtmp10(log2(nn)) = '0' and vtmp12(log2(nn)) = '0' then
 				v.ctrl.small_k_sz := unsigned(r.axi.wdatax(log2(nn) - 1 downto 0));
 				v.ctrl.small_k_sz_en := '1';
@@ -775,15 +776,12 @@ begin
 		-- ---------------------------------------------------------------------
 		-- Blinding: check of correctness of nb of blinding bits set by software
 		-- ---------------------------------------------------------------------
-		-- bitwidth of numbers used to compare nb of blinding bits transmitted by
-		-- software and the maximum allowed in W_BLINDING is not the bitwidth of
-		-- that maximum allowed in W_BLINDING... it is the bitwidth of the maximum
-		-- that this maximum in W_BLINDING have, that is (32 - BLD_BITS_LSB).
-		-- This is because we must account for the possibilty that (malicious?)
-		-- software files a nb of blinding bits greater that one given in
-		-- W_BLINDING register. Not only that, but software driver should be
-		-- able to be compiled without any prejudice regarding the bitwidth of
-		-- value in W_BLINDING
+		-- bitwidth of numbers used to compare nb of blinding bits set by software
+		-- is the complete (32 - BLD_BITS_LSB) bits available in W_BLINDING register
+		-- so that software driver can be compiled without any prejudice regarding
+		-- the value set for nn at synthesis time in ecc_customize.vhd. This value
+		-- is made available to software at runtime through R_CAPABILITIES register,
+		-- see (s171).
 		if r.ctrl.doblindcheck = '1' then -- (s127), .doblindcheck was set by (s128)
 			v.ctrl.doblindcheck := '0';
 			if nn_dynamic then -- statically resolved by synthesizer
@@ -815,34 +813,22 @@ begin
 			v.axi.bvalid := '1';
 		end if;
 
-	--	-- TODO: set a large multicycle on paths:
-	--	--       input -> r.ctrl.rnn
-	--	--       input -> r.ctrl.nnminus1
-	--	--v.ctrl.rnn := to_unsigned(nn, log2(nn)); -- TODO:replace w/ I/O soft WR
-	--	--v.ctrl.nnminus1 := to_unsigned(nn - 1, log2(nn)); -- TODO: idem
-	--	v.ctrl.rnn := to_unsigned(256, log2(nn)); -- TODO:replace w/ I/O soft WR
-	--	-- log2(nn - 1) can be either equal to log2(nn) if nn is not a power-of-2
-	--	-- or equal to log2(nn) - 1 if nn is a power-of-2, so resize function
-	--  -- used below to define r.ctrl.nnminus1 will lose no bit
-	--	v.ctrl.nnminus1 := resize(r.ctrl.rnn - 1, log2(nn - 1)); -- TODO: idem
-
+		-- some registers require default reset
 		v.write.new32 := '0';
 		v.write.fpwe0 := '0'; -- (s24)
 		v.write.fpwe := r.write.fpwe0;
 		v.read.fpre0 := '0'; -- (s49)
 		v.read.fpre := r.read.fpre0;
-		--v.debug.trng.irn.re := '0';
-		v.nndyn.testnn := '0'; -- (s125)
+		v.nndyn.testnn := '0'; -- (s169)
 		v.nndyn.start := '0'; -- (s124)
 		v.write.rnd.avail4mask := '0';
 
 		v.debug.trng.rawreset := '0'; -- (s58)
 		v.debug.trng.irnreset := '0'; -- (s59)
 
-		-- (s96) yesen high means ecc_scalar drives the answer to point-based test
+		-- (s96) yesen high means ecc_scalar drives the answer to a point-based test
 		if yesen = '1' then
-			--v.ctrl.yesen := '1'; -- both bits .yesen and .yes will be cleared
-			v.ctrl.yes := yes; -- when reading STATUS register, see (s97) & (s98)
+			v.ctrl.yes := yes; -- read in R_STATUS register, see (s98)
 		end if;
 
 		-- ecc_scalar
@@ -884,8 +870,9 @@ begin
 			-- register/emptying into register r.write.shdataww (see (s22)) as
 			-- WREADY signal is deasserted as soon as one AXI write has been
 			-- performed, and it is not reasserted again until the whole
-			-- 32-bit (or 64-bit) data has been shifted into r.write.shdataww,
-			-- see (s2) below
+			-- 32-bit (or 64-bit) data has been shifted into r.write.shdataww
+			-- (see (s2) below) and/or when a total of (dynamic-value-of-)nn bits
+			-- is pushed in ecc_fp_dram memory (see (s172))
 			v.axi.wdatax := s_axi_wdata;
 			v.axi.wready := '0'; -- (s0)
 		end if;
@@ -903,17 +890,18 @@ begin
 		-- debug feature
 		v.debug.iwe := '0'; -- (s82)
 		v.debug.ire := '0'; -- (s86)
-		v.debug.resume := '0'; -- (s12)
+		v.debug.resume := '0'; -- (s173)
 		v.debug.dosomeopcodes := '0'; -- (s33)
 		v.ctrl.penupsh := '0' & r.ctrl.penupsh(1);
 		if r.axi.awpending = '1' and r.axi.dwpending = '1' then
 			v.axi.awpending := '0';
 			v.axi.dwpending := '0';
 			-- -------------------------------------------------
-			-- decoding write of CTRL register
+			-- decoding write of W_CTRL register
 			-- -------------------------------------------------
 			if (debug and r.axi.waddr = W_CTRL)
-				or ((not debug) and r.axi.waddr(ADB - 2 downto 0) = W_CTRL(ADB - 2 downto 0))
+				or ((not debug) and r.axi.waddr(ADB - 2 downto 0) =
+					W_CTRL(ADB - 2 downto 0))
 			then
 				-- assert both AWREADY & WREADY signals to allow a new AXI data-beat
 				-- to happen again
@@ -921,13 +909,12 @@ begin
 				v.axi.wready := '1';
 				v.axi.arready := '1';
 				-- drive write-response to initiator
-				v.axi.bvalid := '1'; -- (s4)
-				if (not v_wlock1) or debug then
+				v.axi.bvalid := '1';
+				if (not v_wlock) or debug then -- (s162), see (s161)
 					-- in debug mode we always grant write access to CTRL register
 					-- (so use with care)
 					-- decode content of CTRL register
 					-- TODO: set multicycle constraint on paths:
-					--    r.axi.wdatax -> r.ctrl.irqen
 					--                 -> r.ctrl.doblinding
 					--                 -> r.ctrl.blindbits
 					if r.axi.wdatax(CTRL_WRITE_NB) = '1' then -- SW wants to WR a big-nb
@@ -1154,12 +1141,12 @@ begin
 						--              start of a new [k]P computation
 						-- ----------------------------------------------------------
 						if v_kp_possible then -- (s115)
-							v.ctrl.agokp := '1';
+							v.ctrl.agokp := '1'; -- (s174)
 							v.ctrl.lockaxi := '1'; -- (s68), will be deasserted by (s69)
-							v.ctrl.ierrid(STATUS_ERR_KP_FBD) := '0';
+							v.ctrl.ierrid(STATUS_ERR_KP_FBD) := '0'; -- (s175)
 						else
 							-- SW settings are not enough to perform a point-computation
-							v.ctrl.ierrid(STATUS_ERR_KP_FBD) := '1';
+							v.ctrl.ierrid(STATUS_ERR_KP_FBD) := '1'; -- (s176)
 						end if;
 					-- ----------------------------------------------------------
 					--               other point-based operations
@@ -1263,7 +1250,7 @@ begin
 				else
 					-- raise error flag (illicite register write)
 					v.ctrl.ierrid(STATUS_ERR_UNKNOWN_REG) := '1';
-				end if; -- v_wlock1_n or debug
+				end if; -- v_wlock or debug
 			-- -------------------------------------------------------
 			-- decoding write of W_WRITE_DATA register
 			-- -------------------------------------------------------
@@ -1282,13 +1269,15 @@ begin
 					-- AWREADY is asserted again (we can accept a new address again)
 					-- but NOT WREADY: we CANNOT accept that a new data be pushed to us.
 					-- Assertion of WREADY (which is currently low thx to (s0) see above)
-					-- will happen only when all the 32 (or 64) bits of r.axi.wdatax
-					-- are shifted into r.write.shdataww (see (s2) below)
+					-- will happen later, either when all the 32 (or 64) bits of
+					-- r.axi.wdatax are shifted into r.write.shdataww (see (s2) below)
+					-- or when the total of nn bits of the large number being written
+					-- have actually been transferred into ecc_fp_dram memory (see (s172))
 					v.write.busy := '1'; -- (s134), will be deasserted by (s135)
 				else -- r.ctrl.state /= writebn
 					-- we are not currently in the process of writing a whole big-number
-					-- data into ecc_fp_dram (no write into CTRL register was previously
-					-- made to set that) therefore this write into DATA register
+					-- data into ecc_fp_dram (no write into W_CTRL register was previously
+					-- made to set that) therefore this write into W_WRITE_DATA register
 					-- makes no sense: we simply ignore it, by responding OKAY (already
 					-- done from (s4)) & reasserting s_axi_wready, which is currently
 					-- low from (s0)
@@ -1307,7 +1296,7 @@ begin
 				v.axi.awready := '1';
 				v.axi.arready := '1';
 				v.axi.bvalid := '1';
-				if (not v_wlock1) or debug then
+				if (not v_wlock) or debug then -- (163), see (s161)
 					v.ctrl.r0_is_null := r.axi.wdatax(WR0_IS_NULL);
 					-- clear possible past error
 					v.ctrl.ierrid(STATUS_ERR_WREG_FBD) := '0';
@@ -1326,7 +1315,7 @@ begin
 				v.axi.awready := '1';
 				v.axi.arready := '1';
 				v.axi.bvalid := '1';
-				if (not v_wlock1) or debug then
+				if (not v_wlock) or debug then -- (s164), see (s161)
 					v.ctrl.r1_is_null := r.axi.wdatax(WR1_IS_NULL);
 					-- clear possible past error
 					v.ctrl.ierrid(STATUS_ERR_WREG_FBD) := '0';
@@ -1346,7 +1335,7 @@ begin
 				v.axi.arready := '1';
 				v.axi.bvalid := '1';
 				if nn_dynamic then -- statically resolved by synthesizer
-					if (not v_wlock0) or debug then
+					if (not v_busy) or debug then -- not v_wlock, otherwise deadlock
 						v.nndyn.valnntest := unsigned (
 							r.axi.wdatax(log2(nn) - 1 downto 0) ); -- (s31) see (s35)
 						-- note: from value of nn latched in r.nndyn.valnn by (s31),
@@ -1356,7 +1345,7 @@ begin
 						-- will be latched into r.nndyn.valnnp4 by (s47)
 						v.ctrl.state := newnn;
 						v.nndyn.active := '1';
-						v.nndyn.testnn := '1'; -- asserted only 1 cycle, see (s125)
+						v.nndyn.testnn := '1'; -- asserted only 1 cycle, see (s169)
 						-- clear possible past error
 						v.ctrl.ierrid(STATUS_ERR_WREG_FBD) := '0';
 					else
@@ -1375,18 +1364,15 @@ begin
 					W_BLINDING(ADB - 2 downto 0))
 			then
 				-- (s125) In the case of the W_BLINDING register, a test on the nb
-				-- of bliding bits might occur before we release the bus so the
-				-- assertion of the 4 following AXI signasl may be delayed to (s126)
-				-- (this of course only concerns the case where software sets BLD_EN
-				-- bit to 1)
-				--v.axi.wready := '1';
-				--v.axi.awready := '1';
-				--v.axi.arready := '1';
-				--v.axi.bvalid := '1';
-				if (not v_wlock1) or debug then
+				-- of blinding bits might occur before we release the bus so the
+				-- assertion of the 4 AXI signals {a*wready, arreday & bvalid} may
+				-- be delayed to (s126) (this of course only concerns the case where
+				-- software sets BLD_EN bit to 1)
+				if (not v_wlock) or debug then -- (s165), see (s161)
 					if r.axi.wdatax(BLD_EN) = '1' then
-						--v.ctrl.doblinding := r.axi.wdatax(BLD_EN); 
-						if r.axi.wdatax(BLD_BITS_MSB downto BLD_BITS_LSB) /=
+						-- test that size set is not null, otherwise it should not
+						-- set blinding on
+						if r.axi.wdatax(BLD_BITS_MSB downto BLD_BITS_LSB) /= -- (s170)
 							std_logic_vector(to_unsigned(0, BLD_BITS_MSB - BLD_BITS_LSB + 1))
 						then
 							v.ctrl.blindbits := -- (s129), see (s130)
@@ -1426,7 +1412,7 @@ begin
 				v.axi.awready := '1';
 				v.axi.arready := '1';
 				v.axi.bvalid := '1';
-				if (not v_wlock1) or debug then
+				if (not v_wlock) or debug then -- (s166), see (s161)
 					v.ctrl.doshuffle := r.axi.wdatax(SHF_EN);
 					-- clear possible past error
 					v.ctrl.ierrid(STATUS_ERR_WREG_FBD) := '0';
@@ -1440,11 +1426,13 @@ begin
 			elsif (debug and r.axi.waddr = W_IRQ) or
 				((not debug) and r.axi.waddr(ADB - 2 downto 0) = W_IRQ(ADB - 2 downto 0))
 			then
+				-- TODO: set multicycle constraint on path:
+				--    r.axi.wdatax -> r.ctrl.irqen
 				v.axi.wready := '1';
 				v.axi.awready := '1';
 				v.axi.arready := '1';
 				v.axi.bvalid := '1';
-				if (not v_wlock1) or debug then
+				if (not v_wlock) or debug then -- (s167), see (s161)
 					v.ctrl.irqen := r.axi.wdatax(IRQ_EN);
 					-- clear possible past error
 					v.ctrl.ierrid(STATUS_ERR_WREG_FBD) := '0';
@@ -1471,15 +1459,17 @@ begin
 			-- decoding write to W_SMALL_SCALAR register
 			-- ------------------------------------------------
 			elsif (debug and r.axi.waddr = W_SMALL_SCALAR) or
-				((not debug) and r.axi.waddr(ADB-2 downto 0)=W_SMALL_SCALAR(ADB-2 downto 0))
+				((not debug) and r.axi.waddr(ADB-2 downto 0) =
+					W_SMALL_SCALAR(ADB-2 downto 0))
 			then
 				-- (s157), we assert AWREADY but NOT WREADY yet, postponed to (s158)
+				-- because we first need to sanity check the value set by software
 				-- (unless the access was forbidden, in which case we assert WREADY
 				-- immediately, see (s159))
 				v.axi.awready := '1';
 				v.axi.arready := '1';
 				v.axi.bvalid := '1';
-				if (not v_wlock0) or debug then
+				if (not v_wlock) or debug then -- (s168), see (s161)
 					--v.axi.ksz_test := unsigned(r.axi.datax(log2(nn) - 1 downto 0));
 					v.ctrl.do_ksz_test := '1';
 				else
@@ -1518,7 +1508,7 @@ begin
 			-- --------------------------------------------------------
 			elsif debug and r.axi.waddr = W_DBG_STEPS then
 				if r.axi.wdatax(28) = '1' then
-					v.debug.resume := '1'; -- stays asserted 1 cycle thx to (s12)
+					v.debug.resume := '1'; -- stays asserted 1 cycle thx to (s173)
 				elsif r.axi.wdatax(0) = '1' then
 					v.debug.dosomeopcodes := '1'; -- stays asserted 1 cycle thx to (s33)
 					v.debug.nbopcodes := r.axi.wdatax(23 downto 8);
@@ -1600,7 +1590,7 @@ begin
 				v.axi.wready := '1';
 				v.axi.arready := '1';
 				-- drive write-response to initiator
-				v.axi.bvalid := '1'; -- (s4)
+				v.axi.bvalid := '1';
 				--if r.axi.wdatax(5) = '1' then -- user wants to read an internal rnd nb
 				--	-- ----------------------------------------------------------
 				--	--            start of a new TRNG READ sequence
@@ -1664,7 +1654,7 @@ begin
 				v.axi.wready := '1';
 				v.axi.arready := '1';
 				-- drive write-response to initiator
-				v.axi.bvalid := '1'; -- (s4)
+				v.axi.bvalid := '1';
 			-- -------------------------------------------------------------
 			-- decoding write of W_DBG_FP_ADDR register
 			-- -------------------------------------------------------------
@@ -1677,7 +1667,7 @@ begin
 				v.axi.wready := '1';
 				v.axi.arready := '1';
 				-- drive write-response to initiator
-				v.axi.bvalid := '1'; -- (s4)
+				v.axi.bvalid := '1';
 			-- -------------------------------------------------------------
 			-- decoding write of W_DBG_FP_WDATA register
 			-- -------------------------------------------------------------
@@ -1690,14 +1680,14 @@ begin
 				v.axi.wready := '1';
 				v.axi.arready := '1';
 				-- drive write-response to initiator
-				v.axi.bvalid := '1'; -- (s4)
+				v.axi.bvalid := '1';
 			else
 				-- unknown target address
 				-- (simply ignore & acknowledge everything)
 				v.axi.wready := '1';
 				v.axi.awready := '1';
 				v.axi.arready := '1';
-				v.axi.bvalid := '1'; -- (s4)
+				v.axi.bvalid := '1';
 				-- raise error flag (illicite register write)
 				v.ctrl.ierrid(STATUS_ERR_WREG_FBD) := '1';
 			end if;
@@ -1826,8 +1816,8 @@ begin
 				-- stop shifting r.axi.wdatax into r.write.shdataww
 				v.write.doshift := '0';
 				-- write-response has already been presented to initiator upon
-				-- reception of the 32-bit data word on the AXI interface (see
-				-- (s4) above)
+				-- reception of the 32 (or 64) bit data word on the AXI interface
+				-- (see (s4) above)
 				v.write.bitsaxi := to_unsigned(C_S_AXI_DATA_WIDTH - 1, axiw);
 				-- (s135) is deassertion of (s134), and will be possibly bypassed  by (s136),
 				-- (s137), (s141) & (s142)
@@ -1835,7 +1825,7 @@ begin
 			end if;
 			-- -------------------------------------------------------------------
 			-- detect and handle completion of a cycle amounting to the total data
-			-- size of one big-number
+			-- size of one large number
 			-- -------------------------------------------------------------------
 			if r.write.bitstotal(log2(nn) - 1) = '0' and
 			   v.write.bitstotal(log2(nn) - 1) = '1'
@@ -1909,7 +1899,7 @@ begin
 					-- authorize the reception of a new 32-bit data again from AXI
 					-- fabric (note that AWREADY has already been reasserted when
 					-- sampling the 32-bit word from the AXI interface, see (s3) above)
-					v.axi.wready := '1'; -- (s2) bypassed by (s48) below
+					v.axi.wready := '1'; -- (s172) bypassed by (s48) below
 					v.write.trailingzeros := "00";
 					v.write.active := '0'; -- (s117), reset of (s116)
 					v.write.busy := '0';
@@ -2105,8 +2095,7 @@ begin
 			if r.ctrl.a_set = '1' then
 				v.ctrl.agomtya := '1'; -- (s104), will be reset by (s105)
 				v.ctrl.mtyirq_postponed := '1'; -- (s106)
-				-- we keep .mtypending asserted to maintain (s30) & (s99) tests
-				-- coherent
+				-- we keep .mtypending asserted to maintain (s30) coherent
 				v.ctrl.mtypending := '1'; -- (s108), bypass of (s107), also see (s109)
 			else
 				-- execution of routine .aMontyL was not part of .constMTYL routine
@@ -2313,7 +2302,7 @@ begin
 					R_STATUS(ADB - 2 downto 0))
 			then
 				dw := (others => '0');
-				if v_busy then
+				if v_busy then -- (s160), see (s30)
 					dw(STATUS_BUSY) := '1';
 				else
 					dw(STATUS_BUSY) := '0';
@@ -2338,7 +2327,6 @@ begin
 				--		std_logic_vector(
 				--			to_unsigned(nn, STATUS_VALNN_SZ)); -- (s95), see (93)
 				end if;
-				--dw(STATUS_YESEN) := r.ctrl.yesen; -- (s97), was set by (s96)
 				dw(STATUS_YES) := r.ctrl.yes; -- (s98), was set by (s96)
 				dw(STATUS_R0_IS_NULL) := r.ctrl.r0_is_null;
 				dw(STATUS_R1_IS_NULL) := r.ctrl.r1_is_null;
@@ -2414,7 +2402,7 @@ begin
 				end if;
 				-- maximal (or static) value of prime size
 				dw(CAP_NNMAX_MSB downto CAP_NNMAX_LSB) := std_logic_vector(
-					to_unsigned(nn, log2(nn)));
+					to_unsigned(nn, log2(nn))); -- (s171)
 				v.axi.rdatax := dw;
 				v.axi.rvalid := '1'; -- (s5)
 			-- --------------------------------------
@@ -3584,7 +3572,6 @@ begin
 		nndyn_wm1_s <= resize(r.nndyn.valw - 1, log2(w - 1));
 		nndyn_wm2_s <= resize(r.nndyn.valw - 2, log2(w - 1));
 		nndyn_2wm1_s <= resize((r.nndyn.valw & '0') - 1, log2(2*w - 1));
-		nndyn_2wm2_s <= resize((r.nndyn.valw & '0') - 2, log2(2*w - 1));
 		nndyn_wm1 <= nndyn_wm1_s;
 		nndyn_wm2 <= nndyn_wm2_s;
 		nndyn_2wm1 <= nndyn_2wm1_s;
@@ -3629,7 +3616,6 @@ begin
 		nndyn_wm1_s <= to_unsigned(w - 1, log2(w - 1));
 		nndyn_wm2_s <= to_unsigned(w - 2, log2(w - 1));
 		nndyn_2wm1_s <= to_unsigned(2*w - 1, log2(2*w - 1));
-		nndyn_2wm2_s <= to_unsigned(2*w - 2, log2(2*w - 1));
 		nndyn_wm1 <= nndyn_wm1_s;
 		nndyn_wm2 <= nndyn_wm2_s;
 		nndyn_2wm1 <= nndyn_2wm1_s;

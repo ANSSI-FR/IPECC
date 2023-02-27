@@ -20,7 +20,6 @@ use ieee.numeric_std.all;
 
 use work.ecc_utils.all;
 use work.ecc_pkg.all;
---use work.ecc_trng_pkg.all;
 
 -- pragma translate_off
 use std.textio.all;

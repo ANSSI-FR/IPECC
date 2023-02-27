@@ -20,7 +20,6 @@ use ieee.numeric_std.all;
 use work.ecc_custom.all;
 use work.ecc_utils.all;
 use work.ecc_pkg.all;
---use work.ecc_trng_pkg.all;
 use work.mm_ndsp_pkg.all;
 
 -- pragma translate_off
@@ -35,9 +34,10 @@ entity ecc is
 		constant C_S_AXI_ADDR_WIDTH : integer := 8
 	);
 	port(
-		-- AXI clock & reset
+		-- AXI clock
 		s_axi_aclk : in std_logic;
-		s_axi_aresetn : in std_logic; -- asyn asserted, syn deasserted, active low
+		-- AXI reset (expected active low, async asserted, sync deasserted) 
+		s_axi_aresetn : in std_logic;
 		-- AXI write-address channel
 		s_axi_awaddr : in std_logic_vector(C_S_AXI_ADDR_WIDTH - 1  downto 0);
 		s_axi_awprot : in std_logic_vector(2 downto 0); -- ignored
@@ -67,10 +67,8 @@ entity ecc is
 		-- interrupt
 		irq : out std_logic;
 		irqo : out std_logic;
-		-- general busy signal
+		-- busy signal for [k]P computation
 		busy : out std_logic;
-		-- external reset
-		force_reset : in std_logic;
 		-- debug feature (off-chip trigger)
 		dbgtrigger : out std_logic;
 		dbghalted : out std_logic
@@ -79,8 +77,8 @@ end entity ecc;
 
 architecture struct of ecc is
 
-	-- following attributes are for Xilinx specific but they should not do
-	-- any harm on any other platform
+	-- following attributes are Xilinx specific but they should not do any harm
+	-- on other platforms
 	attribute X_INTERFACE_INFO : string;
 	attribute X_INTERFACE_PARAMETER : string;
 	attribute X_INTERFACE_INFO of irq : signal is
@@ -98,7 +96,6 @@ architecture struct of ecc is
 			-- AXI clock & reset
 			s_axi_aclk : in  std_logic;
 			s_axi_aresetn : in std_logic;
-			force_reset : in std_logic;
 			-- AXI write-address channel
 			s_axi_awaddr : in std_logic_vector(C_S_AXI_ADDR_WIDTH-1 downto 0);
 			s_axi_awprot : in std_logic_vector(2 downto 0); -- ignored
@@ -180,10 +177,10 @@ architecture struct of ecc is
 			trngvalid : in std_logic;
 			trngrdy : out std_logic;
 			trngdata : in std_logic_vector(ww - 1 downto 0);
-			trngaxiirncount : in std_logic_vector(log2(irn_fifo_size_axi) - 1 downto 0);
-			trngefpirncount : in std_logic_vector(log2(irn_fifo_size_fp) - 1 downto 0);
-			trngcurirncount : in std_logic_vector(log2(irn_fifo_size_curve) - 1 downto 0);
-			trngshfirncount : in std_logic_vector(log2(irn_fifo_size_sh) - 1 downto 0);
+			trngaxiirncount : in std_logic_vector(log2(irn_fifo_size_axi)-1 downto 0);
+			trngefpirncount : in std_logic_vector(log2(irn_fifo_size_fp)-1 downto 0);
+			trngcurirncount : in std_logic_vector(log2(irn_fifo_size_curve)-1 downto 0);
+			trngshfirncount : in std_logic_vector(log2(irn_fifo_size_sh)-1 downto 0);
 			-- broadcast interface to Montgomery multipliers
 			pen : out std_logic;
 			nndyn_mask : out std_logic_vector(ww - 1 downto 0);
@@ -198,12 +195,13 @@ architecture struct of ecc is
 			nndyn_wmin_excp : out std_logic;
 			nndyn_mask_wm2 : out std_logic;
 			nndyn_nnm3 : out unsigned(log2(nn) - 1 downto 0);
-			-- general busy signal
+			-- busy signal for [k]P computation
 			kppending : out std_logic;
+			-- software reset (to other components of the IP)
+			swrst : out std_logic;
 			-- debug features (interface with ecc_scalar shared w/ ecc_curve)
 			dbgpgmstate : in std_logic_vector(3 downto 0);
 			dbgnbbits : in std_logic_vector(15 downto 0);
-			--dbgtime : in unsigned(31 downto 0);
 			-- debug features (interface with ecc_curve)
 			dbgbreakpoints : out breakpoints_type;
 			dbgnbopcodes : out std_logic_vector(15 downto 0);
@@ -247,7 +245,7 @@ architecture struct of ecc is
 		port (
 			clk : in  std_logic;
 			rstn : in  std_logic; -- synchronous reset
-			force_reset : in std_logic;
+			swrst : in std_logic;
 			-- interface with ecc_axi
 			--   general
 			initdone : out std_logic;
@@ -335,7 +333,6 @@ architecture struct of ecc is
 			-- debug features
 			dbgpgmstate : out std_logic_vector(3 downto 0);
 			dbgnbbits : out std_logic_vector(15 downto 0)
-			--dbgtime : out unsigned(31 downto 0)
 			-- pragma translate_off
 			-- interface with ecc_fp (simu only)
 			; logr0r1 : out std_logic;
@@ -346,14 +343,12 @@ architecture struct of ecc is
 		);
 	end component ecc_scalar;
 
-	-- unit handling execution of programs to implement curve formulae
-	--  - reads instructions/opcodes to execute formulae from ecc_curve_iram
-	--  - tranfers instructions/opcodes to ecc_fp for processing
+	-- unit handling execution of microcore routines
 	component ecc_curve is
 		port(
 			clk : in std_logic;
 			rstn : in  std_logic; -- deassertion ('1') assumed to be synchr. w/ clk
-			force_reset : in std_logic;
+			swrst : in std_logic;
 			-- interface with ecc_axi
 			masklsb : in std_logic;
 			doblinding : in std_logic;
@@ -476,7 +471,7 @@ architecture struct of ecc is
 		port (
 			clk : in std_logic;
 			rstn : in  std_logic; -- deassertion ('1') assumed synchronous to clk
-			force_reset : in std_logic;
+			swrst : in std_logic;
 			-- interface with ecc_curve
 			opi : in opi_type;
 			opo : out opo_type;
@@ -560,6 +555,7 @@ architecture struct of ecc is
 		port(
 			clk : in std_logic;
 			rstn : in std_logic;
+			swrst : in std_logic;
 			-- interface with ecc_scalar
 			irn_reset : in std_logic;
 			-- interface with entropy client ecc_axi
@@ -630,6 +626,7 @@ architecture struct of ecc is
 		port(
 			clk : in std_logic;
 			rstn : in std_logic;
+			swrst : in std_logic;
 			-- port A: write-only interface from ecc_fp
 			-- (actually for write-access from AXI-lite interface)
 			ena : in std_logic;
@@ -662,7 +659,7 @@ architecture struct of ecc is
 			clkmm : in std_logic;
 			clk : in std_logic;
 			rstn : in std_logic; -- deassertion ('1') assumed to be synchronous w/ clk
-			force_reset : in std_logic;
+			swrst : in std_logic;
 			go : in std_logic;
 			rdy : out std_logic;
 			-- input data
@@ -851,7 +848,6 @@ architecture struct of ecc is
 	-- debug features (signals between ecc_axi & ecc_scalar)
 	signal dbgpgmstate : std_logic_vector(3 downto 0);
 	signal dbgnbbits : std_logic_vector(15 downto 0);
-	--signal dbgtime : unsigned(31 downto 0);
 	signal dbghalted_s : std_logic;
 	-- debug features (signals between ecc_axi & ecc_curve_iram)
 	signal dbgiaddr : std_logic_vector(IRAM_ADDR_SZ - 1 downto 0);
@@ -901,6 +897,9 @@ architecture struct of ecc is
 	signal s_axi_aresetn_rsh : std_logic_vector(2 downto 0);
 	alias s_axi_aresetn_resync : std_logic is s_axi_aresetn_rsh(0);
 
+	-- software reset (to other components of the IP)
+	signal swrst : std_logic;
+
 begin
 
 	assert (axi32or64 = 32 or axi32or64 = 64)
@@ -928,7 +927,6 @@ begin
 			-- AXI clock & reset
 			s_axi_aclk => s_axi_aclk,
 			s_axi_aresetn => s_axi_aresetn_resync,
-			force_reset => force_reset,
 			-- AXI write-address channel
 			s_axi_awaddr => s_axi_awaddr,
 			s_axi_awprot => s_axi_awprot,
@@ -1030,10 +1028,11 @@ begin
 			nndyn_nnm3 => nndyn_nnm3,
 			-- general busy signal
 			kppending => busy,
+			-- software reset (to other components of the IP)
+			swrst => swrst,
 			-- debug features (interface with ecc_scalar)
 			dbgpgmstate => dbgpgmstate,
 			dbgnbbits => dbgnbbits,
-			--dbgtime => dbgtime,
 			-- debug features (interface with ecc_curve)
 			dbgbreakpoints => dbgbreakpoints,
 			dbgnbopcodes => dbgnbopcodes,
@@ -1080,7 +1079,7 @@ begin
 		port map(
 			clk => s_axi_aclk,
 			rstn => s_axi_aresetn_resync,
-			force_reset => force_reset,
+			swrst => swrst,
 			-- interface with ecc_axi
 			--   general
 			initdone => initdone,
@@ -1168,7 +1167,6 @@ begin
 			-- debug features (interface with ecc_axi)
 			dbgpgmstate => dbgpgmstate,
 			dbgnbbits => dbgnbbits
-			--dbgtime => dbgtime
 			-- pragma translate_off
 			-- interface with ecc_fp (simu only)
 			, logr0r1 => logr0r1,
@@ -1183,7 +1181,7 @@ begin
 		port map(
 			clk => s_axi_aclk,
 			rstn => s_axi_aresetn_resync,
-			force_reset => force_reset,
+			swrst => swrst,
 			-- interface with ecc_axi
 			masklsb => masklsb,
 			doblinding => doblinding,
@@ -1299,7 +1297,7 @@ begin
 		port map(
 			clk => s_axi_aclk,
 			rstn => s_axi_aresetn_resync,
-			force_reset => force_reset,
+			swrst => swrst,
 			-- interface with ecc_curve
 			opi => opi,
 			opo => opo,
@@ -1381,6 +1379,7 @@ begin
 		port map(
 			clk => s_axi_aclk,
 			rstn => s_axi_aresetn_resync,
+			swrst => swrst,
 			-- interface with ecc_scalar
 			irn_reset => dbgtrngirnreset,
 			-- interface with entropy client ecc_axi
@@ -1451,6 +1450,7 @@ begin
 			port map(
 				clk => s_axi_aclk,
 				rstn => s_axi_aresetn_resync,
+				swrst => swrst,
 				-- port A: write-only interface to ecc_fp
 				-- (actually for write-access from AXI-lite interface)
 				ena => fpwe,
@@ -1488,7 +1488,7 @@ begin
 				clkmm => clkmm,
 				clk => s_axi_aclk,
 				rstn => s_axi_aresetn_resync,
-				force_reset => force_reset,
+				swrst => swrst,
 				go => mmi(i).go,
 				rdy => mmo(i).rdy,
 				-- input data
@@ -1566,6 +1566,8 @@ begin
 			echo(", simu only ");
 			echo(integer'image(simkb));
 			echol(" bits of k");
+		else
+			echol("");
 		end if;
 		-- 2nd console log line (ecc_curve_iram & ecc_fp settings)
 		echo("ECC: microcode mem size: ");
