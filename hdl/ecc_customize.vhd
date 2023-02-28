@@ -536,10 +536,10 @@ end package ecc_custom;
 --       bit itself is generated after a period of accumulation of jitter
 --       which is itself random, althought there is a minimum for that delay
 --       which is given by parameter 'trngta' - see below).
---       The outputs of the different instances of the primitive are gathered
---       together using a binary routing tree that terminates with a unique
---       root output. (Althought not required, it is probably best that you
---       set a power of two for value of 'nbtrng').
+--       The outputs of each different instances of ES-TRNG primitive are
+--       gathered together using a binary routing tree that terminates with
+--       a unique root output. (Althought not required, it is probably best
+--       that you set a power of two for value of 'nbtrng').
 --       Due to the average number of clock cycles it will take for each
 --       ES-TRNG primitive to issue one random bit (this number is related to
 --       'trngta' parameter, see below) congestion of the tree is not to be
@@ -574,6 +574,7 @@ end package ecc_custom;
 --       into one of the 4 possible target FIFOs, each serving as the entropy
 --       pool for one of the 4 features/countermeasures of the IP that require
 --       random data. These 4 features are:
+--
 --         1. the on-the-fly masking of the scalar in the AXI interface, at the
 --            time it is pushed by software driver in the memory of large
 --            numbers;
@@ -589,6 +590,9 @@ end package ecc_custom;
 --       A round-robin scheduling is applied to the bits pulled from the
 --       postprocessing unit to ensure that each of the 4 target FIFOs fairly
 --       gets the same amount of random data as long as it is not already full.
+--       Needless to say, no bit pushed in any of the 4 FIFOs gets aslo
+--       pushed in any of the three others. The 4 FIFOs aare this filled
+--       with completely independent random bits.
 --
 --       The sizes of each of the 4 target FIFOs are defined in the package
 --       file ecc_trng/ecc_trng_pkg.vhd. The default sizes are functions of
