@@ -31,7 +31,8 @@ entity mm_ndsp is
 		clkmm : in std_logic;
 		clk : in std_logic;
 		rstn : in std_logic;
-		force_reset : in std_logic;
+		-- software reset
+		swrst : in std_logic;
 		go : in std_logic;
 		rdy : out std_logic;
 		-- input data
@@ -65,7 +66,7 @@ end entity mm_ndsp;
 
 architecture rtl of mm_ndsp is
 
-	-- generic component for the DSP blocks' chain
+	-- generic component for the DSP block chain
 	component maccx is
 		port(
 			clk  : in std_logic;
@@ -84,8 +85,8 @@ architecture rtl of mm_ndsp is
 	signal rst22 : std_logic;
 
 	-- -------------------------------------------------------------------------
-	--     Illustration showing overview of operations, with explanation of the
-	--            terminology used in some comments of code thereinafter
+	--     Illustration showing overview of operations, with definition of the
+	--           terminology used in some comments of code thereinafter
 	--                (notably "burst" & "cycle of multiply-&-acc")
 	-- -------------------------------------------------------------------------
 	-- note: the number of bursts (9 in the illustration example below, 3 per
@@ -93,13 +94,13 @@ architecture rtl of mm_ndsp is
 	--       actually depends on the prime size nn (whether it is static or
 	--       dynamically changeable by software - see parameter nn_dynamic
 	--       in ecc_customize.vhd) and the number of DSP blocks available
-	--       in the design (see parameter ndsp in ecc_customize.vhd)
+	--       in the design (see parameter nbdsp in ecc_customize.vhd)
 	-- -------------------------------------------------------------------------
 	--
 	--                               1 Montgomery
 	--                              multiplication
-	--
-	--                                     ^
+	--                          (aka 1 REDC operation)
+	--                                     V
 	--  ___________________________________|___________________________________
 	-- /                                                                       \
 	--
@@ -138,63 +139,62 @@ architecture rtl of mm_ndsp is
 	--                                     V
 	--                               1 Montgomery
 	--                              multiplication
+	--                          (aka 1 REDC operation)
 
 
 	-- numerical values in comments below show explicit value in the w = 16 case
-	constant OPAGEW : positive := log2(w - 1);                           -- 4 bit
+	constant OPAGEW : positive := log2(w - 1); -- 4 bit
 	
 	-- the 3 in definition of OADDR_WIDTH below corresponds to the 7 regions
 	-- (pages) inside ORAM memory
-	constant OADDR_WIDTH : positive := 3 + OPAGEW;                       -- 7 bit
-	constant X_ORAM_ADDR : std_logic_vector(2 downto 0) := "000";        -- 0x00
-	constant Y_ORAM_ADDR : std_logic_vector(2 downto 0) := "001";        -- 0x10
-	constant P_ORAM_ADDR : std_logic_vector(2 downto 0) := "010";        -- 0x20
-	constant PP_ORAM_ADDR : std_logic_vector(2 downto 0) := "011";       -- 0x30
-	constant S_ORAM_ADDR : std_logic_vector(2 downto 0) := "100";        -- 0x40
-	constant ALPHA_ORAM_ADDR : std_logic_vector(2 downto 0) := "110";    -- 0x60
-	constant PROD_ORAM_ADDR : std_logic_vector(2 downto 0) := "111";     -- 0x70
+	constant OADDR_WIDTH : positive := 3 + OPAGEW; -- 7 bit
+	constant X_ORAM_ADDR : std_logic_vector(2 downto 0) := "000"; -- 0x00
+	constant Y_ORAM_ADDR : std_logic_vector(2 downto 0) := "001"; -- 0x10
+	constant P_ORAM_ADDR : std_logic_vector(2 downto 0) := "010"; -- 0x20
+	constant PP_ORAM_ADDR : std_logic_vector(2 downto 0) := "011"; -- 0x30
+	constant S_ORAM_ADDR : std_logic_vector(2 downto 0) := "100"; -- 0x40
+	constant ALPHA_ORAM_ADDR : std_logic_vector(2 downto 0) := "110"; -- 0x60
+	constant PROD_ORAM_ADDR : std_logic_vector(2 downto 0) := "111"; -- 0x70
 
 	-- PRAM is functionally divided in 2 parts of different size
-	--  - one for s_ij product-terms (ij = 0 to 2w - 1)
+	--  - one for s_k product-terms (k = 0 to 2w - 1)
 	--  - one for alpha_i terms (i = 0 to w - 1)
 	-- however to ensure power-of-2 alignment, we consider the biggest part
-	-- (the s_ij one) and double it to define the size of PRAM
+	-- (the s_k one) and double it to define the size of PRAM
 	-- Therfore in the end PRAM is divided in 2 pages of size 2**(OPAGEW + 1)
 	-- words (with each word of size ww-bit)
-	constant PADDR_WIDTH : positive := 2 + OPAGEW;                       -- 6 bit
+	constant PADDR_WIDTH : positive := 2 + OPAGEW; -- 6 bit
 
 	-- constant NBRP designates the number of clock cycles that
 	-- it takes from presenting read command to ORAM memory (or IRAM memory
 	-- in the async = TRUE case) in order to get the first x_i (or s_i or
 	-- alpha_i) operand term, and the time by which the first term accumulated
 	-- through the chain of DSP blocks has reached register r.acc.ppacc
-	-- see (s45) below
+	-- see (s44) below
 	constant NBRP : positive :=
 	    sramlat + 1 -- ORAM read latency, incl. r.prod.rdata latch, see (s1)
 	  + ndsp -- because ndsp x_i terms are first read before first y_j term
 	  + 1 -- latch into r.prod.bb, see (s38)
 	  + 1 -- latch into B register of first DSP block, see (s39)
 	  + 2 -- latch into M & P register of first DSP block
-	  + (ndsp - 1) -- accumulation through the chain of DSP blocks, (s40)-(s43)
-	  + 1 -- latch into r.acc.ppend, see (s34)
+	  + (ndsp - 1) -- accumulation through the chain of DSP blocks
+	  + 1 -- latch into r.acc.ppend, see (s123) & (s34)
 	  + 1; -- latch into r.acc.ppacc, see (s44)
 		-- = sramlat + (2 * ndsp) + 6
 
-	-- constant NBRA is the same as NBRP except that
-	-- it goes until the time by which the first term accumulated through the
-	-- chain of DSP blocks is written into PRAM memory (or TRAM memory, as these
-	-- memories are written in parallel)
-	constant NBRA : positive :=
-		NBRP + sramlat + 5;
+	-- constant NBRA is the same as NBRP except that it extends to the clock
+	-- cycle by which the first term accumulated through the chain of DSP
+	-- blocks is written into PRAM memory (or TRAM memory, as these memories
+	-- are written in parallel)
+	constant NBRA : positive := NBRP + sramlat + 5;
 		-- = (2 * sramlat) + (2 * ndsp) + 11
 
-	-- constant NBRT is the same as NBRP & NBRA except that
-	-- it goes until the time by which the first term accumulated through the
-	-- chain of DSP blocks THAT IS REQUIRED BEFORE THE NEXT MULTIPLY-&-ACC
-	-- CYCLE CAN START is written into PRAM memory (or TRAM memory, as these
-	-- memories are written in parallel)
-	constant NBRT : positive :=
-		NBRA + ndsp;
+	-- constant NBRT is the same as NBRP & NBRA except that it extends to the
+	-- clock cycle by which the first term accumulated through the chain of
+	-- DSP blocks {THAT IS REQUIRED BEFORE THE NEXT MULTIPLY-&-ACC CYCLE CAN
+	-- START} is written into PRAM memory (or TRAM memory, as these memories
+	-- are written in parallel)
+	constant NBRT : positive := NBRA + ndsp;
 		-- = (2 * sramlat) + (3 * ndsp) + 11
 
 	-- for bit-width of slkcnt counter
@@ -224,7 +224,7 @@ architecture rtl of mm_ndsp is
 		raddr_lsb : std_logic_vector(OPAGEW - 1 downto 0); -- OPAGEW bits
 		re : std_logic;
 		-- other control signals
-		shifted : std_logic_vector(ww - 1 downto 0); -- dans oram
+		shifted : std_logic_vector(ww - 1 downto 0);
 		prodburst : std_logic;
 		wcnt : unsigned(log2(w) - 1 downto 0);
 		prodburstend : std_logic;
@@ -266,7 +266,7 @@ architecture rtl of mm_ndsp is
 
 	-- 2 x r_oram_[rw]addr signals below use all the dynamic of the address
 	-- (i.e OADDR_WIDTH bits) in the async = FALSE case, and 1 bit less than
-	-- that (i.e OADDR_WIDTH - 1) in the async = TRUE case 
+	-- that (i.e OADDR_WIDTH - 1 bits) in the async = TRUE case
 	signal r_oram_waddr : std_logic_vector(OADDR_WIDTH - 1 downto 0);
 	signal r_oram_raddr : std_logic_vector(OADDR_WIDTH - 1 downto 0);
 	signal r_oram_rdata : std_logic_vector(ww - 1 downto 0);
@@ -310,7 +310,7 @@ architecture rtl of mm_ndsp is
 	type state_type is (idle, xy, sp, ap);
 	type prod_state_type is (idle, mult, slack);
 
-	-- interconnect type for wiring of each DSP block of the DSP blocks' chain
+	-- interconnect type for wiring of each DSP block of the DSP block chain
 	type dsp_type is record
 		ace : std_logic;
 		bce : std_logic;
@@ -361,7 +361,7 @@ architecture rtl of mm_ndsp is
 		slkcntdone : std_logic;
 	end record;
 
-	-- registered type for control of the each DSP block in the DSP blocks' chain
+	-- registered type for control of the each DSP block in the DSP block chain
 	type dsp_reg_type is record
 		rstm, rstp, rstpdel : std_logic;
 		rstmcnt : unsigned(log2(w - 1) - 1 downto 0); --  trimmed for r.dsp([01])
@@ -379,7 +379,7 @@ architecture rtl of mm_ndsp is
 	type term_type is record
 		valid : std_logic;
 		weight : unsigned(WEIGHT_BITS - 1 downto 0);
-		-- the size of .value signal, ww + 1 is actually only used for the
+		-- the size of .value field (ww + 1) is actually only used for the
 		-- last term, that is register r.acc.term(sramlat + 1). For other
 		-- terms (that is registers r.acc.term(i) for i = 0 to sramlat)
 		-- the useful size is ww. For those synthesizer will trim the extra bit.
@@ -422,7 +422,7 @@ architecture rtl of mm_ndsp is
 		state : state_type;
 	end record;
 
-	-- registered signals for everything related to input/output of mm_ndsp
+	-- registered signals for everything related to input/output out/from mm_ndsp
 	type io_reg_type is record
 		xyin0, xyin1, xyin2, xyin : std_logic_vector(ww - 1 downto 0);
 		xien, xien_prev : std_logic;
@@ -457,7 +457,7 @@ architecture rtl of mm_ndsp is
 		ioforbid : std_logic;
 	end record;
 
-	-- registered signals for final output result barrel-shifter
+	-- registered signals for final output (result) barrel-shifter
 	type barrel_shift_type is array(0 to log2(ww)-1) of unsigned(ww-1 downto 0);
 	type brl_shaddr_type is array(0 to log2(ww)-1) of
 	  std_logic_vector(OPAGEW - 1 downto 0);
@@ -465,7 +465,7 @@ architecture rtl of mm_ndsp is
 		shr : barrel_shift_type;
 		shl : barrel_shift_type;
 		right : unsigned(ww - 1 downto 0);
-		sh_addr : brl_shaddr_type; 
+		sh_addr : brl_shaddr_type;
 		sh_valid : std_logic_vector(log2(ww) - 1 downto 0);
 		actcnt : unsigned(log2(w - 1) - 1 downto 0);
 		active, activedel : std_logic;
@@ -504,11 +504,11 @@ architecture rtl of mm_ndsp is
 		pram : pram_reg_type;
 		-- barrel-shifter for final result
 		brl : barrel_reg_type;
-		-- used only in async=TRUE false
+		-- used only in async = TRUE
 		resync : resync_reg_type;
 		-- pragma translate_off
-		-- TODO: there must be better an upper bound than w^2 for
-		--       the total number of cycles
+		-- there must be better an upper bound than w^2 for the total
+		-- number of cycles (this is just for simulation anyway)
 		simcnt : unsigned(log2(w*w - 1) - 1 downto 0);
 		-- pragma translate_on	
 	end record;
@@ -519,28 +519,12 @@ architecture rtl of mm_ndsp is
 	signal rzram : zram_reg_type;
 
 	signal vcc, gnd : std_logic;
-	signal gndxa : std_logic_vector(ww - 1 downto 0);
-	signal gndxb : std_logic_vector(ww - 1 downto 0);
-	signal gndxc : std_logic_vector(2*ww + ln2(ndsp) - 1 downto 0);
-	signal gndww : std_logic_vector(ww - 1 downto 0);
-
-	constant CST_X7_INMODE_0 : std_logic_vector(4 downto 0) := "10001"; -- B1/A1
-	constant CST_X7_INMODE_i : std_logic_vector(4 downto 0) := "00000"; -- B2/A2
-	constant CST_X7_ALUMODE : std_logic_vector(3 downto 0) := "0000";
-	-- cosntant CST_X7_OPMODE_0 matches operation "P <- A * B"
-	constant CST_X7_OPMODE_0 : std_logic_vector(6 downto 0) := "0000101";
-	-- cosntant CST_X7_OPMODE_i matches operation "P <- A * B + PCIN"
-	constant CST_X7_OPMODE_i : std_logic_vector(6 downto 0) := "0010101";
 
 	signal dspi : maccx_array_in_type;
 	signal dsp_p : std_logic_vector(2*ww + ln2(ndsp) - 1 downto 0);
 
 	-- pragma translate_off
 	subtype std_logic_ww is std_logic_vector(ww - 1 downto 0);
-	--type dsp_sim_p_type is array(0 to ndsp - 1) of std_logic_ww;
-	--signal dsp_sim_p_cry : dsp_sim_p_type;
-	--signal dsp_sim_p_msb : dsp_sim_p_type;
-	--signal dsp_sim_p_lsb : dsp_sim_p_type;
 	signal r_ppacc_cry : unsigned(ww - 1 downto 0);
 	signal r_ppacc_msb : unsigned(ww - 1 downto 0);
 	signal r_ppacc_lsb : unsigned(ww - 1 downto 0);
@@ -561,19 +545,20 @@ architecture rtl of mm_ndsp is
 
 begin
 
-	-- (s101) see (s102) & (s103)
-	assert(2*ww + ln2(ndsp) <= get_dsp_maxacc)
+	-- (s101) see (s0) in maccx_series7.vhd
+	assert((techno /= series7) or (2*ww + ln2(ndsp) <= get_dsp_maxacc))
 		report "mm_ndsp.vhd: too many chained multiply-&-acc blocks (aka "
-		     & "'DSP blocks'), available accumulation dynamic will overflow "
+		     & "'DSP blocks), available accumulation dynamic will overflow "
 		     & "(w = " & integer'image(ww) & ", ndsp = " & integer'image(ww)
 		     & ", get_dsp_maxacc() = " & integer'image(get_dsp_maxacc) & ")"
 			severity FAILURE;
 
 	-- (s108) see (s104) & (s105)
 	assert(ln2(ndsp) <= ww)
-		report "mm_ndsp.vhd: too many multiply-&-acc blocks (aka 'DSP blocks')"
+		report "mm_ndsp.vhd: too many multiply-&-acc blocks (aka 'DSP blocks)"
 			severity FAILURE;
 
+	-- (s125), see (s124)
 	assert(ndsp >= 2)
 		report "mm_ndsp.vhd: ndsp = 1 is not supported"
 			severity FAILURE;
@@ -642,20 +627,16 @@ begin
 
 	vcc <= '1';
 	gnd <= '0';
-	gndxa <= (others => '0');
-	gndxb <= (others => '0');
-	gndxc <= (others => '0');
-	gndww <= (others => '0');
 
-	-- instance of the DSP blocks' chain
+	-- One instance of the DSP block chain
 	d0: maccx
 		port map(
 			clk => clk0,
 			rst => rst22,
 			A => r.prod.aa,
-			B => r.prod.bb,
+			B => r.prod.bb, -- (s39)
 			dspii => dspi,
-			P => dsp_p);
+			P => dsp_p); -- (s123)
 
 	-- DSP block #0 connections
 	dspi(0).rstm <= gnd; --r.dsp(0).rstm;
@@ -678,7 +659,7 @@ begin
 	process(clk0)
 	begin
 		if clk0'event and clk0 = '1' then
-			rst0mm <= (not rstn) or force_reset;
+			rst0mm <= (not rstn) or swrst;
 			rst1mm <= rst0mm;
 			rst2mm  <= rst1mm;
 		end if;
@@ -689,7 +670,7 @@ begin
 	process(clk)
 	begin
 		if clk'event and clk = '1' then
-			rst0 <= (not rstn) or force_reset;
+			rst0 <= (not rstn) or swrst;
 			rst1 <= rst0;
 			rst2  <= rst1;
 		end if;
@@ -728,12 +709,12 @@ begin
 				clka => clk,
 				addra => r_iram_waddr,
 				wea => riram.we,
-				ena => vcc, -- r.iram.we, TODO: replace with true enable STABLE signal!
+				ena => vcc,
 				dia => riram.wdata,
 				-- port B (R only)
 				clkb => clk0,
 				addrb => r_iram_raddr,
-				enb => r.iram.re, --TODO: replace with true enable STABLE signal!
+				enb => r.iram.re,
 				dob => r_iram_rdata -- directly latched into r.prod.rdata, see (s1)
 			);
 		-- -------------
@@ -747,11 +728,11 @@ begin
 				-- port A (W only)
 				addra => r_tram_waddr,
 				wea => r.tram.we,
-				ena => vcc, -- r.tram.we, TODO: replace with true enable STABLE signal!
+				ena => vcc,
 				dia => r.tram.wdata,
 				-- port B (R only)
 				addrb => r_tram_raddr,
-				enb => r.tram.re, --TODO: replace with true enable STABLE signal!
+				enb => r.tram.re,
 				dob => r_tram_rdata -- directly latched into r.prod.rdata, see (s1)
 			);
 		-- -------------
@@ -765,12 +746,12 @@ begin
 				clka => clk0,
 				addra => r_zram_waddr,
 				wea => r.zram.we,
-				ena => vcc, -- r.zram.we, TODO: replace with true enable STABLE signal!
+				ena => vcc,
 				dia => r.zram.wdata,
 				-- port B (R only)
 				clkb => clk,
 				addrb => r_zram_raddr,
-				enb => rzram.re, --TODO: replace with true enable STABLE signal!
+				enb => rzram.re,
 				dob => r_zram_rdata
 			);
 	end generate;
@@ -789,11 +770,11 @@ begin
 				-- port A (W only)
 				addra => r_oram_waddr,
 				wea => r.oram.we,
-				ena => vcc, -- r.oram.we, TODO: replace with true enable STABLE signal!
+				ena => vcc,
 				dia => r.oram.wdata,
 				-- port B (R only)
 				addrb => r_oram_raddr,
-				enb => r.oram.re, --TODO: replace with true enable STABLE signal!
+				enb => r.oram.re,
 				dob => r_oram_rdata -- directly latched into r.prod.rdata, see (s1)
 			);
 	end generate;
@@ -830,7 +811,7 @@ begin
 		iortl: process(clk)
 		begin
 			if clk'event and clk = '1' then
-				if rstn = '0' or force_reset = '1' then
+				if rstn = '0' or swrst = '1' then
 					rio.xien <= '0';
 					rio.yien <= '0';
 					rio.pien <= '0';
@@ -845,9 +826,9 @@ begin
 					-- X & Y data input
 					-- ----------------
 					rio.xyin <= xyin;
-					-- input of x_i terms into 
+					-- input of x_i terms
 					rio.xien <= xen;
-					-- input of y_i terms into 
+					-- input of y_i terms
 					rio.yien <= yen;
 					-- ----------------------
 					-- P (prime number) input
@@ -913,7 +894,6 @@ begin
 							if rio.piencnt = (rio.piencnt'range => '0') then
 								riram.waddr_msb <= P_ORAM_ADDR(1 downto 0);
 								riram.waddr_lsb <= (others => '0');
-							--elsif rio.piencnt = to_unsigned(w - 1, log2(w - 1)) then
 							elsif rio.piencnt = nndyn_wm1 then
 								rio.piencnt <= (others => '0');
 							end if;
@@ -924,7 +904,6 @@ begin
 							if rio.ppiencnt = (rio.ppiencnt'range => '0') then
 								riram.waddr_msb <= PP_ORAM_ADDR(1 downto 0);
 								riram.waddr_lsb <= (others => '0');
-							--elsif rio.ppiencnt = to_unsigned(w - 1, log2(w - 1)) then
 							elsif rio.ppiencnt = nndyn_wm1 then
 								rio.ppiencnt <= (others => '0');
 							end if;
@@ -939,7 +918,7 @@ begin
 						end if;
 					else -- rio.forbid
 						riram.we <= '0';
-					end if; -- rio.forbid
+					end if;
 					-- --------------------------------------------------------
 					-- transfer of Z output operands (result of multiplication)
 					-- from ZRAM memory
@@ -980,7 +959,6 @@ begin
 		variable v_prod_nextxicnt : unsigned(log2(ndsp - 1) - 1 downto 0);
 		variable v_prod_nextxicntzero : std_logic;
 		variable v_prod_nextslkcnt : unsigned(NB_SLK_BITS - 1 downto 0);
-		--variable v_prod_ndspactive : unsigned(log2(w + ndsp) - 1 downto 0);
 		variable v_prod_tobenext : std_logic;
 		variable v_acc_tobenext : std_logic;
 		variable v_prod_nextxmsbraddr : std_logic_vector(2 downto 0);
@@ -989,6 +967,7 @@ begin
 		-- to ensure that 'comb' process is purely combinational
 		v := r;
 
+		-- (s1)
 		-- generation of r.prod.rdata
 		if async then -- statically resolved by synthesizer
 			if sramlat > 2 then -- statically resolved by synthesizer
@@ -1022,7 +1001,7 @@ begin
 
 		-- resynchronization registers
 		-- surrounding these statements with 'if async' condition is just for
-		-- sake of readability (in case acync=FALSE, they would be trimmed
+		-- sake of readability (in case async = FALSE, they would be trimmed
 		-- by synthesizer anyway)
 		if async then
 			v.resync.go0 := go;
@@ -1089,7 +1068,7 @@ begin
 		else -- synchronous case
 
 			if r.ctrl.state = idle and r.oram.prodburst = '0' then
-				-- generation of write enable (s119) see also (s120)
+				-- generation of write enable (s119), see also (s120)
 				v.oram.we := r.io.xien or r.io.yien or r.io.pien or r.io.ppien;
 				-- generation of write address & its increment
 				if r.io.xien = '1' then
@@ -1115,7 +1094,6 @@ begin
 					if r.io.piencnt = (r.io.piencnt'range => '0') then
 						v.oram.waddr_msb := P_ORAM_ADDR;
 						v.oram.waddr_lsb := (others => '0');
-					--elsif r.io.piencnt = to_unsigned(w - 1, log2(w - 1)) then
 					elsif r.io.piencnt = nndyn_wm1 then
 						v.io.piencnt := (others => '0');
 					end if;
@@ -1126,7 +1104,6 @@ begin
 					if r.io.ppiencnt = (r.io.ppiencnt'range => '0') then
 						v.oram.waddr_msb := PP_ORAM_ADDR;
 						v.oram.waddr_lsb := (others => '0');
-					--elsif r.io.ppiencnt = to_unsigned(w - 1, log2(w - 1)) then
 					elsif r.io.ppiencnt = nndyn_wm1 then
 						v.io.ppiencnt := (others => '0');
 					end if;
@@ -1182,7 +1159,7 @@ begin
 
 		if r.prod.dosavexlsbraddr = '1' then
 			-- TODO: set a multicycle on path:
-			--       r.ctrl.state -> r.prod.xlsbpivotraddr + see also (s84)
+			-- r.ctrl.state -> r.prod.xlsbpivotraddr + see also (s84)
 			if async then -- statically resolved by synthesizer
 				if r.ctrl.state = xy then
 					v.prod.xlsbpivotraddr := r.iram.raddr_lsb; -- x_i terms
@@ -1227,19 +1204,12 @@ begin
 				v.prod.yicnt := r.prod.yicnt - 1;
 				v.iram.raddr_lsb := std_logic_vector (
 					unsigned(r.iram.raddr_lsb) + 1 );
-				--if r.ctrl.state = xy then
-				--	v.iram.raddr_lsb := std_logic_vector (
-				--		unsigned(r.iram.raddr_lsb) + 1 );
-				--else
-				--	v.tram.raddr_lsb := std_logic_vector (
-				--		unsigned(r.tram.raddr_lsb) + 1 );
-				--end if;
 			end if;
 		else -- synchronous case
 			if r.prod.xiphase = '1' then
 				v.prod.xicnt := r.prod.xicnt - 1;
 				v.oram.raddr_lsb := std_logic_vector(
-					unsigned(r.oram.raddr_lsb) - 1 ); -- (s3) bypassed by (s4)
+					unsigned(r.oram.raddr_lsb) - 1 );
 			end if;
 			if r.prod.yiphase = '1' then
 				v.prod.yicnt := r.prod.yicnt - 1;
@@ -1247,17 +1217,6 @@ begin
 					unsigned(r.oram.raddr_lsb) + 1 );
 			end if;
 		end if;
-
-		-- some direct latches
-		-- TODO: set a large multicycle on paths:
-		--       input -> r.ctrl.rw
-		--       input -> r.ctrl.rwminus1
-		--       input -> r.ctrl.r2wm1
-		--v.ctrl.rw := to_unsigned(8, log2(w)); -- TODO: replace w/ I/O soft write
-		--v.ctrl.rwminus1 := to_unsigned(7, log2(w - 1)); -- TODO: idem
-		----v.ctrl.rw := to_unsigned(w, log2(w)); -- TODO: replace w/ I/O soft write
-		----v.ctrl.rwminus1 := to_unsigned(w - 1, log2(w - 1)); -- TODO: idem
-		--v.ctrl.r2wm1 := (r.ctrl.rw & '0') - 1; -- TODO: idem
 
 		-- --------------------------------------------------------------------
 		-- production of operands to serve as inputs to the chain of DSP blocks
@@ -1290,13 +1249,11 @@ begin
 			v.prod.xishencntzero := '1';
 		end if;
 
-		if r.prod.xishencntzero = '1' and r.prod.xishen = '1' then -- (s97)
+		if r.prod.xishencntzero = '1' and r.prod.xishen = '1' then
 			v.prod.xishencntzero := '0';
 			v.prod.xishen := '0';
 			v.prod.yishen := '1';
 			v.prod.yishencnt := nndyn_wm1;
-			--if r.ctrl.rwminus1 = to_unsigned(1, log2(w - 1)) then
-			--if nndyn_wm1 = to_unsigned(1, log2(w - 1)) then
 			if nndyn_wm1 = (nndyn_wm1'range => '0') then -- means nndyn_w = 1
 				v.prod.yishencntzero := '1'; -- 'll have effect on (s11) next cycle
 			end if;
@@ -1372,15 +1329,12 @@ begin
 				-- power of 2, then (.rw - 1) will have the same size as .rw, and
 				-- if it is (likely) a power of 2, then (.rw - 1) will lose one bit
 				-- as compared to .rw. In either case, no information is lost by
-				-- keeping only bits bits in the range OPAGEW - 1 downto 0
+				-- keeping solely the bits in the range OPAGEW - 1 downto 0
 				vtmp_3 := nndyn_w - 1;
 				v_prod_nextxlsbraddr :=
 					std_logic_vector(vtmp_3(OPAGEW - 1 downto 0)); -- (s70)
-				--v_prod_ndspactive := to_unsigned(ndsp, log2(w + ndsp));
 				v_prod_nextslkcnt :=
 					to_unsigned(NBRA - 1, NB_SLK_BITS);
-					--+ to_unsigned(ndsp, NB_SLK_BITS)
-					--- resize(nndyn_w, NB_SLK_BITS);
 			else
 				-- w > ndsp
 				v_prod_nextxicnt := to_unsigned(ndsp - 1, log2(ndsp - 1));
@@ -1391,12 +1345,11 @@ begin
 					v_prod_nextxicntzero := '0';
 				end if;
 				v_prod_nextnbx := unsigned(vtmp_2(log2(w) - 1 downto 0));
-				-- as regards (s76) below, ndsp < w (or =)  => ndsp - 1 < w - 1 (or =)
+				-- as regards to (s76) below, ndsp < w (or =)  =>  ndsp - 1 < w-1 (or =)
 				-- => log2(ndsp - 1) < log2(w - 1) (or =), therefore it makes sense
 				-- to encode ndsp - 1 on OPAGEW bits, as OPAGEW = log2(w - 1)
 				v_prod_nextxlsbraddr := std_logic_vector (
 					to_unsigned(ndsp - 1, OPAGEW) ); -- (s76)
-				--v_prod_ndspactive := resize(nndyn_w, log2(w + ndsp));
 				if ndsp > 2 then -- statically resolved by synthesizer
 					v_prod_nextslkcnt := to_unsigned(ndsp - 1, NB_SLK_BITS);
 				else
@@ -1421,18 +1374,15 @@ begin
 					v_prod_nextxicntzero := '0';
 				end if;
 				v_prod_nextnbx := (others => '0');
-				-- as regards (s78) (resp. (s79)) below, same remark applies as
-				-- for (s70) (resp. (s71))
+				-- as regards to (s78) below, same remark applies as for (s70)
 				vtmp_3 := unsigned(r.prod.nbx) - 1;
 				v_prod_nextxlsbraddr := std_logic_vector(
 					unsigned(r.prod.xlsbpivotraddr) +
 					r.prod.nbx(OPAGEW - 1 downto 0) ); -- (s78)
-				--v_prod_ndspactive := to_unsigned(ndsp, log2(w + ndsp));
-				-- r.prod.nbx is on log2(w) bits, and NB_SLK_BITS=log2(NBRA + ndsp + w - 1)
+				-- r.prod.nbx is on log2(w) bits & NB_SLK_BITS=log2(NBRA + ndsp + w - 1)
 				-- so resize function won't truncate nothing
 				v_prod_nextslkcnt := resize(r.prod.nbx, NB_SLK_BITS) +
 				                     to_unsigned(ndsp - 1, NB_SLK_BITS);
-				--v_prod_nextslkcnt := to_unsigned((2 * ndsp) - 1, NB_SLK_BITS);
 			else
 				-- .nbx > ndsp
 				v_prod_nextxicnt := to_unsigned(ndsp - 1, log2(ndsp - 1));
@@ -1443,14 +1393,12 @@ begin
 					v_prod_nextxicntzero := '0';
 				end if;
 				v_prod_nextnbx := unsigned(vtmp_2(log2(w) - 1 downto 0));
-				-- as regards (s80) (resp. (s81)) below, same remark applies as
-				-- for (s76) (resp. (s77))
+				-- as regards to (s80) below, same remark applies as for (s76)
 				v_prod_nextxlsbraddr := std_logic_vector (
 					-- .xlsbpivotraddr was previously latched by (s82), or initialized
 					-- by (s84)
 					unsigned(r.prod.xlsbpivotraddr) + -- (s83)
 					to_unsigned(ndsp, OPAGEW) ); -- (s80)
-				--v_prod_ndspactive := resize(nndyn_w, log2(w + ndsp));
 				if ndsp > 2 then -- statically resolved by synthesizer
 					v_prod_nextslkcnt := to_unsigned(ndsp - 1, NB_SLK_BITS);
 				else
@@ -1460,7 +1408,7 @@ begin
 		end if;
 
 		-- TODO: set a multicycle on path:
-		--       r.ctrl.state -> r.prod.xlsbpivotraddr
+		-- r.ctrl.state -> r.prod.xlsbpivotraddr
 		if r.ctrl.state = idle then
 			v.prod.nbx := nndyn_w;
 			v.prod.xlsbpivotraddr := std_logic_vector(
@@ -1499,11 +1447,7 @@ begin
 						v_prod_nextymsbraddr := Y_ORAM_ADDR;
 					elsif r.prod.nextxymsb = '1' then
 						v_prod_nextxmsbraddr := S_ORAM_ADDR;
-						--if r.prod.ymsbsav = '1' then
-						--	v_prod_nextymsbraddr := Y_ORAM_ADDR;
-						--elsif r.prod.ymsbsav = '0' then
 							v_prod_nextymsbraddr := PP_ORAM_ADDR;
-						--end if;
 					end if;
 				end if;
 
@@ -1518,11 +1462,7 @@ begin
 					v_prod_nextymsbraddr := PP_ORAM_ADDR;
 					elsif r.prod.nextxymsb = '1' then
 						v_prod_nextxmsbraddr := ALPHA_ORAM_ADDR;
-						--if r.prod.ymsbsav = '1' then
-						--	v_prod_nextymsbraddr := PP_ORAM_ADDR;
-						--elsif r.prod.ymsbsav = '0' then
 							v_prod_nextymsbraddr := P_ORAM_ADDR;
-						--end if;
 					end if;
 				end if;
 
@@ -1537,18 +1477,14 @@ begin
 						v_prod_nextymsbraddr := P_ORAM_ADDR;
 					elsif r.prod.nextxymsb = '1' then
 						v_prod_nextxmsbraddr := X_ORAM_ADDR;
-						--if r.prod.ymsbsav = '1' then
-						--	v_prod_nextymsbraddr := P_ORAM_ADDR;
-						--elsif r.prod.ymsbsav = '0' then
 							v_prod_nextymsbraddr := Y_ORAM_ADDR;
-						--end if;
 					end if;
 				end if;
 
 		end case;
 
 		-- ----------------------------
-		-- start of overall computation
+		-- start of overall computation (i.e one complete REDC operation)
 		-- ----------------------------
 		-- TODO: dispatch a part of init logic on registers other than
 		-- "r.ctrl.rdy and etc" to lighten its fan-out (perhaps use a delayed
@@ -1573,15 +1509,15 @@ begin
 				v.oram.re := '1'; -- (s114)
 			end if;
 			-- TODO: set a large multicycle on paths:
-			--       r.oram.nextraddr -> r.oram.raddr
-			--       r.oram.nextxicnt -> r.prod.xicnt
-			--       r.oram.nextraddr -> r.oram.xishencnt
+			-- r.oram.nextraddr -> r.oram.raddr
+			-- r.oram.nextxicnt -> r.prod.xicnt
+			-- r.oram.nextraddr -> r.oram.xishencnt
 			-- r.oram.raddr, r.prod.xicnt & r.prod.xishencnt
 			if async then -- statically resolved by synthesizer
 				v.iram.raddr_msb := v_prod_nextxmsbraddr(1 downto 0);
 				v.iram.raddr_lsb := v_prod_nextxlsbraddr;
 			else -- synchronous case
-				v.oram.raddr_msb := v_prod_nextxmsbraddr; -- previously set by (s64)
+				v.oram.raddr_msb := v_prod_nextxmsbraddr;
 				v.oram.raddr_lsb := v_prod_nextxlsbraddr;
 			end if;
 			v.prod.dosavexlsbraddr := '1'; -- asserted only 1 cycle thx to (s6)
@@ -1589,15 +1525,13 @@ begin
 			v.prod.xishencnt := v_prod_nextxicnt;
 			if v_prod_nextxicntzero = '1' then
 				v.prod.xicntzero := '1'; -- 'll have effect on (s9) upon next cycle
-				--v.prod.xishencntzero := '1'; -- same thing on (s97)
 				v.prod.xishencntzerokeep := '1';
 			else
-				--v.prod.xishencntzero := '0';
 				v.prod.xishencntzerokeep := '0';
 			end if;
 			v.prod.xiphase := '1';
 			v.prod.yiphase := '0';
-			v.prod.xitoshcnt(sramlat) := '1'; -- asserted only 1 cycle see (s2)
+			v.prod.xitoshcnt(sramlat) := '1'; -- asserted only 1 cycle, see (s2)
 			-- TODO: set large multicycle on path r.prod.rw -> r.prod.nbx
 			-- the 1st nbx count used in the 1st cycle of multiply-&-accumulate
 			-- is always the flip one (that is 0)
@@ -1605,7 +1539,7 @@ begin
 		end if;
 
 		if r.ctrl.go = '1' then
-			v.oram.we := '0'; -- (s120) otherwise may stay asserted from (s119)
+			v.oram.we := '0'; -- (s120), otherwise .we may stay asserted from (s119)
 		end if;
 
 		-- -----------------------------------------------------------------------
@@ -1620,9 +1554,9 @@ begin
 		then
 			v.prod.slkcntdone := '0';
 			-- TODO: set a large multicycle on paths:
-			--       r.oram.nextraddr -> r.oram.raddr
-			--       r.prod.nextxicnt -> r.prod.xicnt
-			--       r.prod.nextxicnt -> r.prod.xishencnt
+			-- r.oram.nextraddr -> r.oram.raddr
+			-- r.prod.nextxicnt -> r.prod.xicnt
+			-- r.prod.nextxicnt -> r.prod.xishencnt
 			if not async then -- statically resolved by synthesizer
 				v.oram.raddr_msb := v_prod_nextxmsbraddr;
 				v.oram.raddr_lsb := v_prod_nextxlsbraddr;
@@ -1655,16 +1589,15 @@ begin
 				v.prod.xicnt := v_prod_nextxicnt;
 				v.prod.xishencnt := v_prod_nextxicnt;
 				-- TODO: set a large multicycle on path:
-				--       r.prod.nextxicntzero -> r.prod.xishencntzero
+				-- r.prod.nextxicntzero -> r.prod.xishencntzero
 				if v_prod_nextxicntzero = '1' then
-					v.prod.xicntzero := '1'; -- 'll have effect on (s9) next cycle 
-					--v.prod.xishencntzero := '1'; -- same thing on (s97)
+					v.prod.xicntzero := '1'; -- 'll have effect on (s9) next cycle
 					v.prod.xishencntzerokeep := '1';
 				else
 					v.prod.xishencntzerokeep := '0';
 				end if;
 				v.prod.xiphase := '1';
-				v.prod.xitoshcnt(sramlat) := '1'; -- asserted 1 cycle see (s2)
+				v.prod.xitoshcnt(sramlat) := '1'; -- asserted 1 cycle, see (s2)
 				v.prod.state := mult;
 				-- TODO: set large multicycle on path r.prod.nextnbx -> r.prod.nbx
 				v.prod.nbx := v_prod_nextnbx;
@@ -1696,9 +1629,9 @@ begin
 							v.oram.re := '1'; -- (s116)
 						end if;
 						-- TODO: set a large multicycle on paths:
-						--       r.oram.nextraddr -> r.oram.raddr
-						--       r.prod.nextxicnt -> r.prod.xicnt
-						--       r.prod.nextxicnt -> r.prod.xishencnt
+						-- r.oram.nextraddr -> r.oram.raddr
+						-- r.prod.nextxicnt -> r.prod.xicnt
+						-- r.prod.nextxicnt -> r.prod.xishencnt
 						if r.ctrl.state = xy then
 							v.ctrl.state := sp;
 						else -- if r.ctrl.state = sp
@@ -1707,16 +1640,15 @@ begin
 						v.prod.xicnt := v_prod_nextxicnt;
 						v.prod.xishencnt := v_prod_nextxicnt;
 						-- TODO: set a large multicycle on path:
-						--       r.prod.nextxicntzero -> r.prod.xishencntzero
+						-- r.prod.nextxicntzero -> r.prod.xishencntzero
 						if v_prod_nextxicntzero = '1' then
-							v.prod.xicntzero := '1'; -- 'll have effect on (s9) next cycle 
-							--v.prod.xishencntzero := '1'; -- same thing on (s97)
+							v.prod.xicntzero := '1'; -- 'll have effect on (s9) next cycle
 							v.prod.xishencntzerokeep := '1';
 						else
 							v.prod.xishencntzerokeep := '0';
 						end if;
 						v.prod.xiphase := '1';
-						v.prod.xitoshcnt(sramlat) := '1'; -- asserted 1 cyc see (s2)
+						v.prod.xitoshcnt(sramlat) := '1'; -- asserted 1 cycle, see (s2)
 						v.prod.state := mult;
 						v.prod.bigslkcnt := to_unsigned(NBRT - 1, NB_BIGSLK_BITS);
 						v.prod.bigslkcnten := '1';
@@ -1743,8 +1675,8 @@ begin
 		end if;
 
 		-- TODO: set a multicycle on path:
-		--       input nndyn_wm1 -> r.prod.yicnt
-		if r.prod.xicntzero = '1' then -- (s9) -- same thing on (s97)
+		-- input nndyn_wm1 -> r.prod.yicnt
+		if r.prod.xicntzero = '1' then -- (s9)
 			v.prod.xiphase := '0';
 			v.prod.yiphase := '1';
 			v.prod.yicnt := nndyn_wm1;
@@ -1753,20 +1685,6 @@ begin
 				v.iram.raddr_lsb := (others => '0');
 				v.iram.re := '1';
 				v.tram.re := '0';
-				--if r.ctrl.state = xy then
-				--	-- we now need to read multiplier terms, which are y_i ones,
-				--	-- from IRAM memory
-				--	v.iram.raddr_msb := v_prod_nextymsbraddr(1 downto 0);
-				--	v.iram.raddr_lsb := (others => '0');
-				--	v.iram.re := '1';
-				--else
-				--	-- we are either in 'sp' or 'ap' state, so we now need to read
-				--	-- multiplier terms, which are either p'_i ones (when in state 'sp')
-				--	-- or p_i ones (when in state 'ap'), both taken from TRAM memory
-				--	v.tram.raddr_msb := v_prod_nextymsbraddr(1 downto 0);
-				--	v.tram.raddr_lsb := (others => '0');
-				--	v.tram.re := '1';
-				--end if;
 			else
 				-- all terms are taken from common ORAM memory
 				v.oram.raddr_msb := v_prod_nextymsbraddr;
@@ -1778,21 +1696,13 @@ begin
 		if r.prod.yicntzero = '1' then
 			v.prod.yiphase := '0';
 			v.prod.state := slack;
-			---- we just need to extinguish the RE signal which is currently active
-			--if async and r.iram.re = '1' then
-			--	v.iram.re := '0';
-			--elsif async and r.tram.re = '1' then
-			--	v.tram.re := '0';
-			--elsif (not async) and r.oram.re = '1' then -- synchronous case
-			--	v.oram.re := '0';
-			--end if;
 			if async then
 				v.iram.re := '0';
 			else
 				v.oram.re := '0';
 			end if;
 			v.prod.slkcnt := v_prod_nextslkcnt;
-			-- REMOVE THAT, BUT ONLY AFTER VERIF THAT v_prod_nextslkcnt can't value 0
+			-- TODO: REMOVE THAT, BUT ONLY AFTER VERIF THAT v_prod_nextslkcnt can't =0
 			if v_prod_nextslkcnt = (v_prod_nextslkcnt'range => '0') then
 				v.prod.slkcntzero := '1';
 			end if;
@@ -1810,7 +1720,7 @@ begin
 			-- DSP block 0 is always active (otherwise there would be no new
 			-- burst (as opposed to other DSP blocks, which may or may not be
 			-- active during each burst)
-			v.dsp(0).active := '1'; -- deasserted by (s96) below, same as for others
+			v.dsp(0).active := '1'; -- deasserted by (s96) below, same as for i>0
 		end if;
 
 		-- ----------------------------------------------------------------
@@ -1821,7 +1731,7 @@ begin
 			v.dsp(i).acedel := r.dsp(i).ace;
 		end loop;
 		-- 1/2 - assertion of the clock-enable signal
-		for i in 0 to ndsp - 2 loop -- ndsp assumed to be greater or equal than 2
+		for i in 0 to ndsp - 2 loop -- (s124), ndsp assumed >= 2, see (s125)
 			if r.dsp(i).ace = '1' and r.dsp(i).acedel = '0' then -- (s13)
 				v.dsp(i + 1).acecnt := r.dsp(i).acecnt - 1;
 				if r.dsp(i).acecnt = (r.dsp(i).acecnt'range => '0') then
@@ -1910,7 +1820,8 @@ begin
 		-- --------------------         RSTM         --------------------
 
 		-- DSP block #0 does not need to have its M reg reset
-		v.dsp(0).rstm := '0'; -- unused (will be trimmed by synthesizer)
+		v.dsp(0).rstm := '0'; -- useless (will be trimmed by synthesizer, but
+		-- kept here for sake of readability)
 
 		-- for DSP block #1 .rstm is asserted 1 cycle after BCE and stays so
 		-- for 1 cycle only, unless it is inactive for the current burst,
@@ -1937,7 +1848,7 @@ begin
 			for i in 2 to ndsp - 1 loop
 				-- assertion of .rstm
 				if r.dsp(i).rstm = '0' and r.dsp(i - 1).rstm = '1' then -- (s22)
-					v.dsp(i).rstm := '1'; -- (s95)
+					v.dsp(i).rstm := '1';
 					if r.dsp(i).active =  '1' then
 						v.dsp(i).rstmcnt := to_unsigned(i - 1, log2(w - 1)); -- can't be 0
 					end if;
@@ -2007,8 +1918,7 @@ begin
 			end if;
 		elsif ndsp = 2 then
 			-- DSP block #1 is the last one and assertion of RSTP must lasts
-			-- 2 cycles (TODO: check that, as I haven't verified it actually
-			-- so it might be functionnally wrong)
+			-- 2 cycles
 			if (r.dsp(0).rstp = '0' and r.dsp(0).rstpdel = '1')
 			  or (r.dsp(1).rstp = '1' and r.dsp(1).rstpdel = '0')
 			then
@@ -2055,7 +1965,7 @@ begin
 		-- MSB 0's to it. Furthermore, the length of returned vector
 		-- (= 2*ww + ln2(ndsp)) is guaranteed to be strictly greater than the
 		-- one of the input vector (= ww + ln2(ndsp)) except for the case ww = 0
-		-- which is not admissible
+		-- (which is not admissible)
 		v.acc.ppacc := r.acc.ppend + -- (s44)
 			resize(r.acc.ppacc(2*ww + ln2(ndsp) - 1 downto ww), 2*ww + ln2(ndsp));
 
@@ -2079,13 +1989,13 @@ begin
 		end if;
 
 		-- TODO: set a multicycle on paths:
-		--       r.acc.state -> r.acc.nbx
-		--       r.acc.state -> r.acc.mustread -- FIXME
+		-- r.acc.state -> r.acc.nbx
+		-- r.acc.state -> r.acc.mustread
 		-- (a new Montgomery multiplication is not suppposed to start again
-		-- before at least external interface pulls out the result of the
-		-- current one from us, which represents at least valw cycles)
+		-- before at least the external interface pulls out the result of the
+		-- current one from mm_ndsp, which represents at least 'valw' cycles)
 		-- so unless valw is very low, there's slack here that should be
-		-- given to the routing algo - see also (s23)
+		-- given to the router
 		if r.acc.state = idle then
 			v.acc.nbx := nndyn_w; -- (s24) bypassed by (s26) don't switch order
 			v.acc.mustread := '0';
@@ -2157,8 +2067,8 @@ begin
 		-- of r.acc.nbx - (s28) see also note (s27) below
 		-- -------------------------------------------------------------------
 		-- TODO: set a large multicycle (4 ?) on paths:
-		--       r.acc.nbx -> r.acc.ppaccvalcntnext
-		--       r.acc.nbx -> r.acc.nextnbx
+		-- r.acc.nbx -> r.acc.ppaccvalcntnext
+		-- r.acc.nbx -> r.acc.nextnbx
 		-- (the value of 4 corresponds to the minimal duration of 'mult' state)
 		-- CHECKED OK: v_acc_ndspactive always set: no LATCH should be inferred
 		if v_acc_tobenext = '0' then
@@ -2208,7 +2118,7 @@ begin
 			vtmp_7 := signed('0' & r.acc.nbx);
 			vtmp_8 := signed('0' & to_unsigned(ndsp, log2(w)));
 			vtmp_9 := vtmp_7 - vtmp_8;
-			if vtmp_9(log2(w)) = '1' or vtmp_9 = (vtmp_9'range => '0') then -- < or = 0
+			if vtmp_9(log2(w)) = '1' or vtmp_9 = (vtmp_9'range => '0') then -- < or =0
 				-- the number of x_i terms that remain to process is smaller than
 				-- (or equal to) the number of DSP blocks in the chain
 				-- Therefore only a subset of the DSP blocks will be active during
@@ -2244,11 +2154,11 @@ begin
 		end if;
 
 		-- (s27)
-		-- note: we use the cycle where r.ppaccrst is asserted as the cycle to
-		-- latch value of r.acc.nextnbx into r.acc.nbx & r.acc.ppaccvalcntnext
-		-- into r.acc.ppaccvalcnt, see (s25) & (s26) above, & starting to compute
-		-- r.acc.nextnbx for the burst to come (the one that'll follow the current
-		-- starting one), see (s28) above
+		-- note: we use the cycle where r.ppaccrst is asserted as the cycle to:
+		--   - latch value of r.acc.nextnbx into r.acc.nbx and latch value of
+		--     r.acc.ppaccvalcntnext into r.acc.ppaccvalcnt, see (s25) & (s26) above
+		--   - starting to compute r.acc.nextnbx for the burst to come (the one
+		--     that'll follow the current starting one), see (s28) above
 
 		-- next transitions (xy -> sp, sp -> ap and ap -> idle) are based on
 		-- falling edge of r.acc.ppaccvalid with condition v.acc.nextnbx = 0
@@ -2263,7 +2173,7 @@ begin
 		if r.acc.ppaccvalid = '1' and r.acc.ppaccvalidprev ='0'
 			and v_acc_tobenext = '0' and r.acc.state = ap
 		then
-			-- (s117) initiate r.brl.armcnt decounting.
+			-- Initiate r.brl.armcnt decounting.
 			-- When r.brl.armcnt reaches 0, this means r.brl.start can be asserted
 			-- by (s118)
 			v.brl.armcnten := '1';
@@ -2295,7 +2205,7 @@ begin
 		-- If it is, then we must assert RE (so that the term will be read
 		-- from PRAM and later be added to r.acc.term, see (s49) & (s66))
 		-- otherwise we must deassert RE.
-		-- Furthermore, it also depends on the state of the whole multiplication
+		-- Furthermore, it also depends on the state of the multiplication
 		-- we're currently in:
 		--   - in state 'xy'
 		--   - in state 'sp'
@@ -2321,7 +2231,7 @@ begin
 
 		v.acc.ppaccvalidprev := r.acc.ppaccvalid;
 		if r.acc.ppaccvalid = '0' and r.acc.ppaccvalidprev = '1' then
-			v.acc.mustread := '1'; -- (s36), do not revert order with (s37)
+			v.acc.mustread := '1';
 		end if;
 
 		-- (s66) see also (s65) above & (s49) below
@@ -2332,7 +2242,7 @@ begin
 		-- (we have read into PRAM memory <=> we must add value read from PRAM)
 		v.acc.mustadd := r.pram.re & r.acc.mustadd(sramlat downto 1);
 
-		v.pram.rdata := r_pram_rdata; -- (s29)
+		v.pram.rdata := r_pram_rdata;
 
 		-- generation of read-address into PRAM memory
 		-- note: r.pram.raddr may toggle needlessly (i.e when no actual read is
@@ -2360,12 +2270,12 @@ begin
 		-- r.acc.ppacc content is shifted through a layer of shift-registers
 		-- in quantity sramlat + 1
 		v.acc.term(0).value(ww - 1 downto 0) := r.acc.ppacc(ww - 1 downto 0);
-		v.acc.term(0).value(ww) := '0'; -- (s121)
+		v.acc.term(0).value(ww) := '0'; -- (s122)
 		for i in 1 to sramlat loop
 			v.acc.term(i).valid := r.acc.term(i - 1).valid;
 			v.acc.term(i).weight := r.acc.term(i - 1).weight;
 			v.acc.term(i).value -- (ww - 1 downto 0) :=
-				:= r.acc.term(i - 1).value; --(ww - 1 downto 0);
+				:= r.acc.term(i - 1).value; -- (ww - 1 downto 0);
 		end loop;
 
 		-- the last term (i = sramlat + 1) is a special case, it consumes the
@@ -2378,16 +2288,15 @@ begin
 			v.acc.carry1match := '1';
 		end if;
 		if r.acc.term(sramlat).valid = '1' and r.acc.carry1valid = '1'
-			and r.acc.carry1match = '1' 
-			--and r.acc.carry1weight = r.acc.term(sramlat).weight
+			and r.acc.carry1match = '1'
 		then
-			v.acc.term(sramlat + 1).value := -- ww+1
-        -- we add two words of size ww+1 but we know there can be
+			v.acc.term(sramlat + 1).value := -- ww + 1
+        -- we add two words of size ww + 1 but we know there can be
 				-- no carry (of weight ww + 1) as the first operand has an
 				-- actual dynamic of ww bits (the MSB is set to 0, see
 				-- (s122)) and the second operand has a 3-bit size
-				(r.acc.term(sramlat).value) -- ww+1
-			  + resize(r.acc.carry1, ww + 1);     -- ww+1
+				(r.acc.term(sramlat).value) -- ww + 1
+			  + resize(r.acc.carry1, ww + 1); -- ww + 1
 			-- TODO: could (s91) be possibly bypassed by simultaneous end of burst?
 			-- in the general case, we have to assume that it could
 			v.acc.carry1valid := '0'; -- (s91) bypassed by (s92)
@@ -2408,9 +2317,7 @@ begin
 		if r.acc.mustadd(0) = '1' then
 			v.acc.psum0 := resize(unsigned(r.pram.rdata), ww + 2)
 				+ resize(r.acc.term(sramlat + 1).value, ww + 2);
-				--unsigned("00" & r.pram.rdata) + ('0' & r.acc.term(sramlat+1).value);
 		else
-			--v.acc.psum0 := "00" & r.acc.term(sramlat + 1).value;
 			v.acc.psum0 := resize(r.acc.term(sramlat + 1).value, ww + 2);
 		end if;
 
@@ -2450,7 +2357,7 @@ begin
 		if r.acc.dosavecarry1 = '1' then
 			v.acc.carry1valid := '1'; -- (s92) bypass of (s91)
 			v.acc.carry1weight := r.acc.psum0weight;
-			v.acc.carry1 := r.acc.carry0; --vtmp_11(ww + 2 downto ww); -- 3 bit
+			v.acc.carry1 := r.acc.carry0; -- 3 bit
 		end if;
 		if r.acc.dorstcarry0 = '1' then -- (s53) asserted only 1 cycle thx to (s54)
 			v.acc.carry0 := "000";
@@ -2468,7 +2375,7 @@ begin
 		if r.acc.term(sramlat + 1).valid = '0'
 			and r.acc.term(sramlat).valid = '1'
 		then
-			v.acc.dorstcarry0 := '1'; -- (s54) has effect on (s53)
+			v.acc.dorstcarry0 := '1'; -- (s54), see (s53)
 		end if;
 
 		-- r.acc.psum0 also need to be reset at the end of the burst, because
@@ -2478,14 +2385,14 @@ begin
 		if r.acc.term(sramlat).valid = '0'
 			and r.acc.term(sramlat + 1).valid = '1'
 		then
-			v.acc.dorstpsum0 := '1'; -- (s52) has effect on (s51)
+			v.acc.dorstpsum0 := '1'; -- (s52), see (s51)
 		end if;
 
-		v.pram.waddr_lsb := std_logic_vector(r.acc.psum0weight); -- (s57)
+		v.pram.waddr_lsb := std_logic_vector(r.acc.psum0weight);
 
-		v.pram.we := r.acc.psum0valid; -- (s56)
+		v.pram.we := r.acc.psum0valid;
 
-		v.acc.dosavecarry1 := '0'; -- (s59)
+		v.acc.dosavecarry1 := '0';
 		if r.acc.dorstpsum0 = '1' then
 			-- for comparison between r.acc.psum0weight & input nndyn_2wm1,
 			-- same remark applies as for (s46)
@@ -2505,9 +2412,9 @@ begin
 		-- ----------------------------------------------------------------
 
 		-- TODO: set a multicycle on following paths:
-		--       r.acc.state -> r.oram.we / r.tram.we
-		--       r.acc.state -> r.oram.waddr / r.tram.waddr
-		--       r.acc.state -> r.oram.wdata / r.tram.wdata
+		-- r.acc.state -> r.oram.we / r.tram.we
+		-- r.acc.state -> r.oram.waddr / r.tram.waddr
+		-- r.acc.state -> r.oram.wdata / r.tram.wdata
 		v.brl.armsh := '0' & r.brl.armsh(log2(ww) - 2 downto 1);
 		if r.acc.state = xy or r.acc.state = sp then
 			if async then -- statically resolved by synthesizer
@@ -2521,12 +2428,9 @@ begin
 				v.oram.waddr_msb(0) := r.pram.waddr_lsb(OPAGEW);
 				v.oram.wdata := r.pram.wdata;
 			end if;
-			--if r.acc.state = xy or r.acc.state = sp then
-				-- TODO: set a mullticycle on paths:
-				--       nndyn_wm1 -> r.oram.wdata
-				--       nndyn_mask -> r.oram.wdata
-				-- TODO: set a multicycle on following path:
-				--       nndyn_mask_wm2 -> 
+				-- TODO: set a multicycle on paths:
+				-- nndyn_wm1 -> r.oram.wdata
+				-- nndyn_mask -> r.oram.wdata
 				if nndyn_mask_wm2 = '1' then
 					if r.pram.wdataweight = resize(nndyn_wm2, WEIGHT_BITS) then
 						if async then -- statically resolved by synthesizer
@@ -2551,20 +2455,16 @@ begin
 					end if;
 				end if;
 		-- TODO: set a multicycle on following paths:
-		--       r.acc.nbx -> r.oram.we / r.zram.we
-		--       r.acc.nbx -> r.oram.prodburst
-		--       r.acc.nbx -> r.oram.wdata / r.zram.wdata
-		--       r.acc.nbx -> r.oram.waddr_msb
-		--       r.acc.nbx -> r.oram.waddr_lsb / r.zram.waddr
-		--       r.acc.nbx -> r.oram.wcnt
+		-- r.acc.nbx -> r.oram.we / r.zram.we
+		-- r.acc.nbx -> r.oram.prodburst
+		-- r.acc.nbx -> r.oram.wdata / r.zram.wdata
+		-- r.acc.nbx -> r.oram.waddr_msb
+		-- r.acc.nbx -> r.oram.waddr_lsb / r.zram.waddr
+		-- r.acc.nbx -> r.oram.wcnt
 		-- (due to pipeline depth from r.acc.xxx signals and write cycles
 		-- into ORAM, r.acc.nbx is stabilized at least 'sramlat + 1' cycles
 		-- before we "use" it, same as r.acc.state)
 		elsif r.brl.armed = '1' then
-			-- (s75)
-			-- nndyn_barrel_shifter_needed not being used, the previous if/elsif
-			-- test on nndyn_barrel_shifter_needed is removed (and we saved only the
-			-- part corresponding to nndyn_barrel_shifter_needed = 1)
 			if (nndyn_wmin_excp = '0' and r.pram.wdataweight = nndyn_wmin) or
 				 (nndyn_wmin_excp = '1' and r.pram.wdataweight = nndyn_wmin_excp_val)
 			then
@@ -2578,7 +2478,6 @@ begin
 			end if;
 		end if;
 
-		--if r.brl.startcnt = to_unsigned(log2(ww) - 1, r.brl.startcnt'length) then
 		if r.brl.armsh(0) = '1' then
 			v.brl.enright := '1';
 		end if;
@@ -2595,7 +2494,7 @@ begin
 				else
 					v.oram.we := '1';
 					v.oram.wdata := r.oram.shifted;
-					v.oram.waddr_msb := PROD_ORAM_ADDR; -- (s109) see (s110)
+					v.oram.waddr_msb := PROD_ORAM_ADDR;
 					v.oram.waddr_lsb := (others => '0');
 				end if;
 				v.oram.wcnt := resize(nndyn_wm1, log2(w));
@@ -2603,7 +2502,6 @@ begin
 		end if;
 
 		if r.oram.prodburst = '1' then
-			-- same remark as for (s75) just above
 			if async then -- statically resolved by synthesizer
 				v.zram.wdata := r.oram.shifted;
 			else
@@ -2644,8 +2542,6 @@ begin
 				v.oram.waddr_msb(2 downto 1) := "10"; -- s_i terms page
 			elsif r.acc.state = sp then
 				v.oram.waddr_msb(2 downto 1) := "11"; -- alpha_i terms page
-			--elsif r.acc.state = ap then -- (s110) set by (s109) in the 'ap' case
-			--	v.oram.waddr_msb(2 downto 1) := "11"; -- result terms page
 			end if;
 		end if;
 
@@ -2654,19 +2550,21 @@ begin
 		-- multiplication (end of 'ap' state)
 		-- ---------------------------------------------------------------
 
-		-- TODO: set a multicycle on paths:
-		--         -> r.brl.shrcnt
-		--         -> r.brl.shlcnt
+		-- --------------------
 		-- right barrel-shifter
+		-- --------------------
 		-- TODO: set a multicycle on paths:
-		--       input 'nndyn_shrcnt' -> ...
+		-- ... -> r.brl.shrcnt
+		-- ... -> r.brl.shlcnt
+		-- TODO: set a multicycle on paths:
+		-- input 'nndyn_shrcnt' -> ...
 		if nndyn_shrcnt(log2(ww) - 1) = '1' then
 			v.brl.shr(log2(ww) - 1) :=
 				shift_right(unsigned(r.pram.wdata), 2 ** (log2(ww) - 1));
 		elsif nndyn_shrcnt(log2(ww) - 1) = '0' then
 			v.brl.shr(log2(ww) - 1) := unsigned(r.pram.wdata);
 		end if;
-		-- (s98) above enforces that log2(ww) - 2 >= 0
+		-- for (s99), note that (s98) above enforces that log2(ww) - 2 >= 0
 		for i in log2(ww) - 2 downto 0 loop -- (s99)
 			if nndyn_shrcnt(i) = '1' then
 				v.brl.shr(i) :=
@@ -2696,19 +2594,18 @@ begin
 			v.brl.right := r.brl.shr(0);
 		end if;
 
-		-- -- one extra register on the right side
-		-- v.brl.right := r.brl.shr(0);
-
-		-- TODO: set a multicycle on paths:
-		--       input 'nndyn_shlcnt' -> ...
+		-- -------------------
 		-- left barrel-shifter
+		-- -------------------
+		-- TODO: set a multicycle on paths:
+		-- input 'nndyn_shlcnt' -> ...
 		if nndyn_shlcnt(log2(ww) - 1) = '1' then
 			v.brl.shl(log2(ww) - 1) :=
 				shift_left(unsigned(r.pram.wdata), 2 ** (log2(ww) - 1));
 		elsif nndyn_shlcnt(log2(ww) - 1) = '0' then
 			v.brl.shl(log2(ww) - 1) := unsigned(r.pram.wdata);
 		end if;
-		-- (s98) above enforces that log2(ww) - 2 >= 0
+		-- for (s100), note that (s98) above enforces that log2(ww) - 2 >= 0
 		for i in log2(ww) - 2 downto 0 loop -- (s100)
 			if nndyn_shlcnt(i) = '1' then
 				v.brl.shl(i) :=
@@ -2720,18 +2617,12 @@ begin
 
 		v.oram.shifted := std_logic_vector(r.brl.right or r.brl.shl(0));
 
-    --if r.brl.active = '0' and r.brl.activedel = '1' then
-    --  v.oram.we := '0';
-    --  v.ctrl.state := idle;
-    --end if;
-
 		-- --------------------------------------------
 		-- read-back of multiplication result by ecc_fp (synchronous case only)
 		-- --------------------------------------------
 		if not async then -- statically resolved by synthesizer
 			v.io.zrendel := zren;
 			if zren = '1' and r.io.zrendel = '0' then
-				--v.io.zburst := '1';
 				v.oram.re := '1';
 				v.oram.raddr_msb := PROD_ORAM_ADDR;
 				v.oram.raddr_lsb := (others => '0');
@@ -2741,13 +2632,8 @@ begin
 			end if;
 			if zren = '0' and r.io.zrendel = '1' then
 				v.oram.re := '0';
-				--v.io.zburst = '0';
 			end if;
 		end if;
-
-		-- TODO: at the end of overall operation, restore r.oram.waddr to 0
-		-- (aka X_ORAM_ADDR, which the adress of X input operand in ORAM memory,
-		-- see also (s89))
 
 		-- ---------------------------------------------------------------------
 		-- synchronous (active high) reset
@@ -2755,7 +2641,6 @@ begin
 		if rst22 = '1' then
 			v.ctrl.state := idle;
 			v.prod.state := idle;
-			--v.oram.waddr := (others=>'0'); -- (s89) base-address of X input in ORAM
 			v.io.piencnt := (others => '0');
 			v.io.ppiencnt := (others => '0');
 			v.ctrl.rdy := '1';
@@ -2764,8 +2649,6 @@ begin
 			if async then
 				v.ctrl.ioforbid := '0'; -- I/O access is allowed after reset
 			end if;
-			--v.ctrl.rw := to_unsigned(w, log2(w));
-			--v.ctrl.rwminus1 := to_unsigned(w - 1, log2(w - 1));
 			v.prod.xishen := '0'; -- so that (s12) detects 1st edge of r.prod.xishen
 			for i in 0 to ndsp - 1 loop
 				v.dsp(i).ace := '0'; -- so that (s13) detects 1st edge of r.dsp(i).ace
@@ -2778,21 +2661,15 @@ begin
 			v.dsp(1).rstmcnt := (others => '0');
 			if ndsp > 2 then
 				v.dsp(2).rstmcnt :=
-					(others => '0'); -- absolutely mandatory in synthesis (was a BUG FIX)
+					(others => '0'); -- ABSOLUTELY MANDATORY IN SYNTHESIS (was a BUG FIX)
 			end if;
 			v.dsp(1).bce := '0'; -- so that (s21) detects 1st edge of r.dsp(1).bce
 			v.acc.ppaccvalid := '0';
-			--v.acc.pipetaildocnt := '0';
-			-- (s69) no need to reset r.prod.nbxflipflop, as it is reset by (s68)
-			--v.prod.nbxflipflop := '0';
 			v.prod.nextxymsb := '0';
 			v.acc.state := idle;
 			v.acc.carry1valid := '0';
 			v.oram.prodburst := '0';
 			v.brl.start := '0';
-			--if not async
-			--	v.io.zburst := '0';
-			--end if;
 			v.brl.armed := '0';
 			v.brl.armcnten := '0';
 			v.brl.shexcp := (others => '0');
@@ -2834,13 +2711,13 @@ begin
 	z <= r_zram_rdata when async -- statically resolved by synthesizer
 	     else r_oram_rdata;
 	irq <= r.ctrl.irq;
-	-- used only in asynchronous case
+	-- </used only in asynchronous case
 	go_ack <= r.resync.go_ack;
-	-- end of: used only in asynchronous case
+	-- end of: used only in asynchronous case/>
 
 	-- pragma translate_off
-	-- for sake of waveform readability, r.acc.ppacc & r.acc.ppend
-	-- are chopped in three sub-parts of ww-bit width:
+	-- for sake of waveform readability while simulating, both r.acc.ppacc
+	-- & r.acc.ppend are chopped into three sub-parts, each of ww-bit width:
 	--  - a least significant part (ww-bit always)
 	--  - a middle significant part (ww-bit always)
 	--  - a most significant part (or carry, of width ww - ln2(ndsp) bits)

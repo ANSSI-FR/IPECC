@@ -28,6 +28,7 @@ entity fifo is
 	port(
 		clk : in std_logic;
 		rstn : in std_logic;
+		swrst : in std_logic;
 		datain : in std_logic_vector(datawidth - 1 downto 0);
 		we : in std_logic;
 		werr : out std_logic;
@@ -102,7 +103,7 @@ begin
 		);
 
 	-- combinational logic to generate count + empty & full flags
-	comb : process(r, rstn, we, datain, re, dbgdeact, dbgraddr, dbgrst)
+	comb : process(r, rstn, we, datain, re, dbgdeact, dbgraddr, dbgrst, swrst)
 		variable v : reg_type;
 	begin
 		v := r;
@@ -200,7 +201,7 @@ begin
 		end if;
 
 		-- synchronous reset
-		if rstn = '0' or (debug and dbgrst = '1') then
+		if rstn = '0' or (debug and dbgrst = '1') or swrst = '1' then
 			v.we := '0';
 			v.count := (others => '0');
 			v.empty := '1';

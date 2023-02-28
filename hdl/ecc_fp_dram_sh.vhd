@@ -32,6 +32,7 @@ entity ecc_fp_dram_sh is
 	port(
 		clk : in std_logic;
 		rstn : in std_logic;
+		swrst : in std_logic;
 		-- port A: write-only interface from ecc_fp
 		-- (actually for write-access from AXI-lite interface)
 		ena : in std_logic;
@@ -182,7 +183,7 @@ begin
 		);
 
 	comb: process(r, rstn, ena, wea, addra, dia, reb, addrb, permute, permuteundo,
-	              dob0, dob1, trngvalid, trngdata)
+	              dob0, dob1, trngvalid, trngdata, swrst)
 		variable v : reg_type;
 	begin
 		v := r;
@@ -317,7 +318,7 @@ begin
 			v.perm.raddr := std_logic_vector(unsigned(r.perm.raddr) + 1);
 		end if;
 
-		-- shuffling state (& switch to 
+		-- shuffling state
 		v.perm.endsh := '0' & r.perm.endsh(rdlat + 1 downto 1);
 		if r.state = shuffling then
 			if r.perm.cnt(FP_ADDR - 1) = '0' and v.perm.cnt(FP_ADDR - 1) = '1'
@@ -358,7 +359,7 @@ begin
 		-- ------------------------------
 		-- synchronous (active low) reset
 		-- ------------------------------
-		if rstn = '0' then
+		if rstn = '0' or swrst = '1' then
 			v.flip := '0';
 			v.flop := '1';
 			v.state := idle;

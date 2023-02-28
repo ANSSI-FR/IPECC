@@ -382,6 +382,7 @@ package ecc_pkg is
 		port(
 			clk : in std_logic;
 			rstn : in std_logic;
+			swrst : in std_logic;
 			datain : in std_logic_vector(datawidth - 1 downto 0);
 			we : in std_logic;
 			werr : out std_logic;
@@ -433,19 +434,6 @@ package ecc_pkg is
 
 	function set_ndsp return positive;
 
-	-- get_irn_wsize()
-	--
-	-- returns the size (in bits) of internal random words produced by 'ecc_trng'
-	function get_irn_wsize return natural;
-
-	-- get_irn_nbwords()
-	--
-	-- returns the number of words (the size of which is the number returned
-	-- by function get_irn_wsize()) that 'ecc_trng' needs to produce for
-	-- one [k]P computation (if shuffle countermeasure is not active)
-	-- or for one scalar bit processing (if shuffle countermeasure is active)
-	function get_irn_nbwords return natural;
-
 	-- the following is used between ecc_axi & ecc_scalar to encode operations
 	-- and does not need to be known by software
 	--   point based operations encoding (used between ecc_axi & ecc_scalar)
@@ -466,8 +454,7 @@ package ecc_pkg is
 	-- ---------------------------------------------------------------------------
 	-- ECC_CURVE specifics
 	-- ---------------------------------------------------------------------------
-
-	constant PENDING_OPS_NBBITS : integer := 32;
+	constant PENDING_OPS_NBBITS : integer := 5;
 
 	-- ---------------------------------------------------------------------------
 	-- TRNG specifics
@@ -478,36 +465,7 @@ package ecc_pkg is
 	-- this is the size of TRNG memory in which all raw random bits are buffered
 	-- (this memory is only instanciated, and accessible for read, in debug mode,
 	-- to allow for statistical analysis of the physical TRNG).
-	-- We account for the RC4 key (256 bytes) also but not for the flip/flop
-	-- structure
 	constant raw_ram_size : natural := 32768; -- TODO: set something smarter
-
-	-- trngta
-	--
-	-- Biblio: [Yang, Rozic, Grujic, Mentens, Verbauwhede, "ES-TRNG, A High-
-	-- throughput, Low-area True Random Number Generator based on Edge Sampling"]
-	-- (https://tches.iacr.org/index.php/TCHES/article/view/7276)
-	--
-	-- this is the main parameter of ES-TRNG, named TA in the article above.
-	-- It denotes the number of system clock cycles (i.e AXI clock cycles
-	-- in our IP) that we wait before activating edge-detection of RO1 oscillator
-	-- by RO2 oscillator.
-	--
-	-- THE HIGHER trngta IS, THE MORE JITTER-NOISE HAS BEEN ACCUMULATED IN
-	-- RO1 EDGES, THE GREATER IS THE ENTROPY PER BIT ISSUED BY ES-TRNG
-	--
-	-- trngta is defined as a global constant here (instead of a generic
-	-- parameter local to es_trng_* components) because in debug mode this
-	-- parameter can be edited by software through the AXI interface, and
-	-- therefore ecc_axi must access it. In debug mode trngta serves as an
-	-- out-of-reset default value.
-	--
-	-- When not in debug mode, the parameter cannot be edited and trngta
-	-- denotes the constant value of the parameter, statically set at
-	-- synthesis time
-	--constant trngta : natural range 1 to 4095 := 32;
-	-- trngta can be set in the list of user-modifiable custom parameters
-	-- (see ecc_customize.vhd)
 
 	-- pp_irn_width
 	-- 
@@ -566,7 +524,8 @@ package ecc_pkg is
 	constant W_IRQ : rat := std_logic_vector(to_unsigned(8, ADB));            -- 0x40
 	constant W_ERR_ACK : rat := std_logic_vector(to_unsigned(9, ADB));        -- 0x48
 	constant W_SMALL_SCALAR : rat := std_logic_vector(to_unsigned(10, ADB));  -- 0x50
-	-- reserved                                                           0x58...0x70
+	constant W_SOFT_RESET : rat := std_logic_vector(to_unsigned(11, ADB));    -- 0x58
+	-- reserved                                                           0x60...0x70
 	-- (start of write DEBUG registers)
 	constant W_DBG_HALT : rat := std_logic_vector(to_unsigned(15, ADB));      -- 0x78
 	constant W_DBG_BKPT : rat := std_logic_vector(to_unsigned(16, ADB));      -- 0x80
@@ -662,6 +621,7 @@ package ecc_pkg is
 	constant STATUS_YES : natural := 13;
 	constant STATUS_R0_IS_NULL : natural := 14;
 	constant STATUS_R1_IS_NULL : natural := 15;
+	constant STATUS_ERR_LSB : natural := 16;
 	constant STATUS_ERR_COMP : natural := 16;
 	constant STATUS_ERR_WREG_FBD : natural := 17;
 	constant STATUS_ERR_KP_FBD : natural := 18;
@@ -672,6 +632,7 @@ package ecc_pkg is
 	constant STATUS_ERR_UNKNOWN_REG : natural := 23;
 	constant STATUS_ERR_IN_PT_NOT_ON_CURVE : natural := 24;
 	constant STATUS_ERR_OUT_PT_NOT_ON_CURVE : natural := 25;
+	constant STATUS_ERR_MSB : natural := 31;
 
 	-- bit positions in R_CAPABILITIES register
 	constant CAP_DBG_N_PROD : natural := 0;
@@ -711,15 +672,6 @@ package ecc_pkg is
 	-- bit positions in W_DBG_HALT register
 	constant DBG_HALT : natural := 0;
 
-	-- -- values of ERROR codes for the filed STATUS_ERRID of R_STATUS register
-	-- subtype std_logic_serr is std_logic_vector(STATUS_ERRID_SZ - 1 downto 0);
-	-- constant STATUS_ERR_COMP : std_logic_serr     := "0001";
-	-- constant STATUS_ERR_WREG_FBD : std_logic_serr := "0010";
-	-- constant STATUS_ERR_KP_FBD : std_logic_serr   := "0011";
-	-- constant STATUS_ERR_NNDYN : std_logic_serr    := "0100";
-	-- constant STATUS_ERR_POP_FBD : std_logic_serr  := "0101";
-	-- constant STATUS_ERR_RDNB_FBD : std_logic_serr := "0110";
-
 	-- bit positions in R_PRIME_SIZE
 	--   (same definitions as for W_PRIME_SIZE register, see above)
 
@@ -742,46 +694,5 @@ package body ecc_pkg is
 		end if;
 		return tmp;
 	end function set_ndsp;
-
-	-- Rationale to set the size (in bits) of internal random words
-	-- produced by 'ecc_trng'
-	-- (see IPECC manual, appendix titled "Rationale for dimensioning the
-	-- entropy pool of ecc_trng")
-	function get_irn_wsize return natural is
-		variable tmp : natural := 0;
-	begin
-		if shuffle then
-			if ww >= 2 * (5 + log2(n) - 1) then
-				tmp := ww;
-			else
-				tmp := 2 * (5 + log2(n) - 1);
-			end if;
-		else
-			tmp := ww;
-		end if;
-		if (tmp < 8) then
-			tmp := 8;
-		end if;
-		-- now choose the multiple of bytes greater or equal to ww
-		--return div(tmp, 8) * 8;
-		return tmp;
-	end function;
-
-	-- Rationale to set the quantity of internal random words produced
-	-- by 'ecc_trng'
-	-- (see IPECC manual, appendix titled "Rationale for dimensioning the
-	-- entropy pool of ecc_trng")
-	function get_irn_nbwords return natural is
-		variable tmp : natural := 0;
-	begin
-		if shuffle then
-			tmp := 128 * n;
-		elsif debug then
-			tmp := 768; -- statis. analysis of IRN requires sufficient amount
-		else
-			tmp := 4 * n; -- 5 if random isomorphic curve countermeas. is implem.
-		end if;
-		return tmp;
-	end function;
 
 end package body ecc_pkg;

@@ -20,7 +20,6 @@ use ieee.numeric_std.all;
 use work.ecc_custom.all;
 use work.ecc_utils.all;
 use work.ecc_pkg.all;
---use work.ecc_trng_pkg.all; -- for irn_wsize
 
 -- pragma translate_off
 use std.textio.all;
@@ -31,7 +30,8 @@ entity ecc_fp is
 	port(
 		clk : in std_logic;
 		rstn : in std_logic; -- synchronous reset
-		force_reset : in std_logic;
+		-- software reset
+		swrst : in std_logic;
 		-- interface with ecc_curve
 		opi : in opi_type;
 		opo : out opo_type;
@@ -124,7 +124,6 @@ architecture rtl of ecc_fp is
 		oneavail : std_logic;
 		id0 : integer range 0 to nbmult - 1;
 		id1 : integer range 0 to nbmult - 1;
-		--id2 : integer range 0 to nbmult - 1; useless, see (s33)
 		shstart : std_logic_vector(2*sramlatp2 downto 0);
 		shmid : std_logic_vector(sramlatp2 + 1 downto 0);
 		rd : std_logic;
@@ -173,6 +172,9 @@ architecture rtl of ecc_fp is
 		mmi : mmi_type;
 		-- resynchronization registers of mmo bus input signals
 		mmo0, mmo1, mmo2, mmo3 : mmo_type;
+		irq_prev : std_logic_vector(nbmult - 1 downto 0);
+		nb_pending_redc : unsigned(log2(nbmult) - 1 downto 0);
+		pending_redc : std_logic;
 	end record;
 
 	type addsub_type is record
@@ -248,7 +250,6 @@ architecture rtl of ecc_fp is
 	constant SZ_SH_REG : positive := 2 * w * ww;
 	subtype std_logic_shrnd is std_logic_vector(SZ_SH_REG - 1 downto 0);
 	type shrnd_type is array(0 to NB_MSK_SH_REG - 1) of std_logic_shrnd;
-	--signal r_rnd_sho : std_logic_vector(NB_MSK_SH_REG - 1 downto 0);
 
 	subtype u_shcnt_type is unsigned(log2(SZ_SH_REG - 1) - 1 downto 0);
 	type doshxcnt_type is array(0 to NB_MSK_SH_REG - 1) of u_shcnt_type;
@@ -265,18 +266,13 @@ architecture rtl of ecc_fp is
 		masked : std_logic;
 		shift : std_logic;
 		shiftf : std_logic;
-		shregid : unsigned(1 downto 0); 
+		shregid : unsigned(1 downto 0);
 		dosh : std_logic;
 		doshcnt : unsigned(log2(ww - 1) - 1 downto 0);
 		doshx : std_logic_vector(NB_MSK_SH_REG - 1 downto 0);
 		doshxcnt : doshxcnt_type;
 		burstdone : std_logic;
 		finalizesh : std_logic;
-		--sh : shrnd_type;
-		--sh0 : std_logic_vector(SH_RND_SZ - 1 downto 0);
-		--sh1 : std_logic_vector(SH_RND_SZ - 1 downto 0);
-		--sh2 : std_logic_vector(SH_RND_SZ - 1 downto 0);
-		--sh3 : std_logic_vector(SH_RND_SZ - 1 downto 0);
 	end record;
 
 	component large_shr is
@@ -327,6 +323,7 @@ architecture rtl of ecc_fp is
 		active : std_logic;
 		-- pragma translate_on
 		rdy : std_logic;
+		trypull : std_logic;
 		done : std_logic;
 		ctrl : ctrl_type;
 		-- the 5 in the definition of fields op[abc] below accounts for the
@@ -544,7 +541,7 @@ begin
 				clk => clk,
 				ce => r.rnd.doshx(i),
 				d => r.rnd.data(0),
-				q => opo.shr(i) --r_rnd_sho(i)
+				q => opo.shr(i)
 		);
 	end generate;
 
@@ -554,7 +551,7 @@ begin
 	               compkp, compcstmty, comppop, compaop, trngdata, trngvalid,
 	               dbgtrnguse, dbghalted,
 	               nndyn_nnrnd_mask, nndyn_nnrnd_zerowm1, nndyn_wm1, nndyn_wm2,
-								 nndyn_2wm1, force_reset)
+								 nndyn_2wm1, swrst)
 		variable v : reg_type;
 		variable v_op0 : unsigned(ww downto 0);
 		variable v_op1 : unsigned(ww downto 0);
@@ -565,9 +562,7 @@ begin
 	begin
 		v := r;
 
-		--v.fpram.fprdata := fprdata;
-
-		v.done := '0'; -- (s7)
+		v.done := '0'; -- (s7), see (s31), (s137), (s138), (s139), (s140), (s8)
 
 		-- resynchronization of mmo bus input signals
 		v.mm.mmo0 := mmo;
@@ -583,17 +578,8 @@ begin
 		--      - which ones are available for a new computation
 		--        (= we drive r.mm.push.id0
 		--                  & r.mm.push.oneavail)
-		--        see (s0)
-		--
-		--      - which ones have completed their computation and
-		--        have their result pending & available for read-back
-		--        (= we drive r.mm.pull.done()
-		--                    r.mm.pull.oneavail
-		--                  & r.mm.pull.done_id0)
-		--        see (s9)
 		-- -----------------------------------------------------------
-
-		-- (s0) is there a Montgomery multiplier available?
+		-- (s0)
 		v.mm.push.oneavail := '0';
 		for i in 0 to nbmult - 1 loop
 			if (not async and mmo(i).rdy = '1' and r.mm.busy(i) = '0')
@@ -605,22 +591,60 @@ begin
 			end if;
 		end loop;
 
-		-- (s9) is there a Montgomery multiplier whose operation was carried out
-		--      and can have its result pulled back into ecc_fp_dram?
+		-- -----------------------------------------------------------
+		--    Continously (at each cycle) gather information about
+		--    multipliers:
+		--
+		--      - which ones have completed their computation and
+		--        have their result pending & available for read-back
+		--        (= we drive r.mm.pull.done
+		--                    r.mm.pull.oneavail
+		--                  & r.mm.pull.done_id0)
+		-- -----------------------------------------------------------
+		-- clean detection of irq raising calls for comparison of the
+		-- current value of irq signal value with the one at previous cycle
+		if not async then -- statically resolved by syntheiszer
+			for i in 0 to nbmult - 1 loop
+				v.mm.irq_prev(i) := mmo(i).irq;
+			end loop;
+		else -- async case
+			for i in 0 to nbmult - 1 loop
+				v.mm.irq_prev(i) := r.mm.mmo2(i).irq;
+			end loop;
+		end if;
 		for i in 0 to nbmult - 1 loop
 			-- mind that in the async = FALSE case the irq is asserted only 1 cycle
 			-- by Montgomery multipliers
-			if (not async and mmo(i).irq = '1')
-			  or (async and r.mm.mmo2(i).irq = '1') then
-				v.mm.pull.done(i) := '1'; -- (s12) - bypassed by (s13)
+			if ((not async) and mmo(i).irq = '1' and r.mm.irq_prev(i) = '0') -- (s130)
+			  or (async and r.mm.mmo2(i).irq = '1' and r.mm.irq_prev(i) = '0')
+				-- testing the previous value .irq_prev in (s130) is particularly
+				-- important in the asynchronous case, when the clock of Montgomery
+				-- multipliers is not fast enough to ensure that their IRQ is already
+				-- lowered down by the time (s13) deasserts .done (if it is not,
+				-- then (s12) will assert .done again, which in turn will trigger
+				-- assertion of .oneavail by (s92) and that is an error)
+			then
+				-- for (s12) right down below, .done(i) will be reset low when
+				-- pulling result back from the Montgomery multiplier is over
+				v.mm.pull.done(i) := '1'; -- (s12), bypassed by (s13)
+				-- note that the (s13) bypass of (s12) cannot accidently mask an
+				-- assertion of .done(i) made by (s12), because for an obvious
+				-- functionnal reason, assertion on .done(i) can only happen after
+				-- result is pulled back from the corresponding Montgomery multiplier.
+				-- If a .done(i) is reset in current cycle by (s13), the early
+				-- assertion made by (s12) can only concern another value j different
+				-- from i
 				v.mm.mmi(i).irq_ack := '1';
 			end if;
 			if async and r.mm.mmi(i).irq_ack = '1' and r.mm.mmo2(i).irq = '0' then
-				v.mm.mmi(i).irq_ack := '0'; -- acknowledge the acknowledge
+				v.mm.mmi(i).irq_ack := '0'; -- acknowledge was seen, lower it down
 			end if;
 		end loop;
 
-		v.mm.pull.oneavail := '0';
+		-- r.mm.pull.oneavail holds no memory with it (it is deasserted low by
+		-- default at each cycle by (s129) and is high only if one of .done(i)
+		-- signal is also high)
+		v.mm.pull.oneavail := '0'; -- (s129)
 		for i in 0 to nbmult - 1 loop
 			if r.mm.pull.done(i) = '1' then
 				v.mm.pull.oneavail := '1'; -- (s92)
@@ -629,23 +653,17 @@ begin
 			end if;
 		end loop;
 
-		-- -------------------------------------------------------------------
+		-- ---------------------------------------------------------------------
 		--      (s1) detect end of one REDC multiplication computation
 		--   Basically what we do here is asserting r.mm.pull.pulling (s93),
-		--  asserting the MSbit of r.mm.pull.shstart (s119) for sequence ctrl.
-		--  We also assert the read-enable to the proper Montgomery multiplier
-		--    (s120). Reading back words of the REDC result is done by (s2).
-		-- -------------------------------------------------------------------
+		-- asserting the MSbit of r.mm.pull.shstart (s119) for startup sequence
+		--  We also assert the read-enable to the proper Montgomery multiplier,
+		--   see (s120). Reading back words of the REDC result is done by (s2).
+		-- ---------------------------------------------------------------------
 
 		v.mm.pull.shstart := '0' & r.mm.pull.shstart(sramlat + 1 downto 1);
-		if r.mm.pull.oneavail = '1' and r.mm.pull.pulling = '0' then
-			if (r.rdy = '1' or (r.mm.push.do = '1' and r.mm.push.oneavail = '0')) then
-			-- this is not actually the start of an opcode execution but the
-			-- process of reading back the result of a Montgomery multiplication
-			-- that was programmed previously
-			--if r.mm.pull.pulling = '0' then
-				-- time to pull back data from one Montgomery multiplier whose
-				-- job has terminated and to push them into ecc_fp_dram
+		if r.trypull = '1' then -- (s124)
+			if r.mm.pull.oneavail = '1' and r.mm.pull.pulling = '0' then -- (s126)
 				v.mm.mmi(r.mm.pull.done_id0).zren := '1'; -- (s120)
 				-- save the content of r.mm.pull.done_id0 into .done_id1
 				-- as (s32) might change the content of .done_id0 at any one time.
@@ -661,6 +679,27 @@ begin
 				v.mm.pull.zrencnt := nndyn_wm1; -- (s121)
 				v.mm.pull.zcntonce := '1';
 				v.fpram.waddrmuxsel := "110"; -- (s18) (see (s20))
+				-- r.rdy is necessarily already low when r.trypull is asserted high,
+				-- so it simply stays that way, which is why (s122) below is useless
+				--v.rdy := '0'; -- (s122)
+				v.trypull := '0';
+			elsif r.mm.push.do = '0' then
+				v.rdy := '1';
+				v.trypull := '0'; -- (s125)
+			elsif r.mm.push.do = '1' and r.mm.pending_redc = '0' then
+				-- (s134) is about unlocking (s133) so as to avoid deadlock in case
+				-- an FPREDC has already been accepted from ecc_curve (r.mm.push.do
+				-- = 1) and we just finished pulling data from the last FPREDC that
+				-- was pending in the previous cycle (which just had r.mm.pending_redc
+				-- set back to 0 as per (s135)) - in this situation indeed, if
+				-- r.trypull happens to be asserted, keeping it that way would lead
+				-- to never pass the combo of conditions (s123) - (s133) - (s136)
+				-- that is required to trigger pulling an FRREDC result data.
+				-- (note that the conditions we are currently in {.trypull = .do =
+				-- .oneavail = 1 & .pulling = 0} differs only from (s123)+(s133)+(s136)
+				-- (which is {.do = .oneavail = 1 & .pulling = .trypull = 0}) only
+				-- by .trypull being different in the two sets of conditions
+				v.trypull := '0'; -- (s134), this is to unlock (s133)
 			end if;
 		end if;
 
@@ -668,7 +707,15 @@ begin
 		--            trigger start of overall computation
 		--               (of one opcode execution) (s21)
 		-- -----------------------------------------------------------
-		if r.rdy = '1' and opi.valid = '1' then -- (s22)
+		if r.rdy = '1' and opi.valid = '0' then
+			-- although r.rdy is high by deasserting it we won't cheat ecc_curve in
+			-- believing we're accepting an operation from it, since opi.valid = 0
+			-- means it is not driving us an operation to do
+			v.rdy := '0';
+			-- assert r.trypull to test if there is an FPREDC whose result might be
+			-- ready to be pulled from one of the Montgomery multipliers
+			v.trypull := '1';
+		elsif r.rdy = '1' and opi.valid = '1' then -- (s22)
 			-- deassert opo.rdy so that not to cheat ecc_curve at next cycle
 			v.rdy := '0';
 			-- now set different control signals according to the nature
@@ -714,13 +761,11 @@ begin
 					      -- n > w and nndyn_wm1 is an unsigned, so resize
 				        -- function can't but extend it with 0 MSbits
 					      resize(nndyn_wm1, log2(n - 1)));
-					      --to_unsigned(w - 1, log2(n - 1)));
 					v.opc := opi.c
 					  & std_logic_vector(
 					      -- n > w and nndyn_wm1 is an unsigned, so resize
 				        -- function can't but extend it with 0 MSbits
 					      resize(nndyn_wm1, log2(n - 1)));
-					      --to_unsigned(w - 1, log2(n - 1)));
 					-- instruction NNDIV2 is handled as a special case of NNSRL
 					if opi.div2 = '1' then
 						v.ctrl.div2 := '1';
@@ -756,10 +801,6 @@ begin
 			end if;
 		end if;
 
-		-- TODO: remove all these shitty "reset all other operations flag"
-		-- above and replace them with deassertion of each flag "in its own
-		-- place"!
-
 		-- -------------------------------------------------------------
 		--                multiplication input processing
 		--          (feeding input operands to REDC operation)
@@ -784,20 +825,31 @@ begin
 			-- actually start processing the operation (that's the reason for
 			-- condition r.mm.push.oneavail = 1 below)
 			-- we must also ensure that the logic pulling result from the Montgomery
-			-- multipliers when one has completed its computation it not about
+			-- multipliers when one has completed its computation is not about
 			-- to start doing so (that's the reason for the part 'r.mm.pull.pulling
 			-- and r.mm.pull.oneavail = 0' below)
-			if r.mm.push.oneavail = '1' -- one Montgomery multiplier is available
-				and r.mm.pull.pulling = '0' -- not in the course of pulling REDC data
-				--and r.mm.pull.oneavail = '0' -- and not about to pull either
+			if r.mm.push.oneavail = '1' -- (s123) one Montgomery multiplier is avail.
+				and r.trypull = '0' -- (s133), see (s134)
+				and r.mm.pull.pulling = '0' -- (s136) not currently pulling REDC data
 			then
 				v.mm.push.do := '0';
 				-- pragma translate_off
 				v.active := '1';
 				-- pragma translate_on
-				v.fpram.raddrmuxsel := "00"; -- (s34) address now driven by r.opa
-				                             -- (see (s17))
+				-- (s34) means that address will now be driven by r.opa, see (s17)
+				v.fpram.raddrmuxsel := "00"; -- (s34)
 				v.mm.push.busy := '1';
+				-- increment the nb of FPREDC computations that are currently posted/
+				-- pending to the Montgomery multipliers.
+				-- Note that there cannot be a simultaneous decrease of register
+				-- r.mm.nb_pending_redc in the current cycle (although the process of
+				-- reading back result from the Montgomery multipliers is a completely
+				-- asynchronous process of the one pushing data to them to compute)
+				-- as r.mm.push.do being asserted (as it is right now) means no pulling
+				-- data from a Montgomery multiplier can't be currenly happening in
+				-- the same cycle: hence there is no by-pass of (s131)
+				v.mm.nb_pending_redc := r.mm.nb_pending_redc + 1; -- (s131)
+				v.mm.pending_redc := '1';
 				-- book the multiplier so that selection algo in (s0) above
 				-- does exclude it from its arbitration
 				v.mm.busy(r.mm.push.id0) := '1';
@@ -822,8 +874,28 @@ begin
 				end if;
 				v.mm.push.rdcnt := nndyn_wm1;
 				v.mm.push.rd := '1';
-			end if;
-		end if;
+			else -- .oneavail etc
+				-- (s127)
+				-- we can't simply stall until r.mm.push.oneavail is asserted again
+				-- because it can create deadlock: we must give room to the process
+				-- of pulling result data from the Montgomery multipliers (that is,
+				-- logic described by (s124) & (s126)) otherwise r.mm.push.oneavail
+				-- might never be asserted again (that would be the case if all
+				-- Montgomery multipliers are currently busy) and condition (s123)
+				-- might never be "unlocked" again.
+				-- Besides, r.trypull only stays asserted one cycle if there is act-
+				-- ually no data to pull back from the Montgomery multipliers (see
+				-- (s124) & (s125)) so chance will be given to (s22) logic to accept
+				-- the next opcode from ecc_curve.
+				-- Note finally that no deadlock can happen from giving priority
+				-- to pulling (FPREDC-result-)data from the Montgomery multipliers.
+				if r.mm.pending_redc = '1' then
+					v.trypull := '1'; -- see also (s128)
+				elsif r.mm.pending_redc = '0' then
+					v.trypull := '0';
+				end if;
+			end if; -- .oneavail
+		end if; -- .do
 
 		-- (s96) is bypassed by (s97)
 		if shuffle then -- statically resolved by synthesizer
@@ -889,20 +961,9 @@ begin
 		end if;
 
 		-- assertion/deassertion of xen & yen to the selected Montgomery mult.
-		if r.mm.push.shstart(0) = '1'
-		--if r.mm.push.busy = '1' and
-		--	 ((shuffle -- statically resolved by synthesizer
-		--		 and r.mm.push.opacnt = unsigned(to_signed(w - 7, log2(2*n - 1))))
-		--		or (not shuffle
-		--		 and r.mm.push.opacnt = unsigned(to_signed(w - 4, log2(2*n - 1)))))
-		then
+		if r.mm.push.shstart(0) = '1' then
 			v.mm.mmi(r.mm.push.id1).xen := '1';
 		end if;
-		--if r.mm.push.busy = '1' and
-		--	 ((shuffle -- statically resolved by synthesizer
-		--		 and r.mm.push.opbcnt = unsigned(to_signed(w - 7, log2(2*n - 1))))
-		--		or (not shuffle
-		--		 and r.mm.push.opbcnt = unsigned(to_signed(w - 4, log2(2*n - 1)))) )
 
 		-- switch between xen & yen (data strobes to the Montgomery multiplier)
 		if r.mm.push.shmid(0) = '1'
@@ -917,11 +978,6 @@ begin
 		-- give selected multiplier a go so that Montgomery multiplication
 		-- is actually started
 		if r.mm.push.gosh(0) = '1' then
-			-- r.mm.push.id1 might already have reassigned by the time we reach
-			-- present condition, and that's precisely the role of r.mm.push.id2
-			-- to keep the value of r.mm.push.id1 at the time the multiplier was
-			-- initially selected for pushing operand data into it
-			-- (r.mm.push.id1 was transfered into r.mm.push.id2 by (s33) above)
 			v.mm.mmi(r.mm.push.id1).yen := '0';
 			v.mm.mmi(r.mm.push.id1).go := '1'; -- asserted 1 cycle thx to (s6)
 		end if;
@@ -956,21 +1012,19 @@ begin
 			-- The barrier flag in instructions' opcode is precisely made
 			-- to allow execution synchronization from a higher level point
 			-- of view
-			v.rdy := '1';
 			-- pragma translate_off
 			v.active := '0';
 			-- pragma translate_on
 			v.ctrl.redc := '0';
 			v.mm.push.busy := '0';
-			-- save the content of .push.id1 into .push.id2: since we're
-			-- about to release r.active to 0, (s22) logic might trigger
-			-- a new multiplication input processing, which may lead to
-			-- latch a new value into .push.id1 by (s5)
-			-- v.mm.push.id2 := r.mm.push.id1; -- (s33) USELESS
 			-- note that r.mm.busy(r.mm.push.id1) is not modified (reset)
 			-- so that selection algo in (s0) won't select the multiplier
 			-- again (this should not happen before we have pulled back
 			-- the result of multiplication from it - see (s11))
+
+			-- we could reassert r.rdy but let's give priority to pulling
+		 	-- data back from Montgomery multipliers	
+			v.trypull := '1'; -- (s128), same remark as for (s127)
 		end if;
 
 		-- -------------------------------------------------------------
@@ -993,35 +1047,27 @@ begin
 		end if;
 
 		if r.addsub.do = '1' then -- an addition or subtraction op is pending
-			-- we must ensure that the logic pulling result from the Montgomery
-			-- multipliers when one has completed its computation it not about
-			-- to start doing so (that's the reason for the test 'r.mm.pull.pulling
-			-- and r.mm.pull.oneavail = 0' below) - see (s92) & (s93)
-			if r.mm.pull.pulling = '0' -- not in the course of pulling REDC data
-				--and r.mm.pull.oneavail = '0' -- and not about to pull either
-			then
-				v.addsub.do := '0';
-				if shuffle then -- statically resolved by synthesizer
-					v.addsub.shstart(sramlatp2 + 1) := '1'; -- (s71) bypass of (s70)
-				else
-					v.addsub.shstart(sramlat + 1) := '1'; -- (s71) bypass of (s70)
-				end if;
-				-- pragma translate_off
-				v.active := '1';
-				-- pragma translate_on
-				v.addsub.busy := '1';
-				v.fpram.raddrmuxsel := "00"; -- (s26) (see (s17))
-				v.fpram.waddrmuxsel := "000"; -- (s28) (see (s20))
-				v.addsub.zero := '1'; -- (s68) bypassed by (s69)
-				if shuffle then -- statically resolved by synthesizer
-					v.fpram.wecnt :=
-						to_unsigned(sramlatp2 + 4, log2(sramlatp2 + 4));
-				else
-					v.fpram.wecnt :=
-						to_unsigned(sramlat + 4, log2(sramlatp2 + 4));
-				end if;
-				v.fpram.wecnten := '1';
+			v.addsub.do := '0';
+			if shuffle then -- statically resolved by synthesizer
+				v.addsub.shstart(sramlatp2 + 1) := '1'; -- (s71) bypass of (s70)
+			else
+				v.addsub.shstart(sramlat + 1) := '1'; -- (s71) bypass of (s70)
 			end if;
+			-- pragma translate_off
+			v.active := '1';
+			-- pragma translate_on
+			v.addsub.busy := '1';
+			v.fpram.raddrmuxsel := "00"; -- (s26) (see (s17))
+			v.fpram.waddrmuxsel := "000"; -- (s28) (see (s20))
+			v.addsub.zero := '1'; -- (s68) bypassed by (s69)
+			if shuffle then -- statically resolved by synthesizer
+				v.fpram.wecnt :=
+					to_unsigned(sramlatp2 + 4, log2(sramlatp2 + 4));
+			else
+				v.fpram.wecnt :=
+					to_unsigned(sramlat + 4, log2(sramlatp2 + 4));
+			end if;
+			v.fpram.wecnten := '1';
 		end if;
 
 		-- assertion of r.fpram.re (see (s41) for deassertion)
@@ -1029,8 +1075,6 @@ begin
 			or ((not shuffle) and r.addsub.shstart(sramlat + 1) = '1')
 		then
 			v.fpram.re := '1'; -- (s29) bypassed by (s41)
-			-- we need to read exactly 2*w ww-bit terms from ecc_fp_dram
-			--v.addsub.rdcnt := to_unsigned(2*w - 1, log2(2*w - 1));
 			v.addsub.rdcnt := nndyn_2wm1;
 			v.addsub.rd := '1';
 		end if;
@@ -1081,7 +1125,7 @@ begin
 		end if;
 
 		-- latch actual 'ww'-bits operands (on which to perform the addition)
-		-- The direction register (either r.addsub.op0 or r.addsub.op1) into which
+		-- The target register (either r.addsub.op0 or r.addsub.op1) into which
 		-- fprdata is written depends on the combination of r.fpram.raddrmuxsel
 		-- with boolean 'shuffle' (which encodes the presence of the ecc_fp_dram's
 		-- shuffling countermeasure)
@@ -1089,29 +1133,29 @@ begin
 			if shuffle then -- statically resolved by synthesizer
 				if sramlatp2 mod 2 = 0 then
 					if r.fpram.raddrmuxsel = "01" then
-						v.addsub.op0 := fprdata; --r.fpram.fprdata
+						v.addsub.op0 := fprdata;
 					else
-						v.addsub.op1 := fprdata; --r.fpram.fprdata
+						v.addsub.op1 := fprdata;
 					end if;
 				else -- sramlatp2 mod 2 = 1
 					if r.fpram.raddrmuxsel = "01" then
-						v.addsub.op1 := fprdata; --r.fpram.fprdata
+						v.addsub.op1 := fprdata;
 					else
-						v.addsub.op0 := fprdata; --r.fpram.fprdata
+						v.addsub.op0 := fprdata;
 					end if;
 				end if;
 			else
 				if sramlat mod 2 = 0 then
 					if r.fpram.raddrmuxsel = "01" then
-						v.addsub.op0 := fprdata; --r.fpram.fprdata
+						v.addsub.op0 := fprdata;
 					else
-						v.addsub.op1 := fprdata; --r.fpram.fprdata
+						v.addsub.op1 := fprdata;
 					end if;
 				else -- sramlat mod 2 = 1
 					if r.fpram.raddrmuxsel = "01" then
-						v.addsub.op1 := fprdata; --r.fpram.fprdata
+						v.addsub.op1 := fprdata;
 					else
-						v.addsub.op0 := fprdata; --r.fpram.fprdata
+						v.addsub.op0 := fprdata;
 					end if;
 				end if;
 			end if;
@@ -1211,10 +1255,10 @@ begin
 		if r.addsub.shstart(0) = '1' then
 			-- if the addition (resp. subtraction) instruction is an extended one,
 			-- we must not reset the carry (resp. borrow) since the output carry
-			-- (resp. borrow) which is the one generated by (s51) (resp. (s88))
-			-- when last big number addition (resp. subtraction) happened, must
-			-- be used as the input carry (resp. borrow) to the current big number
-			-- addition (resp. subtraction) see (s87) (resp. ()
+			-- (resp. borrow) which is the one generated by (s51) (resp. (s89))
+			-- when last large number addition (resp. subtraction) happened, must
+			-- be used as the input carry (resp. borrow) to the current large number
+			-- addition (resp. subtraction) see (s87) (resp. (s88))
 			if r.ctrl.extended = '0' then
 				if r.ctrl.add = '1' then
 					v.addsub.carry := '0'; -- (s52) bypass of (s51)
@@ -1234,7 +1278,6 @@ begin
 			v.fpram.we := '1';
 			v.addsub.weact := '1';
 			v.addsub.wr := '1';
-			--v.addsub.wrcnt := to_unsigned(w - 1, log2(w - 1));
 			v.addsub.wrcnt := nndyn_wm1;
 		end if;
 
@@ -1242,14 +1285,13 @@ begin
 		if r.addsub.weact = '1' then
 			-- assertion of write-enable must follow the constraint of 2-cycles
 			-- latency for each 'ww'-bit addition/subtraction issued
-			v.fpram.we := not r.fpram.we; -- (s30)
+			v.fpram.we := not r.fpram.we;
 		end if;
 
 		-- definitive deassertion of r.fpram.we along w/ deassert. of r.addsub.weact
 		-- along w/ increment of r.opc (address where addition result is written)
 		if r.addsub.wr = '1' and r.fpram.we = '1' then
 			v.addsub.wrcnt := r.addsub.wrcnt - 1;
-			--if r.addsub.rdcnt(2*w - 1) = '0' and v.addsub.rdcnt(2*w - 1) = '1' then
 			if r.addsub.wrcnt = (r.addsub.wrcnt'range => '0') then
 				v.fpram.we := '0';
 				v.addsub.wr := '0';
@@ -1309,7 +1351,9 @@ begin
 
 		-- end of computation for addition/subtraction operation
 		-- (deassertion of r.active, assertion of r.done
-		--  & signaling of a possible null result)
+		--  & signaling of a possible null result) - note that finally no error
+		-- is actually generated here (r.ctrl.resulterr will be trimmed away
+		-- by synthesizer and connected to a gnd hard connection instead)
 		if r.addsub.shend(0) = '1' then
 			v.done := '1'; -- (s31) stays asserted only 1 cycle thx to (s7)
 			-- pragma translate_off
@@ -1320,15 +1364,15 @@ begin
 				-- Overflow (which always indicates an error in signed arithmetic)
 				-- occurs on addition if both operands have the same sign and the
 				-- sign of the sum is different
+					--v.ctrl.resulterr := (not (r.addsub.opamsb xor r.addsub.opbmsb)) and
+					-- (r.addsub.opamsb xor r.ctrl.resultsn);
 				v.ctrl.resulterr := '0';
-				--v.ctrl.resulterr := (not (r.addsub.opamsb xor r.addsub.opbmsb)) and
-				--										(r.addsub.opamsb xor r.ctrl.resultsn);
 			else --if r.ctrl.sub = '1'
 				-- Overflow occurs on subtraction if the operands have different
 				-- signs and the sign of the difference differs from the sign of
 				-- first operand
 					--v.ctrl.resulterr := (r.addsub.opamsb xor r.addsub.opbmsb) and
-					--										(r.addsub.opamsb xor r.ctrl.resultsn);
+					-- (r.addsub.opamsb xor r.ctrl.resultsn);
 				v.ctrl.resulterr := '0';
 			end if;
 			-- signal end of operation to ecc_curve, along with
@@ -1357,34 +1401,26 @@ begin
 		end if;
 
 		if r.xxor.do = '1' then -- a bitwise xor operation is pending
-			-- we must ensure that the logic pulling result from the Montgomery
-			-- multipliers when one has completed its computation it not about
-			-- to start doing so (that's the reason for the test 'r.mm.pull.pulling
-			-- and r.mm.pull.oneavail = 0' below)
-			if r.mm.pull.pulling = '0' -- not in the course of pulling REDC data
-				--and r.mm.pull.oneavail = '0' -- and not about to pull either
-			then
-				v.xxor.do := '0';
-				if shuffle then -- statically resolved by synthesizer
-					v.xxor.shstart(sramlatp2 + 1) := '1';
-				else
-					v.xxor.shstart(sramlat + 1) := '1';
-				end if;
-				-- pragma translate_off
-				v.active := '1';
-				-- pragma translate_on
-				v.xxor.busy := '1';
-				v.fpram.raddrmuxsel := "00"; -- (s44)
-				v.fpram.waddrmuxsel := "010"; -- (s45) (see (s20))
-				if shuffle then -- statically resolved by synthesizer
-					v.fpram.wecnt :=
-						to_unsigned(sramlatp2 + 4, log2(sramlatp2 + 4));
-				else
-					v.fpram.wecnt :=
-						to_unsigned(sramlat + 4, log2(sramlatp2 + 4));
-				end if;
-				v.fpram.wecnten := '1';
+			v.xxor.do := '0';
+			if shuffle then -- statically resolved by synthesizer
+				v.xxor.shstart(sramlatp2 + 1) := '1';
+			else
+				v.xxor.shstart(sramlat + 1) := '1';
 			end if;
+			-- pragma translate_off
+			v.active := '1';
+			-- pragma translate_on
+			v.xxor.busy := '1';
+			v.fpram.raddrmuxsel := "00"; -- (s44)
+			v.fpram.waddrmuxsel := "010"; -- (s45) (see (s20))
+			if shuffle then -- statically resolved by synthesizer
+				v.fpram.wecnt :=
+					to_unsigned(sramlatp2 + 4, log2(sramlatp2 + 4));
+			else
+				v.fpram.wecnt :=
+					to_unsigned(sramlat + 4, log2(sramlatp2 + 4));
+			end if;
+			v.fpram.wecnten := '1';
 		end if;
 
 		-- assertion of r.fpram.re
@@ -1392,8 +1428,6 @@ begin
 			or ((not shuffle) and r.xxor.shstart(sramlat + 1) = '1')
 		then
 			v.fpram.re := '1';
-			-- we need to read exactly 2*w ww-bit terms from ecc_fp_dram
-			--v.xxor.rdcnt := to_unsigned(2*w - 1, log2(2*w - 1));
 			v.xxor.rdcnt := nndyn_2wm1;
 			v.xxor.rd := '1';
 		end if;
@@ -1401,10 +1435,10 @@ begin
 		-- shift-register for events involved at computation end
 		if shuffle then -- statically resolved by synthesizer
 			v.xxor.shend := -- (sramlatp2 + 2 downto 0) implied
-				'0' & r.xxor.shend(sramlatp2 + 2 downto 1); -- (s72)
+				'0' & r.xxor.shend(sramlatp2 + 2 downto 1);
 		else
 			v.xxor.shend(sramlat + 2 downto 0) :=
-				'0' & r.xxor.shend(sramlat + 2 downto 1); -- (s72)
+				'0' & r.xxor.shend(sramlat + 2 downto 1);
 		end if;
 
 		-- end of operands reading + arm shift-register controlling end of ops
@@ -1421,6 +1455,7 @@ begin
 			end if;
 		end if;
 
+		-- (s15)
 		-- r.fpram.raddrmuxsel toggling (to drive r.fpram.raddr either from
 		-- r.opa or r.opb, see (s17))
 		if r.xxor.busy = '1' then
@@ -1443,7 +1478,7 @@ begin
 		end if;
 
 		-- latch actual 'ww'-bits operands (on which to perform the bitwise xor)
-		-- The direction register (either r.add.op0 or r.add.op1) into which
+		-- The target register (either r.add.op0 or r.add.op1) into which
 		-- fprdata is written depends on the combination of r.fpram.raddrmuxsel
 		-- with boolean 'shuffle' (which encodes the presence of the ecc_fp_dram's
 		-- shuffling countermeasure)
@@ -1451,29 +1486,29 @@ begin
 			if shuffle then -- statically resolved by synthesizer
 				if sramlatp2 mod 2 = 0 then
 					if r.fpram.raddrmuxsel = "01" then
-						v.xxor.op0 := fprdata; --r.fpram.fprdata
+						v.xxor.op0 := fprdata;
 					else
-						v.xxor.op1 := fprdata; --r.fpram.fprdata
+						v.xxor.op1 := fprdata;
 					end if;
 				else -- sramlatp2 mod 2 = 1
 					if r.fpram.raddrmuxsel = "01" then
-						v.xxor.op1 := fprdata; --r.fpram.fprdata
+						v.xxor.op1 := fprdata;
 					else
-						v.xxor.op0 := fprdata; --r.fpram.fprdata
+						v.xxor.op0 := fprdata;
 					end if;
 				end if;
 			else -- not shuffle
 				if sramlat mod 2 = 0 then
 					if r.fpram.raddrmuxsel = "01" then
-						v.xxor.op0 := fprdata; --r.fpram.fprdata
+						v.xxor.op0 := fprdata;
 					else
-						v.xxor.op1 := fprdata; --r.fpram.fprdata
+						v.xxor.op1 := fprdata;
 					end if;
 				else -- sramlat mod 2 = 1
 					if r.fpram.raddrmuxsel = "01" then
-						v.xxor.op1 := fprdata; --r.fpram.fprdata
+						v.xxor.op1 := fprdata;
 					else
-						v.xxor.op0 := fprdata; --r.fpram.fprdata
+						v.xxor.op0 := fprdata;
 					end if;
 				end if;
 			end if;
@@ -1514,7 +1549,6 @@ begin
 			v.fpram.we := '1';
 			v.xxor.weact := '1';
 			v.xxor.wr := '1';
-			--v.xxor.wrcnt := to_unsigned(w - 1, log2(w - 1));
 			v.xxor.wrcnt := nndyn_wm1;
 		end if;
 
@@ -1546,7 +1580,7 @@ begin
 		-- end of computation for bitwise xor operation
 		-- (deassertion of r.active, assertion of r.done)
 		if r.xxor.shend(0) = '1' then
-			v.done := '1'; -- stays asserted only 1 cycle thx to (s7)
+			v.done := '1'; -- (s137) stays asserted only 1 cycle thx to (s7)
 			-- pragma translate_off
 			v.active := '0';
 			-- pragma translate_on
@@ -1576,49 +1610,41 @@ begin
 		end if;
 
 		if r.shift.do = '1' then -- a bitshift operation is pending
-			-- we must ensure that the logic pulling result from the Montgomery
-			-- multipliers when one has completed its computation it not about
-			-- to start doing so (that's the reason for the test 'r.mm.pull.pulling
-			-- and r.mm.pull.oneavail = 0' below)
-			if r.mm.pull.pulling = '0' -- not in the course of pulling REDC data
-				--and r.mm.pull.oneavail = '0' -- and not about to pull either
-			then
-				v.shift.do := '0';
-				-- pragma translate_off
-				v.active := '1';
-				-- pragma translate_on
-				v.shift.busy := '1';
-				if shuffle then -- statically resolved by synthesizer
-					v.shift.shstart(sramlatp2 + 2) := '1';
-				else
-					v.shift.shstart(sramlat + 2) := '1';
-				end if;
-				v.fpram.raddrmuxsel := "00";
-				v.fpram.waddrmuxsel := "011"; -- (s56) (see (s20))
-				v.shift.zero := '1';
-				if shuffle then -- statically resolved by synthesizer
-					v.fpram.wecnt :=
-						to_unsigned(sramlatp2 + 3, log2(sramlatp2 + 4));
-				else
-					v.fpram.wecnt :=
-						to_unsigned(sramlat + 3, log2(sramlatp2 + 4));
-				end if;
-				v.fpram.wecnten := '1';
-				-- support of NNSRLs & NNSRLf instructions: we assert the shift-enable
-				-- of the appropriate shift-register for just one cycle, see (s111).
-				-- Note that (s114) cannot interfere with (s109) or (s115) (nor can
-				-- these can interfere with (s114)) because (s109) is protected by
-				-- condition r.rnd.dosh=1 and (s115) is protected by condition
-				-- r.rnd.finalizesh=1, neither of which can happen simultaneously
-				-- to condition r.shift.do=1 which protects (s114).
-				if r.shift.rsh = '1' then
-					v.rnd.doshx(to_integer(unsigned(r.shift.rshid))) := '1'; -- (s114)
-				end if;
+			v.shift.do := '0';
+			-- pragma translate_off
+			v.active := '1';
+			-- pragma translate_on
+			v.shift.busy := '1';
+			if shuffle then -- statically resolved by synthesizer
+				v.shift.shstart(sramlatp2 + 2) := '1';
+			else
+				v.shift.shstart(sramlat + 2) := '1';
+			end if;
+			v.fpram.raddrmuxsel := "00"; -- (s16) (see (s17))
+			v.fpram.waddrmuxsel := "011"; -- (s56) (see (s20))
+			v.shift.zero := '1';
+			if shuffle then -- statically resolved by synthesizer
+				v.fpram.wecnt :=
+					to_unsigned(sramlatp2 + 3, log2(sramlatp2 + 4));
+			else
+				v.fpram.wecnt :=
+					to_unsigned(sramlat + 3, log2(sramlatp2 + 4));
+			end if;
+			v.fpram.wecnten := '1';
+			-- support of NNSRLs & NNSRLf instructions: we assert the shift-enable
+			-- of the appropriate shift-register for just one cycle, see (s111).
+			-- Note that (s114) cannot interfere with (s109) or (s115) (nor can
+			-- these can interfere with (s114)) because (s109) is protected by
+			-- condition r.rnd.dosh=1 and (s115) is protected by condition
+			-- r.rnd.finalizesh=1, neither of which can happen simultaneously
+			-- to condition r.shift.do=1 which protects (s114).
+			if r.shift.rsh = '1' then
+				v.rnd.doshx(to_integer(unsigned(r.shift.rshid))) := '1'; -- (s114)
 			end if;
 		end if;
 
 		if r.shift.busy = '1' then
-			-- note that (s111) cannot interfere with (s112) or (s113) (nor can these 
+			-- note that (s111) cannot interfere with (s112) or (s113) (nor can these
 			-- can interfere with (s111)) because (s112) is protected by condition
 			-- r.rnd.busy=1 and (s113) is protected by condition r.rnd.dosh=1,
 			-- neither of which can happen simultaneously to condition r.shift.busy=1
@@ -1632,17 +1658,17 @@ begin
 		then
 			v.fpram.re := '1';
 			-- we need to read exactly w ww-bit terms from ecc_fp_dram
-			v.shift.rdcnt := nndyn_wm1; --to_unsigned(w - 1, log2(w - 1));
+			v.shift.rdcnt := nndyn_wm1;
 			v.shift.rd := '1';
 		end if;
 
 		-- shift-register for events involved at computation end
 		if shuffle then -- statically resolved by synthesizer
 			v.shift.shend :=
-				'0' & r.shift.shend(sramlatp2 + 3 downto 1); -- (s72)
+				'0' & r.shift.shend(sramlatp2 + 3 downto 1);
 		else
 			v.shift.shend(sramlat + 3 downto 0) :=
-				'0' & r.shift.shend(sramlat + 3 downto 1); -- (s72)
+				'0' & r.shift.shend(sramlat + 3 downto 1);
 		end if;
 
 		-- end of operands reading + arm shift-register controlling end of ops
@@ -1660,7 +1686,7 @@ begin
 		end if;
 
 		-- r.opa increment/decrement
-		if r.shift.busy = '1' then --and r.fpram.re = '1' then
+		if r.shift.busy = '1' then
 			if r.ctrl.ssll = '1' then
 				-- for left-shift address must be incremented
 				v.opa(log2(n - 1) - 1 downto 0) :=
@@ -1730,7 +1756,6 @@ begin
 		then
 			v.fpram.we := '1';
 			v.shift.wr := '1';
-			--v.shift.wrcnt := to_unsigned(w - 1, log2(w - 1));
 			v.shift.wrcnt := nndyn_wm1;
 		end if;
 
@@ -1782,7 +1807,7 @@ begin
 		-- (deassertion of r.active, assertion of r.done
 		--  & signaling of a possible null result)
 		if r.shift.shend(0) = '1' then
-			v.done := '1'; -- stays asserted only 1 cycle thx to (s7)
+			v.done := '1'; -- (s138), stays asserted only 1 cycle thx to (s7)
 			-- pragma translate_off
 			v.active := '0';
 			-- pragma translate_on
@@ -1802,24 +1827,16 @@ begin
 		-- random data
 
 		if r.rnd.do = '1' then -- a 'generate-random' operation is pending
-			-- we must ensure that the logic pulling result from the Montgomery
-			-- multipliers when one has completed its computation it not about
-			-- to start doing so (that's the reason for the test 'r.mm.pull.pulling
-			-- and r.mm.pull.oneavail = 0' below)
-			if r.mm.pull.pulling = '0' -- not in the course of pulling REDC data
-				--and r.mm.pull.oneavail = '0' -- and not about to pull either
-			then
-				v.rnd.do := '0';
-				-- pragma translate_off
-				v.active := '1';
-				-- pragma translate_on
-				v.rnd.busy := '1';
-				v.rnd.trngrdy := '1'; -- to pull random numbers
-				v.rnd.opccnt := nndyn_wm1;
-				v.fpram.waddrmuxsel := "100";
-				v.rnd.zero := '1';
-				v.rnd.burstdone := '0';
-			end if;
+			v.rnd.do := '0';
+			-- pragma translate_off
+			v.active := '1';
+			-- pragma translate_on
+			v.rnd.busy := '1';
+			v.rnd.trngrdy := '1'; -- to pull random numbers
+			v.rnd.opccnt := nndyn_wm1;
+			v.fpram.waddrmuxsel := "100"; -- (s141), see (s20)
+			v.rnd.zero := '1';
+			v.rnd.burstdone := '0';
 		end if;
 
 		-- actual transfer of random words into ecc_fp_dram memory
@@ -1948,7 +1965,7 @@ begin
 			-- pragma translate_off
 			assert ( not ((r.rnd.doshxcnt(to_integer(r.rnd.shregid)) =
 			              (r.rnd.doshxcnt'range => '0'))
-			           and (r.rnd.doshcnt /= (r.rnd.doshxcnt'range => '0'))) ) 
+			           and (r.rnd.doshcnt /= (r.rnd.doshxcnt'range => '0'))) )
 				report "ecc_fp.vhd: inconsistent state was met while executing "
 				     & "opcode NNRNDs or NNRNDf"
 					severity FAILURE;
@@ -1961,8 +1978,6 @@ begin
 			v.rnd.doshxcnt(to_integer(r.rnd.shregid)) :=
 				r.rnd.doshxcnt(to_integer(r.rnd.shregid)) - 1;
 			-- detect end of shift
-				--if r.rnd.doshxcnt(to_integer(r.rnd.shregid)) =
-				--	(r.rnd.doshxcnt(to_integer(r.rnd.shregid))'range => '0') then
 			if r.rnd.doshxcnt(to_integer(r.rnd.shregid))(log2(SZ_SH_REG-1)-1) = '0'
 				and v.rnd.doshxcnt(to_integer(r.rnd.shregid))(log2(SZ_SH_REG-1)-1) = '1'
 			then
@@ -2002,7 +2017,7 @@ begin
 		end if;
 
 		if r.rnd.last = '1' then
-			v.done := '1'; -- stays asserted only 1 cycle thx to (s7)
+			v.done := '1'; -- (s139), stays asserted only 1 cycle thx to (s7)
 			-- pragma translate_off
 			v.active := '0';
 			-- pragma translate_on
@@ -2030,24 +2045,16 @@ begin
 		end if;
 
 		if r.par.do = '1' then -- a parity-test operation is pending
-			-- we must ensure that the logic pulling result from the Montgomery
-			-- multipliers when one has completed its computation it not about
-			-- to start doing so (that's the reason for the test 'r.mm.pull.pulling
-			-- and r.mm.pull.oneavail = 0' below)
-			if r.mm.pull.pulling = '0' -- not in the course of pulling REDC data
-				--and r.mm.pull.oneavail = '0' -- and not about to pull either
-			then
-				v.par.do := '0';
-				-- pragma translate_off
-				v.active := '1';
-				-- pragma translate_on
-				v.par.busy := '1';
-				v.fpram.raddrmuxsel := "00"; -- (s74) see (s17)
-				if shuffle then -- statically resolved by synthesizer
-					v.par.sh(sramlatp2 + 1) := '1';
-				else
-					v.par.sh(sramlat + 1) := '1';
-				end if;
+			v.par.do := '0';
+			-- pragma translate_off
+			v.active := '1';
+			-- pragma translate_on
+			v.par.busy := '1';
+			v.fpram.raddrmuxsel := "00"; -- (s74) see (s17)
+			if shuffle then -- statically resolved by synthesizer
+				v.par.sh(sramlatp2 + 1) := '1';
+			else
+				v.par.sh(sramlat + 1) := '1';
 			end if;
 		end if;
 
@@ -2060,7 +2067,7 @@ begin
 			v.fpram.re := '0';
 		elsif r.par.sh(0) = '1' then
 			v.par.par := fprdata(0); -- (s75) drives output 'opresultpar' (see (s76))
-			v.done := '1'; -- stays asserted only 1 cycle thx to (s7)
+			v.done := '1'; -- (s140), stays asserted only 1 cycle thx to (s7)
 			-- pragma translate_off
 			v.active := '0';
 			-- pragma translate_on
@@ -2075,23 +2082,18 @@ begin
 		--             multiplication result processing (s2)
 		-- -------------------------------------------------------------
 		-- read back the ww-bit words of the result of multiplication from
-		-- one selected multiplier that is showing "job done" and push them
+		-- one selected multiplier that is showing "job done", and push them
 		-- into ecc_fp_dram
 		-- also deassert r.mm.pull.done(r.mm.pull.done_id1)
 
 		-- r.mm.pull.zrencnt was initialized by (s121) (at the same time
 		-- the .shstart register was armed to control the sequence of events
 		-- for the starting part of 'pulling' action): when .zrencnt reaches 0
-		-- now it is the .shend shift-register which is armed, to now control
+		-- now it is the .shend shift-register which is armed, now to control
 		-- the sequence of events for the ending part of operations
 
-		--if shuffle then -- statically resolved by synthesizer
-			v.mm.pull.shend := '0' & r.mm.pull.shend(sramlat + 1 downto 1);
-		--else
-		--	v.mm.pull.shend(sramlat + 1 downto 0) :=
-		--		'0' & r.mm.pull.shend(sramlat + 1 downto 1);
-		--end if;
-		if r.mm.pull.pulling = '1' 
+		v.mm.pull.shend := '0' & r.mm.pull.shend(sramlat + 1 downto 1);
+		if r.mm.pull.pulling = '1'
 			--and r.mm.pull.zcntonce = '1' -- this condition is superfluous
 		then
 			v.mm.pull.zrencnt := r.mm.pull.zrencnt - 1;
@@ -2100,13 +2102,9 @@ begin
 				and v.mm.pull.zrencnt(log2(w - 1) - 1) = '1'
 			then
 				v.mm.mmi(r.mm.pull.done_id1).zren := '0';
-				v.mm.pull.done(r.mm.pull.done_id1) := '0'; -- (s13) bypass of (s12)
+				v.mm.pull.done(r.mm.pull.done_id1) := '0'; -- (s13), bypass of (s12)
 				if r.mm.pull.zcntonce = '1' then
-					--if shuffle then -- statically resolved by synthesizer
-						v.mm.pull.shend(sramlat + 1) := '1';
-					--else
-					--	v.mm.pull.shend(sramlat + 1) := '1';
-					--end if;
+					v.mm.pull.shend(sramlat + 1) := '1';
 				end if;
 				v.mm.pull.zcntonce := '0';
 			end if;
@@ -2116,19 +2114,13 @@ begin
 		-- the address where to write the result of the Montgomery multiplication)
 		-- into r.mm.pull.opc as we're going to increment it 'w' times in order
 		-- to burst-write the result of multiplication into ecc_fp_dram
-		--if r.active = '1' then
-			-- note that condition r.mm.pull.zrencnt = "1111" may appear
-			-- not only on 1st cycle of r.active = '1' phase, but also near
-			-- the end, where it does no harm as the write burst will be
-			-- completed by then
-			if r.mm.pull.shstart(1) = '1' then
-				v.mm.pull.opc := r.mm.push.opc(r.mm.pull.done_id1)
-					& std_logic_vector(to_unsigned(0, log2(n - 1)));
-			elsif r.mm.pull.pulling = '1' then
-				v.mm.pull.opc(log2(n - 1) - 1 downto 0) := std_logic_vector(
-					unsigned(r.mm.pull.opc(log2(n - 1) - 1 downto 0)) + 1);
-			end if;
-		--end if;
+		if r.mm.pull.shstart(1) = '1' then
+			v.mm.pull.opc := r.mm.push.opc(r.mm.pull.done_id1)
+				& std_logic_vector(to_unsigned(0, log2(n - 1)));
+		elsif r.mm.pull.pulling = '1' then
+			v.mm.pull.opc(log2(n - 1) - 1 downto 0) := std_logic_vector(
+				unsigned(r.mm.pull.opc(log2(n - 1) - 1 downto 0)) + 1);
+		end if;
 
 		-- assertion of r.fpram.we (write strobe into ecc_fp_dram)
 		if r.mm.pull.shstart(0) = '1' then
@@ -2149,11 +2141,16 @@ begin
 			v.active := '0';
 			-- pragma translate_on
 			v.fpram.we := '0';
-			v.done := '1'; -- (s8) stays asserted only 1 cycle thx to (s7)
+			v.done := '1'; -- (s8), stays asserted only 1 cycle thx to (s7)
 			v.mm.busy(r.mm.pull.done_id1) := '0'; -- (s11)
-			-- we must NOT assert r.rdy (only arithmeric & logical operations
-			-- are concerned by this signal)
-			--v.rdy := '1';
+			if r.mm.push.do = '0' then
+				v.rdy := '1';
+			end if;
+			v.mm.nb_pending_redc := r.mm.nb_pending_redc - 1; -- (s132)
+			if r.mm.nb_pending_redc = to_unsigned(1, log2(nbmult)) then
+				-- (means .nb_pending_redc is about to be set back to 0 by (s132))
+				v.mm.pending_redc := '0'; -- (s135)
+			end if;
 		end if;
 
 		-- -------------------------------------------------------------
@@ -2181,7 +2178,7 @@ begin
 			-- the test below is here so that when entering computation
 			-- of Montgomery constants or when entering computation of [k]P
 			-- or entering any of point-based operations or F_p arithmetic
-			-- operations, we don't leave r.fpram.we inadvertently asserted!
+			-- operations, we don't leave r.fpram.we inadvertently asserted
 			if   (r.compkpdel = '0' and compkp = '1')
 			  or (r.compcstmtydel = '0' and compcstmty = '1')
 			  or (r.comppopdel = '0' and comppop = '1')
@@ -2200,8 +2197,8 @@ begin
 		--                           r e a d
 
 		-- (s17) MUX select of r.fpram.raddr
-		--       (see also (s15), (s16), (s26), (s27), (s34), (s35), (s36),
-		--                 (s48), (s55) & (s74))
+		-- (see also (s15), (s16), (s34), (s35), (s26), (s27), (s44), (s74)
+		--  & (s36))
 		case r.fpram.raddrmuxsel is
 			-- take address from r.opa (redc, sub, add, shift, xor, par)
 			when "00" => v.fpram.raddr := r.opa;
@@ -2215,11 +2212,11 @@ begin
 		--                          w r i t e
 
 		-- (s20) MUX select for r.fpram.waddr & r.fpram.wdata
-		--       (see also (s18), (s28), (s37), (s45) & (s56))
+		-- (see also (s18), (s28), (s37), (s45), (s56) & (s141))
 		-- NOTE: addition allows to set a multicycle of 2 periods
-		--       on path r.opc -> r.fpram.wdata because r.opc is set
-		--       1 cycle before r.fpram.we is asserted high (BUT CHECK
-		--       IF OTHER OPERATIONS ALLOW IT TOO)
+		-- on path r.opc -> r.fpram.wdata, because r.opc is set
+		-- 1 cycle before r.fpram.we is asserted high (BUT CHECK
+		-- IF OTHER OPERATIONS ALLOW IT TOO)
 		case r.fpram.waddrmuxsel is
 			-- addition/subtraction logic
 			when "000" => v.fpram.waddr := r.opc;
@@ -2231,17 +2228,11 @@ begin
 			when "011" => v.fpram.waddr := r.opc;
 			              v.fpram.wdata := r.shift.res;
 			-- randomization
-			--   note that ecc_pkg ensures that ww is smaller than (or equal to)
-			--   the size of trngdata signal - see function get_irn_wsize()
 			when "100" => v.fpram.waddr := r.opc;
 										v.fpram.wdata := r.rnd.data;
 			-- result of multiplication (redc)
 			when "110" => v.fpram.waddr := r.mm.pull.opc;
-										--if async and (ndsp = 1) then -- stat. resolved by syn
-										--	v.fpram.wdata := r.mm.mmo3(r.mm.pull.done_id1).z;
-										--else
-											v.fpram.wdata := mmo(r.mm.pull.done_id1).z;
-										--end if;
+										v.fpram.wdata := mmo(r.mm.pull.done_id1).z;
 			-- AXI-lite access ("111")
 			when "111" => v.fpram.waddr := xaddr;
 		                v.fpram.wdata := xwdata;
@@ -2258,11 +2249,12 @@ begin
 		end if;
 
 		-- synchronous (active-low) reset
-		if rstn = '0' or force_reset = '1' then
+		if rstn = '0' or swrst = '1' then
 			-- pragma translate_off
 			v.active := '0';
 			-- pragma translate_on
 			v.rdy := '1';
+			v.trypull := '0';
 			v.done := '0';
 			for i in 0 to nbmult - 1 loop
 				v.mm.mmi(i).xen := '0';
@@ -2281,6 +2273,8 @@ begin
 			-- redc
 			v.mm.push.busy := '0';
 			v.mm.push.do := '0';
+			v.mm.nb_pending_redc := (others => '0');
+			v.mm.pending_redc := '0';
 			-- add & sub
 			v.addsub.busy := '0';
 			v.addsub.do := '0';
@@ -2303,7 +2297,7 @@ begin
 			v.rnd.doshx := (others => '0');
 			v.rnd.finalizesh := '0';
 			-- ---------------------------------------
-			-- registers that do not need to be reset: -- TODO: complete
+			-- registers that do not need to be reset:
 			-- ---------------------------------------
 			-- r.op[abc], r.mm.push.opaorb, r.op[abc]cnt,
 			-- r.mm.mmi(i).xy,
@@ -2342,7 +2336,7 @@ begin
 	end process regs;
 
 	-- pragma translate_off
-	fplog: process(clk, rstn)
+	fplog: process(clk)
 		file output : TEXT open write_mode is simlog;
 		variable lineout : line;
 		variable vres : std_logic_vector(2*w*ww - 1 downto 0);
@@ -2350,7 +2344,6 @@ begin
 		variable vip : natural range 0 to 2*n - 1;
 		variable vaddra, vaddrb, vaddrc : std_logic_vector(4 downto 0);
 		variable newprg : boolean;
-		--variable redc_2nd_input : boolean := FALSE;
 		variable x0, y0, x1, y1, z : std_logic_vector(ww*w - 1 downto 0);
 		variable pa : natural;
 		variable vfp : std_logic_vector(ww - 1 downto 0);
@@ -2372,115 +2365,725 @@ begin
 		-- the reason for the string' attribute appearing several times below
 		-- (without it simulators won't know how to differentiate between
 		-- string or bit_vector for the 2nd parameter and will issue an error)
-		if rstn = '0' then
-			rblog.b <= '0';
-			rblog.bz <= '0';
-			rblog.bsn <= '0';
-			rblog.bodd <= '0';
-			rblog.call <= '0';
-			rblog.callsn <= '0';
-			rblog.ret <= '0';
-			rblog.nop <= '0';
-			rblog.active <= '0';
-			rblog.mmpushdo <= '0';
-		elsif clk'event and clk = '1' then
-			rblog.b <= b;
-			rblog.bz <= bz;
-			rblog.bsn <= bsn;
-			rblog.bodd <= bodd;
-			rblog.call <= call;
-			rblog.callsn <= callsn;
-			rblog.ret <= ret;
-			rblog.retpc <= retpc;
-			rblog.nop <= nop;
-			rblog.active <= r.active;
-			rblog.mmpushdo <= r.mm.push.do;
-			-- 1-cycle delayed version of rblog
-			rblogbak <= rblog;
-			vw := to_integer(nndyn_w);
-			-- compute vfpnbc
-			if (vw * ww) mod 4 = 0 then
-				vfpnbc0 := (vw * ww) / 4;
+		if clk'event and clk = '1' then
+			if rstn = '0' then
+				rblog.b <= '0';
+				rblog.bz <= '0';
+				rblog.bsn <= '0';
+				rblog.bodd <= '0';
+				rblog.call <= '0';
+				rblog.callsn <= '0';
+				rblog.ret <= '0';
+				rblog.nop <= '0';
+				rblog.active <= '0';
+				rblog.mmpushdo <= '0';
 			else
-				vfpnbc0 := ((vw * ww) / 4) + 1;
-			end if;
-			vfpnbc := vfpnbc0;
-			-- compute vanbc
-			if IRAM_ADDR_SZ mod 4 = 0 then
-				vanbc := IRAM_ADDR_SZ / 4;
-			else
-				vanbc := (IRAM_ADDR_SZ / 4) + 1;
-			end if;
-			vanbc0 := vanbc;
-			if vfpnbc = vanbc then
-				vanbc := 0;
-				vfpnbc := 0;
-			elsif vfpnbc > vanbc then
-				vanbc := vfpnbc - vanbc;
-				vfpnbc := 0;
-			else
-				vfpnbc := vanbc - vfpnbc;
-				vanbc := 0;
-			end if;
-			assert (nbopcodes > 0)
-				report "nbopcodes in ecc_customize.vhd doesn't make sense"
-					severity FAILURE;
-			vadec := (3*log10(nblargenb)) + 13;
-			vptch := log10((2**OP_PATCH_SZ) - 1);
-			-- ------------------------------
-			-- LOG of ARITHmetic instructions
-			-- ------------------------------
-			if (r.addsub.do or r.xxor.do or r.shift.do or r.par.do
-				or r.rnd.do) = '1'
-			then
-				vi := 0;
-				vaddra := r.opa(4 + log2(n - 1) downto log2(n - 1));
-				vaddrb := r.opb(4 + log2(n - 1) downto log2(n - 1));
-				vaddrc := r.opc(4 + log2(n - 1) downto log2(n - 1));
-			end if;
-			if (r.fpram.we = '0' and r.mm.pull.pulling = '1') then
-				vip := 0;
-				vaddra := r.opa(4 + log2(n - 1) downto log2(n - 1));
-				vaddrb := r.opb(4 + log2(n - 1) downto log2(n - 1));
-				vaddrc := r.opc(4 + log2(n - 1) downto log2(n - 1));
-			end if;
-			if r.active = '1' then
-				-- LOG of FPREDC instruction input (Montgomery Multiplication)
-				if rblog.mmpushdo = '1' and r.mm.push.do = '0' and
-					r.mm.push.busy = '1'
+				rblog.b <= b;
+				rblog.bz <= bz;
+				rblog.bsn <= bsn;
+				rblog.bodd <= bodd;
+				rblog.call <= call;
+				rblog.callsn <= callsn;
+				rblog.ret <= ret;
+				rblog.retpc <= retpc;
+				rblog.nop <= nop;
+				rblog.active <= r.active;
+				rblog.mmpushdo <= r.mm.push.do;
+				-- 1-cycle delayed version of rblog
+				rblogbak <= rblog;
+				vw := to_integer(nndyn_w);
+				-- compute vfpnbc
+				if (vw * ww) mod 4 = 0 then
+					vfpnbc0 := (vw * ww) / 4;
+				else
+					vfpnbc0 := ((vw * ww) / 4) + 1;
+				end if;
+				vfpnbc := vfpnbc0;
+				-- compute vanbc
+				if IRAM_ADDR_SZ mod 4 = 0 then
+					vanbc := IRAM_ADDR_SZ / 4;
+				else
+					vanbc := (IRAM_ADDR_SZ / 4) + 1;
+				end if;
+				vanbc0 := vanbc;
+				if vfpnbc = vanbc then
+					vanbc := 0;
+					vfpnbc := 0;
+				elsif vfpnbc > vanbc then
+					vanbc := vfpnbc - vanbc;
+					vfpnbc := 0;
+				else
+					vfpnbc := vanbc - vfpnbc;
+					vanbc := 0;
+				end if;
+				assert (nbopcodes > 0)
+					report "nbopcodes in ecc_customize.vhd doesn't make sense"
+						severity FAILURE;
+				vadec := (3*log10(nblargenb)) + 13;
+				vptch := log10((2**OP_PATCH_SZ) - 1);
+				-- ==============================
+				-- LOG of ARITHmetic instructions
+				-- ==============================
+				if (r.addsub.do or r.xxor.do or r.shift.do or r.par.do
+					or r.rnd.do) = '1'
 				then
-				--if r.mm.push.shstart(0) = '1' then
-				--if rblogbak.active = '0' and r.ctrl.redc = '1' then
-					--if redc_2nd_input_s then
-					--	redc_2nd_input_s <= FALSE;
-					--else
-						redc_2nd_input_s <= TRUE;
+					vi := 0;
+					vaddra := r.opa(4 + log2(n - 1) downto log2(n - 1));
+					vaddrb := r.opb(4 + log2(n - 1) downto log2(n - 1));
+					vaddrc := r.opc(4 + log2(n - 1) downto log2(n - 1));
+				end if;
+				if (r.fpram.we = '0' and r.mm.pull.pulling = '1') then
+					vip := 0;
+					vaddra := r.opa(4 + log2(n - 1) downto log2(n - 1));
+					vaddrb := r.opb(4 + log2(n - 1) downto log2(n - 1));
+					vaddrc := r.opc(4 + log2(n - 1) downto log2(n - 1));
+				end if;
+				if r.active = '1' then
+					-- -------------------------------
+					-- LOG of FPREDC instruction input (Montgomery Multiplication)
+					-- -------------------------------
+					if rblog.mmpushdo = '1' and r.mm.push.do = '0' and
+						r.mm.push.busy = '1'
+					then
+						if redc_2nd_input_s then
+							redc_2nd_input_s <= FALSE;
+						else
+							redc_2nd_input_s <= TRUE;
+							newprg := FALSE;
+							is_new_routine(lineout, pc, newprg);
+							if newprg then
+								writeline(output, lineout);
+							end if;
+						end if;
+						write(lineout, string'("[0x"));
+						hex_write(lineout, pc);
+						write(lineout, string'("] "));
+						write(lineout, string'("  FPREDC   "));
+						vj := vfpnbc0;
+						while vj > 0 loop
+							write(lineout, string'(" "));
+							vj := vj - 1;
+						end loop;
+						write(lineout, string'("  ("));
+						write_addr2(lineout, r.mm.push.opc(r.mm.push.id1));
+						write(lineout, string'(" <- "));
+						write_addr2(lineout, r.opa(4 + log2(n - 1) downto log2(n - 1)));
+						write(lineout, string'("  x  "));
+						write_addr2(lineout, r.opb(4 + log2(n - 1) downto log2(n - 1)));
+						write(lineout, string'(")  ["));
+						write(lineout, time'image(now));
+						write(lineout, string'("]"));
+						writeline(output, lineout);
+						-- handle possible STOP (end of routine)
+						if stop = '1' then
+							vj := vanbc0 + 9;
+							while vj > 0 loop
+								write(lineout, string'(" "));
+								vj := vj - 1;
+							end loop;
+							write(lineout, string'("STOP"));
+							writeline(output, lineout);
+							write(lineout, string'(""));
+							writeline(output, lineout);
+						end if;
+					end if;
+					-- --------------------------------
+					-- LOG of FPREDC instruction result
+					-- --------------------------------
+					if r.mm.pull.pulling = '1' then
+						if r.fpram.we = '1' then
+							vres(ww*vip + ww - 1 downto ww*vip) := r.fpram.wdata;
+							vip := vip + 1;
+							if vip = vw then
+								-- last word is being written, log out whole result on console
+								write(lineout, string'("        "));
+								write(lineout, string'("  FPREDC 0x"));
+								hex_write(lineout, vres(vw*ww - 1 downto 0));
+								write(lineout, string'("  ("));
+								write_addr2(lineout,
+									r.mm.pull.opc(FP_ADDR - 1 downto log2(n - 1)));
+								write(lineout, string'("             )  ["));
+								write(lineout, time'image(now));
+								write(lineout, string'("]"));
+								writeline(output, lineout);
+								vip := 0;
+							end if;
+						end if;
+					end if;
+					-- --------------------------------
+					-- LOG of NNADD & NNSUB instruction
+					-- --------------------------------
+					if r.addsub.busy = '1' then
+						if r.fpram.we = '1' then
+							vres(ww*vi + ww - 1 downto ww*vi) := r.fpram.wdata;
+							vi := vi + 1;
+							if vi = vw then
+								newprg := FALSE;
+								is_new_routine(lineout, pc, newprg);
+								if newprg then
+									writeline(output, lineout);
+								end if;
+								-- last word is being written, log out whole result on console
+								write(lineout, string'("[0x"));
+								hex_write(lineout, pc);
+								write(lineout, string'("] "));
+								if r.ctrl.add = '1' then
+									write(lineout, string'("   NNADD 0x"));
+								else --if r.ctrl.sub = '1'
+									write(lineout, string'("   NNSUB 0x"));
+								end if;
+								hex_write(lineout, vres(vw*ww - 1 downto 0));
+								vj := vfpnbc;
+								while vj > 0 loop
+									write(lineout, string'(" "));
+									vj := vj - 1;
+								end loop;
+								write(lineout, string'("  ("));
+								write_addr2(lineout, vaddrc);
+								write(lineout, string'(" <- "));
+								write_addr2(lineout, vaddra);
+								if r.ctrl.add = '1' then
+									write(lineout, string'("  +  "));
+								else --if r.ctrl.sub = '1'
+									write(lineout, string'("  -  "));
+								end if;
+								write_addr2(lineout, vaddrb);
+								write(lineout, string'(")  ["));
+								write(lineout, time'image(now));
+								write(lineout, string'("]"));
+								writeline(output, lineout);
+								vi := 0;
+								-- handle possible STOP (end of routine)
+								if stop = '1' then
+									vj := vanbc0 + 9;
+									while vj > 0 loop
+										write(lineout, string'(" "));
+										vj := vj - 1;
+									end loop;
+									write(lineout, string'("STOP"));
+									writeline(output, lineout);
+									write(lineout, string'(""));
+									writeline(output, lineout);
+								end if;
+							end if;
+						end if;
+					end if;
+					-- ------------------------
+					-- LOG of NNXOR instruction
+					-- ------------------------
+					if r.xxor.busy = '1' then
+						if r.fpram.we = '1' then
+							vres(ww*vi + ww - 1 downto ww*vi) := r.fpram.wdata;
+							vi := vi + 1;
+							if vi = vw then
+								-- last word is being written, log out whole result on console
+								newprg := FALSE;
+								is_new_routine(lineout, pc, newprg);
+								if newprg then
+									writeline(output, lineout);
+								end if;
+								-- last word is being written, log out whole result on console
+								write(lineout, string'("[0x"));
+								hex_write(lineout, pc);
+								write(lineout, string'("] "));
+								write(lineout, string'("   NNXOR 0x"));
+								hex_write(lineout, vres(vw*ww - 1 downto 0));
+								write(lineout, string'("  ("));
+								write_addr2(lineout, vaddrc);
+								write(lineout, string'(" <- "));
+								write_addr2(lineout, vaddra);
+								write(lineout, string'(" (+) "));
+								write_addr2(lineout, vaddrb);
+								write(lineout, string'(")  ["));
+								write(lineout, time'image(now));
+								write(lineout, string'("]"));
+								writeline(output, lineout);
+								vi := 0;
+								-- handle possible STOP (end of routine)
+								if stop = '1' then
+									vj := vanbc0 + 9;
+									while vj > 0 loop
+										write(lineout, string'(" "));
+										vj := vj - 1;
+									end loop;
+									write(lineout, string'("STOP"));
+									writeline(output, lineout);
+									write(lineout, string'(""));
+									writeline(output, lineout);
+								end if;
+							end if;
+						end if;
+					end if;
+					-- LOG of shift-like instructions
+					if r.shift.busy = '1' then
+						-- ------------------------
+						-- LOG of NNSRL instruction
+						-- ------------------------
+						if r.ctrl.ssrl = '1' then
+							if r.fpram.we = '1' then
+								vres(ww*(vw-1-vi) + ww - 1 downto ww*(vw-1-vi)) := r.fpram.wdata;
+								vi := vi + 1;
+								if vi = vw then
+									-- last word is being written, log out whole result on console
+									newprg := FALSE;
+									is_new_routine(lineout, pc, newprg);
+									if newprg then
+										writeline(output, lineout);
+									end if;
+									write(lineout, string'("[0x"));
+									hex_write(lineout, pc);
+									write(lineout, string'("] "));
+									write(lineout, string'("   NNSRL 0x"));
+									hex_write(lineout, vres(vw*ww - 1 downto 0));
+									write(lineout, string'("  ("));
+									write_addr2(lineout, vaddrc);
+									write(lineout, string'(" <- "));
+									write_addr2(lineout, vaddra);
+									write(lineout, string'("  >>  1"));
+									write(lineout, string'(")  ["));
+									write(lineout, time'image(now));
+									write(lineout, string'("]"));
+									writeline(output, lineout);
+									vi := 0;
+									-- handle possible STOP (end of routine)
+									if stop = '1' then
+										vj := vanbc0 + 9;
+										while vj > 0 loop
+											write(lineout, string'(" "));
+											vj := vj - 1;
+										end loop;
+										write(lineout, string'("STOP"));
+										writeline(output, lineout);
+										write(lineout, string'(""));
+										writeline(output, lineout);
+									end if;
+								end if;
+							end if;
+						-- ------------------------
+						-- LOG of NNSLL instruction
+						-- ------------------------
+						elsif r.ctrl.ssll = '1' then
+							if r.fpram.we = '1' then
+								vres(ww*vi + ww - 1 downto ww*vi) := r.fpram.wdata;
+								vi := vi + 1;
+								if vi = vw then
+									newprg := FALSE;
+									is_new_routine(lineout, pc, newprg);
+									if newprg then
+										writeline(output, lineout);
+									end if;
+									-- last word is being written, log out whole result on console
+									write(lineout, string'("[0x"));
+									hex_write(lineout, pc);
+									write(lineout, string'("] "));
+									write(lineout, string'("   NNSLL 0x"));
+									hex_write(lineout, vres(vw*ww - 1 downto 0));
+									write(lineout, string'("  ("));
+									write_addr2(lineout, vaddrc);
+									write(lineout, string'(" <- "));
+									write_addr2(lineout, vaddra);
+									write(lineout, string'("  <<  1"));
+									write(lineout, string'(")  ["));
+									write(lineout, time'image(now));
+									write(lineout, string'("]"));
+									writeline(output, lineout);
+									vi := 0;
+									-- handle possible STOP (end of routine)
+									if stop = '1' then
+										vj := vanbc0 + 9;
+										while vj > 0 loop
+											write(lineout, string'(" "));
+											vj := vj - 1;
+										end loop;
+										write(lineout, string'("STOP"));
+										writeline(output, lineout);
+										write(lineout, string'(""));
+										writeline(output, lineout);
+									end if;
+								end if;
+							end if;
+						-- -------------------------
+						-- LOG of NNDIV2 instruction
+						-- -------------------------
+						elsif r.ctrl.div2 = '1' then
+							if r.fpram.we = '1' then
+								vres(ww*(vw-1-vi) + ww - 1 downto ww*(vw-1-vi)) := r.fpram.wdata;
+								vi := vi + 1;
+								if vi = vw then
+									newprg := FALSE;
+									is_new_routine(lineout, pc, newprg);
+									if newprg then
+										writeline(output, lineout);
+									end if;
+									-- last word is being written, log out whole result on console
+									write(lineout, string'("[0x"));
+									hex_write(lineout, pc);
+									write(lineout, string'("] "));
+									write(lineout, string'("  NNDIV2 0x"));
+									hex_write(lineout, vres(vw*ww - 1 downto 0));
+									write(lineout, string'("  ("));
+									write_addr2(lineout, vaddrc);
+									write(lineout, string'(" <- "));
+									write_addr2(lineout, vaddra);
+									write(lineout, string'("  /  2 "));
+									write(lineout, string'(")  ["));
+									write(lineout, time'image(now));
+									write(lineout, string'("]"));
+									writeline(output, lineout);
+									vi := 0;
+									-- handle possible STOP (end of routine)
+									if stop = '1' then
+										vj := vanbc0 + 9;
+										while vj > 0 loop
+											write(lineout, string'(" "));
+											vj := vj - 1;
+										end loop;
+										write(lineout, string'("STOP"));
+										writeline(output, lineout);
+										write(lineout, string'(""));
+										writeline(output, lineout);
+									end if;
+								end if;
+							end if;
+						end if;
+					end if; -- r.shift.busy = 1
+					-- --------------------------
+					-- LOG of TESTPAR instruction
+					-- --------------------------
+					if r.par.sh(0) = '1' then
 						newprg := FALSE;
 						is_new_routine(lineout, pc, newprg);
 						if newprg then
 							writeline(output, lineout);
 						end if;
-					--end if;
+						write(lineout, string'("[0x"));
+						hex_write(lineout, pc);
+						write(lineout, string'("] "));
+						if opi.parsh = '0' then
+							write(lineout, string'(" TESTPAR     "));
+						elsif opi.parsh = '1' then
+							write(lineout, string'(" TESTPARs    "));
+						end if;
+						vj := vfpnbc0;
+						while vj > 0 loop
+							write(lineout, string'(" "));
+							vj := vj - 1;
+						end loop;
+						write(lineout, string'("("));
+						write_addr2(lineout, vaddra);
+						-- 2 different logs, depending on whether TESTPAR or TESTPARs
+						if opi.parsh = '0' then
+							if fprdata(0) = '0' then
+								write(lineout, string'(" is   even   )  ["));
+							else
+								write(lineout, string'(" is    odd   )  ["));
+							end if;
+							write(lineout, time'image(now));
+							write(lineout, string'("]"));
+						elsif opi.parsh = '1' then
+							vpar := fprdata(0) xor opi.oposhr;
+							if vpar = '0' then
+								write(lineout, string'(" is   even   )  ["));
+							else
+								write(lineout, string'(" is    odd   )  ["));
+							end if;
+							write(lineout, time'image(now));
+							write(lineout, string'("] ("));
+							if vpar = '0' then
+								write(lineout, std_logic'image(fprdata(0)));
+								write(lineout, string'(" was unmasked by "));
+								write(lineout, std_logic'image(opi.oposhr));
+								write(lineout, string'(")"));
+							else
+								write(lineout, std_logic'image(fprdata(0)));
+								write(lineout, string'(" was unmasked by "));
+								write(lineout, std_logic'image(opi.oposhr));
+								write(lineout, string'(")"));
+							end if;
+						end if;
+						writeline(output, lineout);
+						-- handle possible STOP (end of routine)
+						if stop = '1' then
+							vj := vanbc0 + 9;
+							while vj > 0 loop
+								write(lineout, string'(" "));
+								vj := vj - 1;
+							end loop;
+							write(lineout, string'("STOP"));
+							writeline(output, lineout);
+							write(lineout, string'(""));
+							writeline(output, lineout);
+						end if;
+					end if; -- r.par.sh(0) = 1
+					-- ------------------------
+					-- LOG of NNRND instruction
+					-- ------------------------
+					if r.rnd.busy = '1' then
+						if r.fpram.we = '1' then
+							vres(ww*vi + ww - 1 downto ww*vi) := r.fpram.wdata;
+							vi := vi + 1;
+							if vi = vw then
+								newprg := FALSE;
+								is_new_routine(lineout, pc, newprg);
+								if newprg then
+									writeline(output, lineout);
+								end if;
+								-- last word is being written, log out whole result on console
+								write(lineout, string'("[0x"));
+								hex_write(lineout, pc);
+								write(lineout, string'("] "));
+								write(lineout, string'("   NNRND 0x"));
+								hex_write(lineout, vres(vw*ww - 1 downto 0));
+								write(lineout, string'("  ("));
+								write_addr2(lineout, vaddrc);
+								write(lineout, string'(" <- "));
+								write(lineout, string'(" random  )  ["));
+								write(lineout, time'image(now));
+								write(lineout, string'("]"));
+								writeline(output, lineout);
+								vi := 0;
+								-- handle possible STOP (end of routine)
+								if stop = '1' then
+									vj := vanbc0 + 9;
+									while vj > 0 loop
+										write(lineout, string'(" "));
+										vj := vj - 1;
+									end loop;
+									write(lineout, string'("STOP"));
+									writeline(output, lineout);
+									write(lineout, string'(""));
+									writeline(output, lineout);
+								end if;
+							end if;
+						end if;
+					end if; -- r.rnd.busy = 1
+				end if; -- r.active = 1
+				-- ========================
+				-- LOG of JUMP instructions
+				-- ========================
+				-- --------------------
+				-- LOG of J instruction
+				-- --------------------
+				if rblog.b = '1' and rblogbak.b = '0' then
+					newprg := FALSE;
+					is_new_routine(lineout, pc, newprg);
+					if newprg then
+						writeline(output, lineout);
+					end if;
 					write(lineout, string'("[0x"));
 					hex_write(lineout, pc);
 					write(lineout, string'("] "));
-					write(lineout, string'("  FPREDC   "));
+					write(lineout, string'("       J 0x"));
+					hex_write(lineout, imma);
+					vj := vanbc;
+					while vj > 0 loop
+						write(lineout, string'(" "));
+						vj := vj - 1;
+					end loop;
+					vj := vadec;
+					while vj > 0 loop
+						write(lineout, string'(" "));
+						vj := vj - 1;
+					end loop;
+					write(lineout, string'("  ["));
+					write(lineout, time'image(now));
+					write(lineout, string'("]"));
+					writeline(output, lineout);
+				-- ---------------------
+				-- LOG of Jz instruction
+				-- ---------------------
+				elsif rblog.bz = '1' and rblogbak.bz = '0' then
+					newprg := FALSE;
+					is_new_routine(lineout, pc, newprg);
+					if newprg then
+						writeline(output, lineout);
+					end if;
+					write(lineout, string'("[0x"));
+					hex_write(lineout, pc);
+					write(lineout, string'("] "));
+					write(lineout, string'("      Jz 0x"));
+					hex_write(lineout, imma);
+					vj := vanbc;
+					while vj > 0 loop
+						write(lineout, string'(" "));
+						vj := vj - 1;
+					end loop;
+					vj := vadec;
+					while vj > 0 loop
+						write(lineout, string'(" "));
+						vj := vj - 1;
+					end loop;
+					write(lineout, string'("  ["));
+					write(lineout, time'image(now));
+					write(lineout, string'("]"));
+					writeline(output, lineout);
+				-- ----------------------
+				-- LOG of Jsn instruction
+				-- ----------------------
+				elsif rblog.bsn = '1' and rblogbak.bsn = '0' then
+					newprg := FALSE;
+					is_new_routine(lineout, pc, newprg);
+					if newprg then
+						writeline(output, lineout);
+					end if;
+					write(lineout, string'("[0x"));
+					hex_write(lineout, pc);
+					write(lineout, string'("] "));
+					write(lineout, string'("     Jsn 0x"));
+					hex_write(lineout, imma);
+					vj := vanbc;
+					while vj > 0 loop
+						write(lineout, string'(" "));
+						vj := vj - 1;
+					end loop;
+					vj := vadec;
+					while vj > 0 loop
+						write(lineout, string'(" "));
+						vj := vj - 1;
+					end loop;
+					write(lineout, string'("  ["));
+					write(lineout, time'image(now));
+					write(lineout, string'("]"));
+					writeline(output, lineout);
+				-- -----------------------
+				-- LOG of Jodd instruction
+				-- -----------------------
+				elsif rblog.bodd = '1' and rblogbak.bodd = '0' then
+					newprg := FALSE;
+					is_new_routine(lineout, pc, newprg);
+					if newprg then
+						writeline(output, lineout);
+					end if;
+					write(lineout, string'("[0x"));
+					hex_write(lineout, pc);
+					write(lineout, string'("] "));
+					write(lineout, string'("    Jodd 0x"));
+					hex_write(lineout, imma);
+					vj := vanbc;
+					while vj > 0 loop
+						write(lineout, string'(" "));
+						vj := vj - 1;
+					end loop;
+					vj := vadec;
+					while vj > 0 loop
+						write(lineout, string'(" "));
+						vj := vj - 1;
+					end loop;
+					write(lineout, string'("  ["));
+					write(lineout, time'image(now));
+					write(lineout, string'("]"));
+					writeline(output, lineout);
+				-- ---------------------
+				-- LOG of JL instruction
+				-- ---------------------
+				elsif rblog.call = '1' and rblogbak.call = '0' then
+					newprg := FALSE;
+					is_new_routine(lineout, pc, newprg);
+					if newprg then
+						writeline(output, lineout);
+					end if;
+					write(lineout, string'("[0x"));
+					hex_write(lineout, pc);
+					write(lineout, string'("] "));
+					write(lineout, string'("      JL 0x"));
+					hex_write(lineout, imma);
+					vj := vanbc;
+					while vj > 0 loop
+						write(lineout, string'(" "));
+						vj := vj - 1;
+					end loop;
+					vj := vadec;
+					while vj > 0 loop
+						write(lineout, string'(" "));
+						vj := vj - 1;
+					end loop;
+					write(lineout, string'("  ["));
+					write(lineout, time'image(now));
+					write(lineout, string'("]"));
+					writeline(output, lineout);
+				-- -----------------------
+				-- LOG of JLsn instruction
+				-- -----------------------
+				elsif rblog.callsn = '1' and rblogbak.callsn = '0' then
+					newprg := FALSE;
+					is_new_routine(lineout, pc, newprg);
+					if newprg then
+						writeline(output, lineout);
+					end if;
+					write(lineout, string'("[0x"));
+					hex_write(lineout, pc);
+					write(lineout, string'("] "));
+					write(lineout, string'("  JLsn 0x"));
+					hex_write(lineout, imma);
+					vj := vanbc;
+					while vj > 0 loop
+						write(lineout, string'(" "));
+						vj := vj - 1;
+					end loop;
+					vj := vadec;
+					while vj > 0 loop
+						write(lineout, string'(" "));
+						vj := vj - 1;
+					end loop;
+					write(lineout, string'("  ["));
+					write(lineout, time'image(now));
+					write(lineout, string'("]"));
+					writeline(output, lineout);
+				-- ----------------------
+				-- LOG of RET instruction
+				-- ----------------------
+				elsif rblog.ret = '1' and rblogbak.ret = '0' then
+					newprg := FALSE;
+					is_new_routine(lineout, pc, newprg);
+					if newprg then
+						writeline(output, lineout);
+					end if;
+					write(lineout, string'("[0x"));
+					hex_write(lineout, pc);
+					write(lineout, string'("] "));
+					write(lineout, string'("     RET (0x"));
+					hex_write(lineout, retpc);
+					write(lineout, string'(")"));
+					vj := vanbc;
+					while vj > 0 loop
+						write(lineout, string'(" "));
+						vj := vj - 1;
+					end loop;
+					vj := vadec;
+					while vj > 0 loop
+						write(lineout, string'(" "));
+						vj := vj - 1;
+					end loop;
+					write(lineout, string'("["));
+					write(lineout, time'image(now));
+					write(lineout, string'("]"));
+					writeline(output, lineout);
+				-- ======================
+				-- LOG of NOP instruction
+				-- ======================
+				elsif rblog.nop = '1' and rblogbak.nop = '0' then
+					newprg := FALSE;
+					is_new_routine(lineout, pc, newprg);
+					if newprg then
+						writeline(output, lineout);
+					end if;
+					write(lineout, string'("[0x"));
+					hex_write(lineout, pc);
+					write(lineout, string'("] "));
+					write(lineout, string'("     NOP "));
+					write(lineout, string'("  "));
 					vj := vfpnbc0;
 					while vj > 0 loop
 						write(lineout, string'(" "));
 						vj := vj - 1;
 					end loop;
-					--write(lineout, string'(
-					--	"                  new inputs to multiplier "));
-					--write(lineout, r.mm.push.id1);
-					--write(lineout, string'("                                     "));
-					write(lineout, string'("  ("));
-					write_addr2(lineout, r.mm.push.opc(r.mm.push.id1));
-					write(lineout, string'(" <- "));
-					write_addr2(lineout, r.opa(4 + log2(n - 1) downto log2(n - 1)));
-					write(lineout, string'("  x  "));
-					write_addr2(lineout, r.opb(4 + log2(n - 1) downto log2(n - 1)));
-					write(lineout, string'(")  ["));
+					vj := vadec;
+					while vj > 0 loop
+						write(lineout, string'(" "));
+						vj := vj - 1;
+					end loop;
+					write(lineout, string'("  "));
+					write(lineout, string'("["));
 					write(lineout, time'image(now));
 					write(lineout, string'("]"));
 					writeline(output, lineout);
@@ -2496,814 +3099,162 @@ begin
 						write(lineout, string'(""));
 						writeline(output, lineout);
 					end if;
-					--end if;
 				end if;
-				-- LOG of FPREDC instruction result
-				if r.mm.pull.pulling = '1' then
-					if r.fpram.we = '1' then
-						vres(ww*vip + ww - 1 downto ww*vip) := r.fpram.wdata;
-						vip := vip + 1;
-						if vip = vw then
-							-- last word is being written, log out whole result on console
-							write(lineout, string'("        "));
-							write(lineout, string'("  FPREDC 0x"));
-							hex_write(lineout, vres(vw*ww - 1 downto 0));
-							write(lineout, string'("  ("));
-							write_addr2(lineout,
-								r.mm.pull.opc(FP_ADDR - 1 downto log2(n - 1)));
-							write(lineout, string'("             )  ["));
-							write(lineout, time'image(now));
-							write(lineout, string'("]"));
-							writeline(output, lineout);
-							vip := 0;
-						end if;
+				-- =====================================
+				-- LOG the coordinates of points R0 & R1 (along with Z-coord)
+				-- =====================================
+				if logr0r1 = '1' then
+					-- get randomized coordinates of the four point [XY]R[01]
+					if logr0r1step = 0 or logr0r1step = 1 or logr0r1step = 2 then
+						v_addr_xr0 := 4 + to_integer(unsigned(xr0addr));
+						v_addr_yr0 := 4 + to_integer(unsigned(yr0addr));
+						v_addr_xr1 := 4 + to_integer(unsigned(xr1addr));
+						v_addr_yr1 := 4 + to_integer(unsigned(yr1addr));
+					elsif logr0r1step = 3 then -- at debut or at end (no shuffling)
+						v_addr_xr0 := LARGE_NB_XR0_ADDR;
+						v_addr_yr0 := LARGE_NB_YR0_ADDR;
+						v_addr_xr1 := LARGE_NB_XR1_ADDR;
+						v_addr_yr1 := LARGE_NB_YR1_ADDR;
 					end if;
-				end if;
-				-- LOG of NNADD & NNSUB instruction
-				if r.addsub.busy = '1' then
-					if r.fpram.we = '1' then
-						vres(ww*vi + ww - 1 downto ww*vi) := r.fpram.wdata;
-						vi := vi + 1;
-						if vi = vw then
-							newprg := FALSE;
-							is_new_routine(lineout, pc, newprg);
-							if newprg then
-								writeline(output, lineout);
-							end if;
-							-- last word is being written, log out whole result on console
-							write(lineout, string'("[0x"));
-							hex_write(lineout, pc);
-							write(lineout, string'("] "));
-							--if patching = '1' then
-							--	if r.ctrl.add = '1' then
-							--		write(lineout, string'("   NNADD,p"));
-							--		dec0pad(lineout, patchid);
-							--	else --if r.ctrl.sub = '1'
-							--		write(lineout, string'("   NNSUB,p"));
-							--		dec0pad(lineout, patchid);
-							--	end if;
-							--	write(lineout, string'(" "));
-							--else
-							--	if r.ctrl.add = '1' then
-							--		write(lineout, string'("   NNADD"));
-							--		vj := vptch + 6;
-							--		while vj > 0 loop
-							--			write(lineout, string'(" "));
-							--			vj := vj - 1;
-							--		end loop;
-							--	else --if r.ctrl.sub = '1'
-							--		write(lineout, string'("   NNSUB"));
-							--	end if;
-							--end if;
-							--write(lineout, string'("0x"));
-
-							if r.ctrl.add = '1' then
-								write(lineout, string'("   NNADD 0x"));
-							else --if r.ctrl.sub = '1'
-								write(lineout, string'("   NNSUB 0x"));
-							end if;
-
-							hex_write(lineout, vres(vw*ww - 1 downto 0));
-							vj := vfpnbc;
-							while vj > 0 loop
-								write(lineout, string'(" "));
-								vj := vj - 1;
-							end loop;
-							write(lineout, string'("  ("));
-							write_addr2(lineout, vaddrc);
-							write(lineout, string'(" <- "));
-							write_addr2(lineout, vaddra);
-							if r.ctrl.add = '1' then
-								write(lineout, string'("  +  "));
-							else --if r.ctrl.sub = '1'
-								write(lineout, string'("  -  "));
-							end if;
-							write_addr2(lineout, vaddrb);
-							write(lineout, string'(")  ["));
-							write(lineout, time'image(now));
-							write(lineout, string'("]"));
-							writeline(output, lineout);
-							vi := 0;
-							-- handle possible STOP (end of routine)
-							if stop = '1' then
-								vj := vanbc0 + 9;
-								while vj > 0 loop
-									write(lineout, string'(" "));
-									vj := vj - 1;
-								end loop;
-								write(lineout, string'("STOP"));
-								writeline(output, lineout);
-								write(lineout, string'(""));
-								writeline(output, lineout);
-							end if;
-						end if;
-					end if;
-				end if;
-				-- LOG of NNXOR instruction
-				if r.xxor.busy = '1' then
-					if r.fpram.we = '1' then
-						vres(ww*vi + ww - 1 downto ww*vi) := r.fpram.wdata;
-						vi := vi + 1;
-						if vi = vw then
-							-- last word is being written, log out whole result on console
-							newprg := FALSE;
-							is_new_routine(lineout, pc, newprg);
-							if newprg then
-								writeline(output, lineout);
-							end if;
-							-- last word is being written, log out whole result on console
-							write(lineout, string'("[0x"));
-							hex_write(lineout, pc);
-							write(lineout, string'("] "));
-							write(lineout, string'("   NNXOR 0x"));
-							hex_write(lineout, vres(vw*ww - 1 downto 0));
-							write(lineout, string'("  ("));
-							write_addr2(lineout, vaddrc);
-							write(lineout, string'(" <- "));
-							write_addr2(lineout, vaddra);
-							write(lineout, string'(" (+) "));
-							write_addr2(lineout, vaddrb);
-							write(lineout, string'(")  ["));
-							write(lineout, time'image(now));
-							write(lineout, string'("]"));
-							writeline(output, lineout);
-							vi := 0;
-							-- handle possible STOP (end of routine)
-							if stop = '1' then
-								vj := vanbc0 + 9;
-								while vj > 0 loop
-									write(lineout, string'(" "));
-									vj := vj - 1;
-								end loop;
-								write(lineout, string'("STOP"));
-								writeline(output, lineout);
-								write(lineout, string'(""));
-								writeline(output, lineout);
-							end if;
-						end if;
-					end if;
-				end if;
-				-- LOG of shift-like instructions
-				if r.shift.busy = '1' then
-					-- LOG of NNSRL instruction
-					if r.ctrl.ssrl = '1' then
-						if r.fpram.we = '1' then
-							vres(ww*(vw-1-vi) + ww - 1 downto ww*(vw-1-vi)) := r.fpram.wdata;
-							vi := vi + 1;
-							if vi = vw then
-								-- last word is being written, log out whole result on console
-								newprg := FALSE;
-								is_new_routine(lineout, pc, newprg);
-								if newprg then
-									writeline(output, lineout);
-								end if;
-								write(lineout, string'("[0x"));
-								hex_write(lineout, pc);
-								write(lineout, string'("] "));
-								write(lineout, string'("   NNSRL 0x"));
-								hex_write(lineout, vres(vw*ww - 1 downto 0));
-								write(lineout, string'("  ("));
-								write_addr2(lineout, vaddrc);
-								write(lineout, string'(" <- "));
-								write_addr2(lineout, vaddra);
-								write(lineout, string'("  >>  1"));
-								write(lineout, string'(")  ["));
-								write(lineout, time'image(now));
-								write(lineout, string'("]"));
-								writeline(output, lineout);
-								vi := 0;
-								-- handle possible STOP (end of routine)
-								if stop = '1' then
-									vj := vanbc0 + 9;
-									while vj > 0 loop
-										write(lineout, string'(" "));
-										vj := vj - 1;
-									end loop;
-									write(lineout, string'("STOP"));
-									writeline(output, lineout);
-									write(lineout, string'(""));
-									writeline(output, lineout);
-								end if;
-							end if;
-						end if;
-					-- LOG of NNSLL instruction
-					elsif r.ctrl.ssll = '1' then
-						if r.fpram.we = '1' then
-							vres(ww*vi + ww - 1 downto ww*vi) := r.fpram.wdata;
-							vi := vi + 1;
-							if vi = vw then
-								newprg := FALSE;
-								is_new_routine(lineout, pc, newprg);
-								if newprg then
-									writeline(output, lineout);
-								end if;
-								-- last word is being written, log out whole result on console
-								write(lineout, string'("[0x"));
-								hex_write(lineout, pc);
-								write(lineout, string'("] "));
-								write(lineout, string'("   NNSLL 0x"));
-								hex_write(lineout, vres(vw*ww - 1 downto 0));
-								write(lineout, string'("  ("));
-								write_addr2(lineout, vaddrc);
-								write(lineout, string'(" <- "));
-								write_addr2(lineout, vaddra);
-								write(lineout, string'("  <<  1"));
-								write(lineout, string'(")  ["));
-								write(lineout, time'image(now));
-								write(lineout, string'("]"));
-								writeline(output, lineout);
-								vi := 0;
-								-- handle possible STOP (end of routine)
-								if stop = '1' then
-									vj := vanbc0 + 9;
-									while vj > 0 loop
-										write(lineout, string'(" "));
-										vj := vj - 1;
-									end loop;
-									write(lineout, string'("STOP"));
-									writeline(output, lineout);
-									write(lineout, string'(""));
-									writeline(output, lineout);
-								end if;
-							end if;
-						end if;
-					-- LOG of NNDIV2 instruction
-					elsif r.ctrl.div2 = '1' then
-						if r.fpram.we = '1' then
-							vres(ww*(vw-1-vi) + ww - 1 downto ww*(vw-1-vi)) := r.fpram.wdata;
-							vi := vi + 1;
-							if vi = vw then
-								newprg := FALSE;
-								is_new_routine(lineout, pc, newprg);
-								if newprg then
-									writeline(output, lineout);
-								end if;
-								-- last word is being written, log out whole result on console
-								write(lineout, string'("[0x"));
-								hex_write(lineout, pc);
-								write(lineout, string'("] "));
-								write(lineout, string'("  NNDIV2 0x"));
-								hex_write(lineout, vres(vw*ww - 1 downto 0));
-								write(lineout, string'("  ("));
-								write_addr2(lineout, vaddrc);
-								write(lineout, string'(" <- "));
-								write_addr2(lineout, vaddra);
-								write(lineout, string'("  /  2 "));
-								write(lineout, string'(")  ["));
-								write(lineout, time'image(now));
-								write(lineout, string'("]"));
-								writeline(output, lineout);
-								vi := 0;
-								-- handle possible STOP (end of routine)
-								if stop = '1' then
-									vj := vanbc0 + 9;
-									while vj > 0 loop
-										write(lineout, string'(" "));
-										vj := vj - 1;
-									end loop;
-									write(lineout, string'("STOP"));
-									writeline(output, lineout);
-									write(lineout, string'(""));
-									writeline(output, lineout);
-								end if;
-							end if;
-						end if;
-					end if;
-				end if; -- r.shift.busy = 1
-				-- LOG of TESTPAR instruction
-				if r.par.sh(0) = '1' then
-					newprg := FALSE;
-					is_new_routine(lineout, pc, newprg);
-					if newprg then
-						writeline(output, lineout);
-					end if;
-					write(lineout, string'("[0x"));
-					hex_write(lineout, pc);
-					write(lineout, string'("] "));
-					if opi.parsh = '0' then
-						write(lineout, string'(" TESTPAR     "));
-					elsif opi.parsh = '1' then
-						write(lineout, string'(" TESTPARs    "));
-					end if;
-					vj := vfpnbc0;
-					while vj > 0 loop
-						write(lineout, string'(" "));
-						vj := vj - 1;
-					end loop;
-					--write(lineout, string'("  "));
-					write(lineout, string'("("));
-					write_addr2(lineout, vaddra);
-					-- 2 different logs, depending on whether TESTPAR or TESTPARs
-					if opi.parsh = '0' then
-						if fprdata(0) = '0' then
-							write(lineout, string'(" is   even   )  ["));
-						else
-							write(lineout, string'(" is    odd   )  ["));
-						end if;
-						write(lineout, time'image(now));
-						write(lineout, string'("]"));
-					elsif opi.parsh = '1' then
-						vpar := fprdata(0) xor opi.oposhr;
-						if vpar = '0' then
-							write(lineout, string'(" is   even   )  ["));
-						else
-							write(lineout, string'(" is    odd   )  ["));
-						end if;
-						write(lineout, time'image(now));
-						write(lineout, string'("] ("));
-						if vpar = '0' then
-							write(lineout, std_logic'image(fprdata(0)));
-							write(lineout, string'(" was unmasked by "));
-							write(lineout, std_logic'image(opi.oposhr));
-							write(lineout, string'(")"));
-						else
-							write(lineout, std_logic'image(fprdata(0)));
-							write(lineout, string'(" was unmasked by "));
-							write(lineout, std_logic'image(opi.oposhr));
-							write(lineout, string'(")"));
-						end if;
-					end if;
-					--if fprdata(0) = '0' then
-					--	write(lineout, string'(" is   even   )  ["));
-					--else
-					--	write(lineout, string'(" is    odd   )  ["));
-					--end if;
-					writeline(output, lineout);
-					-- handle possible STOP (end of routine)
-					if stop = '1' then
-						vj := vanbc0 + 9;
-						while vj > 0 loop
-							write(lineout, string'(" "));
-							vj := vj - 1;
+					if shuffle then
+						for i in 0 to vw-1 loop
+							x0(ww*(i+1) - 1 downto ww*i) := fpdram(
+								vtophys((v_addr_xr0*n) + i));
+							y0(ww*(i+1) - 1 downto ww*i) := fpdram(
+								vtophys((v_addr_yr0*n) + i));
+							x1(ww*(i+1) - 1 downto ww*i) := fpdram(
+								vtophys((v_addr_xr1*n) + i));
+							y1(ww*(i+1) - 1 downto ww*i) := fpdram(
+								vtophys((v_addr_yr1*n) + i));
+							z(ww*(i+1) - 1 downto ww*i) := fpdram(
+								vtophys((LARGE_NB_ZR01_ADDR*n) + i));
 						end loop;
-						write(lineout, string'("STOP"));
-						writeline(output, lineout);
-						write(lineout, string'(""));
-						writeline(output, lineout);
+					else
+						for i in 0 to vw-1 loop
+							x0(ww*(i+1) - 1 downto ww*i) := fpdram((v_addr_xr0*n) + i);
+							y0(ww*(i+1) - 1 downto ww*i) := fpdram((v_addr_yr0*n) + i);
+							x1(ww*(i+1) - 1 downto ww*i) := fpdram((v_addr_xr1*n) + i);
+							y1(ww*(i+1) - 1 downto ww*i) := fpdram((v_addr_yr1*n) + i);
+							z(ww*(i+1) - 1 downto ww*i) := fpdram((LARGE_NB_ZR01_ADDR*n) + i);
+						end loop;
 					end if;
-				end if; -- r.par.sh(0) = 1
-				-- LOG of NNRND instruction
-				if r.rnd.busy = '1' then
-					if r.fpram.we = '1' then
-						vres(ww*vi + ww - 1 downto ww*vi) := r.fpram.wdata;
-						vi := vi + 1;
-						if vi = vw then
-							newprg := FALSE;
-							is_new_routine(lineout, pc, newprg);
-							if newprg then
-								writeline(output, lineout);
-							end if;
-							-- last word is being written, log out whole result on console
-							write(lineout, string'("[0x"));
-							hex_write(lineout, pc);
-							write(lineout, string'("] "));
-							write(lineout, string'("   NNRND 0x"));
-							hex_write(lineout, vres(vw*ww - 1 downto 0));
-							write(lineout, string'("  ("));
-							write_addr2(lineout, vaddrc);
-							write(lineout, string'(" <- "));
-							write(lineout, string'(" random  )  ["));
-							write(lineout, time'image(now));
-							write(lineout, string'("]"));
-							writeline(output, lineout);
-							vi := 0;
-							-- handle possible STOP (end of routine)
-							if stop = '1' then
-								vj := vanbc0 + 9;
-								while vj > 0 loop
-									write(lineout, string'(" "));
-									vj := vj - 1;
-								end loop;
-								write(lineout, string'("STOP"));
-								writeline(output, lineout);
-								write(lineout, string'(""));
-								writeline(output, lineout);
-							end if;
+					if logr0r1step = 0 then -- a step other than zaddu or zaddc
+						write(lineout, string'("R0/R1 coordinates :"));
+						writeline(output, lineout);
+					else
+						if logr0r1step = 1 then -- zaddu
+							write(lineout, string'("R0/R1 coordinates after ZADDU of BIT "));
+						elsif logr0r1step = 2 then -- zaddc
+							write(lineout, string'("R0/R1 coordinates after ZADDC of BIT "));
+						elsif logr0r1step = 3 then -- last zaddc
+							write(lineout, string'(
+								"R0/R1 coordinates (addresses not shuffled here)"));
 						end if;
+						if logr0r1step = 1 or logr0r1step = 2 then
+							write(lineout, simbit);
+							write(lineout, string'(" (kappa_"));
+							write(lineout, simbit);
+							write(lineout, string'(" = "));
+							if kap = '0' then
+								write(lineout, string'("0"));
+							elsif kap = '1' then
+								write(lineout, string'("1"));
+							else
+								write(lineout, string'("X"));
+							end if;
+							write(lineout, string'(", "));
+							write(lineout, string'(" kappa'_"));
+							write(lineout, simbit);
+							write(lineout, string'(" = "));
+							if kapp = '0' then
+								write(lineout, string'("0"));
+							elsif kapp = '1' then
+								write(lineout, string'("1"));
+							else
+								write(lineout, string'("X"));
+							end if;
+							write(lineout, string'(")"));
+						end if;
+						writeline(output, lineout);
 					end if;
-				end if; -- r.rnd.busy = 1
-			end if; -- r.active = 1
-			-- ------------------------
-			-- LOG of JUMP instructions
-			-- ------------------------
-			-- LOG of J instruction
-			if rblog.b = '1' and rblogbak.b = '0' then
-				newprg := FALSE;
-				is_new_routine(lineout, pc, newprg);
-				if newprg then
-					writeline(output, lineout);
-				end if;
-				write(lineout, string'("[0x"));
-				hex_write(lineout, pc);
-				write(lineout, string'("] "));
-				write(lineout, string'("       J 0x"));
-				hex_write(lineout, imma);
-				--for i in 0 to (ww*vw)/4 loop
-				--	write(lineout, string'(" "));
-				--end loop;
-				vj := vanbc;
-				while vj > 0 loop
-					write(lineout, string'(" "));
-					vj := vj - 1;
-				end loop;
-				vj := vadec;
-				while vj > 0 loop
-					write(lineout, string'(" "));
-					vj := vj - 1;
-				end loop;
-				write(lineout, string'("  ["));
-				--write(lineout, string'("                ["));
-				write(lineout, time'image(now));
-				write(lineout, string'("]"));
-				writeline(output, lineout);
-			-- LOG of Jz instruction
-			elsif rblog.bz = '1' and rblogbak.bz = '0' then
-				newprg := FALSE;
-				is_new_routine(lineout, pc, newprg);
-				if newprg then
-					writeline(output, lineout);
-				end if;
-				write(lineout, string'("[0x"));
-				hex_write(lineout, pc);
-				write(lineout, string'("] "));
-				write(lineout, string'("      Jz 0x"));
-				hex_write(lineout, imma);
-				--for i in 0 to (ww*vw)/4 loop
-				--	write(lineout, string'(" "));
-				--end loop;
-				vj := vanbc;
-				while vj > 0 loop
-					write(lineout, string'(" "));
-					vj := vj - 1;
-				end loop;
-				vj := vadec;
-				while vj > 0 loop
-					write(lineout, string'(" "));
-					vj := vj - 1;
-				end loop;
-				write(lineout, string'("  ["));
-				--write(lineout, string'("                ["));
-				write(lineout, time'image(now));
-				write(lineout, string'("]"));
-				writeline(output, lineout);
-			-- LOG of Jsn instruction
-			elsif rblog.bsn = '1' and rblogbak.bsn = '0' then
-				newprg := FALSE;
-				is_new_routine(lineout, pc, newprg);
-				if newprg then
-					writeline(output, lineout);
-				end if;
-				write(lineout, string'("[0x"));
-				hex_write(lineout, pc);
-				write(lineout, string'("] "));
-				write(lineout, string'("     Jsn 0x"));
-				hex_write(lineout, imma);
-				--for i in 0 to (ww*vw)/4 loop
-				--	write(lineout, string'(" "));
-				--end loop;
-				vj := vanbc;
-				while vj > 0 loop
-					write(lineout, string'(" "));
-					vj := vj - 1;
-				end loop;
-				vj := vadec;
-				while vj > 0 loop
-					write(lineout, string'(" "));
-					vj := vj - 1;
-				end loop;
-				--write(lineout, string'("  "));
-				--write(lineout, string'("                ["));
-				write(lineout, string'("  ["));
-				write(lineout, time'image(now));
-				write(lineout, string'("]"));
-				writeline(output, lineout);
-			-- LOG of Jodd instruction
-			elsif rblog.bodd = '1' and rblogbak.bodd = '0' then
-				newprg := FALSE;
-				is_new_routine(lineout, pc, newprg);
-				if newprg then
-					writeline(output, lineout);
-				end if;
-				write(lineout, string'("[0x"));
-				hex_write(lineout, pc);
-				write(lineout, string'("] "));
-				write(lineout, string'("    Jodd 0x"));
-				hex_write(lineout, imma);
-				--for i in 0 to vfpnbc - 1 loop --(ww*vw)/4 loop
-				--	write(lineout, string'(" "));
-				--end loop;
-				vj := vanbc;
-				while vj > 0 loop
-					write(lineout, string'(" "));
-					vj := vj - 1;
-				end loop;
-				vj := vadec;
-				while vj > 0 loop
-					write(lineout, string'(" "));
-					vj := vj - 1;
-				end loop;
-				--write(lineout, string'("  ["));
-				--write(lineout, string'("                ["));
-				write(lineout, string'("  ["));
-				write(lineout, time'image(now));
-				write(lineout, string'("]"));
-				writeline(output, lineout);
-			-- LOG of JL instruction
-			elsif rblog.call = '1' and rblogbak.call = '0' then
-				newprg := FALSE;
-				is_new_routine(lineout, pc, newprg);
-				if newprg then
-					writeline(output, lineout);
-				end if;
-				write(lineout, string'("[0x"));
-				hex_write(lineout, pc);
-				write(lineout, string'("] "));
-				write(lineout, string'("      JL 0x"));
-				hex_write(lineout, imma);
-				--write(lineout, string'(" ("));
-				--write_addr2(lineout, rparam);
-				--write(lineout, string'(")"));
-				--for i in 0 to (ww*vw)/4 loop
-				--	write(lineout, string'(" "));
-				--end loop;
-				vj := vanbc;
-				while vj > 0 loop
-					write(lineout, string'(" "));
-					vj := vj - 1;
-				end loop;
-				vj := vadec;
-				while vj > 0 loop
-					write(lineout, string'(" "));
-					vj := vj - 1;
-				end loop;
-				write(lineout, string'("  ["));
-				--write(lineout, string'("           ["));
-				write(lineout, time'image(now));
-				write(lineout, string'("]"));
-				writeline(output, lineout);
-			-- LOG of JLsn instruction
-			elsif rblog.callsn = '1' and rblogbak.callsn = '0' then
-				newprg := FALSE;
-				is_new_routine(lineout, pc, newprg);
-				if newprg then
-					writeline(output, lineout);
-				end if;
-				write(lineout, string'("[0x"));
-				hex_write(lineout, pc);
-				write(lineout, string'("] "));
-				write(lineout, string'("  JLsn 0x"));
-				hex_write(lineout, imma);
-				--write(lineout, string'(" ("));
-				--write_addr2(lineout, rparam);
-				--write(lineout, string'(")"));
-				--for i in 0 to (ww*vw)/4 loop
-				--	write(lineout, string'(" "));
-				--end loop;
-				vj := vanbc;
-				while vj > 0 loop
-					write(lineout, string'(" "));
-					vj := vj - 1;
-				end loop;
-				vj := vadec;
-				while vj > 0 loop
-					write(lineout, string'(" "));
-					vj := vj - 1;
-				end loop;
-				write(lineout, string'("  ["));
-				--write(lineout, string'("           ["));
-				write(lineout, time'image(now));
-				write(lineout, string'("]"));
-				writeline(output, lineout);
-			-- LOG of RET instruction
-			elsif rblog.ret = '1' and rblogbak.ret = '0' then
-				newprg := FALSE;
-				is_new_routine(lineout, pc, newprg);
-				if newprg then
-					writeline(output, lineout);
-				end if;
-				write(lineout, string'("[0x"));
-				hex_write(lineout, pc);
-				write(lineout, string'("] "));
-				write(lineout, string'("     RET (0x"));
-				hex_write(lineout, retpc);
-				write(lineout, string'(")"));
-				--for i in 0 to (ww*vw)/4 loop
-				--	write(lineout, string'(" "));
-				--end loop;
-				vj := vanbc;
-				while vj > 0 loop
-					write(lineout, string'(" "));
-					vj := vj - 1;
-				end loop;
-				vj := vadec;
-				while vj > 0 loop
-					write(lineout, string'(" "));
-					vj := vj - 1;
-				end loop;
-				write(lineout, string'("["));
-				--write(lineout, string'("              ["));
-				write(lineout, time'image(now));
-				write(lineout, string'("]"));
-				writeline(output, lineout);
-			-- LOG of NOP instruction
-			elsif rblog.nop = '1' and rblogbak.nop = '0' then
-				newprg := FALSE;
-				is_new_routine(lineout, pc, newprg);
-				if newprg then
-					writeline(output, lineout);
-				end if;
-				write(lineout, string'("[0x"));
-				hex_write(lineout, pc);
-				write(lineout, string'("] "));
-				write(lineout, string'("     NOP "));
-				--for i in 0 to (ww*vw)/4 loop
-				--	write(lineout, string'(" "));
-				--end loop;
-				write(lineout, string'("  "));
-				vj := vfpnbc0;
-				while vj > 0 loop
-					write(lineout, string'(" "));
-					vj := vj - 1;
-				end loop;
-				vj := vadec;
-				while vj > 0 loop
-					write(lineout, string'(" "));
-					vj := vj - 1;
-				end loop;
-				write(lineout, string'("  "));
-				--write(lineout, string'("     "));
-				--write(lineout, string'("                   ["));
-				write(lineout, string'("["));
-				write(lineout, time'image(now));
-				write(lineout, string'("]"));
-				writeline(output, lineout);
-				-- handle possible STOP (end of routine)
-				if stop = '1' then
-					vj := vanbc0 + 9;
-					while vj > 0 loop
-						write(lineout, string'(" "));
-						vj := vj - 1;
-					end loop;
-					write(lineout, string'("STOP"));
+					-- due to the countermeasure aiming at balancing the address of
+					-- coordinates of points R0 & R1 in ZADD[UC], we have to switch the
+					-- display of their coordinates for them to match the Sage log
+					-- script result (otherwise user might get confused)
+					if logr0r1step = 1 then
+						-- ZADDU
+						log_coords("  XR0", x0, v_addr_xr0, lineout);
+						if r0z = '1' then
+							write(lineout, string'("  but R0 = 0"));
+						end if;
+						writeline(output, lineout);
+						log_coords("  YR0", y0, v_addr_yr0, lineout);
+						if r0z = '1' then
+							write(lineout, string'("  but R0 = 0"));
+						end if;
+						writeline(output, lineout);
+						log_coords("  XR1", x1, v_addr_xr1, lineout);
+						if r1z = '1' then
+							write(lineout, string'("  but R1 = 0"));
+						end if;
+						writeline(output, lineout);
+						log_coords("  YR1", y1, v_addr_yr1, lineout);
+						if r1z = '1' then
+							write(lineout, string'("  but R1 = 0"));
+						end if;
+						writeline(output, lineout);
+					elsif logr0r1step = 0 or logr0r1step = 2 then
+						-- ZADDC
+						log_coords("  XR0", x0, v_addr_xr0, lineout);
+						if r0z = '1' then
+							write(lineout, string'("  but R0 = 0"));
+						end if;
+						writeline(output, lineout);
+						log_coords("  YR0", y0, v_addr_yr0, lineout);
+						if r0z = '1' then
+							write(lineout, string'("  but R0 = 0"));
+						end if;
+						writeline(output, lineout);
+						log_coords("  XR1", x1, v_addr_xr1, lineout);
+						if r1z = '1' then
+							write(lineout, string'("  but R1 = 0"));
+						end if;
+						writeline(output, lineout);
+						log_coords("  YR1", y1, v_addr_yr1, lineout);
+						if r1z = '1' then
+							write(lineout, string'("  but R1 = 0"));
+						end if;
+						writeline(output, lineout);
+					elsif logr0r1step = 3 then
+						-- last ZADDC (the one to condtionnaly subtract P)
+						log_coords("  XR0", x0, LARGE_NB_XR0_ADDR, lineout);
+						if r0z = '1' then
+							write(lineout, string'("  but R0 = 0"));
+						end if;
+						writeline(output, lineout);
+						log_coords("  YR0", y0, LARGE_NB_YR0_ADDR, lineout);
+						if r0z = '1' then
+							write(lineout, string'("  but R0 = 0"));
+						end if;
+						writeline(output, lineout);
+						log_coords("  XR1", x1, LARGE_NB_XR1_ADDR, lineout);
+						if r1z = '1' then
+							write(lineout, string'("  but R1 = 0"));
+						end if;
+						writeline(output, lineout);
+						log_coords("  YR1", y1, LARGE_NB_YR1_ADDR, lineout);
+						if r1z = '1' then
+							write(lineout, string'("  but R1 = 0"));
+						end if;
+						writeline(output, lineout);
+					end if;
+					log_coords("ZR01", z, LARGE_NB_ZR01_ADDR, lineout);
 					writeline(output, lineout);
 					write(lineout, string'(""));
 					writeline(output, lineout);
 				end if;
-			end if;
-			-- LOG the coordinates of points R0 & R1 (along with Z-coord)
-			if logr0r1 = '1' then
-				-- get randomized coordinates of the four point [XY]R[01]
-				if logr0r1step = 0 or logr0r1step = 1 or logr0r1step = 2 then
-					v_addr_xr0 := 4 + to_integer(unsigned(xr0addr));
-					v_addr_yr0 := 4 + to_integer(unsigned(yr0addr));
-					v_addr_xr1 := 4 + to_integer(unsigned(xr1addr));
-					v_addr_yr1 := 4 + to_integer(unsigned(yr1addr));
-				elsif logr0r1step = 3 then -- at debut or at end (no shuffling)
-					v_addr_xr0 := LARGE_NB_XR0_ADDR;
-					v_addr_yr0 := LARGE_NB_YR0_ADDR;
-					v_addr_xr1 := LARGE_NB_XR1_ADDR;
-					v_addr_yr1 := LARGE_NB_YR1_ADDR;
-				end if;
-				if shuffle then
-					for i in 0 to vw-1 loop
-						x0(ww*(i+1) - 1 downto ww*i) := fpdram(
-							vtophys((v_addr_xr0*n) + i));
-						y0(ww*(i+1) - 1 downto ww*i) := fpdram(
-							vtophys((v_addr_yr0*n) + i));
-						x1(ww*(i+1) - 1 downto ww*i) := fpdram(
-							vtophys((v_addr_xr1*n) + i));
-						y1(ww*(i+1) - 1 downto ww*i) := fpdram(
-							vtophys((v_addr_yr1*n) + i));
-						z(ww*(i+1) - 1 downto ww*i) := fpdram(
-							vtophys((LARGE_NB_ZR01_ADDR*n) + i));
-					end loop;
-				else
-					for i in 0 to vw-1 loop
-						x0(ww*(i+1) - 1 downto ww*i) := fpdram((v_addr_xr0*n) + i);
-						y0(ww*(i+1) - 1 downto ww*i) := fpdram((v_addr_yr0*n) + i);
-						x1(ww*(i+1) - 1 downto ww*i) := fpdram((v_addr_xr1*n) + i);
-						y1(ww*(i+1) - 1 downto ww*i) := fpdram((v_addr_yr1*n) + i);
-						z(ww*(i+1) - 1 downto ww*i) := fpdram((LARGE_NB_ZR01_ADDR*n) + i);
-					end loop;
-				end if;
-				if logr0r1step = 0 then -- a step other than zaddu or zaddc
-					write(lineout, string'("R0/R1 coordinates :"));
-					writeline(output, lineout);
-				else
-					if logr0r1step = 1 then -- zaddu
-						write(lineout, string'("R0/R1 coordinates after ZADDU of BIT "));
-					elsif logr0r1step = 2 then -- zaddc
-						write(lineout, string'("R0/R1 coordinates after ZADDC of BIT "));
-					elsif logr0r1step = 3 then -- last zaddc
-						write(lineout, string'(
-							"R0/R1 coordinates (addresses not shuffled here)"));
-					end if;
-					if logr0r1step = 1 or logr0r1step = 2 then
-						write(lineout, simbit);
-						write(lineout, string'(" (kappa_"));
-						write(lineout, simbit);
-						write(lineout, string'(" = "));
-						--write(lineout, kap);
-						if kap = '0' then
-							write(lineout, string'("0"));
-						elsif kap = '1' then
-							write(lineout, string'("1"));
-						else
-							write(lineout, string'("X"));
-						end if;
-						write(lineout, string'(", "));
-						write(lineout, string'(" kappa'_"));
-						write(lineout, simbit);
-						write(lineout, string'(" = "));
-						--write(lineout, kapp);
-						if kapp = '0' then
-							write(lineout, string'("0"));
-						elsif kapp = '1' then
-							write(lineout, string'("1"));
-						else
-							write(lineout, string'("X"));
-						end if;
-						write(lineout, string'(")"));
-					end if;
-					writeline(output, lineout);
-				end if;
-				-- due to the countermeasure aiming at balancing the address of
-				-- coordinates of points R0 & R1 in ZADD[UC], we have to switch the
-				-- display of their coordinates for them to match the Sage log
-				-- script result (otherwise user might get confused)
-				if logr0r1step = 1 then
-					-- ZADDU
-					log_coords("  XR0", x0, v_addr_xr0, lineout);
-					if r0z = '1' then
-						write(lineout, string'("  but R0 = 0"));
-					end if;
-					writeline(output, lineout);
-					log_coords("  YR0", y0, v_addr_yr0, lineout);
-					if r0z = '1' then
-						write(lineout, string'("  but R0 = 0"));
-					end if;
-					writeline(output, lineout);
-					log_coords("  XR1", x1, v_addr_xr1, lineout);
-					if r1z = '1' then
-						write(lineout, string'("  but R1 = 0"));
-					end if;
-					writeline(output, lineout);
-					log_coords("  YR1", y1, v_addr_yr1, lineout);
-					if r1z = '1' then
-						write(lineout, string'("  but R1 = 0"));
-					end if;
-					writeline(output, lineout);
-				elsif logr0r1step = 0 or logr0r1step = 2 then
-					-- ZADDC
-					log_coords("  XR0", x0, v_addr_xr0, lineout);
-					if r0z = '1' then
-						write(lineout, string'("  but R0 = 0"));
-					end if;
-					writeline(output, lineout);
-					log_coords("  YR0", y0, v_addr_yr0, lineout);
-					if r0z = '1' then
-						write(lineout, string'("  but R0 = 0"));
-					end if;
-					writeline(output, lineout);
-					log_coords("  XR1", x1, v_addr_xr1, lineout);
-					if r1z = '1' then
-						write(lineout, string'("  but R1 = 0"));
-					end if;
-					writeline(output, lineout);
-					log_coords("  YR1", y1, v_addr_yr1, lineout);
-					if r1z = '1' then
-						write(lineout, string'("  but R1 = 0"));
-					end if;
-					writeline(output, lineout);
-				elsif logr0r1step = 3 then
-					-- last ZADDC (the one to condtionnaly subtract P)
-					log_coords("  XR0", x0, LARGE_NB_XR0_ADDR, lineout);
-					if r0z = '1' then
-						write(lineout, string'("  but R0 = 0"));
-					end if;
-					writeline(output, lineout);
-					log_coords("  YR0", y0, LARGE_NB_YR0_ADDR, lineout);
-					if r0z = '1' then
-						write(lineout, string'("  but R0 = 0"));
-					end if;
-					writeline(output, lineout);
-					log_coords("  XR1", x1, LARGE_NB_XR1_ADDR, lineout);
-					if r1z = '1' then
-						write(lineout, string'("  but R1 = 0"));
-					end if;
-					writeline(output, lineout);
-					log_coords("  YR1", y1, LARGE_NB_YR1_ADDR, lineout);
-					if r1z = '1' then
-						write(lineout, string'("  but R1 = 0"));
-					end if;
-					writeline(output, lineout);
-				end if;
-				log_coords("ZR01", z, LARGE_NB_ZR01_ADDR, lineout);
-				writeline(output, lineout);
-				write(lineout, string'(""));
-				writeline(output, lineout);
-			end if;
-		end if;
+			end if; -- rstn
+		end if; -- clk'event
 	end process;
 
 	-- LOG final result (coordinates [k]P.x & [k]P.y)
@@ -3322,10 +3273,8 @@ begin
 				if shuffle then
 					for i in 0 to to_integer(nndyn_w) - 1 loop
 						xkp(ww*(i+1) - 1 downto ww*i) := fpdram(
-							--to_integer(unsigned(vtophys((CST_IADDR_XR1*n)+i))));
 							vtophys((LARGE_NB_XR1_ADDR*n)+i));
 						ykp(ww*(i+1) - 1 downto ww*i) := fpdram(
-							--to_integer(unsigned(vtophys((CST_IADDR_YR1*n)+i))));
 							vtophys((LARGE_NB_YR1_ADDR*n)+i));
 					end loop;
 				else
@@ -3370,8 +3319,8 @@ begin
 				write(lineout1, string'("[k]P.y = 0x"));
 				hex_write(lineout1, ykp(max(xmsb, ymsb) downto 0));
 				writeline(output1, lineout1);
-			end if;
-		end if;
+			end if; -- logfinalresult
+		end if; -- clk'event
 	end process;
 	-- pragma translate_on
 
@@ -3380,7 +3329,7 @@ begin
 	opo.rdy <= r.rdy;
 	opo.resultz <= r.ctrl.resultz;
 	opo.resultsn <= r.ctrl.resultsn;
-	opo.resultpar <= r.par.par; -- (s76) see (s75)
+	opo.resultpar <= r.par.par; -- (s76), see (s75)
 	opo.resulterr <= r.ctrl.resulterr;
 	opo.done <= r.done;
 	--   to multipliers
@@ -3399,10 +3348,10 @@ begin
 	-- Software is not necessariy malicious - it is the software that
 	-- provides the secret scalar... -, however it is safer to forbid any spying
 	-- into memory during the computation in case software has been compromised
-	--   TODO: set a multicycle constraint (using a large value, e.g 4 or even 8
-	--         or more) on the paths compkp -> xrdata
-	--                           and compcstmty -> xrdata
-	--          (but NOT on the path fprdata -> xrdata)
+	-- TODO: set a multicycle constraint (using a large value, e.g 4 or even 8
+	-- or more) on the paths compkp -> xrdata
+	--                   and compcstmty -> xrdata
+	--  (but NOT on the path fprdata -> xrdata)
 	xrdata <= fprdata when (   (compkp = '0' and compcstmty = '0')
 	                        or (       debug and dbghalted = '1')   )
 	                  else (others => '0');  -- (s99), see (s100) in ecc_curve.vhd

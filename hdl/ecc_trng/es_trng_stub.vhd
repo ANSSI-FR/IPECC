@@ -30,6 +30,7 @@ entity es_trng_stub is
 	port(
 		clk : in std_logic;
 		rstn : in std_logic;
+		swrst : in std_logic;
 		-- interface with ecc_trng_pp
 		data_t : out std_logic_vector(7 downto 0);
 		valid_t : out std_logic;
@@ -62,7 +63,7 @@ architecture struct of es_trng_stub is
 
 begin
 
-	comb: process(r, rstn, rdy_t, dbgtrngrawreset)
+	comb: process(r, rstn, rdy_t, dbgtrngrawreset, swrst)
 		variable v : reg_type;
 		variable tline : line;
 		variable good : boolean;
@@ -101,7 +102,7 @@ begin
 		end if;
 
 		-- synchronous reset
-		if rstn = '0' or dbgtrngrawreset = '1' then
+		if rstn = '0' or dbgtrngrawreset = '1' or swrst = '1' then
 			v.valid_t := '0';
 			v.oor := '1';
 		end if;

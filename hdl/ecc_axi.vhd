@@ -20,8 +20,7 @@ use ieee.numeric_std.all;
 use work.ecc_custom.all;
 use work.ecc_utils.all;
 use work.ecc_pkg.all;
---use work.ecc_trng_pkg.all; -- for irn_ & raw_ constants
-use work.mm_ndsp_pkg.all; -- for ndsp constant
+use work.mm_ndsp_pkg.all;
 -- pragma translate_off
 use std.textio.all;
 -- pragma translate_on
@@ -29,7 +28,7 @@ use std.textio.all;
 entity ecc_axi is
 	generic(
 		-- Width of S_AXI data bus
-		C_S_AXI_DATA_WIDTH : integer := axi32or64;
+		C_S_AXI_DATA_WIDTH : integer := axi32or64; -- (s194), see (s195)
 		-- Width of S_AXI address bus
 		C_S_AXI_ADDR_WIDTH : integer := 8);
 	port(
@@ -62,8 +61,6 @@ entity ecc_axi is
 		s_axi_rready : in std_logic;
 		-- interrupt
 		irq : out std_logic;
-		-- external reset
-		force_reset : in std_logic;
 		-- interface with ecc_scalar
 		--   general
 		initdone : in std_logic;
@@ -121,7 +118,7 @@ entity ecc_axi is
 		trngdata : in std_logic_vector(ww - 1 downto 0);
 		trngaxiirncount : in std_logic_vector(log2(irn_fifo_size_axi) - 1 downto 0);
 		trngefpirncount : in std_logic_vector(log2(irn_fifo_size_fp) - 1 downto 0);
-		trngcurirncount : in std_logic_vector(log2(irn_fifo_size_curve) - 1 downto 0);
+		trngcurirncount : in std_logic_vector(log2(irn_fifo_size_curve)-1 downto 0);
 		trngshfirncount : in std_logic_vector(log2(irn_fifo_size_sh) - 1 downto 0);
 		-- broadcast interface to Montgomery multipliers
 		pen : out std_logic;
@@ -139,10 +136,11 @@ entity ecc_axi is
 		nndyn_nnm3 : out unsigned(log2(nn) - 1 downto 0);
 		-- busy signal for [k]P computation
 		kppending : out std_logic;
+		-- software reset (to other components of the IP)
+		swrst : out std_logic;
 		-- debug features (interface with ecc_scalar)
 		dbgpgmstate : in std_logic_vector(3 downto 0);
 		dbgnbbits : in std_logic_vector(15 downto 0);
-		--dbgtime : in unsigned(31 downto 0);
 		-- debug features (interface with ecc_curve)
 		dbgbreakpoints : out breakpoints_type;
 		dbgnbopcodes : out std_logic_vector(15 downto 0);
@@ -304,7 +302,6 @@ architecture rtl of ecc_axi is
 		popdone_d : std_logic;
 		aopdone_d : std_logic;
 		yes : std_logic;
-		--yesen : std_logic;
 		r0_is_null : std_logic;
 		r1_is_null : std_logic;
 		p_set : std_logic;
@@ -330,6 +327,9 @@ architecture rtl of ecc_axi is
 		small_k_sz_en : std_logic;
 		small_k_sz_en_en : std_logic;
 		small_k_sz_is_on : std_logic;
+		-- software reset
+		swrst : std_logic;
+		swrst_cnt : unsigned(2 downto 0);
 	end record;
 
 	type nndyn_reg_type is record
@@ -485,7 +485,7 @@ begin
 
 	-- (s77), see (s76) & (s78)
 	assert (16 + FP_ADDR_MSB - 1 < 32)
-		report "ecc_axi.vhd: large numbers address too large to fit into CTRL reg"
+		report "ecc_axi.vhd: large numbers' address too large to fit in W_CTRL reg"
 			severity FAILURE;
 
 	-- (s79), see (s80) & (s81)
@@ -507,17 +507,13 @@ begin
 				 & "register R_DBG_STATUS wouldn't be correct)"
 			severity FAILURE;
 
-	-- -- (s93), see (s94) & (s95)
-	-- assert (log2(nn) <= STATUS_VALNN_SZ)
-	-- 	report "nn value too large to fit in STATUS register"
-	-- 		severity FAILURE;
-
+	-- (s195), see (s194)
 	assert (axi32or64 = 32 or axi32or64 = 64)
-		report "wrong value of paramter axi32or64 in ecc_custom (must be 32 or 64)"
+		report "wrong value of parameter axi32or64 in ecc_custom (must be 32 or 64)"
 			severity FAILURE;
 
 	-- (s144), see (s145)
-	assert (ww <= C_S_AXI_DATA_WIDTH)
+	assert ( (not debug) or ww <= C_S_AXI_DATA_WIDTH )
 		report "in debug mode ww must be smaller than or equal to "
 		     & "C_S_AXI_DATA_WIDTH"
 			severity FAILURE;
@@ -558,7 +554,7 @@ begin
 								trngvalid, trngdata, initdone,
 								trngaxiirncount, trngefpirncount, trngcurirncount,
 								trngshfirncount,
-								ar01zien, ar0zi, ar1zi, amtydone, force_reset,
+								ar01zien, ar0zi, ar1zi, amtydone,
 	              -- debug features
 								dbghalted, dbgdecodepc, dbgbreakpointid, dbgremainingopcodes,
 								dbgpdops,
@@ -597,20 +593,30 @@ begin
 	begin
 		v := r;
 
+		-- software reset (acts as a hardware reset for all other components of the
+		-- IP except for ecc_axi)
+		if r.ctrl.swrst = '1' then
+			v.ctrl.swrst_cnt := r.ctrl.swrst_cnt - 1;
+			if r.ctrl.swrst_cnt = (r.ctrl.swrst_cnt'range => '0') then
+				v.ctrl.swrst := '0';
+				v.axi.wready := '1'; -- (s197), see (s198)
+			end if;
+		end if;
+
 		v.ctrl.aerr_inpt_ack := '0';
 		v.ctrl.aerr_outpt_ack := '0';
 
 		v.debug.halt := '0'; -- (s154)
 
 		-- v_pop_possible must be always defined to avoid spurious latch inference
-		--   TODO: set multicycle constraint on the following paths (which all go
-		--         through combinational signals v_pop_possible & v_kp_possible):
-		--     r.ctrl.[pab]_set -> r.ctrl.agokp (see (s174))
-		--                      -> r.ctrl.lockaxi (see (s68))
-		--                      -> r.ctrl.ierrid (see (s176)-(s176))
-		--     r.ctrl.[pa]_set_and_mty -> r.ctrl.agokp
-		--                             -> r.ctrl.lockaxi
-		--                             -> r.ctrl.ierrid
+		-- TODO: multicycle constraints are possible  on the following paths (which
+		--   all go through combinational signals v_pop_possible & v_kp_possible):
+		-- r.ctrl.[pab]_set -> r.ctrl.agokp (see (s174))
+		--                  -> r.ctrl.lockaxi (see (s68))
+		--                  -> r.ctrl.ierrid (see (s176)-(s176))
+		-- r.ctrl.[pa]_set_and_mty -> r.ctrl.agokp
+		--                         -> r.ctrl.lockaxi
+		--                         -> r.ctrl.ierrid
 		--   The max number of cycles for the constraint should match the minimum
 		--   nb of cycles to be expected between 2 AXI transactions
 		if (r.ctrl.p_set and r.ctrl.p_set_and_mty and r.ctrl.a_set and
@@ -622,17 +628,11 @@ begin
 		end if;
 
 		-- v_kp_possible must be always defined to avoid spurious latch inference
-		--   TODO: set multicycle constraint on these paths (which all go through
-		--         combinational signal v_kp_possible):
-		--     r.ctrl.doblinding -> r.ctrl.agokp
-		--                       -> r.ctrl.lockaxi
-		--                       -> r.ctrl.ierrid
-		--     r.ctrl.[kq]_set -> r.ctrl.agokp
-		--                     -> r.ctrl.lockaxi
-		--                     -> r.ctrl.ierrid
-		--     r.nndyn.valwerr -> r.ctrl.agokp
-		--                     -> r.ctrl.lockaxi
-		--                     -> r.ctrl.ierrid
+		-- TODO: multicycle constraints are possible on the following paths (which
+		-- all go through combinational signal v_kp_possible):
+		--   r.ctrl.doblinding -> r.ctrl.agokp/r.ctrl.lockaxi/r.ctrl.ierrid
+		--   r.ctrl.[kq]_set -> r.ctrl.agokp/r.ctrl.lockaxi/r.ctrl.ierrid
+		--   r.nndyn.valwerr -> r.ctrl.agokp/r.ctrl.lockaxi/r.ctrl.ierrid
 		v_kp_possible := v_pop_possible and r.ctrl.k_set = '1' -- (s114)
 			and ((not nn_dynamic) or (nn_dynamic and r.nndyn.valwerr = '0')) and
 		  (r.ctrl.doblinding = '0' or (r.ctrl.doblinding and r.ctrl.q_set) = '1');
@@ -670,12 +670,11 @@ begin
 		         or (nn_dynamic and r.nndyn.active = '1')
 		         or r.read.trngreading = '1'
 		         or r.ctrl.lockaxi = '1';
-		-- (s161) compared to v_busy, v_wlock adds the condition that the last
+		-- (s161) - Compared to v_busy, v_wlock adds the condition that the last
 		-- prime size set by software did not incur an error - thus preventing
 		-- software from performing undesirable actions when nn is not set properly
-		-- yet, namely by not accessing the following write registers:
-		-- W_CTRL, W_R[01]_NULL, W_BLINDING, W_SHUFFLE, W_IRQ & W_SMALL_SCALAR,
-		-- see (s162) - (s168).
+		-- yet (this concerns the following write registers: W_CTRL, W_R[01]_NULL,
+		-- W_BLINDING, W_SHUFFLE, W_IRQ & W_SMALL_SCALAR, see (s162) - (s168)).
 		v_wlock := v_busy or (nn_dynamic and r.nndyn.valwerr = '1');
 
 		-- pragma translate_off
@@ -779,7 +778,7 @@ begin
 		-- bitwidth of numbers used to compare nb of blinding bits set by software
 		-- is the complete (32 - BLD_BITS_LSB) bits available in W_BLINDING register
 		-- so that software driver can be compiled without any prejudice regarding
-		-- the value set for nn at synthesis time in ecc_customize.vhd. This value
+		-- the value set for nn at synthesis time in ecc_customize.vhd. Value of nn
 		-- is made available to software at runtime through R_CAPABILITIES register,
 		-- see (s171).
 		if r.ctrl.doblindcheck = '1' then -- (s127), .doblindcheck was set by (s128)
@@ -827,6 +826,7 @@ begin
 		v.debug.trng.irnreset := '0'; -- (s59)
 
 		-- (s96) yesen high means ecc_scalar drives the answer to a point-based test
+		-- (this signal is driven high by ecc_scalar during 1 cycle only)
 		if yesen = '1' then
 			v.ctrl.yes := yes; -- read in R_STATUS register, see (s98)
 		end if;
@@ -869,10 +869,10 @@ begin
 			-- smashed by an AXI write access during the process of its shift-
 			-- register/emptying into register r.write.shdataww (see (s22)) as
 			-- WREADY signal is deasserted as soon as one AXI write has been
-			-- performed, and it is not reasserted again until the whole
-			-- 32-bit (or 64-bit) data has been shifted into r.write.shdataww
-			-- (see (s2) below) and/or when a total of (dynamic-value-of-)nn bits
-			-- is pushed in ecc_fp_dram memory (see (s172))
+			-- performed (see (s0) just below) and it is not reasserted again
+			-- until the whole 32-bit (or 64-bit) data has been shifted into
+			-- r.write.shdataww (see (s2) below) and/or when a total of (dynamic-
+			-- value-of-)nn bits is pushed in ecc_fp_dram memory (see (s172))
 			v.axi.wdatax := s_axi_wdata;
 			v.axi.wready := '0'; -- (s0)
 		end if;
@@ -911,55 +911,75 @@ begin
 				-- drive write-response to initiator
 				v.axi.bvalid := '1';
 				if (not v_wlock) or debug then -- (s162), see (s161)
-					-- in debug mode we always grant write access to CTRL register
+					-- in debug mode we always grant write access to W_CTRL register
 					-- (so use with care)
-					-- decode content of CTRL register
-					-- TODO: set multicycle constraint on paths:
-					--                 -> r.ctrl.doblinding
-					--                 -> r.ctrl.blindbits
-					if r.axi.wdatax(CTRL_WRITE_NB) = '1' then -- SW wants to WR a big-nb
-						-- initialize some registers for a complete new big-number transfer
+					-- Decode content of W_CTRL register. Since sevaral actions can
+					-- be triggered by software here, we need to prioritize them,
+					-- which is done below (action 1 has the highest priority, action 5
+					-- has the lowest)
+					--   1. software wants to write a large number, see (s186)
+					--   2. software wants to read a large number, see (s187)
+					--   3. software wants to start a [k]P computation, see (s188)
+					--   4. software asks for a point-based operation (other than [k]P),
+					--      see (s189)
+					--   5. software asks for a field-arithmetic operation, see (s190)
+					-- In any other case, error flag STATUS_ERR_WREG_FBD is raised in
+					-- R_STATUS register. Note that no error flag is raised in case
+					-- several actions are asked for in the same W_CTRL write, instead
+					-- priorities described above simply are applied
+					-- (TODO: multicycle constraints are possible on a few paths below)
+					if r.axi.wdatax(CTRL_WRITE_NB) = '1' then
 						-- ----------------------------------------------------------
-						--          start of a new big-number WRITE sequence
+						--         start of a new large number WRITE sequence
 						-- ----------------------------------------------------------
-						-- sample 5-bit address from CTRL register content
+						-- (s186)
+						-- sample address from W_CTRL register content
+						-- (width of the address field is given by FP_ADDR_MSB, see ecc_pkg)
 						if debug then
 							-- (s76), see (s77)
 							v.fpaddr0 := r.axi.wdatax(
 								CTRL_NBADDR_LSB + FP_ADDR_MSB - 1 downto CTRL_NBADDR_LSB)
 								& std_logic_vector(to_unsigned(0, log2(n - 1)));
 						else
+							-- if not in debug mode, the only large numbers writable by
+							-- software are the first eight ones: p, a, b, q, and the four
+							-- affine coordinates [XY]R[01] of points R0 & R1
 							v.fpaddr0 := std_logic_vector(to_unsigned(0, FP_ADDR_MSB - 3))
 								& r.axi.wdatax(CTRL_NBADDR_LSB + 2 downto CTRL_NBADDR_LSB)
 								& std_logic_vector(to_unsigned(0, log2(n - 1)));
 						end if;
-						-- -- by default the big nb to write is not a, but see bypass (s121)
+						-- by default the large number to write is not 'a', but see bypass
+						-- (s121) below
 						v.ctrl.newa := '0'; -- (s120)
+						-- (s177)
 						-- set some flags according to the address of the large nb software
 						-- says he's about to modify, so that ecc_axi knows what curve
 						-- parameters have been written and which have not been
-						--   - when SW starts a large nb writing sequence by writing the
-						--     its address in the CTRL register (point where we are now)
+						--   - when SW starts a large nb write sequence by writing its
+						--     address in the W_CTRL register (point where we are now)
 						--     the corresponding flag is deasserted
-						--   - once the transfert of the large nb is over, only then is the
-						--     flag asserted
-						-- TODO: perhaps set a multi-cycle on paths:
+						--   - once the transfer of the large nb is over, only then is the
+						--     flag asserted, see (s178)
+						-- TODO: multicycle constraints are possible here on a few paths:
 						--         r.axi.wdatax(addr) -> r.ctrl.[pabqxy]_set
 						--         r.axi.wdatax(addr) -> r.ctrl.a_set_and_mty
 						case r.axi.wdatax(
 								CTRL_NBADDR_LSB + FP_ADDR_MSB - 1 downto CTRL_NBADDR_LSB) is
-							when CST_ADDR_P => v.ctrl.p_set := '0'; -- see (s112)
-							                   v.ctrl.p_set_and_mty := '0'; -- see (s110)
-							when CST_ADDR_A => v.ctrl.a_set := '0'; -- see (s113)
-							                   v.ctrl.a_set_and_mty := '0'; -- see (s111)
-							                   v.ctrl.newa := '1'; -- (s121), bypass of (s120)
+							when CST_ADDR_P =>
+								v.ctrl.p_set := '0'; -- see (s112)
+							  v.ctrl.p_set_and_mty := '0'; -- (s179), see (s110)
+							when CST_ADDR_A =>
+								v.ctrl.a_set := '0'; -- (s181), see (s113)
+							  v.ctrl.a_set_and_mty := '0'; -- (s182), see (s111)
+							  v.ctrl.newa := '1'; -- (s121), bypass of (s120)
 							when CST_ADDR_B => v.ctrl.b_set := '0';
 							when CST_ADDR_Q => v.ctrl.q_set := '0';
-							--when CST_ADDR_K => v.ctrl.k_set := '0'; -- see (s102)
-							when CST_ADDR_XR1 => v.ctrl.x_set := '0';
-							                     v.ctrl.r1_is_null := '0';
-							when CST_ADDR_YR1 => v.ctrl.y_set := '0';
-							                     v.ctrl.r1_is_null := '0';
+							when CST_ADDR_XR1 =>
+								v.ctrl.x_set := '0';
+							  v.ctrl.r1_is_null := '0';
+							when CST_ADDR_YR1 =>
+								v.ctrl.y_set := '0';
+							  v.ctrl.r1_is_null := '0';
 							when CST_ADDR_XR0 => v.ctrl.r0_is_null := '0';
 							when CST_ADDR_YR0 => v.ctrl.r0_is_null := '0';
 							when others => null;
@@ -969,7 +989,7 @@ begin
 						end if;
 						if r.axi.wdatax(
 								CTRL_NBADDR_LSB + FP_ADDR_MSB - 1 downto CTRL_NBADDR_LSB)
-							= CST_ADDR_P --std_logic_vector(to_unsigned(0, FP_ADDR_MSB))
+							= CST_ADDR_P
 						then
 							-- --------------------------------------
 							-- user wants to write the prime number p
@@ -977,41 +997,35 @@ begin
 							-- assert r.ctrl.newp so that we can trigger the computation
 							-- (by ecc_scalar) of the 2 new Montgomery constants associated
 							-- with the new value of p as soon as (see (s11) below) the
-							-- whole big-number value of p has been written through AXI-
+							-- whole large number value of p has been written through AXI-
 							-- fabric.
 							-- r.ctrl.newp will be deasserted either by (s8) (when ecc_scalar
 							-- acknowledges the order to recompute the Montgomery constants)
-							-- or by (s10) (when the next big-number write sequence is
-							-- programmed for a number other than p, see (s10) below)
+							-- or by (s10) (when the next large number write sequence is
+							-- programmed for a number other than p)
 							v.ctrl.newp := '1';
 							-- assert r.ctrl.pen (directly drives output 'pen', see (s9))
 							-- so that the Montgomery mult. components are aware they should
 							-- sample the 'w' x 'ww'-bit words of p at the same time they
 							-- are being written into ecc_fp_dram
-							v.ctrl.penupsh(1) := '1';
+							v.ctrl.penupsh(1) := '1'; -- (s184), see (s185)
 							-- writing p means all current curve parameters become obsolete
 							v.ctrl.p_set := '0'; -- see (s112)
-							v.ctrl.p_set_and_mty := '0'; -- see (s110)
-							--v.ctrl.a_set := '0'; -- see (s113)
-							v.ctrl.a_set_and_mty := '0'; -- see (s111)
-							--v.ctrl.b_set := '0';
-							--v.ctrl.q_set := '0';
-							--v.ctrl.x_set := '0';
-							--v.ctrl.y_set := '0';
-							--v.ctrl.k_set := '0';
+							v.ctrl.p_set_and_mty := '0'; -- (s180), see (s110)
+							v.ctrl.a_set_and_mty := '0'; -- (s183), see (s111)
 						else
 							v.ctrl.newp := '0'; -- (s10)
-						end if; -- prime
+						end if; -- prime p
 						if r.axi.wdatax(
 							CTRL_NBADDR_LSB + FP_ADDR_MSB - 1 downto CTRL_NBADDR_LSB)
-							= CST_ADDR_K and r.axi.wdatax(CTRL_WRITE_K) = '1'
-							--std_logic_vector(to_unsigned(4, FP_ADDR_MSB))
+								= CST_ADDR_K
+							and r.axi.wdatax(CTRL_WRITE_K) = '1'
 						then
-							v.ctrl.k_set := '0'; -- (s102)
-							v.ctrl.k_is_being_set := '1'; -- (s122), see (s123)
 							-- --------------------------------
 							-- user wants to write the scalar k
 							-- --------------------------------
+							v.ctrl.k_set := '0';
+							v.ctrl.k_is_being_set := '1'; -- (s122), see (s123)
 							if r.write.rnd.enough_random = '1' then
 								v.ctrl.wk := '1';
 								v.ctrl.k_is_null := '1';
@@ -1087,15 +1101,16 @@ begin
 							-- thx to (s55) above, if there is not enough random to mask the
 							-- scalar, attempting to write it will fail (subsequent writes
 							-- of data words to the WRITE_DATA register will simply be
-							-- discarded due to r.ctrl.state not being switched to 'writebn'
+							-- discarded due to r.ctrl.state not being switched to 'writeln'
 							-- (see (s57))
-							v.ctrl.state := writebn;
+							v.ctrl.state := writeln;
 						end if;
-					elsif r.axi.wdatax(CTRL_READ_NB) = '1' then -- SW wants to RD a bignb
+					elsif r.axi.wdatax(CTRL_READ_NB) = '1' then
 						-- ----------------------------------------------------------
-						--          start of a new big-number READ sequence
+						--        start of a new large number READ sequence
 						-- ----------------------------------------------------------
-						-- sample address from CTRL register content
+						-- (s187)
+						-- sample address from W_CTRL register content
 						--   (actually sample only the LSB of the address field,
 						--   as the external interface is only allowed to read
 						--   XR1 and YR1 locations from ecc_fp_dram)
@@ -1126,20 +1141,21 @@ begin
 							v.read.bitsaxi := to_unsigned(C_S_AXI_DATA_WIDTH - 1, axiw);
 							v.read.active := '1'; -- (s118), will be reset by (s119)
 							v.read.busy := '1'; -- (s138), will be deasserted by (s139)
-							--v.read.bitstotal := to_unsigned(nn - 1, log2(nn - 1));
 							if nn_dynamic then
 								v.read.bitstotal := r.nndyn.valnnm1;
 							else
 								v.read.bitstotal := to_unsigned(nn - 1, log2(nn));
 							end if;
-							v.ctrl.state := readbn;
-							v.axi.rvalid := '0'; -- means: no valid read data avail from us yet
-							--                      (on read-data channel)
+							v.ctrl.state := readln;
+							-- deassertion of r.axi.rvalid by (s192) means: no valid read data
+							-- available from the IP yet on AXI read-data channel
+							v.axi.rvalid := '0'; -- (s192)
 						end if;
 					elsif r.axi.wdatax(CTRL_KP) = '1' then
 						-- ----------------------------------------------------------
 						--              start of a new [k]P computation
 						-- ----------------------------------------------------------
+						-- (s188)
 						if v_kp_possible then -- (s115)
 							v.ctrl.agokp := '1'; -- (s174)
 							v.ctrl.lockaxi := '1'; -- (s68), will be deasserted by (s69)
@@ -1151,6 +1167,7 @@ begin
 					-- ----------------------------------------------------------
 					--               other point-based operations
 					-- ----------------------------------------------------------
+					-- (s189)
 					elsif r.axi.wdatax(CTRL_PT_ADD) = '1' then
 						-- SW is asking for a point addition
 						if v_pop_possible then
@@ -1220,6 +1237,7 @@ begin
 					-- ----------------------------------------------------------
 					--                 field arithmetic operations
 					-- ----------------------------------------------------------
+					-- (s190)
 					elsif r.axi.wdatax(CTRL_FP_ADD) = '1' then
 						-- SW is asking for an Fp addition
 						v.ctrl.doaop := '1';
@@ -1245,11 +1263,12 @@ begin
 						v.ctrl.doaop := '1';
 						v.ctrl.aopid := ECC_AXI_FP_INVEXP;
 						v.ctrl.lockaxi := '1'; -- (s91), will be deasserted by (s92)
-					end if; -- decoding content of CTRL register
+					end if; -- decoding content of W_CTRL register
 					v.ctrl.ierrid(STATUS_ERR_WREG_FBD) := '0'; -- clr possible past error
 				else
 					-- raise error flag (illicite register write)
-					v.ctrl.ierrid(STATUS_ERR_UNKNOWN_REG) := '1';
+					-- (s191)
+					v.ctrl.ierrid(STATUS_ERR_WREG_FBD) := '1';
 				end if; -- v_wlock or debug
 			-- -------------------------------------------------------
 			-- decoding write of W_WRITE_DATA register
@@ -1262,7 +1281,7 @@ begin
 				v.axi.arready := '1';
 				-- drive write-response to initiator
 				v.axi.bvalid := '1'; -- (s4)
-				if r.ctrl.state = writebn then -- (s57)
+				if r.ctrl.state = writeln then -- (s57)
 					v.write.new32 := '1';
 					-- clear possible past error
 					v.ctrl.ierrid(STATUS_ERR_WREG_FBD) := '0';
@@ -1274,9 +1293,9 @@ begin
 					-- or when the total of nn bits of the large number being written
 					-- have actually been transferred into ecc_fp_dram memory (see (s172))
 					v.write.busy := '1'; -- (s134), will be deasserted by (s135)
-				else -- r.ctrl.state /= writebn
-					-- we are not currently in the process of writing a whole big-number
-					-- data into ecc_fp_dram (no write into W_CTRL register was previously
+				else -- r.ctrl.state /= writeln
+					-- we are not currently in the process of writing large number data
+					-- into ecc_fp_dram (no write into W_CTRL register was previously
 					-- made to set that) therefore this write into W_WRITE_DATA register
 					-- makes no sense: we simply ignore it, by responding OKAY (already
 					-- done from (s4)) & reasserting s_axi_wready, which is currently
@@ -1363,11 +1382,11 @@ begin
 				((not debug) and r.axi.waddr(ADB - 2 downto 0) =
 					W_BLINDING(ADB - 2 downto 0))
 			then
-				-- (s125) In the case of the W_BLINDING register, a test on the nb
-				-- of blinding bits might occur before we release the bus so the
-				-- assertion of the 4 AXI signals {a*wready, arreday & bvalid} may
-				-- be delayed to (s126) (this of course only concerns the case where
-				-- software sets BLD_EN bit to 1)
+				-- (s125) For the W_BLINDING register, a test on the number of
+				-- blinding bits set by software must occur before we release
+				-- the bus so the assertion of the 4 AXI signals {a*wready, arreday
+				-- & bvalid} is delayed to (s126) (this of course only concerns
+				-- the case where software sets BLD_EN bit to 1)
 				if (not v_wlock) or debug then -- (s165), see (s161)
 					if r.axi.wdatax(BLD_EN) = '1' then
 						-- test that size set is not null, otherwise it should not
@@ -1406,7 +1425,8 @@ begin
 			-- decoding write of W_SHUFFLE register
 			-- ----------------------------------------------------
 			elsif (debug and r.axi.waddr = W_SHUFFLE) or
-				((not debug) and r.axi.waddr(ADB - 2 downto 0) = W_SHUFFLE(ADB-2 downto 0))
+				((not debug) and r.axi.waddr(ADB - 2 downto 0) =
+					W_SHUFFLE(ADB - 2 downto 0))
 			then
 				v.axi.wready := '1';
 				v.axi.awready := '1';
@@ -1424,7 +1444,8 @@ begin
 			-- decoding write of W_IRQ register
 			-- ------------------------------------------------
 			elsif (debug and r.axi.waddr = W_IRQ) or
-				((not debug) and r.axi.waddr(ADB - 2 downto 0) = W_IRQ(ADB - 2 downto 0))
+				((not debug) and r.axi.waddr(ADB - 2 downto 0) =
+					W_IRQ(ADB - 2 downto 0))
 			then
 				-- TODO: set multicycle constraint on path:
 				--    r.axi.wdatax -> r.ctrl.irqen
@@ -1443,24 +1464,26 @@ begin
 			-- ------------------------------------------------
 			-- decoding write to W_ERR_ACK register
 			-- ------------------------------------------------
+			-- writing W_ERR_ACK register is always allowed
 			elsif (debug and r.axi.waddr = W_ERR_ACK) or
-				((not debug) and r.axi.waddr(ADB-2 downto 0) = W_ERR_ACK(ADB-2 downto 0))
+				((not debug) and r.axi.waddr(ADB - 2 downto 0) =
+					W_ERR_ACK(ADB - 2 downto 0))
 			then
 				v.axi.wready := '1';
 				v.axi.awready := '1';
 				v.axi.arready := '1';
 				v.axi.bvalid := '1';
-				-- writing W_ERR_ACK register always allowed
 				v.ctrl.ierrid := r.ctrl.ierrid and not (r.axi.wdatax(31 downto 16));
-				-- .aerr_inpt_ack & .aerr_outpt_ack, if asserted, stay asserted only 1 cycle
+				-- .aerr_inpt_ack & .aerr_outpt_ack, if asserted, stay asserted only
+				-- 1 cycle
 				v.ctrl.aerr_inpt_ack := r.axi.wdatax(STATUS_ERR_IN_PT_NOT_ON_CURVE);
 				v.ctrl.aerr_outpt_ack := r.axi.wdatax(STATUS_ERR_OUT_PT_NOT_ON_CURVE);
 			-- ------------------------------------------------
 			-- decoding write to W_SMALL_SCALAR register
 			-- ------------------------------------------------
 			elsif (debug and r.axi.waddr = W_SMALL_SCALAR) or
-				((not debug) and r.axi.waddr(ADB-2 downto 0) =
-					W_SMALL_SCALAR(ADB-2 downto 0))
+				((not debug) and r.axi.waddr(ADB - 2 downto 0) =
+					W_SMALL_SCALAR(ADB - 2 downto 0))
 			then
 				-- (s157), we assert AWREADY but NOT WREADY yet, postponed to (s158)
 				-- because we first need to sanity check the value set by software
@@ -1477,6 +1500,30 @@ begin
 					v.ctrl.ierrid(STATUS_ERR_WREG_FBD) := '1';
 					v.axi.wready := '1'; -- (s159), see (s157)
 				end if;
+			-- ------------------------------------------------
+			-- decoding write to W_SOFT_RESET register
+			-- ------------------------------------------------
+			elsif (debug and r.axi.waddr = W_SOFT_RESET) or
+				((not debug) and r.axi.waddr(ADB - 2 downto 0) =
+					W_SOFT_RESET(ADB - 2 downto 0)) 
+			then
+				v.axi.awready := '1';
+				v.axi.arready := '1';
+				v.axi.bvalid := '1';
+				-- (s198), we don't assert back WREADY yet, this will be done later
+				-- by (s197) when swrst output has been asserted a sufficient number
+				-- of clock cycles so as to have its high pulse be seen by every
+				-- sub-component of the IP
+				v.ctrl.swrst := '1';
+				v.ctrl.swrst_cnt := (others => '1');
+			-- ------------------------------
+			-- below are DEBUG only registers
+			-- ------------------------------
+			-- (note that until now, the 'debug' boolean constant was only used
+			-- for proper address decoding - now in the following registers,
+			-- 'debug=TRUE' is used as a required condition for the hardware
+			-- inference of each of them, meaning these registers only exist
+			-- in debug mode)
 			-- -------------------------------------------------------------
 			-- decoding write of W_DBG_HALT register
 			-- -------------------------------------------------------------
@@ -1591,26 +1638,10 @@ begin
 				v.axi.arready := '1';
 				-- drive write-response to initiator
 				v.axi.bvalid := '1';
-				--if r.axi.wdatax(5) = '1' then -- user wants to read an internal rnd nb
-				--	-- ----------------------------------------------------------
-				--	--            start of a new TRNG READ sequence
-				--	--               (for internal random number)
-				--	-- ----------------------------------------------------------
-				--	-- sample address from register content
-				--	--   (actually sample only the meaningful part of the address,
-				--	--   that is the least significant bits which are in number
-				--	--   log2(irn_ram_size-1))
-				--	if r.ctrl.state = idle then
-				--		v.debug.trng.irn.raddr :=
-				--			r.axi.wdatax(12 + log2(irn_ram_size - 1) - 1 downto 12);
-				--		v.ctrl.state := readirn;
-				--		v.axi.rvalid := '0'; -- (s28) -- will be asserted by (s27)
-				--	end if;
-				--elsif r.axi.wdatax(5) = '1' then
 				if r.axi.wdatax(DBG_TRNG_RAW_READ) = '1' then
 					-- ----------------------------------------------------------
 					--            start of a new TRNG READ sequence
-					--                  (for raw random bit)
+					--                   (for raw random bit)
 					-- ----------------------------------------------------------
 					-- sample address from register content
 					--   (actually sample only the meaningful part of the address,
@@ -1620,8 +1651,9 @@ begin
 						v.debug.trng.raw.raddr :=
 							r.axi.wdatax(DBG_TRNG_RAW_ADDR_MSB downto DBG_TRNG_RAW_ADDR_LSB);
 						v.ctrl.state := readraw;
-						-- deassert r.axi.rvalid (drives s_axi_rvalid) means: no valid read
-						-- data available from us yet (on read(data channel).
+						-- deassertion r.axi.rvalid by (s26) (drives output s_axi_rvalid)
+						-- means no valid read data are available from us yet on AXI read
+						-- data channel
 						v.axi.rvalid := '0'; -- (s26) - will be asserted by (s27)
 						v.read.trngreading := '1';
 					end if;
@@ -1688,22 +1720,22 @@ begin
 				v.axi.awready := '1';
 				v.axi.arready := '1';
 				v.axi.bvalid := '1';
-				-- raise error flag (illicite register write)
-				v.ctrl.ierrid(STATUS_ERR_WREG_FBD) := '1';
+				-- raise error flag (illicite register access)
+				v.ctrl.ierrid(STATUS_ERR_UNKNOWN_REG) := '1';
 			end if;
 		end if; -- awpending = dwpending = 1 (one data beat)
 
-		-- detection of writing one new part of a big-number to be transferred
+		-- detection of writing one new limb of a large number to be transferred
 		-- into ecc_fp_dram
-		-- (one big number among: p, a, b, q, XR1, YR1, k0, k1 when in production
-		-- mode (= not debug), anyone of the 32 big numbers in ecc_fp_dram
+		-- (one large number among: p, a, b, q, [XY]R[01], k0, k1 when in production
+		-- mode (= not debug), anyone of the 32 large numbers in ecc_fp_dram
 		-- otherwise)
 		if r.write.new32 = '1' then
 			v.write.doshift := '1';
 		end if;
 
 		-- --------------------------------
-		-- on-the-fly masking of the scalar  (1st part)  producing random masks
+		-- on-the-fly masking of the scalar  (part 1 on 2)  producing random masks
 		-- --------------------------------
 
 		-- a random mask is made available as soon as r.write.rnd.kmaskfull = 1,
@@ -1713,7 +1745,7 @@ begin
 		-- the value to be masked and the mask itself is complete.
 		-- Restoring .kmaskfull to 0 will have the shifting of IRN data into
 		-- r.write.rnd.irn to be resumed thx to (s67)
-
+		
 		-- handshake with ecc_trng
 		if r.write.rnd.trngrdy = '1' and trngvalid = '1' then
 			v.write.rnd.trngrdy := '0';
@@ -1768,16 +1800,17 @@ begin
 		end if;
 
 		-- --------------
-		-- shift-register during write of big numbers (from AXI to ecc_fp_dram)
+		-- shift-register during write of large numbers (from AXI to ecc_fp_dram)
 		-- --------------
 		v.ctrl.pendownsh := '0' & r.ctrl.pendownsh(3 downto 1);
 		if r.write.doshift = '1' then
-			-- emptying r.axi.wdatax (s22)
+			-- emptying r.axi.wdatax
 			v.axi.wdatax := '0' & r.axi.wdatax(31 downto 1);
 			-- filling r.write.shdataww (from r.axi.wdatax)
 			if r.write.trailingzeros(0) = '1' or r.write.trailingzeros(1) = '1' then
 				v.write.shdataww := '0' & r.write.shdataww(ww - 1 downto 1);
-			else -- (s22)
+			else
+				-- (s22)
 				v.write.shdataww := r.axi.wdatax(0) & r.write.shdataww(ww-1 downto 1);
 			end if;
 			-- detecting if the current LSbit is non-null
@@ -1805,7 +1838,7 @@ begin
 			end if;
 			-- -----------------------------------------------------------------
 			-- detect and handle completion of a cycle amounting to the bitwidth
-			-- of one AXI data transfer
+			-- of one AXI data transfer (32 or 64 bits)
 			-- -----------------------------------------------------------------
 			if r.write.bitsaxi(axiw - 1) = '0' and v.write.bitsaxi(axiw - 1) = '1'
 			then
@@ -1819,8 +1852,8 @@ begin
 				-- reception of the 32 (or 64) bit data word on the AXI interface
 				-- (see (s4) above)
 				v.write.bitsaxi := to_unsigned(C_S_AXI_DATA_WIDTH - 1, axiw);
-				-- (s135) is deassertion of (s134), and will be possibly bypassed  by (s136),
-				-- (s137), (s141) & (s142)
+				-- (s135) is deassertion of (s134), and will be possibly bypassed
+				-- by (s136), (s137)
 				v.write.busy := '0'; -- (s135)
 			end if;
 			-- -------------------------------------------------------------------
@@ -1830,44 +1863,42 @@ begin
 			if r.write.bitstotal(log2(nn) - 1) = '0' and
 			   v.write.bitstotal(log2(nn) - 1) = '1'
 			then
-				-- all nn bits of the big-number have been read from AXI interface
-				-- & shifted into r.write.shdataww. However we still need to trail
+				-- all nn bits of the large number have been read from AXI interface
+				-- & shifted into r.write.shdataww. However we still need to push
 				-- a certain number of zeros (depending on the value of nn) to account
 				-- for the fact that nn is not necessarily a multiple of ww bit,
-				-- and also that we must guarantee that all big numbers in ecc_fp_dram
-				-- show 4 most-significant null bits:
+				-- and also that we must guarantee that all large numbers in ecc_fp_dram
+				-- have their 4 most-significant bits to 0:
 				--   2 of these are for the Montgomery reduction technique, which
 				--                      is based on a field numbers' representation
 				--                      in which they can span the [0...2p[ interval
 				--                      (not simply [0;p[ as for ordinary modulo-p
 				--                      arithmetic)
 				--   1 of these is because we need to form the number R = 2**(nn + 2)
-				--   1 of these is for sign
+				--   1 of these is for sign (two's complement representation)
 				if r.write.trailingzeros(1) = '1' or
 					(r.write.trailingzeros(0) = '1'
 					  and (r.ctrl.doblinding = '0' or r.ctrl.wk = '0'))
 				then
 					v.ctrl.state := idle;
 					v.write.doshift := '0';
-					-- in this case deassertion of r.write.busy by (s135) above was legitimate
-					-- (we don't assert it with a bypass), we keep the statement below in
-					-- comment for the sake of readability
+					-- in this case deassertion of r.write.busy by (s135) above was
+					-- legitimate (we don't assert it with a bypass), we keep the
+					-- statement below in comment for the sake of readability
 					-- v.write.busy := '0';
 					if r.ctrl.pen = '1' then
 						-- so that Montgomery multipliers stop sampling words of
-						-- big number 'p'
+						-- large number 'p'
 						v.ctrl.pendownsh(3) := '1';
 					end if;
 					if r.ctrl.newp = '1' and r.ctrl.mtypending = '0' then -- (s11)
 						v.ctrl.agocstmty := '1'; -- reset by (s1) after ecc_scalar's ACK
-						v.write.busy := '0'; -- (s141), bypass of (s135)
-						--v.ctrl.lockaxi := '1'; -- (s132), will be deasserted by (s133)
+						v.write.busy := '0';
 					end if;
+					-- (s178), see (s177)
 					case r.fpaddr0(log2(n - 1) + FP_ADDR_MSB - 1 downto log2(n - 1)) is
 						when CST_ADDR_P => v.ctrl.p_set := '1'; -- (s112)
-															 --v.ctrl.p_set_and_mty := '0';
-						when CST_ADDR_A => v.ctrl.a_set := '1'; -- (s113)
-															 --v.ctrl.a_set_and_mty := '0';
+						when CST_ADDR_A => v.ctrl.a_set := '1'; -- (s113), see (s181)
 							-- since Montgomery constants have been computed & are available,
 							-- transmission of parameter 'a' triggers the execution of the
 							-- (tiny) routine that will switch it into its Montgomery repre-
@@ -1877,7 +1908,7 @@ begin
 								-- r.ctrl.agomtya will be reset by (s105) after ecc_scalar's ACK
 								v.ctrl.agomtya := '1'; -- (s103)
 								v.ctrl.newa := '0';
-								v.write.busy := '0'; -- (s142), bypass of (s135)
+								v.write.busy := '0';
 							-- else
 							-- 	-- r.ctrl.a_set_and_mty still 0
 							end if;
@@ -1888,8 +1919,8 @@ begin
 						when CST_ADDR_YR1 => v.ctrl.y_set := '1';
 						when others => null;
 					end case;
-					-- (s123) we can't use r.fpaddr0 to detect that k is the large nb
-					-- currently written (because in that case r.fpaddr0 might as well
+					-- (s123) we can't use r.fpaddr0 to detect that scalar k is the large
+					-- nb currently written (because in that case r.fpaddr0 might as well
 					-- contain the address of the mask for k), so we use a special flag
 					-- (r.ctrl.k_is_being_set) that was asserted by (s122)
 					if r.ctrl.k_is_being_set = '1' then
@@ -1899,7 +1930,7 @@ begin
 					-- authorize the reception of a new 32-bit data again from AXI
 					-- fabric (note that AWREADY has already been reasserted when
 					-- sampling the 32-bit word from the AXI interface, see (s3) above)
-					v.axi.wready := '1'; -- (s172) bypassed by (s48) below
+					v.axi.wready := '1'; -- (s172) bypassed by (s48) & (s193) below
 					v.write.trailingzeros := "00";
 					v.write.active := '0'; -- (s117), reset of (s116)
 					v.write.busy := '0';
@@ -1921,13 +1952,13 @@ begin
 					-- The idea here is to reuse register .bitstotal in order to shift
 					-- the required number of trailing zeros into .shdataww. Next time
 					-- we hit down 0 for .bitstotal, we'll know the job is over for
-					-- the whole big number as .trailingzeros this time will be high
+					-- the whole large number as .trailingzeros this time will be high
 					-- (note that there are always trailing zeros to account for
-					-- since the big number transmitted by user-software is nn-bit
-					-- long while the big numbers in ecc_fp_dram are (nn+4)-bit long
-					-- Note: in the case of blinding the trick is now using an extra
-					-- bit for register r.write.trailingzeros, to allow enough extra
-					-- 0 bits to span the entirety of the scalar once blinded.
+					-- since the large number transmitted by user-software is nn-bit
+					-- long while the large numbers in ecc_fp_dram are (nn+4)-bit long
+					-- Note: in case of blinding the trick is now using an extra bit
+					-- for register r.write.trailingzeros, to allow enough extra 0 bits
+					-- to span the entirety of the scalar once blinded.
 					if nn_dynamic then -- statically resolved by synthesizer
 						v.write.bitstotal := resize(r.nndyn.nbtrailzeros, log2(nn));
 					else -- the 4 tests below will be statically resolved by synthesizer
@@ -1941,7 +1972,7 @@ begin
 							v.write.bitstotal := to_unsigned(2*ww-(nn mod ww)-1, log2(nn));
 						end if;
 					end if;
-					v.axi.wready := '0'; -- (s48)
+					v.axi.wready := '0'; -- (s193)
 					v.write.doshift := '1';
 					-- in this case deassertion of r.write.busy by (s135) must not occur
 					v.write.busy := '1'; -- (s137), bypass of (s135)
@@ -1952,15 +1983,15 @@ begin
 				v.write.doshift := '0';
 				v.write.rnd.wreadybk := v.axi.wready; -- (s53) note v for r-value
 				v.axi.wready := '0';
-				-- in this case deassertion of r.write.busy by (s135) above was legitimate
-				-- (we don't assert it with a bypass), we keep the statement below in
-				-- comment for the sake of readability
+				-- in this case deassertion of r.write.busy by (s135) above was
+				-- legitimate (we don't assert it with a bypass), we keep the
+				-- statement below in comment for the sake of readability
 				-- v.write.busy := '0';
 			end if;
 		end if; -- doshift = 1
 
 		-- --------------------------------
-		-- on-the-fly masking of the scalar  (2nd part)  actual masking + write
+		-- on-the-fly masking of the scalar  (part 2 on 2)  actual masking + write
 		-- --------------------------------
 
 		if r.write.rnd.avail4mask = '1' then
@@ -2067,6 +2098,7 @@ begin
 			end if;
 		end if;
 
+		-- (s185), see (s184)
 		if r.ctrl.penupsh(0) = '1' then
 			v.ctrl.pen := '1';
 		end if;
@@ -2080,10 +2112,6 @@ begin
 			v.ctrl.irq := '0';
 		end if;
 
-		-- deassertion of r.ctrl.mtypending once ecc_scalar has asserted mtydone
-		--if mtydone = '1' then
-		--	v.ctrl.mtypending := '0';
-		--end if;
 		-- irq generation upon rising edge of mtydone
 		v.ctrl.mtydone_d := mtydone;
 		if mtydone = '1' and r.ctrl.mtydone_d = '0' then
@@ -2096,7 +2124,7 @@ begin
 				v.ctrl.agomtya := '1'; -- (s104), will be reset by (s105)
 				v.ctrl.mtyirq_postponed := '1'; -- (s106)
 				-- we keep .mtypending asserted to maintain (s30) coherent
-				v.ctrl.mtypending := '1'; -- (s108), bypass of (s107), also see (s109)
+				v.ctrl.mtypending := '1'; -- (s108), bypass of (s107), see also (s109)
 			else
 				-- execution of routine .aMontyL was not part of .constMTYL routine
 				-- post-processing (means SW has first written 'p', and then 'a')
@@ -2106,7 +2134,7 @@ begin
 					v.ctrl.irq := '1';
 				end if;
 			end if;
-			v.ctrl.p_set_and_mty := '1'; -- (s110)
+			v.ctrl.p_set_and_mty := '1'; -- (s110), see (s179) & (s180)
 		end if;
 
 		-- {deassertion of r.ctrl.agocstmty}/{assertion of r.ctrl.mtypending}
@@ -2115,7 +2143,6 @@ begin
 			v.ctrl.agocstmty := '0'; -- (s1)
 			v.ctrl.mtypending := '1';
 			v.ctrl.newp := '0'; -- (s8)
-			--v.ctrl.lockaxi := '0'; -- (s133) deassertion of (s132)
 		end if;
 
 		-- deassertion of r.ctrl.amtypending once ecc_scalar has asserted amtydone
@@ -2130,7 +2157,7 @@ begin
 			-- amtydone rising edge means routine .aMontyL was just executed,
 			-- which means curve parameter 'a' is now in Montgomery representation
 			-- so we set r.ctrl.a_set_and_mty
-			v.ctrl.a_set_and_mty := '1'; -- (s111)
+			v.ctrl.a_set_and_mty := '1'; -- (s111), see (s182) & (s183)
 		end if;
 
 		-- {deassertion of r.ctrl.agomtya}/{assertion of r.ctrl.amtypending}
@@ -2151,10 +2178,6 @@ begin
 			end if;
 		end if;
 
-		-- deassertion of r.ctrl.kppending once ecc_scalar has asserted kpdone
-		--if kpdone = '1' then
-		--	v.ctrl.kppending := '0';
-		--end if;
 		-- irq generation upon rising edge of kpdone
 		v.ctrl.kpdone_d := kpdone;
 		if kpdone = '1' and r.ctrl.kpdone_d = '0' then
@@ -2172,7 +2195,7 @@ begin
 		end if;
 
 		-- -------------------------
-		-- start of [k]P computation (run signal sent tot ecc_scalar)
+		-- start of [k]P computation (handshake with ecc_scalar)
 		-- -------------------------
 		-- {deassertion of r.ctrl.agokp}/{assertion of r.ctrl.kppending}
 		-- once ecc_scalar has acknowledged 'agokp' request
@@ -2186,16 +2209,16 @@ begin
 			end if;
 		end if;
 
-		if debug then
-			if (r.ctrl.kppending = '1' or r.ctrl.poppending = '1' or r.ctrl.aoppending = '1')
-				and dbghalted = '0'
+		if debug then -- statically resolved by synthesizer
+			if (r.ctrl.kppending = '1' or r.ctrl.poppending = '1' or
+				r.ctrl.aoppending = '1') and dbghalted = '0'
 			then
 				v.debug.counter := r.debug.counter + 1;
 			end if;
 		end if;
 
 		-- detect possible trigger counter matches
-		if debug then
+		if debug then -- statically resolved by synthesizer
 			if r.debug.counter = unsigned(r.debug.trigdown) then
 				v.debug.trigger := '0';
 			end if;
@@ -2205,16 +2228,8 @@ begin
 			if r.debug.trigactive = '0' then
 				v.debug.trigger := '0';
 			end if;
-			--v.debug.halted_b := dbghalted;
-			--if r.debug.halted_b = '0' and dbghalted = '1' then
-			--	v.debug.halted := '1';
-			--end if;
 		end if;
 
-		-- deassertion of r.ctrl.poppending once ecc_scalar has asserted popdone
-		--if popdone = '1' then
-		--	v.ctrl.poppending := '0';
-		--end if;
 		-- irq generation upon rising edge of popdone
 		v.ctrl.popdone_d := popdone;
 		if popdone = '1' and r.ctrl.popdone_d = '0' then
@@ -2227,9 +2242,9 @@ begin
 			v.ctrl.read_forbidden := '0';
 		end if;
 		
-		-- -----------------------------------
-		-- start of a point-based  computation (run signal sent tot ecc_scalar)
-		-- -----------------------------------
+		-- ------------------------------------
+		-- start of one point-based computation (handshake with ecc_scalar)
+		-- ------------------------------------
 		-- {deassertion of r.ctrl.dopop}/{assertion of r.ctrl.poppending}
 		-- once ecc_scalar has acknowledged 'dopop' request
 		if r.ctrl.dopop = '1' and ardy = '1' then
@@ -2242,10 +2257,6 @@ begin
 			end if;
 		end if;
 
-		-- deassertion of r.ctrl.aoppending once ecc_scalar has asserted aopdone
-		--if aopdone = '1' then
-		--	v.ctrl.aoppending := '0';
-		--end if;
 		-- irq generation upon rising edge of aopdone
 		v.ctrl.aopdone_d := aopdone;
 		if aopdone = '1' and r.ctrl.aopdone_d = '0' then
@@ -2259,7 +2270,7 @@ begin
 		end if;
 
 		-- ---------------------------------
-		-- start of an  Fp-based computation (run signal sent tot ecc_scalar)
+		-- start of one Fp-based computation (handshake with ecc_scalar)
 		-- ---------------------------------
 		-- {deassertion of r.ctrl.doaop}/{assertion of r.ctrl.aoppending}
 		-- once ecc_scalar has acknowledged 'doaop' request
@@ -2318,24 +2329,13 @@ begin
 				dw(STATUS_ENOUGH_RND) := not r.write.rnd.enough_random;
 				if nn_dynamic then -- statically resolved by synthesizer
 					dw(STATUS_NNDYNACT) := r.nndyn.active;
-				--	dw(STATUS_VALNN_MSB downto STATUS_VALNN_LSB) :=
-				--		std_logic_vector(
-				--			resize(r.nndyn.valnn, STATUS_VALNN_SZ)); -- (s94), see (s93)
 				else
 					dw(STATUS_NNDYNACT) := '0';
-				--	dw(STATUS_VALNN_MSB downto STATUS_VALNN_LSB) :=
-				--		std_logic_vector(
-				--			to_unsigned(nn, STATUS_VALNN_SZ)); -- (s95), see (93)
 				end if;
 				dw(STATUS_YES) := r.ctrl.yes; -- (s98), was set by (s96)
 				dw(STATUS_R0_IS_NULL) := r.ctrl.r0_is_null;
 				dw(STATUS_R1_IS_NULL) := r.ctrl.r1_is_null;
-				--if aerr = '1' then
-				--	dw(STATUS_ERRID_MSB downto STATUS_ERRID_LSB) := STATUS_ERR_COMP;
-				--elsif aerr = '0' then
-				--	dw(STATUS_ERRID_MSB downto STATUS_ERRID_LSB) := r.ctrl.ierrid;
-				--end if;
-				dw(31 downto 16) := r.ctrl.ierrid;
+				dw(STATUS_ERR_MSB downto STATUS_ERR_LSB) := r.ctrl.ierrid;
 				dw(STATUS_ERR_IN_PT_NOT_ON_CURVE) := aerr_inpt_not_on_curve;
 				dw(STATUS_ERR_OUT_PT_NOT_ON_CURVE) := aerr_outpt_not_on_curve;
 				v.axi.rdatax := dw;
@@ -2345,7 +2345,7 @@ begin
 			-- -------------------------------------
 			elsif (debug and s_axi_araddr(ADB + 2 downto 3) = R_READ_DATA)
 				or ((not debug) and s_axi_araddr(ADB + 1 downto 3) =
-					R_READ_DATA(1 downto 0))
+					R_READ_DATA(ADB - 2 downto 0))
 			then
 				-- actually there is nothing to do here: s_axi_rvalid will be asserted
 				-- (along with data on the AXI read-data channel) once available data
@@ -2358,10 +2358,10 @@ begin
 				-- r.read.arpending is used as a flag to differenciate AXI read acces-
 				-- ses targeting the DATA register (r.read.arpending = 1) from AXI read
 				-- accesses targeting other registers
-				if r.ctrl.state = readbn then
+				if r.ctrl.state = readln then
 					v.read.arpending := '1';
 				else
-					v.axi.rvalid := '1';
+					v.axi.rvalid := '1'; -- (s5)
 					v.axi.rdatax := (others => '1'); -- 0xFFF...FF
 				end if;
 			-- ----------------------------------------
@@ -2393,12 +2393,8 @@ begin
 				-- is prime size modifiable
 				if nn_dynamic then -- statically resolved by synthesizer
 					dw(CAP_NNDYN) := '1';
-					--dw(CAP_NNMAX_MSB downto CAP_NNMAX_LSB) := std_logic_vector(
-					--	unsigned(resize(r.nndyn.valnn, log2(nn))));
 				else
 					dw(CAP_NNDYN) := '0';
-					--dw(CAP_NNMAX_MSB downto CAP_NNMAX_LSB) := std_logic_vector(
-					--	to_unsigned(nn, log2(nn)));
 				end if;
 				-- maximal (or static) value of prime size
 				dw(CAP_NNMAX_MSB downto CAP_NNMAX_LSB) := std_logic_vector(
@@ -2417,6 +2413,14 @@ begin
 					resize(r.nndyn.valnn, C_S_AXI_DATA_WIDTH));
 				v.axi.rdatax := dw;
 				v.axi.rvalid := '1'; -- (s5)
+			-- ------------------------------
+			-- below are DEBUG only registers
+			-- ------------------------------
+			-- (note that until now, the 'debug' boolean constant was only used
+			-- for proper address decoding - now in the following registers,
+			-- 'debug=TRUE' is used as a required condition for the hardware
+			-- inference of each of them, meaning these registers only exist
+			-- in debug mode)
 			-- -------------------------------------
 			-- decoding read of R_DBG_CAPABILITIES_0
 			-- -------------------------------------
@@ -2427,7 +2431,7 @@ begin
 				dw(log2(ww) - 1 downto 0) :=
 					std_logic_vector(to_unsigned(ww, log2(ww)));
 				v.axi.rdatax := dw;
-				v.axi.rvalid := '1'; 
+				v.axi.rvalid := '1'; -- (s5)
 			-- -------------------------------------
 			-- decoding read of R_DBG_CAPABILITIES_1
 			-- -------------------------------------
@@ -2440,7 +2444,7 @@ begin
 				dw(16 + log2(OPCODE_SZ) - 1 downto 16) := -- (s149), see (s148)
 					std_logic_vector(to_unsigned(OPCODE_SZ, log2(OPCODE_SZ)));
 				v.axi.rdatax := dw;
-				v.axi.rvalid := '1'; 
+				v.axi.rvalid := '1'; -- (s5)
 			-- -------------------------------------
 			-- decoding read of R_DBG_CAPABILITIES_2
 			-- -------------------------------------
@@ -2451,7 +2455,7 @@ begin
 				dw(log2(raw_ram_size) - 1 downto 0) := -- (s151), see (s150)
 					std_logic_vector(to_unsigned(raw_ram_size, log2(raw_ram_size)));
 				v.axi.rdatax := dw;
-				v.axi.rvalid := '1'; 
+				v.axi.rvalid := '1'; -- (s5)
 			-- --------------------------------------
 			-- decoding read of R_DBG_STATUS register
 			-- --------------------------------------
@@ -2459,14 +2463,15 @@ begin
 			  and s_axi_araddr(ADB + 2 downto 3) = R_DBG_STATUS
 			then
 				-- (s153), see (s152)
+				-- TODO: add 1-bit bkptid valid
 				v.axi.rdatax(31 downto 0) :=
 					  dbgpgmstate -- 4 bits (31..28)
 			  	& dbgnbbits(11 downto 0) -- 12 bits  (27..16)
 			  	& std_logic_vector(resize(unsigned( -- (s88),see (s87)
 					dbgdecodepc), 12)) -- 12 bits (15..4)
 					& dbgbreakpointhit -- 1 bit
-					& dbgbreakpointid & dbghalted; -- 3 bits (2..0) TODO : et ajouter 1 bit validité bkptid
-				v.axi.rvalid := '1';
+					& dbgbreakpointid & dbghalted; -- 3 bits (2..0)
+				v.axi.rvalid := '1'; -- (s5)
 			-- -----------------------------------------
 			-- decoding read of R_DBG_RMN_STEPS register
 			-- -----------------------------------------
@@ -2474,7 +2479,7 @@ begin
 			  and s_axi_araddr(ADB + 2 downto 3) = R_DBG_RMN_STEPS
 			then
 				v.axi.rdatax(31 downto 0) := x"00" & dbgremainingopcodes & x"00";
-				v.axi.rvalid := '1';
+				v.axi.rvalid := '1'; -- (s5)
 			-- ------------------------------------
 			-- decoding read of R_DBG_TIME register
 			-- ------------------------------------
@@ -2482,7 +2487,7 @@ begin
 			  and s_axi_araddr(ADB + 2 downto 3) = R_DBG_TIME
 			then
 				v.axi.rdatax(31 downto 0) := std_logic_vector(r.debug.counter);
-				v.axi.rvalid := '1';
+				v.axi.rvalid := '1'; -- (s5)
 			-- ---------------------------------------
 			-- decoding read of R_DBG_RAW_DUR register
 			-- ---------------------------------------
@@ -2490,7 +2495,7 @@ begin
 			  and s_axi_araddr(ADB + 2 downto 3) = R_DBG_RAWDUR
 			then
 				v.axi.rdatax(31 downto 0) := std_logic_vector(dbgtrngrawduration);
-				v.axi.rvalid := '1';
+				v.axi.rvalid := '1'; -- (s5)
 			-- -------------------------------------
 			-- decoding read of R_DBG_FLAGS register
 			-- -------------------------------------
@@ -2515,7 +2520,7 @@ begin
 					dw(FLAGS_NOT_BLN_OR_Q_NOT_SET) := '0';
 				end if;
 				v.axi.rdatax(31 downto 0) := dw;
-				v.axi.rvalid := '1';
+				v.axi.rvalid := '1'; -- (s5)
 			-- -----------------------------------------
 			-- decoding read of R_DBG_RD_OPCODE register
 			-- -----------------------------------------
@@ -2526,20 +2531,18 @@ begin
 					if r.debug.idatabeat = '0' then
 						v.debug.idatabeat := '1';
 						v.axi.rdatax := dbgirdata(C_S_AXI_DATA_WIDTH - 1 downto 0);
-						v.axi.rvalid := '1';
+						v.axi.rvalid := '1'; -- (s5)
 					elsif r.debug.idatabeat = '1' then
 						v.debug.idatabeat := '0';
 						v.axi.rdatax((OPCODE_SZ mod C_S_AXI_DATA_WIDTH) - 1 downto 0) :=
 							dbgirdata(C_S_AXI_DATA_WIDTH+(OPCODE_SZ mod C_S_AXI_DATA_WIDTH)-1
 							          downto C_S_AXI_DATA_WIDTH); -- (s85), see (s83)
-						v.axi.rvalid := '1';
+						v.axi.rvalid := '1'; -- (s5)
 					end if;
 				else
 					v.axi.rdatax(OPCODE_SZ - 1 downto 0) := dbgirdata;
-					v.axi.rvalid := '1';
+					v.axi.rvalid := '1'; -- (s5)
 				end if;
-				--v.axi.rdatax(31 downto 0) := dbgirdata;
-				--v.axi.rvalid := '1';
 			-- -------------------------------------------
 			-- decoding read of R_DBG_TRNG_STATUS register
 			-- -------------------------------------------
@@ -2552,24 +2555,15 @@ begin
 				  & dbgtrngrawwaddr
 				  & "0000"
 				  & "000" & dbgtrngrawfull;
-				v.axi.rvalid := '1';
+				v.axi.rvalid := '1'; -- (s5)
 			-- -----------------------------------------
 			-- decoding read of R_DBG_TRNG_DATA register
 			-- -----------------------------------------
 			elsif debug -- statically resolved by synthesizer
 			  and s_axi_araddr(ADB + 2 downto 3) = R_DBG_TRNG_DATA
 			then
-				--if r.ctrl.state = readirn then
-				--	v.axi.rvalid := '1'; -- (s27) see (s28)
-				--	v.axi.rdatax(C_S_AXI_DATA_WIDTH - 1 downto 0) :=
-				--		std_logic_vector(to_unsigned(0, C_S_AXI_DATA_WIDTH - ww))
-				--		& std_logic_vector(to_signed(-1, ww));
-				--	-- reading one internal random nb requires only 1 AXI read
-				--	-- access so we can get back to idle state
-				--	v.ctrl.state := idle;
-				--elsif r.ctrl.state = readraw then
 				if r.ctrl.state = readraw then
-					--TODO: v.debug.trng.raw.arpending := '1';
+					--v.debug.trng.raw.arpending := '1';
 					v.axi.rvalid := '1'; -- (s27) see (s26)
 					v.axi.rdatax(C_S_AXI_DATA_WIDTH - 1 downto 1) := (others => '0');
 					v.axi.rdatax(0) := dbgtrngrawdata;
@@ -2577,7 +2571,7 @@ begin
 					-- get back to idle state
 					v.ctrl.state := idle;
 				else
-					v.axi.rvalid := '1';
+					v.axi.rvalid := '1'; -- (s5)
 					v.axi.rdatax := (others => '1'); -- 0xFFF...FF
 				end if;
 			-- ----------------------------------------
@@ -2588,7 +2582,7 @@ begin
 			then
 				v.axi.rdatax(31 downto 0) :=
 					(C_S_AXI_DATA_WIDTH-1 downto ww => '0') & xrdata; -- (s50), see (s51)
-				v.axi.rvalid := '1';
+				v.axi.rvalid := '1'; -- (s5)
 			-- -------------------------------------------
 			-- decoding read of R_DBG_IRN_CNT_AXI register
 			-- -------------------------------------------
@@ -2597,7 +2591,7 @@ begin
 			then
 				v.axi.rdatax(31 downto 0) :=
 					std_logic_vector(resize(unsigned(trngaxiirncount), 32));
-				v.axi.rvalid := '1';
+				v.axi.rvalid := '1'; -- (s5)
 			-- -------------------------------------------
 			-- decoding read of R_DBG_IRN_CNT_EFP register
 			-- -------------------------------------------
@@ -2606,7 +2600,7 @@ begin
 			then
 				v.axi.rdatax(31 downto 0) :=
 					std_logic_vector(resize(unsigned(trngefpirncount), 32));
-				v.axi.rvalid := '1';
+				v.axi.rvalid := '1'; -- (s5)
 			-- -------------------------------------------
 			-- decoding read of R_DBG_IRN_CNT_CUR register
 			-- -------------------------------------------
@@ -2615,7 +2609,7 @@ begin
 			then
 				v.axi.rdatax(31 downto 0) :=
 					std_logic_vector(resize(unsigned(trngcurirncount), 32));
-				v.axi.rvalid := '1';
+				v.axi.rvalid := '1'; -- (s5)
 			-- -------------------------------------------
 			-- decoding read of R_DBG_IRN_CNT_SHF register
 			-- -------------------------------------------
@@ -2624,7 +2618,7 @@ begin
 			then
 				v.axi.rdatax(31 downto 0) :=
 					std_logic_vector(resize(unsigned(trngshfirncount), 32));
-				v.axi.rvalid := '1';
+				v.axi.rvalid := '1'; -- (s5)
 			-- -------------------------------------------
 			-- decoding read of R_DBG_PENDING_OPS register
 			-- -------------------------------------------
@@ -2632,21 +2626,23 @@ begin
 			  and s_axi_araddr(ADB + 2 downto 3) = R_DBG_PENDING_OPS
 			then
 				v.axi.rdatax(31 downto 0) := std_logic_vector(resize(dbgpdops, 32));
-				v.axi.rvalid := '1';
+				v.axi.rvalid := '1'; -- (s5)
 			-- --------------------------------------------
 			-- unknown target address, drive back dumb data (all 1's)
 			-- --------------------------------------------
 			else
 				v.axi.rdatax := (others => '1'); -- 0xFFFFFFFF
-				v.axi.rvalid := '1';
+				v.axi.rvalid := '1'; -- (s5)
+				-- raise error flag (illicite register acess)
+				v.ctrl.ierrid(STATUS_ERR_UNKNOWN_REG) := '1';
 			end if;
 		end if;
 
-		-- handshake over AXI data-read channel (both for Big numbers & Int rnd nb)
+		-- handshake over AXI data-read channel
 		if r.axi.rvalid = '1' and s_axi_rready = '1' then
 			v.axi.rvalid := '0';
-			-- tell AXI fabric that our AXI address-read channel is ready to accept
-			-- an address value again
+			-- tell AXI fabric that our AXI address-read channel is ready
+			-- to accept a new address again
 			v.axi.arready := '1'; -- (s6)
 			if r.read.arpending = '1' then -- (s7)
 				v.read.arpending := '0';
@@ -2659,21 +2655,12 @@ begin
 			-- pragma translate_off
 			v.axi.rdatax := (others => 'X');
 			-- pragma translate_on
-			--if debug then
-			--	if r.debug.trng.irn.arpending = '1' then
-			--		v.debug.trng.irn.arpending := '0';
-			--		if r.debug.trng.irn.lastwordx = '1' then
-			--			v.ctrl.state := idle;
-			--			v.debug.trng.irn.lastwordx := '0';
-			--		end if;
-			--	end if;
-			--end if;
 		end if;
 
 		--                      --------------------
 		--                          state-machine
 		--                      for read accesses to
-		--                           Big numbers
+		--                          large numbers
 		--                      --------------------
 
 		-- sample of data read back from ecc_fp_dram into r.read.shdataww
@@ -2690,7 +2677,7 @@ begin
 		end if;
 
 		-- --------------
-		-- shift-register during read of big numbers (from ecc_fp_dram to AXI)
+		-- shift-register during read of large numbers (from ecc_fp_dram to AXI)
 		-- --------------
 		if r.read.shdatawwcanbeemptied = '1' -- (s19)
 			and r.read.rdataxcanbefilled = '1'
@@ -2729,7 +2716,7 @@ begin
 				v.read.busy := '0'; -- (s139)
 			end if;
 			-- detect and handle completion of a cycle amounting to total size
-			-- of one big-number
+			-- of one large number
 			if r.read.bitstotal(log2(nn) - 1) = '0' and
 			   v.read.bitstotal(log2(nn) - 1) = '1'
 			then
@@ -2786,91 +2773,13 @@ begin
 			v.fpaddr0 := std_logic_vector(unsigned(r.fpaddr0) + 1);
 		end if;
 
-		--                     -----------------------
-		--                          state-machine
-		--                      for read accesses to
-		--                     Internal random numbers
-		--                     -----------------------
-
-		--if debug then -- statically resolved by synthesizer
-
-		--	-- sample of data read back from ecc_trng internal numbers memory
-		--	-- into r.debug.trng.irn.shdatai
-		--	-- & assertion of r.debug.trng.irn.shdataicanbeemptied
-		--	v.debug.trng.irn.resh :=
-		--		r.debug.trng.irn.re & r.debug.trng.irn.resh(3 downto 1);
-		--	if r.debug.trng.irn.resh(0) = '1' then
-		--		v.debug.trng.irn.shdatai := dbgtrngirndata;
-		--		v.debug.trng.irn.shdataicanbeemptied := '1';
-		--	end if;
-
-		--	-- --------------
-		--	-- shift-register during reads (from ecc_trng to AXI) for Internal rn Nb
-		--	-- --------------
-		--	if r.debug.trng.irn.shdataicanbeemptied = '1'
-		--		and r.debug.trng.irn.rdataxcanbefilled = '1'
-		--	then
-		--		-- emptying r.debug.trng.irn.shdatai
-		--		v.debug.trng.irn.shdatai :=
-		--			'0' & r.debug.trng.irn.shdatai(irn_wsize - 1 downto 1);
-		--		-- filling r.debug.trng.irn.rdatax
-		--		if r.debug.trng.irn.lastwordx = '0' then
-		--			v.debug.trng.irn.rdatax :=
-		--				r.debug.trng.irn.shdatai(0) &
-		--				r.debug.trng.irn.rdatax(C_S_AXI_DATA_WIDTH - 1 downto 1);
-		--		else
-		--			v.debug.trng.irn.rdatax :=
-		--				'0' &
-		--				r.debug.trng.irn.rdatax(C_S_AXI_DATA_WIDTH - 1 downto 1);
-		--		end if;
-		--		-- decrement counters
-		--		v.debug.trng.irn.bitsi := r.debug.trng.irn.bitsi - 1;
-		--		v.debug.trng.irn.bitsaxi := r.debug.trng.irn.bitsaxi - 1;
-		--		-- detect and handle completion of a cycle amounting to the width of
-		--		-- an AXI data transfer
-		--		if r.debug.trng.irn.bitsaxi(axiw - 1) = '0'
-		--			and v.debug.trng.irn.bitsaxi(axiw - 1) = '1'
-		--		then
-		--			v.debug.trng.irn.bitsaxi := to_unsigned(C_S_AXI_DATA_WIDTH - 1, axiw);
-		--			v.debug.trng.irn.availx := '1';
-		--			v.debug.trng.irn.rdataxcanbefilled := '0';
-		--		end if;
-		--		-- detect and handle completion of a cycle amounting to total size
-		--		-- of one internal random number
-		--		if r.debug.trng.irn.bitsi(log2(irn_wsize - 1) - 1) = '0' and
-		--			 v.debug.trng.irn.bitsi(log2(irn_wsize - 1) - 1) = '1'
-		--		then
-		--			if r.debug.trng.irn.lastwordx = '0' then
-		--				v.debug.trng.irn.shdataicanbeemptied := '0';
-		--			end if;
-		--			v.debug.trng.irn.lastwordx := '1';
-		--			if (irn_wsize mod C_S_AXI_DATA_WIDTH) /= 0 -- stat. resolved by syn
-		--			then
-		--				v.debug.trng.irn.shdataicanbeemptied := '1';
-		--			end if;
-		--		end if;
-		--	end if;
-
-		--	if r.debug.trng.irn.arpending = '1' and r.debug.trng.irn.availx = '1'
-		--		and r.axi.rvalid = '0'
-		--	then
-		--		v.debug.trng.irn.availx := '0';
-		--		v.axi.rvalid := '1';
-		--		v.axi.rdatax := r.debug.trng.irn.rdatax;
-		--		if r.debug.trng.irn.lastwordx = '0' then
-		--			v.read.rdataxcanbefilled := '1';
-		--		end if;
-		--	end if;
-
-		--end if; -- debug
-
 		--                     ------------------------
 		--                          state-machine
 		--                      for dynamic modifs of
 		--                      size 'nn' of prime  p
 		--                     ------------------------
 
-		-- the aim is to compute the value of following registers:
+		-- the aim is to compute the value of a few registers, among which:
 		--   r.nndyn.valnnm1: holds value of "dynamic nn" minus 1
 		--   r.nndyn.valnnp2: holds value of "dynamic nn" plus 2
 		--   r.nndyn.valw: holds value of "dynamic nn" + 2 divided by ww
@@ -2879,6 +2788,10 @@ begin
 		--   r.nndyn.val2wm1: hold value of (2 * r.nndyn.valw) - 1
 		--   r.nndyn.nnrnd_mask
 		-- these registers are forwarded to mm_ndsp blocks and ecc_fp
+		-- TODO: multicycle constraints are possible on many paths below!
+		-- (all the more many idle states are inserted at the end of the
+		-- different computations to let signals nndyn_xxx propagate to
+		-- their target DFF, see (s196) below)
 
 		if nn_dynamic then -- statically resolved by synthesizer
 
@@ -3011,14 +2924,12 @@ begin
 
 			if r.nndyn.doshcnt = '1' then
 				v.nndyn.masktmp := r.nndyn.masktmp(ww - 2 downto 0) & '1';
-				--v.nndyn.masktmp0 := r.nndyn.masktmp0(ww - 2 downto 0) & '0';
 				v.nndyn.shcnt := r.nndyn.shcnt - 1;
 				if r.nndyn.shcnt(log2(ww - 1) - 1) = '0'
 					and v.nndyn.shcnt(log2(ww - 1) - 1) = '1'
 				then
 					v.nndyn.doshcnt := '0';
 					v.nndyn.mask := r.nndyn.masktmp;
-					--v.nndyn.mask0 := r.nndyn.masktmp0;
 					v.nndyn.dodec0done := '1';
 				end if;
 			end if;
@@ -3028,7 +2939,7 @@ begin
 			-- --------------------------------------------------------------------
 
 			-- This batch aims at computing the signal r.nndyn.nbtrailzeros.
-			-- This signal is used by (s43) to enforce proper representation of big
+			-- This signal is used by (s43) to enforce proper representation of large
 			-- numbers in ecc_fp_dram memory (meaning by this: with adequate most
 			-- significant bits set to 0, as this depends on the value of nn)
 
@@ -3048,7 +2959,7 @@ begin
 
 			-- computation of signal r.nndyn.nbtrailzeros based on value
 			-- of .nn_mod_ww
-			-- TODO: set a multicycle of 16 on following path:
+			-- TODO: set a multicycle on following path:
 			--       r.nndyn.nn_mod_ww -> r.nndyn.nbtrailzeros
 			-- (s45) below is the (lazy) reason why we don't want to support ww < 4,
 			-- see (s44)
@@ -3130,7 +3041,7 @@ begin
 				vtmp3 := "00" & r.nndyn.valnnp2dww; -- log2(w) + 2 bits
 				vtmp4 := '0' & r.nndyn.brlwmin; -- log2(w) + 2 bits
 				vtmp5 := vtmp3 - vtmp4;
-				-- r.nndyn.except will be asserted iff .valnnp2dww < .brlwmin
+				-- r.nndyn.exception asserted iff .valnnp2dww < .brlwmin
 				v.nndyn.exception := vtmp5(log2(w) + 1);
 			end if;
 
@@ -3213,10 +3124,6 @@ begin
 					v.nndyn.masktmp4 := (0 => '1', others => '0');
 					v.nndyn.valw4m1 := r.nndyn.valwtmp4prev;
 				end if;
-				--if r.nndyn.tmp4(log2(nn + 3)) = '1' then -- < 0
-				--	v.nndyn.valw4m1 := r.nndyn.valwtmp4;
-				--elsif r.nndyn.tmp4 = (r.nndyn.tmp4'range => '0') then -- = 0
-				--end if;
 			end if;
 
 			v.nndyn.tmpprev4 := r.nndyn.tmp4;
@@ -3225,15 +3132,11 @@ begin
 			if r.nndyn.doshcnt4 = '1' then
 				v.nndyn.masktmp4 := r.nndyn.masktmp4(ww - 2 downto 0) & '0';
 				v.nndyn.shcnt4 := r.nndyn.shcnt4 - 1;
-				if r.nndyn.shcnt4 = to_unsigned(1, log2(ww - 1))
-				--if r.nndyn.shcnt4(log2(ww - 1) - 1) = '0'
-				--	and v.nndyn.shcnt4(log2(ww - 1 ) - 1) = '1'
-				then
+				if r.nndyn.shcnt4 = to_unsigned(1, log2(ww - 1)) then
 					v.nndyn.doshcnt4 := '0';
 					v.nndyn.mask4 := r.nndyn.masktmp4;
 					v.nndyn.dodec4done := '1';
 					v.nndyn.r_burstwr := '1';
-					--v.nndyn.r_burstwrcnt := resize(r.nndyn.valw - 1, log2(w - 1));
 					v.nndyn.r_burstwrcnt := to_unsigned(n - 2, log2(n - 1));
 					v.write.fpwe0 := '1';
 					-- (s80), see (s79)
@@ -3246,7 +3149,7 @@ begin
 			end if;
 
 			-- once .mask4 and .valw4m1 are known, perform a write into ecc_fp_dram
-			-- so as to form the big number 2**(nn + 2) ( = constant R for the
+			-- so as to form the large number 2**(nn + 2) ( = constant R for the
 			-- Montgomery representation)
 			-- This is done by bursting a serie of ww-bit null words into the
 			-- address corresponding to R, followed by the write of the ww-bit
@@ -3275,6 +3178,7 @@ begin
 			end if;
 
 			-- --------------------------------------------------------------------
+			-- (s196)
 			-- 6th batch of operations: wait a few cycles so as to let nndyn_xxx
 			-- signals propagate to their target DFF
 			-- --------------------------------------------------------------------
@@ -3294,13 +3198,13 @@ begin
 				v.nndyn.rwritedone := '0';
 				v.nndyn.docnt32done := '0';
 				v.ctrl.state := idle;
-				v.nndyn.active := '0';
+				v.nndyn.active := '0'; -- release BUSY bit in R_STATUS, see (s30)
 			end if;
 
 		end if; -- nn_dynamic
 
 		-- synchronous (active low) reset
-		if s_axi_aresetn = '0' or force_reset = '1' then
+		if s_axi_aresetn = '0' then
 			v.ctrl.state := idle;
 			v.axi.awpending := '0';
 			v.axi.dwpending := '0';
@@ -3370,13 +3274,13 @@ begin
 			v.ctrl.k_is_being_set := '0';
 			v.ctrl.x_set := '0';
 			v.ctrl.y_set := '0';
-			--v.ctrl.yesen := '0';
 			v.ctrl.r0_is_null := '0';
 			v.ctrl.r1_is_null := '0';
 			v.ctrl.read_forbidden := '1'; -- upon reset, no read access to ecc_fp_dram
 			v.ctrl.do_ksz_test := '0';
 			v.ctrl.small_k_sz_en := '0';
 			v.ctrl.small_k_sz_is_on := '0';
+			v.ctrl.swrst := '0'; -- no need to reset r.ctrl.swrst_cnt
 			v.write.rnd.irnempty := '1';
 			v.write.rnd.trngrdy := '1';
 			v.write.rnd.kmaskfull := '0';
@@ -3394,7 +3298,7 @@ begin
 			if nn_dynamic then
 				-- the idea here is that when nn_dynamic = TRUE, all r.nndyn.xxx
 				-- registered signals are given a reset value corresponding to the
-				-- value of nn given statically in ecc_pkg.vhd (which constitutes
+				-- value of nn given statically in ecc_customize.vhd (which constitutes
 				-- a maximal value for dynamic nn parameter).
 				-- Alternatively, to save routing ressources, we could remove the
 				-- following assignments and specify user/software to write the
@@ -3409,7 +3313,7 @@ begin
 				v.nndyn.mask := std_logic_vector (
 					resize(unsigned(to_signed(-1, (nn + 2) mod ww)), ww) );
 					-- it is important to cast the result of to_signed in unsigned
-					-- so as to have resize() adding 0's on MSbits instead of 1's
+					-- so as to have resize() adding 0s on MSbits instead of 1s
 				v.nndyn.shrcnt := to_unsigned((nn + 2) mod ww, log2(ww));
 				v.nndyn.shlcnt := to_unsigned(ww - ((nn + 2) mod ww), log2(ww));
 				--v.nndyn.tmp := to_unsigned(ww - ((nn + 2) mod ww), log2(nn + 2) + 1);
@@ -3424,18 +3328,6 @@ begin
 				v.nndyn.valwerr := '0';
 				v.nndyn.valnnm3 := to_unsigned(nn - 3, log2(nn));
 			else -- nn_dynamic = FALSE
---				-- value of nn is fixed and known statically: the register
---				-- r.nndyn.nbtrailzeros should be pruned & replaced with constant
---				-- (for this the synthesizer will use its reset value)
---				if (nn mod ww) = 0 then
---					v.nndyn.nbtrailzeros := to_unsigned(ww - 1, log2(2*ww));
---				elsif (nn mod ww) < ww - 4 then
---					v.nndyn.nbtrailzeros := to_unsigned(ww - (nn mod ww) - 1, log2(2*ww));
---				elsif (nn mod ww) = ww - 4 then
---					v.nndyn.nbtrailzeros := to_unsigned(3, log2(2*ww));
---				else -- means nn mod ww > ww - 4 strictly (either ww-3, ww-2 or ww-1)
---					v.nndyn.nbtrailzeros := to_unsigned(2*ww-(nn mod ww)-1, log2(2*ww));
---				end if;
 				v.nndyn.valnn := to_unsigned(nn, log2(nn));
 				v.nndyn.valnnm1 := to_unsigned(nn - 1, log2(nn));
 				v.nndyn.valw := to_unsigned(w, log2(w));
@@ -3467,24 +3359,12 @@ begin
 				for i in 0 to 3 loop
 					v.debug.breakpoints(i).act := '0';
 				end loop;
-				--v.debug.halted := '0';
-				--v.debug.halted_b := '0';
 				v.debug.dosomeopcodes := '0';
 				v.debug.resume := '0';
 				v.debug.nbopcodes := (others => '0');
 				v.debug.trng.using := '1';
-				--TODO: RAJOUTER RESET des dbgtrng etc...
+				--TODO: add reset of dbgtrngxxx etc...
 				v.debug.trng.ta := to_unsigned(trngta, 20); -- defined in ecc_customize
-				-- -- at least one of the 2 registers r.debug.trng.irn.shdataicanbeemptied
-				-- -- & r.debug.trng.irn.rdataxcanbefilled (but not the two) must be reset
-				-- -- so that (s29) does not create erronous behaviour
-				-- --v.debug.trng.irn.rdataxcanbefilled := '1';
-				--v.debug.trng.irn.shdataicanbeemptied := '0';
-				--v.debug.trng.irn.re := '0';
-				--v.debug.trng.irn.resh := (others => '0');
-				--v.debug.trng.irn.arpending := '0';
-				--v.debug.trng.irn.availx := '0';
-				--v.debug.trng.irn.lastwordx := '0';
 				v.debug.trng.completebypass := '0';
 				v.debug.trng.vonneuman := '1';
 				-- by default, es_trng_byte will stay only 1 clock cyle into
@@ -3513,7 +3393,10 @@ begin
 	-- drive output signals
 	-- --------------------
 
-	--   to ecc_scalar
+	-- software reset
+	swrst <= r.ctrl.swrst;
+
+	-- to ecc_scalar
 	agokp <= r.ctrl.agokp;
 	agocstmty <= r.ctrl.agocstmty;
 	agomtya <= r.ctrl.agomtya;
@@ -3533,10 +3416,10 @@ begin
 	small_k_sz_en_en <= r.ctrl.small_k_sz_en_en;
 	small_k_sz <= r.ctrl.small_k_sz;
 
-	--   to ecc_curve
+	-- to ecc_curve
 	masklsb <= r.write.rnd.masklsb;
 
-	--   to ecc_fp
+	-- to ecc_fp
 	xwe <= r.write.fpwe;
 	xaddr <= r.fpaddr;
 	-- if writing into ecc_fp_dram using the debug interface was not
@@ -3547,7 +3430,7 @@ begin
 	          else r.write.fpwdata;
 	xre <= r.read.fpre;
 
-	--   to external AXI interface
+	-- to external AXI interface
 	s_axi_awready <= r.axi.awready;
 	s_axi_wready <= r.axi.wready;
 	s_axi_bresp <= CST_AXI_RESP_OKAY;
@@ -3557,7 +3440,7 @@ begin
 	s_axi_rresp <= CST_AXI_RESP_OKAY;
 	s_axi_rvalid <= r.axi.rvalid;
 
-	--   interrupt
+	-- interrupt
 	irq <= r.ctrl.irq;
 
 	-- to mm_ndsp's
@@ -3644,27 +3527,27 @@ begin
 		nndyn_nnm3 <= nndyn_nnm3_s;
 	end generate;
 
-	--   general busy signal
+	-- general busy signal
 	kppending <= r.ctrl.kppending;
 
-	--   interface with ecc_trng
+	-- interface with ecc_trng
 	trngrdy <= r.write.rnd.trngrdy;
 
-	--   debug features (to ecc_curve_iram)
+	-- debug features (to ecc_curve_iram)
 	dbgiaddr <= r.debug.iaddr;
 	dbgiwdata <= r.debug.iwdata;
 	dbgiwe <= r.debug.iwe;
 	dbgire <= r.debug.ire;
 	dbgtrigger <= r.debug.trigger;
 
-	--   debug features (to ecc_curve)
+	-- debug features (to ecc_curve)
 	dbgbreakpoints <= r.debug.breakpoints;
 	dbgnbopcodes <= r.debug.nbopcodes;
 	dbgdosomeopcodes <= r.debug.dosomeopcodes;
 	dbgresume <= r.debug.resume;
 	dbghalt <= r.debug.halt;
 
-	--   debug features (to trng)
+	-- debug features (to trng)
 	dbgtrnguse <= r.debug.trng.using; -- (s38)
 	dbgtrngta <= r.debug.trng.ta;
 	dbgtrngrawreset <= r.debug.trng.rawreset;

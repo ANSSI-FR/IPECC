@@ -16,7 +16,10 @@
 .constMTY0L:
 .constMTYL_export:
 # *****************************************************************
-# clear both the logical and arithmetical masks
+# clear both the logical and arithmetical masks (mu0, mu1, m0 & m1).
+# If the size of prime p was modified and lowered down since next
+# computation, there may remain pernicious bits in the upper part of
+# the masks
 # *****************************************************************
 	NNCLR			mu0
 	NNCLR			mu1

@@ -192,7 +192,7 @@ package body ecc_utils is
 	begin
 		if techno = spartan6 then tmp := 16;
 		elsif techno = series7 or techno = virtex6 then tmp := 16;
-		elsif techno = ialtera then tmp := 24;
+		elsif techno = ialtera then tmp := 27;
 		elsif techno = asic then tmp := multwidth;
 		end if;
 		return tmp;

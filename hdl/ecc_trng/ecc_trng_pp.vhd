@@ -13,7 +13,6 @@
 --  See LICENSE file at the root folder of the project.
 --
 
-
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -34,6 +33,7 @@ entity ecc_trng_pp is
 	port(
 		clk : in std_logic;
 		rstn : in std_logic;
+		swrst : in std_logic;
 		-- interface with es_trng
 		data_t : in std_logic_vector(7 downto 0);
 		valid_t : in std_logic;
@@ -62,7 +62,7 @@ architecture rtl of ecc_trng_pp is
 
 begin
 
-	comb: process(r, rstn, data_t, valid_t, rdy_s)
+	comb: process(r, rstn, data_t, valid_t, rdy_s, swrst)
 		variable v : reg_type;
 	begin
 		v := r;
@@ -102,7 +102,7 @@ begin
 		end if;
 
 		-- synchronous reset
-		if rstn = '0' then
+		if rstn = '0' or swrst = '1' then
 			v.rdy_t := '1';
 			v.sh8canberead := '0';
 			v.shicanbewritten := '1';

@@ -31,7 +31,8 @@ entity ecc_scalar is
 	port (
 		clk : in  std_logic;
 		rstn : in  std_logic; -- synchronous reset
-		force_reset : in std_logic;
+		-- software reset
+		swrst : in std_logic;
 		-- interface with ecc_axi
 		--   general
 		initdone : out std_logic;
@@ -112,14 +113,13 @@ entity ecc_scalar is
 		compcstmty : out std_logic;
 		comppop : out std_logic;
 		compaop : out std_logic;
-		-- interface with ecc_fp_dram_sh (used only in the 'shuffle' case)
+		-- interface with ecc_fp_dram_sh (used only if shuffle = TRUE)
 		permute : out std_logic;
 		permuterdy : in std_logic;
 		permuteundo : out std_logic;
 		-- debug features
 		dbgpgmstate : out std_logic_vector(3 downto 0);
 		dbgnbbits : out std_logic_vector(15 downto 0)
-		--dbgtime : out unsigned(31 downto 0)
 		-- pragma translate_off
 		-- interface with ecc_fp (simu only)
 		; logr0r1 : out std_logic;
@@ -168,7 +168,6 @@ architecture rtl of ecc_scalar is
 		joye : joye_reg_type;
 		substate : program_type;
 		nextsubstate : program_type;
-		--resultok : std_logic;
 		done : std_logic;
 		firstzaddu : std_logic;
 		blind_nbbits : unsigned(log2(nn) - 1 downto 0);
@@ -179,7 +178,6 @@ architecture rtl of ecc_scalar is
 		k_is_null : std_logic;
 		subpstep : std_logic;
 		subptype : std_logic_vector(1 downto 0);
-		--threep_equals_p : std_logic;
 		zu, zc : std_logic;
 		pts_are_equal : std_logic;
 		pts_are_oppos : std_logic;
@@ -219,6 +217,7 @@ architecture rtl of ecc_scalar is
 	end record;
 
 	-- pragma translate_off
+	-- simulation only
 	type sim_reg_type is record
 		logr0r1 : std_logic;
 		logr0r1step : natural;
@@ -253,8 +252,6 @@ architecture rtl of ecc_scalar is
 	type debug_reg_type is record
 		dbgnextstate : program_type;
 		dbgnextjoyestate : joye_state_type;
-		--timecnt : unsigned(31 downto 0);
-		--timecnten : std_logic;
 	end record;
 
 	type reg_type is record
@@ -270,8 +267,6 @@ architecture rtl of ecc_scalar is
 		-- pragma translate_on
 	end record; -- reg_type
 
-	signal vcc, gnd : std_logic;
-
 	signal r, rin : reg_type;
 	-- pragma translate_off
 	signal rbak_state : state_type;
@@ -280,19 +275,6 @@ architecture rtl of ecc_scalar is
 	signal rlog_blind_nbbits : natural;
 	-- pragma translate_on
 
-	-- Address of the routines below (starting with ECC_IRAM_) are
-	-- defined in package ecc_addr (see file <ecc_addr.vhd> which is
- 	-- automatically generated: numerical values in it are obtained
-	-- when compiling all *.s source files, and extracting addresses
-	-- from the final binary image that match the labels listed in
-	-- configuration file <ecc_addr.txt>)
-	-- Note: synthesis of constant EXEC_ADDR will almost certainly
-	-- lead to inference of LUT-based logic only, as the way EXEC_ADDR
-	-- is combinationaly (hence asynchronously) accessed in the remaining
-	-- of ecc_scalar code below (see e.g (s0)) will prevent synthesizer
-	-- to infer a blockRAM, as these blocks are all synchronous in off-
-	-- the-shelf FPGAs. However allowing EXEC_ADDR to be synthesized
-	-- as an SRAM memory should not take a huge effort.
 	constant CONSTMTY_ROUTINE : natural := 0;
 	constant CHKCURVE_ROUTINE : natural := 1;
 	constant BLINDSTART_ROUTINE : natural := 2;
@@ -324,6 +306,31 @@ architecture rtl of ecc_scalar is
 	constant ZDBL_ROUTINE : natural := 28;
 	constant ZNEGC_ROUTINE : natural := 29;
 	constant SETUP_END_ROUTINE : natural := 30;
+	-- Address of the routines below (all starting with ECC_IRAM_) are defined in
+	-- package ecc_addr (see file <ecc_addr.vhd> which is automatically generated
+	-- when running 'make' in folder hdl/ecc_curve_iram/.
+	-- Numerical values in <ecc_addr.vhd> are obtained when compiling all *.s
+	-- source files present in folder hdl/ecc_curve_iram/asm_src and extracting
+	-- addresses from the final binary image. The addresses to be extracted
+	-- are all the addresses whose label is suffixed with the string "_export":
+	--
+	--   1. this suffixe is removed, as long as the uppercase letter 'L'
+	--      preceeding it, as long as the initial "." prefixing the label name
+	--   2. the remaining identification string is switched to uppercase
+	--   3. it is prefixed with the string "ECC_IRAM_"
+	--
+	-- Example: constant ECC_IRAM_CONSTMTY_ADDR is the address of routine
+	--  ".constMTYL_export".
+	--  (.constMTYL_export -> constMTY -> CONSTMTYL -> ECC_IRAM_CONSTMTY_ADDR)
+	--
+	-- A note on synthesis of constant EXEC_ADDR: it will almost certainly
+	-- lead to inference of LUT-based logic only, because of the way EXEC_ADDR
+	-- is combinationaly (hence asynchronously) accessed in the remaining
+	-- of ecc_scalar code below (see e.g (s0)). This indeed will prevent
+	-- synthesizer from infering a blockRAM, as these blocks are always
+	-- purely synchronous in off-the-shelf FPGAs. However allowing EXEC_ADDR
+	-- to be synthesized as an SRAM memory (either for FPGA or ASIC target)
+	-- should not take a big effort in modifying the RTL below.
 	subtype std_logic_pc is std_logic_vector(IRAM_ADDR_SZ - 1 downto 0);
 	type exec_addr_type is array(0 to 30) of std_logic_pc;
 	constant EXEC_ADDR : exec_addr_type := (
@@ -374,9 +381,6 @@ architecture rtl of ecc_scalar is
 
 begin
 
-	vcc <= '1';
-	gnd <= '0';
-
 	-- (s29), see (s30)
 	-- pragma translate_off
 	assert (log2(nn) <= 16)
@@ -389,7 +393,7 @@ begin
 	               frdy, ferr, zero, iterate_shuffle_rdy, permuterdy, doshuffle,
 	               k_is_null, aerr_inpt_ack, aerr_outpt_ack,
 	               nndyn_nnm3, dopop, popid, doaop, aopid, ar0zo, ar1zo,
-								 x_are_equal, y_are_equal, y_are_opposite, force_reset,
+								 x_are_equal, y_are_equal, y_are_opposite, swrst,
 								 first_2p_is_null, xmxz, ymyz, ypyz, torsion2, kap, kapp,
 								 phimsb, kb0end, small_k_sz_en, small_k_sz_en_en, small_k_sz)
 		variable v : reg_type;
@@ -422,7 +426,7 @@ begin
 		end if;
 
 		v.int.small_k_sz_en_ack := '0';
-		-- acknowledge ecc_axi has sent a new value of small_k_sz
+		-- acknowledge that ecc_axi has sent a new value of small_k_sz
 		if small_k_sz_en_en = '1' then
 			v.int.small_k_sz_en_ack := '1';
 			v.ctrl.small_k_sz_en := small_k_sz_en;
@@ -435,14 +439,13 @@ begin
 		-- ----------------------
 		if r.ctrl.state = idle then
 			if (r.int.ardy = '1' and agocstmty = '1') then
-				-- trigger computation of the 1st Montgomery constant (-p^-1 mod b)
+				-- trigger computation of the 1st Montgomery constant (-p^{-1} mod R)
 				v.ctrl.state := cst;
 				v.ctrl.active := '1';
 				v.int.ardy := '0';
 				v.int.faddr := EXEC_ADDR(CONSTMTY_ROUTINE);
 				v.int.fgo := '1';
 				v.mty.computing := '1';
-				--v.mty.computing_a := '0'; -- useless
 				v.mty.done := '0';
 				v.kp.laststep := '0';
 				v.kp.setup := '0';
@@ -451,13 +454,11 @@ begin
 				v.ctrl.state := cst;
 				v.ctrl.active := '1';
 				v.int.ardy := '0';
-				v.int.faddr := EXEC_ADDR(AMONTY_ROUTINE); -- to launch .aMontyL routine
+				v.int.faddr := EXEC_ADDR(AMONTY_ROUTINE); -- to start .aMontyL routine
 				v.int.fgo := '1';
 				v.mty.computing := '1';
 				v.mty.computing_a := '1';
 				v.mty.donea := '0';
-				--v.kp.laststep := '0';
-				--v.kp.setup := '0';
 			elsif (r.int.ardy = '1' and agokp = '1') then
 				-- --------------------------------------------
 				-- trigger start of an overall [k]P computation
@@ -467,14 +468,11 @@ begin
 				v.sim.perfcnt := 0;
 				v.sim.perfcnten := '1';
 				-- pragma translate_on
-				--if debug then -- statically resolved by synthesizer
-				--	v.dbg.timecnt := (others => '0');
-				--	v.dbg.timecnten := '1';
-				--end if;
 				v.ctrl.state := set;
-				v.kp.initkp := '1'; -- (s19) stays asserted only 1 cycle, see (s20)
+				-- (s19) asserts initkp for a short period (nominaly only 1 cycle)
+				-- for ecc_curve to initialize a few internal signals - see (s20)
+				v.kp.initkp := '1'; -- (s19)
 				v.ctrl.active := '1';
-				--v.fgo := '1';
 				v.kp.computing := '1';
 				v.int.ardy := '0';
 				v.int.aerr_inpt_not_on_curve := '0';
@@ -494,16 +492,13 @@ begin
 					v.ctrl.small_k_sz_en := '0';
 				elsif doblinding = '1' then
 					v.kp.blind_nbbits := unsigned(blindbits);
-					--v.joye.nbbits := unsigned(blindbits) + to_unsigned(nn - 3, 11);
 					v.kp.joye.nbbits :=
 						  resize(unsigned(blindbits), log2(nn) + 1)
 						+ resize(nndyn_nnm3, log2(nn) + 1);
 				else
-					--v.joye.nbbits := to_unsigned(nn - 3, 12);
 					v.kp.joye.nbbits := resize(nndyn_nnm3, log2(nn) + 1);
 				end if;
 				-- pragma translate_off
-				--report "v.kp.joye.nbbits = " & integer'image(to_integer(v.kp.joye.nbbits));
 				nnmax_joye_loop_s <= to_integer(v.kp.joye.nbbits);
 				blbits_max_s <= to_integer(unsigned(blindbits));
 				-- pragma translate_on
@@ -528,7 +523,6 @@ begin
 				-- sample the state of scalar k as regards to its possible nullity
 				-- (using k_is_null input signal driven by ecc_axi)
 				v.kp.k_is_null := k_is_null;
-				--v.kp.threep_equals_p := '0'; -- probably useless
 			elsif (r.int.ardy = '1' and dopop = '1') then
 				-- ----------------------------------
 				-- trigger start of a point operation (other than [k]P)
@@ -560,13 +554,14 @@ begin
 						v.pop.neg := '1';
 					when ECC_AXI_POINT_EQU =>
 						v.int.faddr := EXEC_ADDR(EQUALX_ROUTINE); -- are X-coords equal?
-						v.pop.equal := '1';           -- are Y-coords equal tested later
+						v.pop.equal := '1';       -- (equality of Y-coords tested later)
 						v.pop.step := '0';
 					when ECC_AXI_POINT_OPP =>
-						v.int.faddr := EXEC_ADDR(EQUALX_ROUTINE); -- are X-coords opposite?
-						v.pop.opp := '1';             -- are Y-coords opposite tested later
+						v.int.faddr := EXEC_ADDR(EQUALX_ROUTINE); -- are X-coords equal?
+						v.pop.opp := '1';       -- (opposition of Y-coords tested later)
 						v.pop.step := '0';
-					when others => null; -- no error, ids should be filtered by ecc_axi
+					when others =>
+						null; -- no error, ids should be filtered by ecc_axi
 				end case;
 				-- sample now the possible null-state of R0 & R1 points (from signals
 				-- ar[01]zo, which are driven by ecc_axi) so that even if SW changes
@@ -587,12 +582,18 @@ begin
 				v.ctrl.active := '1';
 				v.ctrl.state := aop;
 				case aopid is
-					when "000" => v.int.faddr := EXEC_ADDR(FPADD_ROUTINE); -- Fp add
-					when "001" => v.int.faddr := EXEC_ADDR(FPSUB_ROUTINE); -- Fp sub
-					when "010" => v.int.faddr := EXEC_ADDR(FPMULT_ROUTINE); -- Fp REDC
-					when "011" => v.int.faddr := EXEC_ADDR(FPINV_ROUTINE); -- Fp invert
-					when "100" => v.int.faddr := EXEC_ADDR(FPINVEXP_ROUTINE); -- cst time
-					when others => null; -- no error, ids should be filtered by ecc_axi
+					-- Fp addition
+					when "000" => v.int.faddr := EXEC_ADDR(FPADD_ROUTINE);
+					-- Fp subtraction
+					when "001" => v.int.faddr := EXEC_ADDR(FPSUB_ROUTINE);
+					-- Fp REDC
+					when "010" => v.int.faddr := EXEC_ADDR(FPMULT_ROUTINE);
+					-- Fp inversion
+					when "011" => v.int.faddr := EXEC_ADDR(FPINV_ROUTINE);
+					-- Fp inversion in constant time
+					when "100" => v.int.faddr := EXEC_ADDR(FPINVEXP_ROUTINE);
+					-- no error here, ids should be filtered by ecc_axi
+					when others => null;
 				end case;
 				v.int.fgo := '1';
 				v.aop.computing := '1';
@@ -606,13 +607,7 @@ begin
 		end if;
 		-- pragma translate_on
 
-		--if debug then --  statically resolved by synthesizer
-		--	if r.dbg.timecnten = '1' then
-		--		v.dbg.timecnt := r.dbg.timecnt + 1;
-		--	end if;
-		--end if;
-
-		-- deassert fgo when ecc_curve (here acting as a slave) has
+		-- deassert fgo when ecc_curve (here acting as an agent) has
 		-- acknowledged the request for execution of a program (that is
 		-- when frdy = '1' at the same time we have fgo asserted high)
 		if r.int.fgo = '1' and frdy = '1' then
@@ -624,14 +619,13 @@ begin
 		-- ------------------------
 		-- main state machine (based on r.ctrl.state)
 		v.int.permute := '0'; -- (s4)
-		if r.int.fgo = '0' and frdy = '1' then --and r.ctrl.active = '1' (useless)
+		if r.int.fgo = '0' and frdy = '1' then
 			case r.ctrl.state is
 				when cst =>
 					v.ctrl.state := idle;
 					v.mty.computing := '0';
 					v.mty.computing_a := '0';
 					v.int.ardy := '1';
-					--v.int.aerr := ferr;
 					v.mty.done := '1';
 					if r.mty.computing_a = '1' then
 						v.mty.donea := '1';
@@ -641,7 +635,6 @@ begin
 					v.kp.initkp := '0'; -- (s20), see (s19)
 					v.ctrl.state := kp;
 					v.kp.substate := checkoncurve;
-					--v.kp.resultok := '0';
 					v.int.faddr := EXEC_ADDR(CHKCURVE_ROUTINE); -- (s0)
 					v.int.fgo := '1';
 				when kp =>
@@ -657,10 +650,6 @@ begin
 						v.sim.logfinalresult := '1';
 						v.sim.perfcnten := '0';
 						-- pragma translate_on
-						--if debug then -- statically resolved by synthesizer
-						--	v.dbg.timecnten := '0';
-						--end if;
-						--if r.ctrl.r1z_init = '1' or -- point P was null to begin with
 						if r.kp.k_is_null = '1' -- the scalar was null to begin with
 							-- TODO: the possible nullity of [k]P result should in the end
 							-- only based on signal r.ctrl.r1z
@@ -672,15 +661,15 @@ begin
 							v.int.ar1zi := '0';
 						end if;
 						v.int.ar01zien := '1';
-						v.int.small_k_sz_kpdone := '1'; -- asserted only 1 cycle thx to (s54)
+						v.int.small_k_sz_kpdone := '1'; -- asserted 1 cycle thx to (s54)
 					else
 						-- nothing to do, ecc_curve acknowledgement is handled in the
 						-- state machine (s1) below
 						null;
 					end if;
 				when pop =>
-					-- (s24) following assignments on .active./.state/.ardy/.popdone/
-					-- .compop have possible bypasses below in (s25) & (s26)
+					-- (s24) - following assignments on .active./.state/.ardy/.pop.done/
+					-- .computing have possible bypasses in (s25) & (s26) below
 					v.ctrl.active := '0';
 					v.ctrl.state := idle;
 					v.int.ardy := '1';
@@ -706,10 +695,10 @@ begin
 						v01z := r.ctrl.r1z_init & r.ctrl.r0z_init;
 						case v01z is
 							when "00" =>
-								-- neither R0 nor R1 input points were null
-								-- we need to catch if the resulting P+Q point happened to be
-								-- the null point - that's the reason for patch ,p45 in
-								-- addition.s
+								-- neither R0 nor R1 input points were null to begin with
+								-- we need to catch if the resulting P + Q point happens to be
+								-- the null point - that's the reason for patch ,p42 & ,p43
+								-- in addition.s
 								if x_are_equal = '1' and y_are_equal = '1' then
 									-- SW asked for a P + Q computation with P = Q: assert error
 									-- to ecc_axi (r.int.aerr will stay asserted until a new com-
@@ -717,7 +706,7 @@ begin
 									--v.int.aerr := '1'; -- TODO: switch to DOUBLE!
 								elsif x_are_equal = '1' and y_are_opposite = '1' then
 									-- SW asked for a P + Q operation with P = -Q: assert ar1zi
-									-- so that SW can see in the STATUS register that R1 is now
+									-- so that SW can see in R_STATUS register that R1 is now
 									-- the null point
 									v.int.ar1zi := '1';
 									v.int.ar01zien := '1'; -- stays asserted 1 cycle thx to (s28)
@@ -750,7 +739,7 @@ begin
 						-- -------------------------
 						-- operation was a point DBL
 						-- -------------------------
-						-- since R1 <= [2]R0, R1 gets the state (towards nullity) that
+						-- since R1 <= [2]R0, R1 gets the state (regarding nullity) that
 						-- R0 was showing at the time computation was set
 						v.int.ar1zi := r.ctrl.r0z_init;
 						v.int.ar01zien := '1'; -- stays asserted 1 cycle thx to (s28)
@@ -758,7 +747,7 @@ begin
 						-- -------------------------
 						-- operation was a point NEG
 						-- -------------------------
-						-- since R1 <= -R0, R1 gets the state (towards nullity) that
+						-- since R1 <= -R0, R1 gets the state (regarding nullity) that
 						-- R0 was showing at the time computation was set
 						v.int.ar1zi := r.ctrl.r0z_init;
 						v.int.ar01zien := '1'; -- stays asserted 1 cycle thx to (s28)
@@ -800,23 +789,23 @@ begin
 									-- of arithmetic computations is pertinent
 									if zero = '1' and r.pop.equalx = '1' then
 										v.pop.yes := '1';
-										v.pop.yesen := '1'; -- stays asserted only 1 cycle thx to (s27)
+										v.pop.yesen := '1'; -- stays high only 1 cycle thx to (s27)
 									elsif zero = '0' or r.pop.equalx = '0' then
 										v.pop.yes := '0';
-										v.pop.yesen := '1'; -- stays asserted only 1 cycle thx to (s27)
+										v.pop.yesen := '1'; -- stays high only 1 cycle thx to (s27)
 									end if;
 								when "01" =>
 									-- R0 was null, R1 was not: points can't be equal
 									v.pop.yes := '0';
-									v.pop.yesen := '1'; -- stays asserted only 1 cycle thx to (s27)
+									v.pop.yesen := '1'; -- stays high only 1 cycle thx to (s27)
 								when "10" =>
 									-- R1 was null, R0 was not: points can't be equal
 									v.pop.yes := '0';
-									v.pop.yesen := '1'; -- stays asserted only 1 cycle thx to (s27)
+									v.pop.yesen := '1'; -- stays high only 1 cycle thx to (s27)
 								when "11" =>
 									-- both R0 & R1 were null, they are equal
 									v.pop.yes := '1';
-									v.pop.yesen := '1'; -- stays asserted only 1 cycle thx to (s27)
+									v.pop.yesen := '1'; -- stays high only 1 cycle thx to (s27)
 								when others => null;
 							end case;
 						end if;
@@ -851,24 +840,23 @@ begin
 						v.int.faddr := EXEC_ADDR(BLINDSTART_ROUTINE);
 						v.kp.substate := blindinit;
 					elsif doblinding = '0' then
-						-- Therefore switch from 'checkoncurve' state to 'adpa' state
+						-- switch from 'checkoncurve' state to 'adpa' state
 						v.int.faddr := EXEC_ADDR(ADPA_ROUTINE);
 						v.kp.substate := adpa;
 					end if;
 					v.int.fgo := '1';
 					if r.ctrl.r1z = '1' then
 						-- R1 being null from start of computation, the check-on-curve
-						-- test is assumed to be TRUE with no regards as what computations
-						-- on coordinates show
-						v.int.aerr_inpt_not_on_curve := '0'; -- no error (0 is on curve)
+						-- test is assumed to be TRUE with no regards as to the result of
+						-- computations on coordinates
+						v.int.aerr_inpt_not_on_curve := '0'; -- no error (0-pt is on curve)
 					elsif r.ctrl.r1z = '0' then
 						if zero = '0' then -- input point is not null and is NOT on curve
-							--v.ctrl.state := idle;
-							--v.kp.substate := idle;
-							--v.kp.resultok := '0';
-							v.int.aerr_inpt_not_on_curve := '1'; -- error (input point NOT on curve)
+							-- error (= input point NOT on curve)
+							v.int.aerr_inpt_not_on_curve := '1';
 						elsif zero = '1' then
-							v.int.aerr_inpt_not_on_curve := '0'; -- no error (input point is on curve)
+							-- no error
+							v.int.aerr_inpt_not_on_curve := '0';
 						end if;
 					end if;
 					-- pragma translate_off
@@ -944,31 +932,30 @@ begin
 						-- 1st pass of state 'ssetup' is done
 						-- ----------------------------------
 						v.kp.pts_are_equal := '0'; -- points can't be equal (P would be 0)
-						v.kp.pts_are_oppos := xmxz and not ymyz; -- (s54)
-						v.int.faddr := EXEC_ADDR(SETUP_END_ROUTINE); -- (s52), byp. by (s53)
+						v.kp.pts_are_oppos := xmxz and not ymyz; -- (s55)
+						v.int.faddr := EXEC_ADDR(SETUP_END_ROUTINE);
 						v.int.fgo := '1';
 						-- we stay in the same 'ssetup' state, but the 2nd pass
-						-- is ensured by asserting .kp.ssetup_step high
+						-- is enforced by asserting .kp.ssetup_step high
 						v.kp.ssetup_step := '1';
 						v.kp.zu := '1';
 						-- if the two points R0 & R1 are opposite (and non null), we must
-						-- drive output 'p_is_of_torsion3' high to ecc_curve so that patches
+						-- drive output 'p_is_of_order_3' high to ecc_curve so that patches
 						-- in .zadduL ensure proper processing
 						if r.ctrl.r0z = '0' and r.ctrl.r1z = '0' -- neither XR0 nor XR1 = 0
 							and xmxz = '1' and ymyz = '0' -- XR0 = -XR1
 						then
 							v.kp.first3pz := '1';
-						-- pragma translate_off
-						v.sim.logr0r1 := '1';
-						v.sim.logr0r1step := 3;
-						-- pragma translate_on
+							-- pragma translate_off
+							v.sim.logr0r1 := '1';
+							v.sim.logr0r1step := 3;
+							-- pragma translate_on
 						end if;
 					elsif r.kp.ssetup_step = '1' then
 						-- ----------------------------------
 						-- 2nd pass of state 'ssetup' is done
 						-- ----------------------------------
 						v.kp.ssetup_step := '0';
-						--v.kp.threep_equals_p := first_2p_is_null;
 						v.int.faddr := EXEC_ADDR(SWITCH3P_ROUTINE); -- (s9)
 						v.kp.setup := '0';
 						if iterate_shuffle_rdy = '1' then
@@ -983,7 +970,7 @@ begin
 							v.kp.substate := wait_xyr01_permute;
 							v.kp.nextsubstate := switch3p;
 						end if;
-						if r.kp.pts_are_oppos = '1' then -- set by (s54)
+						if r.kp.pts_are_oppos = '1' then -- set by (s55)
 							if kap = '0' then -- R0 & R1 must switch places
 								-- R0 contains initial point P, which is non null
 								v.ctrl.r0z := '0';
@@ -1003,6 +990,8 @@ begin
 				when switch3p =>
 					-- switch from 'switch3p' state to 'joyecoz' state to perform the
 					-- loop of the Joye Double-&-Add scalar arithmetic level algorithm
+					-- TODO: state 'switch3p' is obsolete (as well as its associated
+					-- routine .switch3PL, which now contains only a NOP) -> remove them
 					v.int.faddr := EXEC_ADDR(ITOH_ROUTINE);
 					v.kp.substate := joyecoz;
 					if (not debug and shuffle) or
@@ -1023,10 +1012,11 @@ begin
 				-- Joye Double-&-Add always (s5), see also (s6)
 				-- ------------------------
 				when joyecoz => 
-					-- this state is looped a number of times equal to the number
-					-- of bits which the blinded scalar number is made of
-					-- (that is, the number of bits of the private scalar
-					-- + the number of bits of the random blinding number)
+					-- this state is looped a number of times equal to the number of
+					-- bits which the blinded scalar number is made of (that is, the
+					-- number of bits of the private scalar + the number of bits of
+					-- the random blinding number if blinding is active, or simply
+					-- the number of bits of the private scalar if it is not)
 					if r.kp.joye.state = itoh then
 						-- -------------------------------------------
 						--                 end of ITOH
@@ -1045,13 +1035,13 @@ begin
 							v.sim.simbit := r.sim.simbit + 1;
 							-- pragma translate_on
 						elsif iterate_shuffle_rdy = '0' then
-							-- random is not ready yet to ensure shuffle of [XR]R[01] coords,
-							-- switch from substate joyecoz to wait_xyr01_permute.
+							-- random is not available yet to ensure shuffle of [XR]R[01]
+							-- coords, switch from substate joyecoz to wait_xyr01_permute.
 							-- Having not set r.kp.joye.state to prezaddu (see (s12) just
 							-- above) and instead having kept it to 'itoh' will ensure that
-							-- logic described by (s13) below will recognize that we entered
-							-- substate 'wait_xyr01_permute' to prepare an itoh-to-prezaddu
-							-- transition rather than a zaddu-to-prezaddc one.
+							-- logic described by (s13) below recognizes we entered substate
+							-- 'wait_xyr01_permute' to prepare an itoh-to-prezaddu transition
+							-- rather than a zaddu-to-prezaddc one.
 							v.kp.substate := wait_xyr01_permute;
 							v.kp.nextsubstate := joyecoz; -- (s14)
 						end if;
@@ -1062,7 +1052,7 @@ begin
 						if (r.ctrl.r0z xor r.ctrl.r1z) = '1' then
 							v.kp.pts_are_equal := '0';
 							v.kp.pts_are_oppos := '0';
-						else -- if r.ctrl.r0z = '0' and r.ctrl.r1z = '0' then
+						else
 							v.kp.pts_are_equal := xmxz and ymyz; -- (s45)
 							v.kp.pts_are_oppos := xmxz and not ymyz; -- (s46)
 						end if;
@@ -1073,7 +1063,7 @@ begin
 						-- if the two points R0 & R1 are equal (and non null), we must
 						-- call .zdblL instead of .zadduL (and switch to zdblu state
 						-- instead of zaddu)
-						if r.ctrl.r0z = '0' and r.ctrl.r1z = '0' -- neither XR0 nor XR1 = 0
+						if r.ctrl.r0z = '0' and r.ctrl.r1z = '0' -- neither XR0 nor XR1 is 0
 							and xmxz = '1' and ymyz = '1' -- XR0 = XR1
 						then
 							-- we need to call ZDBL to handle this case
@@ -1095,22 +1085,22 @@ begin
 							-- pragma translate_on
 						elsif iterate_shuffle_rdy = '0' then
 							-- switch from substate joyecoz to wait_xyr01_permute.
-							-- Having not set r.kp.joye.state to prezaddc (see (s17) just above)
-							-- and instead having kept it to 'zaddu' will ensure that logic
-							-- described by (s18) below will recognize that we entered
+							-- Having not set r.kp.joye.state to prezaddc (see (s17) just
+							-- above) and instead having kept it to 'zaddu' will ensure that
+							-- logic described by (s18) below will recognize that we entered
 							-- substate 'wait_xyr01_permute' for preparing a zaddu-to-prezaddc
 							-- Joye-state transition
 							v.kp.substate := wait_xyr01_permute;
 							v.kp.nextsubstate := joyecoz; -- (s16)
 						end if;
-						-- compute new nullity flags for R0 & R1
-						-- independently of whether we're entering immediately prezaddc
-						-- joye-state (or temporarily switching to state wait_xyr01_permute)
+						-- compute new nullity flags for R0 & R1.
+						-- Independently of whether we're entering immediately prezaddc
+						-- joye-state or temporarily switching to state wait_xyr01_permute,
 						-- we set the zero flags according to:
 						--    - r.kp.pts_are_[equal/oppos] signals which were set at the
 						--      end of prezaddu state
 						--    - r.ctrl.r[01]z
-						--    - kap & kapp inputs (driven by ecc_curve) (also used in patchs)
+						--    - kap & kapp inputs (driven by ecc_curve), also used in patchs
 						--    - (torsion2 plays no role here, only in ZDBL - see below)
 						if r.ctrl.r0z = '0' and r.ctrl.r1z = '0' then
 							-- neither R0 nor R1 was null when starting ZADDU
@@ -1133,6 +1123,7 @@ begin
 								-- so they stay non-null
 								--v.ctrl.r0z := '0'; -- useless (R0 wasn't null, it stays so)
 								--v.ctrl.r1z := '0'; -- useless (R0 wasn't null, it stays so)
+								null;
 							end if;
 						elsif r.ctrl.r0z = '0' and r.ctrl.r1z = '1' then
 							-- R0 was non null, but R1 was, when starting ZADDU
@@ -1156,6 +1147,7 @@ begin
 							-- R0 & R1 were both null when starting ZADDU
 							--v.ctrl.r0z := '1'; -- useless (R0 was null, it stays so)
 							--v.ctrl.r1z := '1'; -- useless (R1 was null, it stays so)
+							null;
 						end if;
 					elsif r.kp.joye.state = zdblu then
 						-- -------------------------------------------
@@ -1187,7 +1179,7 @@ begin
 						--    - r.kp.pts_are_[equal/oppos] signals which were set at the
 						--      end of prezaddu state
 						--    - r.ctrl.r[01]z
-						--    - kap & kapp inputs (driven by ecc_curve) (also used in patchs)
+						--    - kap & kapp inputs (driven by ecc_curve), also used in patchs
 						--    - torsion2 input (driven by ecc_curve)
 						if r.ctrl.r0z = '0' and r.ctrl.r1z = '0' then
 							if r.kp.pts_are_equal = '1' then -- was set by (s45)
@@ -1299,7 +1291,7 @@ begin
 						--    - r.kp.pts_are_[equal/oppos] signals which were set at the
 						--      end of prezaddu state
 						--    - r.ctrl.r[01]z
-						--    - kap & kapp inputs (driven by ecc_curve) (also used in patchs)
+						--    - kap & kapp inputs (driven by ecc_curve), also used in patchs
 						--    - torsion2 input (driven by ecc_curve)
 						if r.ctrl.r0z = '0' and r.ctrl.r1z = '0' then
 							if r.kp.pts_are_equal = '1' then -- was set by (s47)
@@ -1361,12 +1353,7 @@ begin
 						-- which is common to end of zaddc, zdblc & znegc, will handle
 						-- possible end of scalar loop.
 						-- (s51) - compute new nullity flags for R0 & R1
-						-- i.e set the zero flags according to:
-						--    - r.kp.pts_are_[equal/oppos] signals which were set at the
-						--      end of prezaddu state
-						--    - r.ctrl.r[01]z
-						--    - kap & kapp inputs (driven by ecc_curve) (also used in patchs)
-						--    - torsion2 input (driven by ecc_curve)
+						-- i.e set the zero flags according to r.ctrl.r[01]z
 						if r.ctrl.r0z = '0' and r.ctrl.r1z = '0' then
 							-- pragma translate_off
 							assert (FALSE)
@@ -1390,11 +1377,11 @@ begin
 							-- pragma translate_on
 							null;
 						end if;
-					end if; -- if r.kp.joye.state = itoh
+					end if; -- if r.kp.joye.state
 
 					-- (s49)
 					-- below is handled the end of ZADDC in common with the end of ZDBLC
-					-- and NEGC, as it consists in all the 3 states in decrementing
+					-- and ZNEGC, as it consists in all the 3 states in decrementing
 					-- r.kp.joye.nbbits and testing:
 					--   - if we've reached the end of scalar loop (if it has reached 0)
 					--     in which case we jump to substractp state
@@ -1411,7 +1398,6 @@ begin
 						--      (to catch the end of scalar loop)
 						-- -------------------------------------------
 						v.kp.joye.nbbits := r.kp.joye.nbbits - 1;
-						--v.sim.simbit := r.sim.simbit + 1;
 						if r.kp.joye.nbbits(log2(nn)) = '0' and
 							v.kp.joye.nbbits(log2(nn)) = '1'
 						then
@@ -1443,7 +1429,7 @@ begin
 							if (not debug and shuffle) or
 					  		(debug and shuffle and doshuffle = '1') -- (s21)
 							then
-								v.kp.joye.state := permutation; -- (s8)
+								v.kp.joye.state := permutation;
 								v.int.permute := '1'; -- stays asserted 1 cycle thx to (s4)
 								if r.kp.joye.nbbits = to_unsigned(1, r.kp.joye.nbbits'length)
 								then
@@ -1468,7 +1454,7 @@ begin
 				when subtractp =>
 					if r.kp.subpstep = '0' then
 						-- we just have finished executing the .pre_zaddcL routine that the
-						-- code of .subtractP has branched to at its end we can use the
+						-- code of .subtractP has branched to at its end, so we can use the
 						-- values of XmXC (difference of X-coords when entering .pre_zaddcL)
 						-- and YmY (same for Y-coords) to determine:
 						--   - if the [k + 1 - k%2]P and P points are possibly equal
@@ -1511,7 +1497,7 @@ begin
 						else
 							v.kp.pts_are_equal := '0';
 							v.kp.pts_are_oppos := '0';
-							-- execute zaddcL (regular situation, no exception)
+							-- execute zaddcL (nominal situation, no exception)
 							v.int.faddr := EXEC_ADDR(ZADDC_ROUTINE);
 							v.kp.subptype := "00";
 						end if;
@@ -1527,15 +1513,19 @@ begin
 					elsif r.kp.subpstep = '1' then
 						if r.kp.subptype = "01" then
 							-- we're back from .zdblL routine
-							-- R1 (final [k]P point) might be null! This is the case in 2 situations:
+							-- R1 (final [k]P point) might be null! This is the case in two
+							-- situations:
 							--   1st situation:
 							--        - if the input scalar is even
-							--    and - twe two points [k + 1 - k%2]P and P turned out to be equal
+							--    and - twe two points [k + 1 - k%2]P and P turned out to be
+							--          equal
 							--   2nd situation:
 							--        - if the 2-torsion flag ('torsion2') driven by ecc_curve
-							--          (set by patch ,p56 & used by patches ,p22/,p23/,p61) is high
+							--          (set by patch ,p56 & used by patches ,p22/,p23/,p61)
+							--          is high
 							--    and - if the input scalar is even
-							--    and - twe two points [k + 1 - k%2]P and P turned to be opposed
+							--    and - twe two points [k + 1 - k%2]P and P turned to be
+							--          opposed
 							if (r.kp.pts_are_equal = '1' and kb0end = '0') or
 								(r.kp.pts_are_oppos = '1' and kb0end = '0' and torsion2 = '1')
 							then
@@ -1545,8 +1535,8 @@ begin
 							end if;
 						elsif r.kp.subptype = "10" then
 							-- we're back from .znegcL routine
-							-- R1 (final [k]P point) might be null! This is the case in 1 situation:
-							--    if the input scalar is odd
+							-- R1 (final [k]P point) might be null! This is the case if the
+							-- input scalar is odd
 							if kb0end = '1' then
 								v.ctrl.r1z := '1'; -- final point is null
 							else
@@ -1567,10 +1557,10 @@ begin
 						v.sim.logr0r1step := 3;
 						-- pragma translate_on
 					end if;
-				----------------------------------------
-				-- exit:   return to  affine coordinates
-				--       & check final point is on curve
-				----------------------------------------
+				-----------------------------------------
+				-- exits:   return to  affine coordinates
+				--        & check final point is on curve
+				-----------------------------------------
 				when others => -- ("others" stands for exits)
 					-- test input 'zero' driven by ecc_curve to check if the
 					-- result [k]P actually belongs to the curve
@@ -1580,7 +1570,6 @@ begin
 						if zero = '0' then
 							v.int.aerr_outpt_not_on_curve := '1'; -- error (output point NOT on curve)
 						elsif zero = '1' then
-							--v.kp.resultok := '0';
 							v.int.aerr_outpt_not_on_curve := '0'; -- no error (output point on curve)
 						end if;
 					end if;
@@ -1682,7 +1671,7 @@ begin
 		end if;
 
 		-- synchronous (active low) reset
-		if rstn = '0' or force_reset = '1' then
+		if rstn = '0' or swrst = '1' then
 			v.ctrl.active := '0';
 			v.ctrl.initdone := '0';
 			v.ctrl.uponreset := '1';
@@ -1714,10 +1703,6 @@ begin
 			v.sim.perfcnten := '0';
 			v.sim.perfcnt := 0;
 			-- pragma translate_on
-			--if debug then -- statically resolved by synthesizer
-			--	v.dbg.timecnten := '0'; -- useless
-			--end if;
-			--v.kp.resultok := '0';
 			v.kp.done := '0';
 			v.mty.done := '0';
 			v.mty.donea := '0';
@@ -1767,12 +1752,6 @@ begin
 	ar1zi <= r.int.ar1zi;
 	small_k_sz_en_ack <= r.int.small_k_sz_en_ack;
 	small_k_sz_kpdone <= r.int.small_k_sz_kpdone;
-	--dbgt: if debug generate
-	--	-- if it wasn't a debug feature, a multicycle would be possible
-	--	-- on the path from r.dbg.timecnt to the register of ecc_axi that
-	--	-- sofware driver reads to get the time measure
-	--	dbgtime <= r.dbg.timecnt;
-	--end generate;
 	--   interface with ecc_curve
 	fgo <= r.int.fgo;
 	faddr <= r.int.faddr;
@@ -1805,8 +1784,8 @@ begin
 	simbit <= r.sim.simbit;
 	-- pragma translate_on
 	-- debug features
-	-- TODO: set lots of multicycles on paths r.[sub]state -> dbg*
-	--                                      & r.dbgnextstate -> dbg*
+	-- TODO: many multicycles can be set on paths r.[sub]state -> dbg*
+	--                                          & r.dbgnextstate -> dbg*
 	dbgpgmstate <= DEBUG_STATE_IDLE when r.ctrl.state = idle
 	  else DEBUG_STATE_CSTMTY when r.ctrl.state = cst
 	  else DEBUG_STATE_CHECKONCURVE when r.kp.substate = checkoncurve
@@ -1827,17 +1806,13 @@ begin
 	  else DEBUG_STATE_SUBTRACTP when r.kp.substate = subtractp
 	  else DEBUG_STATE_EXIT when r.kp.substate = exits
 	  else "1111";
-	--dbgjoyestate <=
-	--       "01" when r.kp.substate = joyecoz and r.kp.joye.state = itoh
-	--  else "10" when r.kp.substate = joyecoz and r.kp.joye.state = zaddu
-	--  else "11" when r.kp.substate = joyecoz and r.kp.joye.state = zaddc
-	--  else "00";
 	-- (s30), see (s29)
 	dbgnbbits <= std_logic_vector(resize(r.kp.joye.nbbits, 16))
 	                  when r.kp.substate = joyecoz
 	             else std_logic_vector(resize(r.kp.blind_nbbits, 16))
 	                  when r.kp.substate = blindbit
 	             else std_logic_vector(to_unsigned(0, 16));
+
 	-- pragma translate_off
 	logr0r1 <= r.sim.logr0r1;
 	logr0r1step <= r.sim.logr0r1step;

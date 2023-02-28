@@ -31,6 +31,7 @@ entity es_trng is
 	port(
 		clk : in std_logic;
 		rstn : in std_logic;
+		swrst : in std_logic;
 		-- interface with ecc_trng_pp
 		data_t : out std_logic_vector(7 downto 0);
 		valid_t : out std_logic;
@@ -56,6 +57,7 @@ architecture struct of es_trng is
 		port(
 			clk : in std_logic;
 			rstn : in std_logic;
+			swrst : in std_logic;
 			-- interface with es_trng_aggreg
 			raw : out std_logic;
 			valid : out std_logic;
@@ -71,6 +73,7 @@ architecture struct of es_trng is
 		port(
 			clk : in std_logic;
 			rstn : in std_logic;
+			swrst : in std_logic;
 			-- interface with downstream es_trng_aggreg
 			raw : out std_logic;
 			valid : out std_logic;
@@ -138,6 +141,7 @@ begin
 			port map(
 				clk => clk,
 				rstn => rstn,
+				swrst => swrst,
 				-- interface with downstream es_trng_aggreg
 				raw => rawi,
 				valid => validi,
@@ -157,6 +161,7 @@ begin
 				port map(
 					clk => clk,
 					rstn => rstn,
+					swrst => swrst,
 					-- interface with downstream es_trng_aggreg
 					raw => raw0(i),
 					valid => valid0(i),
@@ -173,6 +178,7 @@ begin
 				port map(
 					clk => clk,
 					rstn => rstn,
+					swrst => swrst,
 					-- interface with downstream es_trng_aggreg
 					raw => raw1(i),
 					valid => valid1(i),
@@ -203,6 +209,7 @@ begin
 		port map(
 			clk => clk,
 			rstn => rstn,
+			swrst => swrst,
 			datain => r_rawi,
 			we => r.we,
 			werr => open,
@@ -220,7 +227,7 @@ begin
 		);
 
 	comb: process(r, rstn, rawi, validi, rawout, full, empty, count, rdy_t,
-		            dbgtrngppdeact)
+		            dbgtrngppdeact, dbgtrngrawreset, swrst)
 		variable v : reg_type;
 	begin
 		v := r;
@@ -317,7 +324,7 @@ begin
 		end if;
 
 		-- synchronous reset
-		if rstn = '0' or dbgtrngrawreset = '1' then
+		if rstn = '0' or dbgtrngrawreset = '1' or swrst = '1' then
 			v.we := '0';
 			v.rdyi := '1';
 			v.re := '0';

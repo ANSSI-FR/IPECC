@@ -21,11 +21,8 @@
 	BARRIER
 # *****************************************************************
 # do some cleaning up
-# It is important to clean at least the masks mu0, mu1, m0 and m1
-# because in case the size of the prime p was to change and be
-# reduced before next computation, there may remain pernicious bits
-# in the upper part of the masks. Note that kb1 is not cleared here
-# as this is already done by adpa.s
+# Note that kb1 is not cleared here as this is already done in adpa.s.
+# Masks mu0, mu1, m0 & m1 are cleared in monty-cst.s
 # *****************************************************************
 	NNCLR			phi0
 	NNCLR			phi1

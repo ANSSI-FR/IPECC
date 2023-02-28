@@ -29,7 +29,8 @@ entity ecc_curve is
 	port(
 		clk : in std_logic;
 		rstn : in std_logic; -- synchronous reset
-		force_reset : in std_logic;
+		-- software reset
+		swrst : in std_logic;
 		-- interface with ecc_axi
 		masklsb : in std_logic;
 		doblinding : in std_logic;
@@ -238,8 +239,6 @@ architecture rtl of ecc_curve is
 	end record;
 
 	type ctrl_reg_type is record
-		r0_is_null: std_logic;
-		r1_is_null : std_logic;
 		x_are_equal : std_logic;
 		y_are_equal : std_logic;
 		y_are_opposite : std_logic;
@@ -392,7 +391,7 @@ architecture rtl of ecc_curve is
 
 	-- Note that constants CST_ADDR_[XY]R[01] which are defined in
 	-- <ecc_pkg.vhd> also must be kept consistent with the values
-	-- in <vardesf.csv>
+	-- in <vardesf.csv> (of folder ecc_curve_iram/asm_src/
 
 	-- pragma translate_off
 	signal r_op_plus : std_logic;
@@ -422,7 +421,7 @@ begin
 	               trng_data, trng_valid, fr0z, fr1z, compkp, comppop, compaop,
 	               iterate_shuffle_valid, iterate_shuffle_force, dbghalt,
 	               doblinding, opo, dbgbreakpoints, dbgpgmstate, dbgnbbits,
-								 dbgnbopcodes, dbgdosomeopcodes, dbgresume, force_reset,
+								 dbgnbopcodes, dbgdosomeopcodes, dbgresume, swrst,
 								 zu, zc, r0z, r1z,
 								 pts_are_equal, pts_are_oppos, p_is_of_order_3)
 		variable v : reg_type;
@@ -489,7 +488,7 @@ begin
 		--       whether or not debug features are present (unless it would
 		--       naturally be trimmed by synthesizer when they are not)
 		v_breakpointhit := FALSE;
-		v_breakpointnb := 0; -- to avoid inference of useless latches
+		v_breakpointnb := 0; -- to avoid inference of latches
 		for i in 0 to 3 loop
 			if debug
 				and dbgbreakpoints(i).act = '1'
@@ -531,13 +530,10 @@ begin
 
 		-- shift register for read-enable from ecc_curve_iram
 		v.fetch.ramresh :=
-			'0' & r.fetch.ramresh(sramlat downto 1); -- (s0) bypassed by (s11-13)
+			'0' & r.fetch.ramresh(sramlat downto 1); -- (s0) bypassed by (s11)-(s13)
 
 		if r.state = idle then
 			if initkp = '1' then
-				v.ctrl.r0_is_null := '1'; -- R0 variable represents null-point
-				v.ctrl.r1_is_null := '0'; -- R1 shouldn't be the null-point
-				                          -- (this is checked by 'init' program)
 				-- reset all error flags
 				v.err := '0';
 				v.err_flags := (others => '0');
@@ -552,10 +548,8 @@ begin
 				v.shuffle.state := "00";
 				v.shuffle.trng_rdy := '1';
 				-- it is important that .kapp be reset to 0 at the begining of each
-				-- new [k]P computation, so as to make patches in the first zaddu
-				-- (the one called at the end of .setupL to compute [3]P in Co-Z)
-				-- behave as if Kappa' = 0 (at least for some of the opcodes, and,
-				-- inside these, for some of their operands)
+				-- new [k]P computation, so as to make a certain number of patches
+				-- to behave as if Kappa' = 0
 				v.ctrl.kapp := '0'; -- (s45) see below (s46) to (s60)
 			elsif r.frdy = '1' and fgo = '1' then
 				-- trigger of a new program execution
@@ -574,7 +568,6 @@ begin
 		-- ----------------------------------------------
 
 		if r.fetch.state = fetch then
-			--v.fetch.state := wwait;
 			if r.fetch.ramresh(0) = '1' then
 				v.fetch.opcode := irdata;
 				v.fetch.valid := '1'; -- (s14) bypassed by (s15) & (s16)
@@ -587,7 +580,7 @@ begin
 					std_logic_vector(unsigned(r.fetch.pc) + 1);
 				-- (s12) arm shift-reg 'r.fetch.ramresh' (see (s0) above) so that
 				-- 'r.fetch.valid' is asserted by (s14) sramlat+1 cycles later
-				v.fetch.ramresh(sramlat) := '1'; -- (s12) stays asserted 1 cycle thx to (s0)
+				v.fetch.ramresh(sramlat) := '1'; -- (s12) stays high 1 cycle thx to (s0)
 				-- (s12) is bypassed by (s37) below
 			end if;
 		end if;
@@ -595,7 +588,7 @@ begin
 		-- deassertion of 'r.fetch.valid' as soon as the decode
 		-- stage has acknowledged it
 		if r.fetch.valid = '1' and r.decode.rdy = '1' then
-			v.fetch.valid := '0'; -- (s15)
+			v.fetch.valid := '0'; -- (s15) bypass of (s14)
 		end if;
 
 		-- detect possible end of program (STOP) and if so cancel possible
@@ -604,7 +597,7 @@ begin
 		-- opcode which is not supposed to be executed)
 		if r.decode.c.stop = '1' or r.stop = '1' then
 			v.fetch.ramresh := (others => '0'); -- (s37) bypass of (s12)
-			v.fetch.state := idle; -- (s38) redundant w/ (s39): not an error but TODO
+			v.fetch.state := idle; -- (s38) redundant with (s39)
 			v.fetch.valid := '0';
 		end if;
 
@@ -614,7 +607,7 @@ begin
 
 		-- deassertion of 'r.decode.valid' as soon as ecc_fp has acknowledged it
 		if r.decode.valid = '1' and opo.rdy = '1' then
-			v.decode.valid := '0'; -- (s4) bypassed by (s35)
+			v.decode.valid := '0'; -- (s4)
 		end if;
 
 		case r.decode.state is
@@ -622,29 +615,26 @@ begin
 			-- idle state
 			-- ----------
 			when idle =>
-				if r.decode.c.stop = '1' then -- necessarily comes from the last
-				                              -- instruction that was executed
+				if r.decode.c.stop = '1' then
+					-- r.decode.c.stop = 1 necessarily comes from the last instruction
+				 	-- that was executed
 					v.stop := '1';
 					v.decode.c.stop := '0';
-				elsif r.fetch.valid = '1' then -- no need to test 'r.decode.rdy' since
-				                               -- we are in 'idle' state
+				elsif r.fetch.valid = '1' then
+					-- no need to also test 'r.decode.rdy' since we are in 'idle' state
 					v.decode.state := decode;
 					v.decode.rdy := '0';
 					v.decode.pc := r.fetch.pc;
 					-- (s7)
-					-- instead of latching the content of 'r.fetch.opcode' into
-					-- another register 'r.opcode.opcode', we dispatch it in different
-					-- fields (this is just for the sake of readability, and is
-					-- obviously the same from the point of view of hardware)
-							-- v.decode.c.opcode := r.fetch.opcode;
-					-- fields common to all types of instructions
+					-- dispatch 'r.fetch.opcode' in different fields
+					-- 1/ fields common to all types of instructions
 					v.decode.c.stop := r.fetch.opcode(OP_S_POS); -- 31
 					v.decode.c.barrier := r.fetch.opcode(OP_B_POS); -- 30
 					v.decode.c.optype :=
 						r.fetch.opcode(OP_TYPE_MSB downto OP_TYPE_LSB); -- 29..28
 					v.decode.c.opcode :=
 						r.fetch.opcode(OP_OP_MSB downto OP_OP_LSB); -- 27..24
-					-- fields related to ARITHmetic operations
+					-- 2/ fields related to ARITHmetic operations
 					v.decode.c.extended := r.fetch.opcode(OP_X_POS); -- 23
 					v.decode.c.patch := r.fetch.opcode(OP_P_POS); -- 22
 					v.decode.a.redcm := r.fetch.opcode(OP_M_POS); -- 15
@@ -653,10 +643,9 @@ begin
 					v.decode.a.opb := r.fetch.opcode(OPB_MSB downto OPB_LSB); -- 9..5
 					-- r.decode.a.opc is also used for TESTPAR
 					v.decode.a.opc := r.fetch.opcode(OPC_MSB downto OPC_LSB); -- 4..0
-					-- fields related to BRANCH instructions
-					--v.decode.b.imma := r.fetch.opcode(OP_BR_IMM_MSB downto OP_BR_IMM_LSB);
+					-- 3/ fields related to BRANCH instructions
 					v.decode.b.imma := r.fetch.opcode(OP_BR_IMM_SZ - 1 downto 0);
-					-- fields related to the TESTPAR/TESTPARs instruction
+					-- 4/ fields related to the TESTPAR/TESTPARs instruction
 					v.decode.c.mu0 := r.fetch.opcode(4);
 					v.decode.c.kb0 := r.fetch.opcode(3);
 					v.decode.c.par := r.fetch.opcode(2);
@@ -666,12 +655,11 @@ begin
 					-- ----------------- /DEBUG BREAKPOINTS/ -----------------------
 					-- (s41) breakpoint detection & step-by-step execution
 					if debug then
-						--if r.fetch.pc = breakpointaddr and breakpointact = '1' then
 						if v_breakpointhit or r.debug.halt_pending = '1' then
 							-- (s100)
 							-- if there is an asynchronous operation pending (an FPREDC)
 							-- we switch to state 'waitb4bkpt' (instead of 'breakpoint')
-							-- in which we'll wait until all pending pos are completed
+							-- in which we'll wait until all pending ops are completed
 							-- before actualy entering the 'breakpoint' state and setting
 							-- r.debug.halted to 1.
 							-- This is for consistancy towards the debug driver software.
@@ -725,14 +713,7 @@ begin
 					-- ----------------- \DEBUG BREAKPOINTS\ -----------------------
 
 				else
-					v.decode.rdy := '1'; --TODO: what is this for? (don't we always have
-					                     --      r.decode.rdy = 1 when in 'idle' state?)
-					                     --                 -> check this fact
-					                     --      (it may have something to do w/ the line
-					                     --      v.decode.rdy:='1' I added when returning
-					                     --      to idle from barrier state when
-					                     --      r.decode.barnop=1 and balance of opcodes
-					                     --      has been reached)
+					v.decode.rdy := '1';
 				end if;
 			-- ------------
 			-- decode state
@@ -746,7 +727,7 @@ begin
 				--     for the logical test (if any) on which the branch depends,
 				--     that will be carried out while in the state 'branch' (see (s21)
 				--     below)
-				--   - for ARITHmetic instructions for a which a patch is needed,
+				--   - for ARITHmetic instructions for which a patch is needed,
 				--     all assignments made below in (s22) are kept valid, except that
 				--     bypass (s18) will enforce to keep 'r.decode.valid' deasserted
 				--     and bypass (s24) will reroute 'r.decode.state' to 'patch' state.
@@ -759,7 +740,7 @@ begin
 				--     barrier are required, the order in which the states are taken
 				--     is: 1. 'patch', 2. 'barrier', and 3. 'arith'.
 				-- by default all flags are deasserted (and only one may be
-				-- asserted high by present cycle) -- TODO: move resets to end of comps!
+				-- asserted high by present cycle)
 				v.decode.b.b := '0'; v.decode.b.z := '0'; v.decode.b.sn := '0';
 				v.decode.b.odd := '0'; v.decode.b.ret := '0';
 				v.decode.b.call := '0'; v.decode.b.callsn :='0';
@@ -840,7 +821,7 @@ begin
 							                         v.decode.a.rndshf := '1';
 							when others => -- unknown opcode error
 								v.err_flags(ERR_INVALID_OPCODE) := '1';
-								v.decode.state := errorr; -- error is VHDL reserved
+								v.decode.state := errorr; -- 'error' is a VHDL reserved word
 						end case;
 						-- (note: no need to decode the 'extended' bit (bit 24 of the
 						-- opcode) as it directly drives the 'extended' output (see
@@ -885,8 +866,10 @@ begin
 							v.decode.state := patch; -- (s24) bypass of (s26)
 							-- pragma translate_off
 							v.decode.patch.applying := '1';
-							v.decode.patch.nb := r.fetch.opcode(OP_PATCH_MSB downto OP_PATCH_LSB);
-							if r.fetch.opcode(OP_PATCH_MSB downto OP_PATCH_LSB) /= "000101" then
+							v.decode.patch.nb :=
+								r.fetch.opcode(OP_PATCH_MSB downto OP_PATCH_LSB);
+							if r.fetch.opcode(OP_PATCH_MSB downto OP_PATCH_LSB) /= "000101"
+							then
 								v.decode.patch.applying_but_not_p5 := '1';
 								v.decode.patch.nb_not_p5 :=
 									r.fetch.opcode(OP_PATCH_MSB downto OP_PATCH_LSB);
@@ -898,7 +881,7 @@ begin
 								when "000000" => -- set opa for ",p0" patch
 									if laststep = '1' then
 										if (doblinding = '0' and (r.ctrl.kb0 xor masklsb) = '1')
-											or (doblinding = '1' and (r.ctrl.kb0 xor r.ctrl.mu0) = '1')
+											or (doblinding = '1' and (r.ctrl.kb0 xor r.ctrl.mu0)='1')
 										then
 											-- the original scalar is actually ODD: the subtraction
 											-- performed by ZADDC must NOT take place, and instead
@@ -919,7 +902,7 @@ begin
 								when "000001" => -- set opa for ",p1" patch
 									if laststep = '1' then
 										if (doblinding = '0' and (r.ctrl.kb0 xor masklsb) = '1')
-											or (doblinding = '1' and (r.ctrl.kb0 xor r.ctrl.mu0) = '1')
+											or (doblinding = '1' and (r.ctrl.kb0 xor r.ctrl.mu0)='1')
 										then
 											-- the original scalar is actually ODD: the subtraction
 											-- performed by ZADDC must NOT take place, and instead
@@ -941,7 +924,7 @@ begin
 									if laststep = '1' then
 										if ((doblinding = '0' and ((r.ctrl.kb0 xor masklsb) = '1'))
 										  or
-										  (doblinding = '1' and ((r.ctrl.kb0 xor r.ctrl.mu0) = '1')))
+										  (doblinding = '1' and ((r.ctrl.kb0 xor r.ctrl.mu0)='1')))
 										then
 											-- the original scalar is actually ODD: the subtraction
 											-- performed by ZADDC must NOT take place, so ZR01 must
@@ -1562,27 +1545,15 @@ begin
 									else -- default case (including r0z = r1z = 0 and pts opposed)
 										v.decode.patch.as := '1'; -- same as ,p5 patch
 										if setup = '1' then -- 
-											--if r.ctrl.first2pz = '1' then
-											--	-- (s101)
-											--	-- [2]P = 0 (input point P is a 2-torsion point)
-											--	-- so the 1st zaddu (which computes ([2]P,P) -> ([3]P,P))
-											--	-- must ensure ("crap",P) -> (P,P) and therefore R0 must
-											--	-- be written w/ R1 ("crap" means that the coordinates of
-											--	-- R0 are not valid because the computation of [2]P using
-											--	-- cmo-2 formulae is invalid)
-											--	v.decode.patch.opax1 := '1';
-											--	v.decode.patch.opcx0next := '1';
-											--elsif r.ctrl.first2pz = '0' then
-												if r.ctrl.kap = '0' then
-													-- kappa_1 = 0 (R0 & R1 must switch places)
-													v.decode.patch.opax1next := '1';
-													v.decode.patch.opcx1next := '1';
-												elsif r.ctrl.kap = '1' then
-													-- kappa_1 = 1
-													v.decode.patch.opax0next := '1';
-													v.decode.patch.opcx0next := '1';
-												end if;
-											--end if;
+											if r.ctrl.kap = '0' then
+												-- kappa_1 = 0 (R0 & R1 must switch places)
+												v.decode.patch.opax1next := '1';
+												v.decode.patch.opcx1next := '1';
+											elsif r.ctrl.kap = '1' then
+												-- kappa_1 = 1
+												v.decode.patch.opax0next := '1';
+												v.decode.patch.opcx0next := '1';
+											end if;
 										elsif setup = '0' then
 											if r.ctrl.kapp = '0' then -- (s59), see (s45)
 												v.decode.patch.opax1next := '1';
@@ -1668,7 +1639,7 @@ begin
 									-- means this instruction, once executed, must set YR0==-YR1
 									v.ctrl.test_y_opposite := '1';
 									v.decode.patch.p := '1';
-								when "101101" => -- set opa for ",p45" patch (
+								when "101101" => -- set opa for ",p45" patch
 									if fr0z = '1' and fr1z = '0' then -- R0 = 0 and R1 != 0
 										v.decode.patch.opcx1 := '1';
 									elsif fr0z = '0' and fr1z = '1' then -- R0 != 0 and R1 = 0
@@ -1798,7 +1769,7 @@ begin
 								when "111001" => -- patch ",p57" (in .zdblL)
 									if laststep = '1' then
 										if (doblinding = '0' and (r.ctrl.kb0 xor masklsb) = '1')
-											or (doblinding = '1' and (r.ctrl.kb0 xor r.ctrl.mu0) = '1')
+											or (doblinding = '1' and (r.ctrl.kb0 xor r.ctrl.mu0)='1')
 										then
 											-- original scalar is actually ODD
 											v.decode.patch.opcx1det := '1';
@@ -1850,7 +1821,7 @@ begin
 								when "111010" => -- patch ",p58" (in .zdblL)
 									if laststep = '1' then
 										if (doblinding = '0' and (r.ctrl.kb0 xor masklsb) = '1')
-											or (doblinding = '1' and (r.ctrl.kb0 xor r.ctrl.mu0) = '1')
+											or (doblinding = '1' and (r.ctrl.kb0 xor r.ctrl.mu0)='1')
 										then
 											-- original scalar is actually ODD
 											v.decode.patch.opcy1det := '1';
@@ -1902,7 +1873,7 @@ begin
 								when "111011" => -- patch ",p59" (in .zdblL)
 									if laststep = '1' then
 										if (doblinding = '0' and (r.ctrl.kb0 xor masklsb) = '1')
-											or (doblinding = '1' and (r.ctrl.kb0 xor r.ctrl.mu0) = '1')
+											or (doblinding = '1' and (r.ctrl.kb0 xor r.ctrl.mu0)='1')
 										then
 											-- original scalar is actually ODD
 											v.decode.patch.opaz := '1';
@@ -1950,7 +1921,7 @@ begin
 								when "111100" => -- patch ",p60" (in .zdblL)
 									if laststep = '1' then
 										if (doblinding = '0' and (r.ctrl.kb0 xor masklsb) = '1')
-											or (doblinding = '1' and (r.ctrl.kb0 xor r.ctrl.mu0) = '1')
+											or (doblinding = '1' and (r.ctrl.kb0 xor r.ctrl.mu0)='1')
 										then
 											-- original scalar is actually ODD
 											v.decode.patch.opaz := '1';
@@ -2007,11 +1978,6 @@ begin
 									v.decode.patch.opcvoid :=
 										r0z or r1z or pts_are_equal or pts_are_oppos
 										or (r.ctrl.first2pz and setup);
-									--if zu = '1' and zc = '0' then
-									--	v.decode.patch.opcvoid := '1';
-									--else
-									--	v.decode.patch.opcvoid := r.ctrl.torsion2;
-									--end if;
 								when others =>
 									null;
 							end case;
@@ -2019,23 +1985,25 @@ begin
 
 						-- is there a barrier?
 						if r.decode.c.barrier = '1' then
-							-- the opcode has it barrier flag set
+							-- the opcode has its barrier flag set
 							if r.ctrl.pending_ops = to_unsigned(0, PENDING_OPS_NBBITS) then
-								-- the opcode has it barrier flag set, but there is no
+								-- the opcode has its barrier flag set, but there is no
 								-- pending operation, all state transitions made above
-								-- are legitimate: change nothing
+								-- are legitimate: change nothing (in particular assertion
+								-- of r.decode.valid made by (s17) & switch to 'arith' state
+								-- made by (s26)
 								null;
 							else
-								-- the opcode has it barrier flag set, and there IS at least
+								-- the opcode has its barrier flag set, and there IS at least
 								-- one pending op
 								if r.decode.c.patch = '0' then
-									-- thers is no patch to perform on the opcode, so switch
+									-- there is no patch to perform on the opcode, so switch
 							 		-- to 'barrier' state to wait for completion of all pending
 									-- ops
 									v.decode.state := barrier; -- (s25) bypass of (s26)
 									v.decode.valid := '0'; -- (s19) bypass of (s17)
 								elsif r.decode.c.patch = '1' then
-									-- (s111) thers is a patch to perform on the opcode but
+									-- (s111) there is a patch to perform on the opcode but
 									-- (s24) (switch of r.decode.state to 'patch' state) still
 									-- is valid: waiting for pending operations to complete will
 									-- be done later: from the 'patch' state we'll switch to
@@ -2053,7 +2021,6 @@ begin
 					when OPCODE_BRANCH => -- (s23)
 						-- it is a branch instruction: we decode the condition flags,
 						-- and switch to 'branch' state
-						-- TODO: move resets to end of comps!
 						v.decode.b.b := '0'; v.decode.b.z := '0'; v.decode.b.sn := '0';
 						v.decode.b.odd := '0'; v.decode.b.ret := '0';
 						v.decode.b.call := '0'; v.decode.b.callsn :='0';
@@ -2115,37 +2082,29 @@ begin
 						v.decode.a.popb := C_PATCH_TWOP;
 					end if;
 				end if;
---				-- handle 'A' flag
---				if r.decode.patch.a = '1' then
---					if r.ctrl.sn = '1' then
---						v.decode.a.popb := C_PATCH_TWOP;
---					elsif r.ctrl.sn = '0' then
---						v.decode.a.popb := C_PATCH_ZERO;
---					end if;
---				end if;
 				-- handle other numerical values of patch field
 				if compkp = '1' then
 					-- ---
 					-- opa
 					-- ---
-					if    r.decode.patch.opax0det  = '1' then
-						v.decode.a.popa             := CST_ADDR_XR0;
+					if r.decode.patch.opax0det  = '1' then
+						v.decode.a.popa := CST_ADDR_XR0;
 					elsif r.decode.patch.opay0det  = '1' then
-						v.decode.a.popa             := CST_ADDR_YR0;
+						v.decode.a.popa := CST_ADDR_YR0;
 					elsif r.decode.patch.opax1det  = '1' then
-						v.decode.a.popa             := CST_ADDR_XR1;
+						v.decode.a.popa := CST_ADDR_XR1;
 					elsif r.decode.patch.opay1det  = '1' then
-						v.decode.a.popa             := CST_ADDR_YR1;
-					elsif r.decode.patch.opax0     = '1' then
+						v.decode.a.popa := CST_ADDR_YR1;
+					elsif r.decode.patch.opax0 = '1' then
 						v.decode.a.popa := -- (1 downto 0)
 	 						XYR01_MSB & r.shuffle.zero;
-					elsif r.decode.patch.opay0     = '1' then
+					elsif r.decode.patch.opay0 = '1' then
 						v.decode.a.popa := -- (1 downto 0)
 							XYR01_MSB & r.shuffle.one;
-					elsif r.decode.patch.opax1     = '1' then
+					elsif r.decode.patch.opax1 = '1' then
 						v.decode.a.popa := -- (1 downto 0)
 							XYR01_MSB & r.shuffle.two;
-					elsif r.decode.patch.opay1     = '1' then
+					elsif r.decode.patch.opay1 = '1' then
 						v.decode.a.popa := -- (1 downto 0)
 							XYR01_MSB & r.shuffle.three;
 					elsif r.decode.patch.opax0next = '1' then
@@ -2160,11 +2119,11 @@ begin
 					elsif r.decode.patch.opay1next = '1' then
 						v.decode.a.popa := -- (1 downto 0)
 							XYR01_MSB & r.shuffle.next_three;
-					elsif r.decode.patch.opaxtmp   = '1' then
-						v.decode.a.popa             := C_PATCH_XTMP;
-					elsif r.decode.patch.opaytmp   = '1' then
-						v.decode.a.popa             := C_PATCH_YTMP;
-					elsif r.decode.patch.opaz      = '1' then
+					elsif r.decode.patch.opaxtmp = '1' then
+						v.decode.a.popa := C_PATCH_XTMP;
+					elsif r.decode.patch.opaytmp = '1' then
+						v.decode.a.popa := C_PATCH_YTMP;
+					elsif r.decode.patch.opaz = '1' then
 						v.decode.a.popa := C_PATCH_ZERO;
 					elsif r.decode.patch.opax1noshuf = '1' then
 						v.decode.a.popa := CST_ADDR_XR1;
@@ -2172,16 +2131,16 @@ begin
 					-- ---
 					-- opb
 					-- ---
-					if    r.decode.patch.opbx0     = '1' then
+					if r.decode.patch.opbx0 = '1' then
 						v.decode.a.popb := -- (1 downto 0)
 							XYR01_MSB & r.shuffle.zero;
-					elsif r.decode.patch.opby0     = '1' then
+					elsif r.decode.patch.opby0 = '1' then
 						v.decode.a.popb := -- (1 downto 0)
 							XYR01_MSB & r.shuffle.one;
-					elsif r.decode.patch.opbx1     = '1' then
-						v.decode.a.popb := -- (1 downto 0):=
+					elsif r.decode.patch.opbx1 = '1' then
+						v.decode.a.popb := -- (1 downto 0)
 							XYR01_MSB & r.shuffle.two;
-					elsif r.decode.patch.opby1     = '1' then
+					elsif r.decode.patch.opby1 = '1' then
 						v.decode.a.popb := -- (1 downto 0)
 							XYR01_MSB & r.shuffle.three;
 					elsif r.decode.patch.opbx0next = '1' then
@@ -2196,24 +2155,18 @@ begin
 					elsif r.decode.patch.opby1next = '1' then
 						v.decode.a.popb := -- (1 downto 0)
 							XYR01_MSB & r.shuffle.next_three;
-					elsif r.decode.patch.opbz      = '1' then
-						v.decode.a.popb             := C_PATCH_ZERO;
-					elsif r.decode.patch.opbr      = '1' then
-						v.decode.a.popb             := C_PATCH_R;
+					elsif r.decode.patch.opbz = '1' then
+						v.decode.a.popb := C_PATCH_ZERO;
+					elsif r.decode.patch.opbr = '1' then
+						v.decode.a.popb := C_PATCH_R;
 					end if;
 					-- ---
 					-- opc
 					-- ---
-					--if r.decode.patch.opcx0 = '1' then
-					--	v.decode.a.popc := -- (1 downto 0)
-					--		XYR01_MSB & r.shuffle.zero;
-					--elsif r.decode.patch.opcy0 = '1' then
-					--	v.decode.a.popc := -- (1 downto 0)
-					--		XYR01_MSB & r.shuffle.one;
-					if    r.decode.patch.opcx1     = '1' then
+					if r.decode.patch.opcx1 = '1' then
 						v.decode.a.popc := -- (1 downto 0)
 							XYR01_MSB & r.shuffle.two;
-					elsif r.decode.patch.opcy1     = '1' then
+					elsif r.decode.patch.opcy1 = '1' then
 						v.decode.a.popc := -- (1 downto 0)
 							XYR01_MSB & r.shuffle.three;
 					elsif r.decode.patch.opcx0next = '1' then
@@ -2242,14 +2195,14 @@ begin
 					elsif r.decode.patch.opcy0 = '1' then
 						v.decode.a.popc := -- (1 downto 0)
 							XYR01_MSB & r.shuffle.one;
-					elsif r.decode.patch.opcx0det  = '1' then
-						v.decode.a.popc             := CST_ADDR_XR0;
-					elsif r.decode.patch.opcy0det  = '1' then
-						v.decode.a.popc             := CST_ADDR_YR0;
-					elsif r.decode.patch.opcx1det  = '1' then
-						v.decode.a.popc             := CST_ADDR_XR1;
-					elsif r.decode.patch.opcy1det  = '1' then
-						v.decode.a.popc             := CST_ADDR_YR1;
+					elsif r.decode.patch.opcx0det = '1' then
+						v.decode.a.popc := CST_ADDR_XR0;
+					elsif r.decode.patch.opcy0det = '1' then
+						v.decode.a.popc := CST_ADDR_YR0;
+					elsif r.decode.patch.opcx1det = '1' then
+						v.decode.a.popc := CST_ADDR_XR1;
+					elsif r.decode.patch.opcy1det = '1' then
+						v.decode.a.popc := CST_ADDR_YR1;
 					end if;
 				elsif comppop = '1' then
 					-- opa
@@ -2278,9 +2231,7 @@ begin
 				-- 'r' flag (so we don't even test it here)
 				-- pragma translate_off
 				v.decode.patch.applying := '0';
-				--v.decode.patch.nb := (others => 'X');
 				v.decode.patch.applying_but_not_p5 := '0';
-				--v.decode.patch.nb_not_p5 := (others => 'X');
 				-- pragma translate_on
 			-- -------------
 			-- barrier state (TODO)
@@ -2363,14 +2314,11 @@ begin
 					-- that an error occured, using 'r.err' and 'r.err_flags', so that
 					-- later on we can notify the user/software that the final result
 					-- is wrong)
-					-- Note; of course this is not supposed to happen at all, given
-					-- the dynamic of big numbers (nn + 4) which is made so as to
-					-- ensure that all the results of the arithmetic operations
-					-- like NNADD & NNSUB return the correct result
+					-- Note: for now errors are not driven to upper layers (ecc_scalar &
+					-- ecc_axi) - so synthesis will trim away both r.err & r.err_flags
 					if opo.resulterr = '1' then
 						v.err := '1';
 						v.err_flags(ERR_OVERFLOW) := '1';
-						-- remove that!  (given the comment just above)
 						v.state := idle;
 						v.fetch.state := idle;
 						--v.decode.state := idle; -- not needed thx to (s36)
@@ -2445,7 +2393,6 @@ begin
 					vdobranch := TRUE;
 				end if;
 				if vdobranch then
-					--v.fetch.ramresh := "100"; -- (s13) stays high 1 cycle thx to (s0)
 					v.fetch.ramresh :=
 						(sramlat => '1', others => '0'); -- (s13) only 1 clk thx to (s0)
 					v.fetch.state := fetch;
@@ -2468,7 +2415,7 @@ begin
 					-- simply get back to 'idle' state, and asserts again 'r.decode.rdy'
 				end if;
 				v.decode.state := idle; -- (s27)
-				v.decode.rdy := '1'; --TODO: WHAT HAPPENS if fetch.valid is asserted?
+				v.decode.rdy := '1';
 			-- ----------------
 			-- breakpoint state (debug)
 			-- ----------------
@@ -2482,7 +2429,7 @@ begin
 					v.debug.halted := '0';
 					v.debug.severalopcodes := '1';
 					if dbgnbopcodes = x"0000" then
-						v.debug.nbopcodes := x"0000"; -- to_unsigned(1, 16);
+						v.debug.nbopcodes := x"0000";
 					else
 						v.debug.nbopcodes := unsigned(dbgnbopcodes) - 1;
 					end if;
@@ -2523,7 +2470,7 @@ begin
 		if r.stop = '1' then -- (s29)
 			v.state := idle;
 			v.decode.state := idle;
-			v.fetch.state := idle; -- (s39) redundant w/ (s38): not an error but TODO
+			v.fetch.state := idle; -- (s39) redundant w/ (s38) (try remove it)
 			v.frdy := '1'; -- (s31)
 			-- we need to deassert r.stop by (s30) so that (s29) is not triggered
 			-- again which would reassert r.frdy through (s31) and therefore
@@ -2532,10 +2479,10 @@ begin
 			v.debug.halted := '0';
 		end if;
 
-		-- =====================================================================
-		-- shuffle feature (countermeasure against possible SCA leak of operands
+		-- ======================================================================
+		-- shuffle feature (countermeasure against possible SCA leak of operands'
 		-- address of the four variables XR0, XR1, YR0 and YR1)
-		-- =====================================================================
+		-- ======================================================================
 
 		-- handshake with ecc_trng
 		if trng_valid = '1' and r.shuffle.trng_rdy = '1' then
@@ -2609,7 +2556,7 @@ begin
 		--       first time or from r.shuffle.next_zero otherwise)
 		if r.shuffle.start = '1' then
 			v_shuffle_zero := r.shuffle.zero;
-		elsif r.shuffle.start = '0' then
+		else --if r.shuffle.start = '0' then
 			v_shuffle_zero := r.shuffle.next_zero;
 		end if;
 		--     1st transposition
@@ -2649,7 +2596,7 @@ begin
 		--           having (s43) asserting r.shuffle.state)
 		if r.shuffle.start = '1' then
 			v.shuffle.next_zero := v_shuffle_zero_sw1;
-		elsif r.shuffle.start = '0' then
+		else --if r.shuffle.start = '0' then
 			v.shuffle.next_next_zero := v_shuffle_zero_sw1;
 		end if;
 
@@ -2670,7 +2617,7 @@ begin
 		-- ---------------------------------------------------------------------
 		if r.shuffle.start = '1' then
 			v_shuffle_one := r.shuffle.one;
-		elsif r.shuffle.start = '0' then
+		else --if r.shuffle.start = '0' then
 			v_shuffle_one := r.shuffle.next_one;
 		end if;
 		--     1st transposition
@@ -2710,7 +2657,7 @@ begin
 		--           having (s43) asserting r.shuffle.state)
 		if r.shuffle.start = '1' then
 			v.shuffle.next_one := v_shuffle_one_sw1;
-		elsif r.shuffle.start = '0' then
+		else --if r.shuffle.start = '0' then
 			v.shuffle.next_next_one := v_shuffle_one_sw1;
 		end if;
 
@@ -2731,7 +2678,7 @@ begin
 		-- ---------------------------------------------------------------------
 		if r.shuffle.start = '1' then
 			v_shuffle_two := r.shuffle.two;
-		elsif r.shuffle.start = '0' then
+		else --if r.shuffle.start = '0' then
 			v_shuffle_two := r.shuffle.next_two;
 		end if;
 		--     1st transposition
@@ -2771,7 +2718,7 @@ begin
 		--           having (s43) asserting r.shuffle.state)
 		if r.shuffle.start = '1' then
 			v.shuffle.next_two := v_shuffle_two_sw1;
-		elsif r.shuffle.start = '0' then
+		else --if r.shuffle.start = '0' then
 			v.shuffle.next_next_two := v_shuffle_two_sw1;
 		end if;
 
@@ -2790,7 +2737,7 @@ begin
 		-- ---------------------------------------------------------------------
 		if r.shuffle.start = '1' then
 			v_shuffle_three := r.shuffle.three;
-		elsif r.shuffle.start = '0' then
+		else --if r.shuffle.start = '0' then
 			v_shuffle_three := r.shuffle.next_three;
 		end if;
 		--     1st transposition
@@ -2829,7 +2776,7 @@ begin
 		--         having (s43) asserting r.shuffle.state)
 		if r.shuffle.start = '1' then
 			v.shuffle.next_three := v_shuffle_three_sw1;
-		elsif r.shuffle.start = '0' then
+		else -- if r.shuffle.start = '0' then
 			v.shuffle.next_next_three := v_shuffle_three_sw1;
 		end if;
 		
@@ -2861,7 +2808,7 @@ begin
 		end if;
 
 		-- synchronous (active-low) reset
-		if rstn = '0' or force_reset = '1' then -- TODO: complete all resets
+		if rstn = '0' or swrst = '1' then
 			v.active := '0';
 			v.state := idle;
 			v.fetch.state := idle;
@@ -2878,7 +2825,6 @@ begin
 			v.decode.barbra  := '0';
 			v.decode.rdy := '1';
 			v.decode.valid := '0';
-			-- no need to reset r.ctrl.r0_is_null/r1_is_null
 			-- no need to reset r.ctrl.kap/kapp
 			-- no need to reset r.ctrl.z/sn/par
 			-- no need to reset r.ctrl.ret
@@ -2940,7 +2886,7 @@ begin
 			-- and it happens to be a 2-torsion point
 			rbak_torsion2 <= r.ctrl.torsion2;
 			if rbak_torsion2 = '0' and r.ctrl.torsion2 = '1' then -- (s105)
-				echol("ECC_CURVE: detecting doubling of a 2-torsion point (result = 0)");
+				echol("ECC_CURVE: detected doubling of a 2-torsion point (result = 0)");
 			end if;
 		end if;
 	end process log;
@@ -3005,10 +2951,12 @@ begin
 	bsn <= '1' when r.decode.state = branch and r.decode.b.sn = '1' else '0';
 	bodd <= '1' when r.decode.state = branch and r.decode.b.odd = '1' else '0';
 	call <= '1' when r.decode.state = branch and r.decode.b.call = '1' else '0';
-	callsn <= '1' when r.decode.state = branch and r.decode.b.callsn = '1' else '0';
+	callsn <= '1' when r.decode.state = branch and r.decode.b.callsn = '1' else
+						'0';
 	ret <= '1' when r.decode.state = branch and r.decode.b.ret = '1' else '0';
 	retpc <= r.ctrl.ret;
-	nop <= '1' when r.decode.state = decode and r.decode.c.optype = OPCODE_NOP else '0';
+	nop <= '1' when r.decode.state = decode and r.decode.c.optype = OPCODE_NOP
+				 else '0';
 	imma <= r.decode.b.imma;
 	xr0addr <= r.shuffle.next_zero;
 	yr0addr <= r.shuffle.next_one;
@@ -3018,7 +2966,8 @@ begin
 	opi.oposhr <= opo.shr(to_integer(unsigned(r.decode.a.popb(1 downto 0))));
 	stop <= r.decode.c.stop;
 	patching <= r.decode.c.patch;
-	patchid <= to_integer(unsigned(r.fetch.opcode(OP_PATCH_MSB downto OP_PATCH_LSB)));
+	patchid <= to_integer(unsigned(
+						 r.fetch.opcode(OP_PATCH_MSB downto OP_PATCH_LSB)));
 	-- pragma translate_on
 
 end architecture rtl;

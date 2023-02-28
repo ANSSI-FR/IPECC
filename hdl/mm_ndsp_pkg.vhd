@@ -24,14 +24,8 @@ use work.ecc_pkg.all;
 package mm_ndsp_pkg is
 
 	function get_dsp_maxacc return positive;
-	function is_barrel_shifter_needed return boolean;
 
-	constant VALUE_BITS : positive := ln2((4*w) + 3) + ww;
 	constant WEIGHT_BITS : positive := log2((2*w) - 1);
-	constant NBTERMS_BITS : positive := log2((4*w) + 3);
-	constant RAMWORD_BITS : positive := VALUE_BITS + NBTERMS_BITS;
-
-	constant WEIGHT_ZERO : unsigned(WEIGHT_BITS - 1 downto 0) := (others => '0');
 
 	type maccx_in_type is record
 		rstm : std_logic;
@@ -43,9 +37,14 @@ package mm_ndsp_pkg is
 
 	-- 'ndsp'
 	--
-	-- this is the actual number of DSP primitives in the design, based on
-	-- the user choice expressed above (nbdsp) and the value of the 'w'
-	-- parameter (defined from values of 'nn' and 'ww' user parameters)
+	-- this is the actual number of DSP primitives that will be instanciated
+	-- in the design at synthesis time, based on the user choice (parameter
+	-- nbdsp) expressed in ecc_customize.vhd and the value of the parameter
+	-- 'w' (defined from values of 'nn' and 'ww')
+	-- So nbdsp is the user (designer) choice, ndsp is the value which is
+	-- deduced from the user choice, in order to enforce that the nb of DSP
+	-- blocks actually in the hardware does not exceed parameter 'w', which
+	-- would not make sense
 	constant ndsp : positive := set_ndsp;
 
 	type maccx_array_in_type is array(0 to ndsp - 1) of maccx_in_type;
@@ -64,16 +63,5 @@ package body mm_ndsp_pkg is
 		end if;
 		return tmp;
 	end function get_dsp_maxacc;
-
-	function is_barrel_shifter_needed return boolean is
-		variable tmp : boolean;
-	begin
-		if (not nn_dynamic) and ((nn + 2) mod ww = 0) then
-			tmp := FALSE;
-		else
-			tmp := TRUE;
-		end if;
-		return tmp;
-	end function is_barrel_shifter_needed;
 
 end package body mm_ndsp_pkg;

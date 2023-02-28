@@ -19,34 +19,986 @@ use ieee.numeric_std.all;
 
 package ecc_custom is
 
+	-- A small doc on the following parameters is provided at the end of the
+	-- package description, in the same order as they appear below.
+
 	-- ----------------------------------
-	-- starf of: user-editable parameters
+	-- start of: user-editable parameters
 	-- ----------------------------------
 	constant nn : positive := 528;
 	constant nn_dynamic : boolean := TRUE;
 	type techno_type is (spartan6, virtex6, series7, ialtera, asic);
-	constant techno : techno_type := series7; -- choose one of 'techno_type' values
+	constant techno : techno_type := series7; -- choose one of 'techno_type' value
 	-- multwidth is only used if 'techno' = 'asic'
 	-- (otherwise its value has no meaning and can be ignored)
-	constant multwidth : positive := 16; -- 32 seems fair for an ASIC default
+	constant multwidth : positive := 32; -- 32 seems fair for an ASIC default
 	constant nbmult : positive range 1 to 2 := 2;
-	constant nbdsp : positive := 8;
+	constant nbdsp : positive := 4;
 	constant sramlat : positive range 1 to 2 := 1;
 	constant async : boolean := TRUE;
 	constant shuffle : boolean := FALSE;
 	constant nbtrng : positive := 1;
-	constant trngta : natural range 1 to 4095 := 32;
+	constant trngta : natural range 1 to 4095 := 32; -- doc: see ecc_trng_pkg.vhd
 	constant axi32or64 : natural := 32;
-	constant debug : boolean := TRUE;
+	constant debug : boolean := FALSE;
 	constant nblargenb : positive := 32;  -- change these two parameters only if
 	constant nbopcodes : positive := 1024; -- you really know what you're doing
 	-- below concerns simulation only
 	constant simkb : natural range 0 to natural'high := 0; -- if 0 then ignored
 	constant simlog : string := "/tmp/ecc.log";
-	constant simnotrng : boolean := FALSE; -- TRUE for simu, FALSE for synthesis
+	constant simnotrng : boolean := FALSE; -- set to TRUE for simu, FALSE for syn
 	constant simtrngfile: string := "/tmp/random.txt";
 	-- --------------------------------
 	-- end of: user-editable parameters
 	-- --------------------------------
 	
 end package ecc_custom;
+
+--                         ******************************
+--                         *      DOCUMENTATION OF     *
+--                         *      PARAMETERS ABOVE      *
+--                         ******************************
+
+-- ============================================================================
+-- NAME
+--       nn
+--
+-- DEFINITION
+--       Main security parameter.
+--
+-- TYPE/VALUE
+--       Integer. No limit except that of the hardware ressources available
+--       from your target/die-area.
+--
+-- DESCRIPTION
+--       Defines the size in bit of large numbers implied in cryptographic
+--       computations: the prime number p of course which defines the field
+--       on which the elliptic curve is based on, the curve parameters a, b,
+--       q of the curve, the point coordiantes XP & YP of the base point, and
+--       all intermediate variables used during computations.
+--       Note: the order q of the curve can be greater than p (by a quantity
+--       that, according to Hasse theorem, may be up to twhice the square root
+--       of p) therefore the value of 'nn' should be chosen as max(size of p,
+--       size of q). Refer for instance to [Hankerson, Menezes, Vanstone,
+--       "Elliptic Curve Cryptography", Springer 2004, p. 82, thereom 3.7],
+--       or the Wikipedia article "Hasse's theorem on elliptic curves"
+--       https://en.wikipedia.org/wiki/Hasse%27s_theorem_on_elliptic_curves.
+--
+-- ============================================================================
+-- NAME
+--       nn_dynamic
+--
+-- DEFINITION
+--       Option to set the "dynamic prime size" feature.
+--
+-- TYPE/VALUE
+--       Boolean (true or false).
+--
+-- DESCRIPTION
+--       When this option is set to TRUE, it becomes possible for software
+--       driver to dynamically set the security parameter, meaning the value
+--       of 'nn' can be modified at runtime. This is done by writing register
+--       W_PRIME_SIZE. The value statically set to 'nn' in the present file
+--       then becomes the maximum value allowed at runtime (hardware enforces
+--       verification of this and, in case the condition that the value set
+--       by software is greater than 'nn', raises an error flag in main status
+--       register (R_STATUS) and freezes operations until a correct value
+--       is set again by software.
+--       When the option it set to FALSE, software cannot modify value of 'nn'
+--       at runtime, and only cares the value set of 'nn' in the present file.
+--       The advantage of setting this option to FALSE when the feature is
+--       not considered useful for your own design is to save logic.
+--       The advatange of setting this option to TRUE when you need for your
+--       application to modify the security parameter at runtime is to increase
+--       performances (latency and throughput) whenever a smaller value of 'nn'
+--       can be chosen.
+--
+-- ============================================================================
+-- NAME
+--       techno
+--
+-- DEFINITION
+--       Defines the technology (ASIC vs FPGA) you wish to target and, in the
+--       FPGA case, the vendor/part.
+--
+-- TYPE/VALUE
+--       Enumerate. Choices are between:
+--         - 'series7', 'spartan6' for ARM/Xilinx FPGAs (more should follow)
+--         - 'ialtera' for Intel-Altera FPGAs
+--         - 'asic' if you're designing an ASIC or a system-on-a-chip
+--
+-- DESCRIPTION
+--       This parameter mainly impacts the instanciation of the pipelined chain
+--       of multipliers-accumulators (aka "MACC" in ASICs and "DSP blocks" in
+--       FPGAs) inside each Montgomery multiplier, as this is almost the only
+--       hardware feature that needs to be "black-box" instanciated in the
+--       design (as opposed to inferred by synthesizer from behavorial VHDL).
+--
+-- ============================================================================
+-- NAME
+--       multwidth
+--
+-- DEFINITION
+--       Only used if 'techno' = asic, and in this case designates the size
+--       of limbs in which large numbers are split and are accessible into/
+--       from the memory of large numbers.
+--
+-- TYPE/VALUE
+--       Integer. No limit a priori but you should obviously consider the
+--       possible loss of performance of a multiplier which inputs would
+--       become too large in your specific technological node.
+--       Default of 32 seemed fair for a multiplier hardwired in an ASIC.
+--
+-- DESCRIPTION
+--       This is the size (bitwidth) of the input operands to the multipliers
+--       in the design. For sake of architectural simplicity, it is hence also
+--       the bitwidth of the limbs in which large cryptographic numbers are
+--       split, buffered & processed in arithmetic operations inside the IP.
+--       If your design targets an FPGA, 'multwidth' is ignored and the size of
+--       the limbs is given by parameter 'ww' instead (not customizable and
+--       automatically set by the RTL).
+--       - In an ASIC, there is obviously no predefined size for the multiplier
+--         you wish to use in your design, unless your founder/standard-cell
+--         library imposes you one. Therefore the designer can tweak this
+--         parameter to set the area and performance of multipliers that
+--         will be inferred in the hardware.
+--       - In FPGA circuits, the multiplier-accumulators, which are called
+--         "DSP blocks", already exist ("hard-coded") and cannot accept any
+--         size of operands on their inputs. For instance the 7-series family
+--         of FPGA from ARM-Xilinx offers the DSP48E1 primitive which is a
+--         25x18 signed multiplier driving a(n also signed) result on 48 bits.
+--         The 5 bit difference (48 - (25 + 18)) means that 5 extra bits are
+--         present in the accumulator part of the DSP block to allow 32 output
+--         terms of the DSP block to be added together (or added to the output
+--         of neighbouring DSP blocks) without an overflow incurring. The
+--         DSP blocks are performing to their best when they are instanciated
+--         as a chain (aka in a pipeline) because there exist dedicated fast
+--         physical connexions on both inputs and outputs of neighbouring pairs
+--         of DSP blocks that bypass the general-purpose routing fabric of the
+--         circuit, thus possibly incurring very high pipeline frequencies.
+--         This is the architectural choice made within the IP for implementing
+--         multiplications of large numbers that are required to carry on
+--         Montgomery multiplications (c.f source file mm_ndsp.vhd).
+--         Similarly, in the Spartan-6 family, also from ARM-Xilinx, the
+--         DSP48A1 primitive allows signed 18x18 multiplications and an accumu-
+--         lated output of 48 bits.
+--         In Intel-Altera FPGAs such as Arrias & Stratix the DSP blocks can
+--         be configured in 3 different ways: 9x9, 18x18 and 27x27, with an
+--         accumulation on up to 64 bits.
+--
+--       The size of the limbs of large numbers manipulated in the IP (hence
+--       also the size of the inputs to the multipliers) is denoted 'ww' (for
+--       word's width) and is set statically (meaning at compilation/synthesis
+--       time) by function set_ww of package ecc_utils (file ecc_utils.vhd):
+--
+--         - if you have set 'techno' = asic, value of 'ww' is set to the same
+--           value as 'multwidth'
+--         - if target technology is an FPGA one, 'ww' is set according to the
+--           'techno' parameter:
+--             - for ARM-Xilinx FPGAs, 'ww' is set to 16.
+--               Note: the reason for this number is that Xilinx DSP blocks
+--               being either SIGNED 25x18 multipliers (in 7-series) or SIGNED
+--               18x18 multipliers (in Spartan-6) multipliers, only 17 bits are
+--               actually available when doing unsigned arithmetics (which is
+--               what we need when splitting large multiplications into smaller
+--               ones performed on limbs). The MSBit is necessarily tied to a
+--               logic 0.
+--               For sake of number readability when simulating the IP, the
+--               value of 16 was chosen instead of 17, which should not incur
+--               a significant difference in the final area nor the performance
+--               of the design.
+--               However if you really want to scrimp and save to the maximum,
+--               you can tweak set_ww function to return 17 instead of 16.
+--             - for Intel-Altera FPGAs, 'ww' is set to 27. This is a peremptory
+--               choice that you can also modify to a default 9 or 18 by editing
+--               the code.
+--
+--       Note: in any of the cases described above, the VHDL code in mm_ndsp.vhd
+--       performs a simple static test in order to enforce that the number of
+--       chained/pipelined multiplier-accumulators cannot create an overflow on
+--       the output result of the chain. The dynamic on the ouput value of the
+--       chain is simply given by (2 x ww + ln2(ndsp)) where ndsp is the number
+--       of multiplier-accumulator blocks in the chain (and 'ww' as defined pre-
+--       viously) so the test merely consists in ensuring that this quantity
+--       does not exceed the max accumulation available in accumulators of the
+--       target technology.
+--       (For instance in 7-series parts, DSP blocks have a 48 bit accumulator,
+--       hence the maximum number of such blocks when tiled in a pipeline chain
+--       is given by (2 x 16) + ln2(ndsp) = 48, which yields a huge number
+--       (65536) that cannot be reached physically on one single die.
+--       On the other hand, if you're targeting an ASIC and your multipliers
+--       are 32x32 with an accumulator of let say 68 bit, you may only thread
+--       16 MACC per Montgomery multiplier, which will usually do the job but
+--       won't fit the needs of an application targeting a 521 bit security
+--       (521 bit is the maximum security you may find in standardized crypto
+--       protocols based on elliptic curves in 2023).
+--       The numerical examples we've seen just above show you that in most
+--       cases you won't have to worry about 'ww' and 'multwidth' parameters.
+--
+-- SEE ALSO
+--       nbdsp
+--
+-- ============================================================================
+-- NAME
+--       nbmult
+--
+-- DEFINITION
+--       Number of Montgomery multipliers instanciated in the IP.
+--
+-- TYPE/VALUE
+--       Integer which should be kept small (default being 2)
+--
+-- DESCRIPTION
+--       The number of Montgomery multipliers in the IP should be dictated by
+--       the maximum Montgomery multiplications (aka REDC operation) that
+--       can be simultaneously carried out when performing point operations
+--       on a curve, that is considering one possible set of formulae for
+--       point addition, point subtraction, and point doubling, among all
+--       the different ones which are available from state-of-the-art.
+--       In IPECC we use the so-called CoZ formulae which are available
+--       in the jacobian projective representation of points. This set
+--       of formulae is made possible when the points that need be added
+--       do share the same Z coordinate. CoZ formulae were introduced
+--       in [N. Meloni, "New point addition formulae for ECC applications",
+--       2007]. A comprehensive survey can be found in [M. Rivain, "Fast and
+--       Regular Algorithms for Scalar Multiplication over Elliptic Curves",
+--       2011].
+--       From the purely algorithmic/software point of view, CoZ formulae
+--       reduce rouhgly by half the number of REDC operations needed to
+--       complete one point addition, as compared to formulae that were
+--       existing so far (e.g [Cohen, Miyaji, Ono, "Efficient elliptic curve
+--       exponentiation using mixed coordinates", 1998]). Obviously in
+--       hardware this is a matter of area/speed trade-off, however the
+--       gain can be estimated by stating that the same computation speed
+--       can be obtained as compared to a non-CoZ implementation with only
+--       half the number of Montgomery multipliers instanciated in the hardware.
+--       In IPECC by default only 2 REDC operators are instanciated in the
+--       design (this is block mm_ndsp, c.f source file mm_ndsp.vhd). This is
+--       the maximum number of Montgomery multiplications that it is possible
+--       to carry out in parallel due to the dependency that exists between
+--       intermediate variables in the CoZ formulae.
+--       This means that setting 'nbmult' to a value more than 2 for your design
+--       would simply increase - quite significantly - its surface, without
+--       improving the speed of curve computations at all. Normally you don't
+--       want to do that. On the other hand, if for any particular reason
+--       you're considering choosing another set of formulae for your specific
+--       design, then you may also consider tweaking parameter 'nbmult'.
+--       Note that the set of formulae is implemented in software in IPECC
+--       (using a custom assembly language) and can be easily edited/
+--       modified. Visit the page "Explicit-Formulas Database" of website
+--       hyperelliptic.org for a comprehensive description of elliptic curve
+--       formulae, with a comparison of their performances.
+-- ============================================================================
+-- NAME
+--       nbdsp
+--
+-- DEFINITION
+--       Number of MACC/DSP blocks per Montgomery multipliers
+--
+-- TYPE/VALUE
+--       Integer greater or equal to 2
+--
+-- DESCRIPTION
+--       This parameter directly influences the performance of the IP by
+--       allowing you to control the area/speed trade-off in the Montgomery
+--       multipliers.
+--       Obviously the more there are MACC/DSP blocks in each Montgomery
+--       multiplier, the less it will take for them to carry out a complete
+--       REDC operation.
+--       Note however that the "speed vs nbdsp" relation is of linear only
+--       in a specific range of the 'nbdsp' parameter, a range which can
+--       sometimes turn to be quite small - meaning that past a specific
+--       threeshold (that is dependent mainly on the values of 'nn' and 'ww')
+--       the computation speed will plateau however hard you try and increase
+--       parameter 'nbdsp' (actually it may even decrease due to the fact that
+--       the excess of MACC/DSP blocks will increase the time for data to
+--       go through the chain without increasing the number of useful multi-
+--       plications per clock cycle).
+--       The table below gives the duration of one REDC operation for 'nn' = 256
+--       in 'techno' = asic, for different values of the parameter 'ww' (which
+--       in the case of asic matches 'multwidth') and different values of the
+--       'nbdsp' parameter. The mm_ndsp block is assumed to run at 300 MHz.
+--
+--            \ nbdsp |   2    3    4    5    6     8     10   12   13
+--          ww \      |
+--        ------------+--------------------------------------------------
+--           8        | 12.8  9    7.8  6.7  6.1   5.5    5    4.5  4.5
+--          16        |  4.3  3.3  3    2.7  2.4   2.4    2.2  2.2
+--          32        |  1.8  1.4  1.4
+--          64        |   .9   .8   .9
+--
+--       Note that the static value of parameter 'nn' determines the maximum
+--       value allowed for 'nbdsp', which matches the number of 'ww'-bit limbs
+--       large numbers are made of. Function set_ndsp in package ecc_pkg.vhd
+--       enforces that this limit is not exceeded, it is used to compute the
+--       value of a parameter called 'ndsp' based on 'nbdsp' which is the
+--       constant actually used in the RTL code: if value of nbdsp set by
+--       user in present file is below the limit, then ndsp = nbdsp, and if
+--       it is greater, then ndsp is set to the limit.
+--       For instance in the example above and with 'ww' = 16, the limit to
+--       'nbdsp' is 17, therefore any value for 'nbdsp' above 17 will be ignored
+--       and replaced by 17. Now the table above also tells us that 17 is
+--       already a suboptimal value for 'nbdsp', and that you'd probably better
+--       set 'nbdsp' = 10 instead.
+--
+-- ============================================================================
+-- NAME
+--       sramlat
+--
+-- DEFINITION
+--       Read latency for all the blocks of SRAM memory used in the IP
+--
+-- TYPE/VALUE
+--       Integer, with only values 1 or 2 allowed.
+--
+-- DESCRIPTION
+--       All SRAM blocks instanciated in the IP are purely synchronous and
+--       have the same latency when accessed in read mode, which can be either
+--       1 or 2 clock cycles, as defined by this parameter.
+--       Choosing 2 instead of 1 simply means trying to increase the maximum
+--       frequency at the cost of an extra layer of flip-flops on the output
+--       data bus. This can be of interest in particular in FPGAs as the
+--       SRAM blocks are natively provided with this extra layer of registers
+--       inside the block itself, which is why synthesizer will most probably
+--       infer using these internal registers instead of consuming flip-flops
+--       from the general logic fabric. That's why for an FPGA technology
+--       you probably want to set this parameter to 2.
+--
+-- ============================================================================
+-- NAME
+--       async
+--
+-- DEFINITION
+--       If TRUE, the Montgomery multipliers in the design will reside in
+--       a specific clock-domain (independent of the rest of the IP).
+--
+-- TYPE/VALUE
+--       Boolean (true or false).
+--
+-- DESCRIPTION
+--       This is an attempt at a "globally asynchronous / locally synchronous"
+--       feature in the IP.
+--       The Montgomery multiplication is notoriously the most costful operation
+--       in asymetric cryptography algorithms, so the purpose of this option is
+--       to allow the designer to isolate the Montgomery multipliers in their
+--       own specific clock-domain that can thus be optimized as regards to
+--       timing considerations.
+--       You may try to:
+--         - increase the frequency of that specific clock domain without
+--           stressing the backend tools on the remaining parts of the circuit,
+--           as they are less impacting on performances
+--         - perform timing optimization solely on this clock domain as it
+--           is the one that deserves the highest optimization effort.
+--       Obviously the two aspects are related and should be analyzed together.
+--
+--       Depending on the value of 'async' paramter, the clock-domains in the IP
+--       are as follows:
+--         - if 'async' = FALSE, then there is only one clock-domain and the IP
+--           is totally synchronous to the same clock, which thus also happens
+--           to be the clock of the AXI-interconnect the IP is connected to.
+--         - if 'async' = TRUE, then there are two clock-domains in the IP.
+--           One clock-domain is the one in which data transfers are made on
+--           the AXI-interconnect and all arithmetic operationsa except REDC
+--           are also carried out.
+--           The second clock-domain is the one of the REDC operators (Montgo-
+--           mery multipliers).
+--           In this case the usual synchronization issues at the crossing
+--           of the domains are resolved in two differents ways:
+--             - for control signals a layer of two or three resynchroniozation
+--               flip-flops is used
+--             - for data signals, we use the fact that most FPGA families offer
+--               asynchronous dual-port memories to push data in one clock
+--               domain and pull them in another without having to worry about
+--               synchronization issues (possible metastability in the read
+--               clock-domain that would be due to asynchronicity with write
+--               clock will be gone by the time data are actually read).
+--           If you're targeting an ASIC, you should first check the availabi-
+--           lity of single dual port (asynchronous) memories in your technolo-
+--           gical library.
+--
+--       Note having solely one clock-domain may be penalizing in FPGAs if the
+--       SoC and interconnect (the IP is connected to) imposes you to run at a
+--       low frequency. Values such as 100 or 150 MHz are typically found in
+--       SoC-FPGA ecosystems however this is not the highest frequency by far
+--       that you can hope the Montgomery multipliers to run at. Actually 200
+--       MHz should be seen as the minimum target on the 28-nm node FPGAs such
+--       as the ARM-Xilinx 7-series family or Ithe ntel-Altera Stratix V family.
+--
+--       If 'async' is set to FALSE, then the unique input clock to the IP is
+--       the 's_axi_aclk' input port on top-level 'ecc' entity.
+--       If 'async' is set to TRUE, 's_axi_aclk' is still the primary clock
+--       input, and the dedicated clock to the REDC operators must be driven
+--       on 'clkmm' input port of the IP top-level.
+--
+-- ============================================================================
+-- NAME
+--       shuffle
+--
+-- DEFINITION
+--       This parameter is used to statically activate ot statically deactivate
+--       the shuffling anti side-channel countermeasure.
+--
+-- TYPE/VALUE
+--       Boolean, true or false.
+--
+-- DESCRIPTION
+--       When set to TRUE, this parameter activates the random shuffling of
+--       the complete memory storing large cryptographic numbers between the
+--       processing of each bit of the scalar. This countermeasure thwarts the
+--       attacks aimed at guessing which intermediate variables are manipulated
+--       inside point addition formulae, by using their address. As memory
+--       shuffling removes the relation between addresses and values of the
+--       aforementioned variables, these attacks become infeasible - or, more
+--       precisely, much difficult to be carried out.
+--
+--       The permutation applied to the content of the memory consists in
+--       drawing a random mask and applying it linearly (xor) to the read
+--       address of each data word to determine the target (shuffled) write
+--       address. Therefore when the countermeasure is activated the memory
+--       is physically duplicated inside the IP and a flip/flop mechanism is
+--       used to ensure consistency of the transfer of one version of the
+--       memory into its newly shuffled version.
+--
+--       A linear masking of the address as we do may appear a too little
+--       fragile countermeasure at first sight. However it appeared to us that
+--       it was the only way to avoid using a more complex permutation (such as
+--       one generated using the Knuth/Fisher-Yates algorithm) that would
+--       require using a RAM array to buffer it - thus defeating the purpose
+--       of masking the read address of the sensible memory to begin with.
+--       In other words, since the purpose of the shuffling countermeasure
+--       is to break the relation between large numbers and the address in the
+--       physical memory they are read from during sensitive computations,
+--       what point would it be to randomize this read address if to get the
+--       randomized address, the logic must first read it from another physical
+--       memory? In FPGAs all physical memories have the same size (typically
+--       32 kbit) therefore the physical leakage occuring while reading a
+--       large number from its RAM block is expected to be the same as the
+--       one that would occur when reading the randomized address from another
+--       RAM block.
+--
+--       Our strategy is different in the sense that using a simple boolean
+--       masking of the address, both application of one permutation (inbetween
+--       the bits of the scalar) and inversion of the permutation (when acces-
+--       sing the memory for arithmetical computations) now can be done inside
+--       FPGA logic fabric only (as opposed to RAM block access).
+--
+--       Note: a previous version of the IP was released internally using the
+--       Knuth/Fisher-Yates permutation algorithm buffered into a physical RAM
+--       block. In this situation, the entropy of the permutation is maximum
+--       since each new random permutation can happen to be one among all the
+--       n! possible permutations (with 'n' here denoting the size of the
+--       large number memory to be shuffled). Whereas with the current code
+--       release, based on linear masking, the number of permutations is only
+--       a small fraction (n) of the total number of possible permutations.
+--       It is possible that this feature be released again in the future.
+--       If it is, choice will then be given to the designer to choose wich
+--       kind of permutation algorithm ha wants to implement (linear masking
+--       with logic gates, versus Knuth RAM buffered permutation).
+--
+-- ============================================================================
+-- NAME
+--       nbtrng
+--
+-- DEFINITION
+--       Number of TRNG primitives instanciated in parallel in the IP.
+--
+-- TYPE/VALUE
+--       Integer which should be set according to the entropy throughput
+--       required for a specific application. Default is 1.
+--
+-- BIBLIO
+--       [Yang, Rozic, Grujic, Mentens, Verbauwhede, "ES-TRNG, A High-
+--       throughput, Low-area True Random Number Generator based on Edge
+--       Sampling"]
+--       (https://tches.iacr.org/index.php/TCHES/article/view/7276)
+--       
+-- DESCRIPTION
+--       The physical true random number generator used in the IP is the
+--       ES-TRNG, designed at the COSIC research group of KU Leuven. It was
+--       first published at the CHES'18 conference. Its architecture makes it
+--       particularly suitable to FPGA designs. It has a very small footprint,
+--       while still exhibiting very good throughput results.
+--       Porting it to an ASIC technology should not be difficult as the
+--       only FPGA-specific features that it relies on are carry propagation
+--       primitives (usually used for adders and counters) which are actually
+--       used in ES-TRNG as pure delay propagation lines. ASIC buffers would
+--       normally fit this purpose without any problem.
+--
+--       We do not give here the architecture nor the design principles of
+--       ES-TRNG, rather we point the reader to its online presentation paper
+--       (c.f section BIBLIO above).
+--
+--       The way ES-TRNG is used in the IP is that exactly 'nbtrng' copies
+--       of the ES-TRNG primitive are physically instanciated in the IP.
+--       They operate completely independently one from the other and
+--       "periodically" generate a random bit along with its strobe signal
+--       (the quotation marks on word "periodically" are because each random
+--       bit itself is generated after a period of accumulation of jitter
+--       which is itself random, althought there is a minimum for that delay
+--       which is given by parameter 'trngta' - see below).
+--       The outputs of the different instances of the primitive are gathered
+--       together using a binary routing tree that terminates with a unique
+--       root output. (Althought not required, it is probably best that you
+--       set a power of two for value of 'nbtrng').
+--       Due to the average number of clock cycles it will take for each
+--       ES-TRNG primitive to issue one random bit (this number is related to
+--       'trngta' parameter, see below) congestion of the tree is not to be
+--       expected unless you really set too large a value for 'nbtrng'.
+--       Ideally this parameter should be set to a number such that at each
+--       clock cycle, and given the frequency at which the IP main clock is
+--       set, a new random bit presents itself at the root of the tree.
+--       Output raw random bits are pushed into a FIFO which feeds a post-
+--       processing unit.
+--
+--       +===============================================================+
+--       | THE POST-PROCESSING UNIT IS NOT PART OF THE IPECC DESIGN AND  |
+--       | SHOULD BE PROVIDED BY YOUR OWN CARE. THE ROLE OF POST-PRO-    |
+--       | CESSING FUNCTION IN RANDOM APPLICATIONS IS IMPORTANT BECAUSE  |
+--       | IT GUARANTEES THAT THE OUPUT OF THE RANDOM GENERATOR REMAINS  |
+--       | UNPREDICTABLE TO AN ATTACKER EVEN IF SHE TAKES CONTROL OF THE |
+--       | PHYSICAL ENTROPY SOURCE AND THAT THE OUTPUT OF THE PHYSICAL   |
+--       | ENTROPY SOURCE BECOMES DETERMINISTIC TO HER.                  |
+--       +===============================================================+
+--
+--       In present release of the IP, as no postprocessing unit is provided,
+--       the output port of the raw random bit FIFO is directly connected to
+--       the logic that would normally extract postprocessed bits. This "logic
+--       stub" allows the IP to be operational as is - that is, despite the
+--       absence of postprocessing on the raw random bits - while allowing
+--       to very simply plug any cryptographic logic component that you may
+--       design or reuse to implement the postprocessing, provided that its
+--       interfaces fit the ones we use inside the IP TRNG (which are very
+--       basic).
+--
+--       Past the postprocessing unit, random bits are pushed one at a time
+--       into one of the 4 possible target FIFOs, each serving as the entropy
+--       pool for one of the 4 features/countermeasures of the IP that require
+--       random data. These 4 features are:
+--         1. the on-the-fly masking of the scalar in the AXI interface, at the
+--            time it is pushed by software driver in the memory of large
+--            numbers;
+--         2. the NNRND instruction which IP microcode can use to generate a
+--            complete random large number in the memory of large numbers;
+--         3. the 4-by-4 shuffling that the IP applies to the 4 coordinates
+--            XR0, YR0, XR1 and YR1 of points R0 and R1 inbetween the processing
+--            of each bit of the scalar;
+--         4. the shuffling countermeasure of the complete memory of large
+--            numbers, when it is set and activated (see parameter 'shuffle'
+--            above).
+--
+--       A round-robin scheduling is applied to the bits pulled from the
+--       postprocessing unit to ensure that each of the 4 target FIFOs fairly
+--       gets the same amount of random data as long as it is not already full.
+--
+--       The sizes of each of the 4 target FIFOs are defined in the package
+--       file ecc_trng/ecc_trng_pkg.vhd. The default sizes are functions of
+--       the parameter 'nn' (directly or indirectly, as some depends on
+--       parameter 'n' which in turn depends on 'nn' and 'ww'). If you need
+--       to customize the amount of random data equired for each of the 4
+--       features in your application, you may do it in this file.
+--
+--       In debug mode, diagnostic features allow you to read the content
+--       of the raw random bit memory through the AXI interface in order
+--       to perform statisticial tests and estimate the entropy of each
+--       TRNG instances (the entropy performance of each instance directly
+--       relies on its floorplan realization, therefore they won't be
+--       necessarily the same for all instances).
+--
+--       For FPGA applications, the design rationale you should apply here
+--       is that once the entropy quality s estimated good enough of one
+--       instance (this is assessed using statistical tests suits such as
+--       the one provided by U.S NIST or german BSI) you should "logic-lock"
+--       this instance using the software feature that CAD tools provide
+--       you with, preventing the instance from being re-placed or re-routed
+--       elsewhere in future place-and-route runs of your circuit.
+--
+--       Note that the IP does not include statistical self-tests.
+--
+-- IMPORTANT
+--       The default setting of 1 for parameter 'nbtrng' might not be sufficient
+--       to your application!
+--       You must perform a throughput analysis and evaluation of the randomness
+--       your application specifically needs, and set, along with a properly
+--       chosen 'trngta' parameter, the number of ES-TRNG instances that is fit
+--       to achieve this throughput.
+--       The effect of not assessing the quantity/throughput of entropy your
+--       application needs is that the IP might often stall at runtime. This
+--       will happen each time the IP needs to perform an operation that
+--       requires a minimum amount of entropy to be properly carried out till
+--       the end, and that amount is not available yet in the corresponding
+--       FIFO.
+--
+-- SEE ALSO
+--       trngta, simnotrng
+-- ============================================================================
+-- NAME
+--       trngta
+--
+-- DEFINITION
+--       Main sizing parameter of the entropy quality generated by the ES-TRNG
+--       primitive.
+--
+-- TYPE/VALUE
+--       Integer. Default is 32 but this value is quite arbitrary.
+--
+-- DESCRIPTION
+--       The greater the value of 'trngta' is, the highest the entropy per
+--       random bit is, but also the smaller the random production througput.
+--       The smaller the value of 'trngta' is, the greater the throughput is,
+--       but also the poorer the entropy per bit is.
+--
+--       The principle of ES-TRNG is the same as many other TRNG designs: a free
+--       running oscillator is formed using a ring of inverters in odd number,
+--       and let to run freely until a specific amount of time is passed so as
+--       to consider that enough entropy has been accumulated in the phase noise
+--       ("jitter" in the time domain) of the oscillator edges. Value of para-
+--       meter 'trngta' exactly denotes the duration of that "free-running"
+--       phase of the oscillator, expressed in number of periods of the main
+--       system clock of the IP. (Remember from what was stated earlier - see
+--       'async' section above -, that is clock is the one connected to the
+--       input port 's_axi_aclk' of the top-level entity). The meaning of the
+--       value of 'trngta' therefore depends on the frequency of that main
+--       clock and it carries no sense without it.
+--       When the free-running phase has passed, some very tiny logic (that can
+--       fit into a very small number of FPGA LUTs) is triggered to detect the
+--       first rising edge of the free oscillator. This detector samples the
+--       information as to whether the sampling clock "saw" the edge of the
+--       oscillator before or after its own edge, thus capturing in one bit
+--       the jitter of the free-oscillator.
+--
+--       Only tests and measurements made on real hardware can assess that
+--       number properly.
+--
+-- SEE ALSO
+--       nbtrng, simnotrng
+-- ============================================================================
+-- NAME
+--       axi32or64
+--
+-- DEFINITION
+--       Defines the width of the data buses of the AXI interfaces of the IP.
+--       These are: the WDATA signal bus of the AXI write-data channel, and
+--       RDATA signal bus of the AXI read-data channel.
+--
+-- TYPE/VALUE
+--       Integer, with only values 32 or 64 allowed.
+--
+-- DESCRIPTION
+--       To simplify integration of the IP inside any AXI-interconnect/system-
+--       on-chip (meaning: independently of whether the architecture is 32 or
+--       64 bit) registers accessible by the software driver:
+--
+--         - are all 32-bit long (as if data buses were that of a 32-bit
+--           system), WITH THE EXCEPTION OF THE TWO REGISTERS W_WRITE_DATA
+--           and R_READ_DATA
+--         - have address aligned on 8 bytes (as if address buses were that
+--           of a 64-bit system).
+--
+--       The size of both registers W_WRITE_DATA and R_READ_DATA depends on
+--       parameter 'axi32or64':
+--
+--         - when the IP is configured using 'axi32or64' = 32, then W_WRITE_DATA
+--           and R_READ_DATA are 32 bit long.
+--           Therefore, if the AXI-interconnect the IP is connected to is 64 bit
+--           then:
+--
+--             - when reading register R_READ_DATA, the 32 upper bits of the
+--               signal bus RDATA (AXI read data channel) will be cleared
+--               (zeroed) by the IP
+--             - when writing register W_WRITE_DATA, the 32 upper bits of the
+--               signal bus WDATA (AXI write data channel) will be ignored
+--               by the IP.
+--
+--         - when the IP is configured using 'axi32or64' = 64, then W_WRITE_DATA
+--           and R_READ_DATA are 64 bit long.
+--           Therefore, if the AXI-interconnect the IP is connected to is
+--           32 bit, then you might consider adding extra logic in between the
+--           IP and the AXI-interconnect so as to:
+--
+--             - gather two consecutive read accesses to R_READ_DATA into one
+--               64 bit read transaction to the IP and split the result into
+--               two 32-bit responses to transaction initiator (CPU, memory
+--               controller, bridge, etc).
+--
+--             - gather two consecutive write accesses to W_WRITE_DATA into
+--               one 64 bit write transaction to the IP.
+--
+--             In both cases (read & write) software should be aware of the
+--             mismatch between size of the IP AXI interface and the size of
+--             the AXI interconnect, so that to enforce that transactions
+--             should always be issued by pair (otherwise deadlock might occur).
+--
+-- ============================================================================
+-- NAME
+--       debug
+--
+-- DEFINITION
+--       To choose between 'debug mode' versus 'production mode' of the IP.
+--       In a nutshell, debug mode means any tampering with the IP is made
+--       easy to the software driver. On the contrary production mode means
+--       hardware security is at its max.
+--
+-- TYPE/VALUE
+--       Boolean, true or false.
+--
+-- DESCRIPTION
+--       The IP can be used in two different modes which are exclusive of one
+--       another: either the IP is configured in production mode or it is confi-
+--       gured in debug mode. This configuration is static and can’t be modified
+--       at runtime. Setting 'debug' to TRUE naturally means setting the IP in
+--       the debug mode, and in production mode otherwise.
+--
+--       Debug mode means that interacting with the IP through software driver
+--       is made very permissive, so as to alloow pre-production analysis of the
+--       IP and of its side-channel leakages. Software driver can then tamper
+--       freely with almost any security feature implemented in the IP.
+--
+--       In debug mode, software-driver can:
+--         - read or write the value of any large number in memory, at any time
+--         - insert breakpoints into microcode to interrupt scalar multiplica-
+--           tion and perform step by step execution (e.g to allow time iso-
+--           lation of a specific part of [k]P computation for clean, reduced-
+--           noise side-channel measurement)
+--         - specify a precise time in the course of [k]P computation where to
+--           activate or deactivate the trigger signal driven out of the IP
+--           (this is 'dbgtrigger' output port of top-level entity 'ecc').
+--           Use cases for the external out trigger feature include oscilloscope
+--           input-trigger activation and EM injection probe setting-off.
+--           This feature is clock-cycle accurate
+--         - bypass the TRNG and force use of deterministic numbers instead of
+--           random ones
+--         - access internal memory array of the TRNG raw random bit FIFO, in
+--           order to perform entropy quality assessment
+--         - modify the content of the microcode memory to implement and
+--           evaluate different curve formulae or different countermeasures.
+--
+--       In production mode:
+--         - the only large numbers software driver is allowed to write in
+--           memory are the first eight ones (large number address 0 to 7).
+--           These are: prime number p, curve parameters a, b and q, scalar k
+--           and base point coordinates XP & YP
+--         - the only large numbers software driver is allowed to read from
+--           memory are the two coordinates of the result point (these are
+--           x_{[k]P} and y_{[k]P} in affine representation) which are avai-
+--           lable for read at the same address as XP and YP are respectively
+--           available for write)
+--         - breakpoints do not exist (control logic & data paths were pruned
+--           at synthesis time)
+--         - outside trigger does not exit (control logic & data paths wrer
+--           pruned at synthesis time).
+--         - TRNG cannot be bypassed, nor random values be forced, nor random
+--           values be read by software (control logic and read data paths were
+--           pruned at synthesis time)
+--         - microcode memory cannot be modified (content was fixed at syn-
+--           thesis time and write-data path to memory was pruned).
+--         - Interactions between software driver and IP are strongly res-
+--           tricted. Whenever software issues a command that requires
+--           computation from the IP, it can no longer issues any command
+--           before that computation is totally carried out and completed.
+--
+--       To sum-up:
+--
+--         - If you intend to use the IP in a security application such as a
+--       Secure Element, a Hardware Security Module or if you entend to
+--       integrate it as hardware accelerator inside a general purpose SoC,
+--       choose FALSE.
+--
+--         - If you intend to use the IP for an academic/research purpose,
+--       to evaluate the side-channel resistance of the IP on a specific
+--       target, or during the preproduction phase of your product, choose
+--       TRUE (in the latter case, you may consider to "logic-lock" all
+--       the portion of the design that will remain when you eventually
+--       turn the parameter to FALSE and send it to foundry).
+
+-- ============================================================================
+-- NAME
+--       nblargenb
+--
+-- DEFINITION
+--       Number of cryptographic large numbers that inner memory of the IP
+--       can buffer.
+--
+-- TYPE/VALUE
+--       Integer. Default is 32. Obviously keep it a power of 2.
+--
+-- DESCRIPTION
+--       Note that this is not a memory size in bytes or bits or whatever
+--       absolute unity of size, this is a relative number. For instance
+--       if each large number is 256 bit wide, then the size of the memory of
+--       large numbers will be given by 32 x 256 bit = 8 Kbit (assuming the
+--       default of 32 for parameter 'nblargenb').
+--
+--       The IP is basically an ALU for large numbers controlled by a hardware
+--       state machine that fetches and decodes arithmetic instructions opera-
+--       ting on these large numbers. An opcode format exists for such instruc-
+--       tions describing in particular the address of the numbers in the
+--       memory of large numbers which are to be read and/or written by each
+--       instruction. Most of instructions contain 3 operands named opa, opb &
+--       opc, with opa & opb being the input (read) operands & opc the output
+--       (written) operand. All these fields are, in the current release of the
+--       IP, 5 bit address fields pointing to a large number. This value of 5
+--       bit obviously matches the size of the memory, which is made of 32
+--       large numbers. The 32 default was chosen because it is the minimum
+--       that we were able to fit into the set of all intermediate variables
+--       involved in the computation of the scalar multiplication (the most
+--       complex operation performed by the IP). To that default setting of 32
+--       large numgers corresponds 5-bit fields for addresses op[abc] in the
+--       instruction opcodes, which packed along other fields turned out to
+--       to form a quite practical 32-bit size for the opcode words.
+--
+--       You can change the value of parameter 'nblargenb', but you should do
+--       it with precaution. The HDL code of the IP was written all along with
+--       genericity in mind, notably regards the parameters 'nblargenb' &
+--       'nbopcodes' (see below) however not many simulation runs nor tests
+--       were actually done with other values than the default ones (resp. 32
+--       and 512). So you should change these parameters only if you really
+--       know that you're doing.
+--
+--       Mind in particular that increasing the value of 'nblargenb' will
+--       have the size of fields op[abc] in instruction opcodes obviously
+--       also increase (e.g to 6 bit if you set 'nblargenb' to 64). This in
+--       turn will make opcodes become larger than 32 bit.
+--
+-- ============================================================================
+-- NAME
+--       nbopcodes
+--
+-- DEFINITION
+--       Size of the microcode memory of the IP, in number of instruction
+--       opcodes.
+--
+-- TYPE/VALUE
+--       Integer. Default is 512. Same as 'nblargenb' above: obviously keep it
+--       a power of 2.
+--
+-- DESCRIPTION
+--       Note that this is not a memory size in bytes or bits or whatever
+--       absolute unity of size, this is a relative number. For instance
+--       if size of each opcode is 32 bit wide (the default) then the size
+--       of the microcode memory will be given by 512 x 32 bit = 16 Kbit
+--       (assuming the default of 512 for parameter 'nbopcodes').
+--
+--       Please refer to the discussion above for parameter 'nblargenb', which
+--       also widely applies to 'nbopcodes'.
+--
+-- ============================================================================
+-- NAME
+--       simkb
+--
+-- DEFINITION
+--       Only used in simulation, to artificially restrict the size of a large
+--       scalar.
+--
+-- TYPE/VALUE
+--       Integer. Must be greater than or equal to 3.
+--
+-- DESCRIPTION
+--       When 'simkb' is different from 0, then the main right-to-left loop
+--       which parses the scalar bits will span only bits 0 to simkb - 1.
+--       You can therefore use parameter 'simkb' as if you were truncating
+--       the scalar set by software driver to its lowest 'simkb' bits, without
+--       modifying your simulation testbench.
+--
+--       When 'simkb' is 0, then the main loop will parse all the bits of the
+--       scalar.
+--
+-- WARNING
+--       It doesn't make sense to restrict the size of the scalar (using
+--       'simkb') in a simulation where blinding countermeasure is also active,
+--       or at least simply keep in mind that the quantity of bits that will be
+--       taken into account by the IP are the ones of the *blinded* scalar,
+--       hence the result can bear no more logic relation with the initial
+--       scalar as provided by the software driver.
+--
+-- ============================================================================
+-- NAME
+--       simlog
+--
+-- DEFINITION
+--       Only used in simulation. Path file for the simulation log.
+--
+-- TYPE/VALUE
+--       Character string indicating a file path which should be accessible
+--       in write mode.
+--       Default is "/tmp/ecc.log", which should be convenient at least for
+--       Unix-like systems.
+--
+-- DESCRIPTION
+--       This is the path of the file where simulation will dump the information
+--       detailing all the instructions that were executed, with their operands
+--       address, result value, timestamp, etc.
+--
+--       If you provide a relative path, the place where the file will actually
+--       be placed is dependent on your simulator (the default "/tmp/ecc.log"
+--       was made an absolute path to avoid this).
+--
+-- ============================================================================
+-- NAME
+--       simnotrng
+--
+-- DEFINITION
+--       Only used in simulation, MUST BE SET TO FALSE IN SYNTHESIS (otherwise
+--       synthesis will fail).
+--       Used to amputate the testbench from the TRNG HDL despcription
+--       which is not fit to simulation and replace it with a file containing
+--       "random" data.
+--
+-- TYPE/VALUE
+--       Boolean (true or false).
+--       Default is TRUE, hence fitting simulation. Change to FALSE before
+--       synthesis!
+--
+-- DESCRIPTION
+--       The HDL description of the TRNG in the IP contains a combinational
+--       loop which cannot be simulated (it would hang the simulator engine
+--       by creating an infinite number of simulation steps, or deltas, inside
+--       each physical instant). This is why you must set parameter depending
+--       on what you're doing with the IP, simulating it or synthesizing it:
+--
+--         - when you're simulating, parameter 'simnotrng' must be set to true.
+--           All the ES-TRNG instances are then removed from the HDL model, as
+--           well as the binary tree gathering their outputs (see above discus-
+--           sion of parameter 'nbtrng'). Instead a simulation-only process is
+--           instanciated that will read "random" data from the file specified
+--           in parameter 'simtrngfile' (see below this parameter).
+--
+--         - when you're synthesizing, parameter 'simnotrng' must be set to
+--           FALSE. The HDL model then embeds the ES-TRNG component with the
+--           combinational loop describing the ring oscillator.
+--
+--       If you provided the IP with a random post-processor (again refer to
+--       discussion for paramater 'nbtrng' above) it will still be part of
+--       the simulation model when 'simnotrng' = TRUE.
+--
+-- WARNING
+--       Vivado tool from ARM-Xilinx seems not comfortable with this parameter
+--       being set to either one of "/dev/random" or "/dev/urandom" (it will
+--       halt simulation from the begining).
+
+-- SEE ALSO
+--       simtrngfile
+-- ============================================================================
+-- NAME
+--       simtrngfile
+--
+-- DEFINITION
+--       Only used in simulation.
+--       Testbench input file providing "random" data to the TRNG simulation
+--       model.
+--
+-- TYPE/VALUE
+--       Character string indicating a file path which should be accessible
+--       in read mode.
+--       Default "/tmp/random.txt" is arbitrary.
+--
+-- DESCRIPTION
+--       Format of this file is the following: each value should be an
+--       unsigned decimal integer ranging from 0 to 255, with one value
+--       per line.
+--       Simulation will stop when it hits the end of the file.
+--
+--       File sim/jittervals-HOWTO.txt gives an example of a one-liner
+--       command you can use to quickly generate this file.
+--
+-- SEE ALSO
+--       simnotrng

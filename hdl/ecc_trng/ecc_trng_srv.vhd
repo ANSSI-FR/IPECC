@@ -13,7 +13,6 @@
 --  See LICENSE file at the root folder of the project.
 --
 
-
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -30,6 +29,7 @@ entity ecc_trng_srv is
 	port(
 		clk : in std_logic;
 		rstn : in std_logic;
+		swrst : in std_logic;
 		-- interface with ecc_scalar
 		irn_reset : in std_logic;
 		-- interface with ecc_trng_pp
@@ -142,6 +142,7 @@ begin
 		port map(
 			clk => clk,
 			rstn => rstn,
+			swrst => swrst,
 			datain => r.ppdatain0,
 			we => r.irn(0).we,
 			werr => open,
@@ -164,6 +165,7 @@ begin
 		port map(
 			clk => clk,
 			rstn => rstn,
+			swrst => swrst,
 			datain => r.ppdatain1,
 			we => r.irn(1).we,
 			werr => open,
@@ -186,6 +188,7 @@ begin
 		port map(
 			clk => clk,
 			rstn => rstn,
+			swrst => swrst,
 			datain => r.ppdatain2,
 			we => r.irn(2).we,
 			werr => open,
@@ -210,6 +213,7 @@ begin
 		port map(
 			clk => clk,
 			rstn => rstn,
+			swrst => swrst,
 			datain => r.ppdatain3,
 			we => r.irn(3).we,
 			werr => open,
@@ -226,7 +230,7 @@ begin
 			dbgrst => gnd
 		);
 
-	comb: process(r, rstn, irn_reset, data_s, valid_s, rdy,
+	comb: process(r, rstn, irn_reset, data_s, valid_s, rdy, swrst,
 		            --rdy0, rdy1, rdy2, rdy3, dbgtrngcompletebypass,
 	              full, empty, ppdataout0, ppdataout1,
 		            ppdataout2, ppdataout3, count0, count1, count2, count3)
@@ -565,7 +569,7 @@ begin
 		end loop;
 	
 		-- synchronous reset
-		if rstn = '0' or irn_reset = '1' then
+		if rstn = '0' or irn_reset = '1' or swrst = '1' then
 			v.ppdatain_can_be_emptied := '0';
 			v.priority := 0;
 			v.valid(0) := '0'; -- on reset, nothing to serve to client 0
@@ -605,22 +609,22 @@ begin
 	valid0 <= r.valid(0);
 	-- if complete bypass of TRNG wasn't a debug feature, we could set
 	-- a multi-cycle constraint on path: dbgtrngcompletebypass -> data[0-3]
-	data0 <= r.data0 when dbgtrngcompletebypass = '0'
+	data0 <= r.data0 when ((not debug) or dbgtrngcompletebypass = '0')
 	         else (data0'range => '1');
 	irncount0 <= count0;
 	--   client 1
 	valid1 <= r.valid(1);
-	data1 <= r.data1 when dbgtrngcompletebypass = '0'
+	data1 <= r.data1 when ((not debug) or dbgtrngcompletebypass = '0')
 	         else (data1'range => '1');
 	irncount1 <= count1;
 	--   client 2
 	valid2 <= r.valid(2);
-	data2 <= r.data2 when dbgtrngcompletebypass = '0'
+	data2 <= r.data2 when ((not debug) or dbgtrngcompletebypass = '0')
 	         else (data2'range => '1');
 	irncount2 <= count2;
 	--   client 3
 	valid3 <= r.valid(3);
-	data3 <= r.data3 when dbgtrngcompletebypass = '0'
+	data3 <= r.data3 when ((not debug) or dbgtrngcompletebypass = '0')
 	         else (data3'range => '1');
 	irncount3 <= count3;
 	--   handshake with ecc_trng_pp

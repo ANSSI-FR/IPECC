@@ -29,6 +29,7 @@ entity ecc_trng is
 	port(
 		clk : in std_logic;
 		rstn : in std_logic;
+		swrst : in std_logic;
 		-- interface with ecc_scalar
 		irn_reset : in std_logic;
 		-- interface with entropy client ecc_axi
@@ -72,6 +73,7 @@ architecture rtl of ecc_trng is
 		port(
 			clk : in std_logic;
 			rstn : in std_logic;
+			swrst : in std_logic;
 			-- interface with ecc_trng_pp
 			data_t : out std_logic_vector(7 downto 0);
 			valid_t : out std_logic;
@@ -95,6 +97,7 @@ architecture rtl of ecc_trng is
 		port(
 			clk : in std_logic;
 			rstn : in std_logic;
+			swrst : in std_logic;
 			-- interface with ecc_trng_pp
 			data_t : out std_logic_vector(7 downto 0);
 			valid_t : out std_logic;
@@ -118,6 +121,7 @@ architecture rtl of ecc_trng is
 		port(
 			clk : in std_logic;
 			rstn : in std_logic;
+			swrst : in std_logic;
 			-- interface with es_trng
 			data_t : in std_logic_vector(7 downto 0);
 			valid_t : in std_logic;
@@ -133,6 +137,7 @@ architecture rtl of ecc_trng is
 		port(
 			clk : in std_logic;
 			rstn : in std_logic;
+			swrst : in std_logic;
 			-- interface with ecc_scalar
 			irn_reset : in std_logic;
 			-- interface with ecc_trng_pp
@@ -181,6 +186,7 @@ begin
 			port map(
 				clk => clk,
 				rstn => rstn,
+				swrst => swrst,
 				data_t => data_t,
 				valid_t => valid_t,
 				rdy_t => rdy_t,
@@ -205,6 +211,7 @@ begin
 			port map(
 				clk => clk,
 				rstn => rstn,
+				swrst => swrst,
 				data_t => data_t,
 				valid_t => valid_t,
 				rdy_t => rdy_t,
@@ -227,6 +234,7 @@ begin
 		port map(
 			clk => clk,
 			rstn => rstn,
+			swrst => swrst,
 			data_t => data_t,
 			valid_t => valid_t,
 			rdy_t => rdy_t,
@@ -240,6 +248,7 @@ begin
 		port map(
 			clk => clk,
 			rstn => rstn,
+			swrst => swrst,
 			-- interface with ecc_scalar
 			irn_reset => irn_reset,
 			-- interface with ecc_trng_pp

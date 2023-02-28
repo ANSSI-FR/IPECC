@@ -25,6 +25,7 @@ entity es_trng_bitctrl is
 	port(
 		clk : in std_logic;
 		rstn : in std_logic;
+		swrst : in std_logic;
 		-- interface with es_trng_aggreg_all
 		raw : out std_logic;
 		valid : out std_logic;
@@ -171,7 +172,7 @@ begin
 		end if;
 
 		-- synchronous reset
-		if rstn = '0' then
+		if rstn = '0' or swrst = '1' then
 			v.state := idle;
 			-- no need to reset r.debug.idlecnt other than in behav simulation
 			-- pragma translate_off

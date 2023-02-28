@@ -13,14 +13,16 @@
 #  See LICENSE file at the root folder of the project.
 
 
-# Jitter file for simulation can be generated using this very simple one-liner:
-# (mind that generated file '/tmp/random.txt' should match the value
-# set for HDL parameter 'simtrng' in file hdl/ecc_customize.vhd)
-# Value 128 MiB below (arbitratry large) designates the number of
-# values generated, so be sure to generate enough of these for your
-# own simulation requirements to avoid starving of the TRNG (reaching
-# the end of file will make the simulation stop)
+# You can use the following simple one-liner (at least on a Unix-like
+# system) to generate the input file that will replace the physical
+# TRNG as "random" input source in the simulation testbench:
 od -t u1 -w1 -v /dev/urandom | awk '{print $2}' | head -$((128*1024*1024)) > /tmp/random.txt
-#  ('-t u1' tells od to format its output as one unsigned byte
-#   '-w1' tells od to output one byte per line
-#   '-v' tells od not to suppress lines, which otherwise are replaced with *)
+
+# Mind that generated file ("/tmp/random.txt" above is just an example)
+# should match the value set for HDL parameter 'simtrngfile' in file
+# hdl/ecc_customize.vhd.
+# Value 128 Meg above is also quite arbitratry and denotes the number
+# of values that will be generated. Be sure to generate enough of
+# these for your own simulation requirements to avoid starving of the
+# HDL process replacing the TRNG (reaching the end of file will make
+# the simulation stop).
