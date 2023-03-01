@@ -309,7 +309,6 @@ architecture struct of ecc is
 			p_is_of_order_3 : out std_logic;
 			xmxz : in std_logic;
 			ymyz : in std_logic;
-			ypyz : in std_logic;
 			torsion2 : in std_logic;
 			kap : in std_logic;
 			kapp : in std_logic;
@@ -373,7 +372,6 @@ architecture struct of ecc is
 			p_is_of_order_3 : in std_logic;
 			xmxz : out std_logic;
 			ymyz : out std_logic;
-			ypyz : out std_logic;
 			torsion2 : out std_logic;
 			kap : out std_logic;
 			kapp : out std_logic;
@@ -761,7 +759,7 @@ architecture struct of ecc is
 	signal y_are_opposite : std_logic;
 	signal first_2p_is_null : std_logic;
 	signal p_is_of_order_3 : std_logic;
-	signal xmxz, ymyz, ypyz : std_logic;
+	signal xmxz, ymyz : std_logic;
 	signal torsion2 : std_logic;
 	signal kap, kapp : std_logic;
 	signal zu, zc : std_logic;
@@ -1143,7 +1141,6 @@ begin
 			p_is_of_order_3 => p_is_of_order_3,
 			xmxz => xmxz,
 			ymyz => ymyz,
-			ypyz => ypyz,
 			torsion2 => torsion2,
 			kap => kap,
 			kapp => kapp,
@@ -1206,7 +1203,6 @@ begin
 			p_is_of_order_3 => p_is_of_order_3,
 			xmxz => xmxz,
 			ymyz => ymyz,
-			ypyz => ypyz,
 			torsion2 => torsion2,
 			kap => kap,
 			kapp => kapp,

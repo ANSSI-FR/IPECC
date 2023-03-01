@@ -55,7 +55,6 @@ entity ecc_curve is
 		p_is_of_order_3 : in std_logic;
 		xmxz : out std_logic;
 		ymyz : out std_logic;
-		ypyz : out std_logic;
 		torsion2 : out std_logic;
 		kap : out std_logic;
 		kapp : out std_logic;
@@ -247,9 +246,9 @@ architecture rtl of ecc_curve is
 		test_y_opposite : std_logic;
 		detect2pz : std_logic;
 		first2pz : std_logic;
-		detectxmxz, detectymyz, detectypyz : std_logic;
+		detectxmxz, detectymyz : std_logic;
 		detecttorsion2 : std_logic;
-		xmxz, ymyz, ypyz : std_logic;
+		xmxz, ymyz : std_logic;
 		torsion2 : std_logic;
 		kb0 : std_logic;
 		mu0 : std_logic;
@@ -1666,9 +1665,7 @@ begin
 									v.ctrl.detectymyz := '1';
 									v.decode.patch.p := '1';
 								when "110010" => -- detect possible 0-result for patch ",p50"
-									-- patch ,p50 includes the same functionality as ,p4
-									v.ctrl.detectypyz := '1';
-									v.decode.patch.p := '1';
+									null;
 								when "110011" => -- possibly restore ZR01 for patch ",p51"
 									-- if first2pz = 1 then [2]P = 0, so we must restore
 									-- back ZR01 from ZPBK in this case, so we must NOT
@@ -2355,9 +2352,6 @@ begin
 					if r.ctrl.detectymyz = '1' then
 						v.ctrl.ymyz := opo.resultz;
 					end if;
-					if r.ctrl.detectypyz = '1' then
-						v.ctrl.ypyz := opo.resultz;
-					end if;
 					if r.ctrl.detecttorsion2 = '1' then
 						v.ctrl.torsion2 := opo.resultz;
 					end if;
@@ -2368,7 +2362,6 @@ begin
 					v.ctrl.detect2pz := '0';
 					v.ctrl.detectxmxz := '0';
 					v.ctrl.detectymyz := '0';
-					v.ctrl.detectypyz := '0';
 					v.ctrl.detecttorsion2 := '0';
 				end if; -- opo.rdy = 1
 			-- ------------
@@ -2904,7 +2897,6 @@ begin
 	first_2p_is_null <= r.ctrl.first2pz;
 	xmxz <= r.ctrl.xmxz;
 	ymyz <= r.ctrl.ymyz;
-	ypyz <= r.ctrl.ypyz;
 	torsion2 <= r.ctrl.torsion2;
 	kap <= r.ctrl.kap;
 	kapp <= r.ctrl.kapp;

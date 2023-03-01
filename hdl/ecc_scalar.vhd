@@ -96,7 +96,6 @@ entity ecc_scalar is
 		p_is_of_order_3 : out std_logic;
 		xmxz : in std_logic;
 		ymyz : in std_logic;
-		ypyz : in std_logic; -- TODO: remove (useless)
 		torsion2 : in std_logic;
 		kap : in std_logic;
 		kapp : in std_logic;
@@ -394,7 +393,7 @@ begin
 	               k_is_null, aerr_inpt_ack, aerr_outpt_ack,
 	               nndyn_nnm3, dopop, popid, doaop, aopid, ar0zo, ar1zo,
 								 x_are_equal, y_are_equal, y_are_opposite, swrst,
-								 first_2p_is_null, xmxz, ymyz, ypyz, torsion2, kap, kapp,
+								 first_2p_is_null, xmxz, ymyz, torsion2, kap, kapp,
 								 phimsb, kb0end, small_k_sz_en, small_k_sz_en_en, small_k_sz)
 		variable v : reg_type;
 		variable v_simkb : integer;
@@ -518,7 +517,7 @@ begin
 				v.sim.simbit := 1;
 				-- pragma translate_on
 				v.ctrl.r1z_init := ar1zo; -- state of R1 before starting [k]P saved here
-				v.ctrl.r1z := ar1zo; -- this one may evolve during [k]P computation
+				v.ctrl.r1z := ar1zo; -- as opposed to .r1z_init, this one now may evolve
 				v.ctrl.r0z := '0';
 				-- sample the state of scalar k as regards to its possible nullity
 				-- (using k_is_null input signal driven by ecc_axi)

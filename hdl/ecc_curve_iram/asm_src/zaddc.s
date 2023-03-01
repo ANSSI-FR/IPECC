@@ -44,9 +44,6 @@
 	NNADD,p31	YR0	YR1	G
 	NNSUB	G	twop	red
 	NNADD,p5	red	patchme	G
-# we need to test if YR0 == -YR1 (i.e G == 0) so reduce G in [0, p-1[
-	NNSUB	G	p	red
-	NNADD,p50	red	patchme	G
 	STOP
 
 .zaddcL:
