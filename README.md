@@ -67,7 +67,7 @@ The main features of IPECC are:
 
 8. Automatic computation of Montgomery constants
 
-9. Optional dynamically changeable size of large numgers/security parameter
+9. Optional dynamically changeable size of large numbers/security parameter
 
 10. Optional GALS (Montgomery multipliers with their own sped-up clock domain)
 
