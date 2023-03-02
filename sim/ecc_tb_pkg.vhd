@@ -1,3 +1,18 @@
+--
+--  Copyright (C) 2023 - This file is part of IPECC project
+--
+--  Authors:
+--      Karim KHALFALLAH <karim.khalfallah@ssi.gouv.fr>
+--      Ryad BENADJILA <ryadbenadjila@gmail.com>
+--
+--  Contributors:
+--      Adrian THILLARD
+--      Emmanuel PROUFF
+--
+--  This software is licensed under GPL v2 license.
+--  See LICENSE file at the root folder of the project.
+--
+
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -66,6 +81,13 @@ package ecc_tb_pkg is
 	                    constant addr : in natural range 0 to nblargenb - 1;
 	                    constant val : in std_logic_vector);
 
+	procedure debug_write_big(signal clk: in std_logic;
+	                    signal axi: out axi_in_type;
+	                    signal axo: in axi_out_type;
+	                    constant valnn : in positive;
+	                    constant addr : in natural range 0 to nblargenb - 1;
+	                    constant val : in std_logic_vector);
+
 	procedure configure_shuffle(signal clk: in std_logic;
 	                            signal axi: out axi_in_type;
 	                            signal axo: in axi_out_type;
@@ -124,6 +146,13 @@ package ecc_tb_pkg is
 	                   constant valnn: in positive;
 	                   constant addr : in natural range 0 to nblargenb - 1;
 	                   variable bignb: inout std_logic_vector);
+
+	procedure debug_read_big(signal clk: in std_logic;
+	                         signal axi: out axi_in_type;
+	                         signal axo: in axi_out_type;
+	                         constant valnn: in positive;
+	                         constant addr : in natural range 0 to nblargenb - 1;
+	                         variable bignb: inout std_logic_vector);
 
 	procedure read_and_display_kp_result(signal clk: in std_logic;
 	                                     signal axi: out axi_in_type;
@@ -236,6 +265,36 @@ package ecc_tb_pkg is
 	                                         signal axo: in axi_out_type;
 	                                         constant valnn: in positive);
 
+	procedure set_one_breakpoint(signal clk: in std_logic;
+                               signal axi: out axi_in_type;
+	                             signal axo: in axi_out_type;
+	                             constant id: in natural;
+	                             constant addr: in std_logic_vector(8 downto 0);
+	                             constant state: in std_logic_vector(3 downto 0);
+	                             constant nbbits: in natural);
+	
+	procedure poll_until_debug_halted(signal clk: in std_logic;
+	                                  signal axi: out axi_in_type;
+	                                  signal axo: in axi_out_type);
+
+	procedure resume(signal clk: in std_logic;
+	                 signal axi: out axi_in_type;
+	                 signal axo: in axi_out_type);
+
+	procedure read_and_display_one_large_nb(
+	                signal clk: in std_logic;
+	                signal axi: out axi_in_type;
+	                signal axo: in axi_out_type;
+	                constant valnn: in positive;
+	                constant addr: in natural range 0 to nblargenb - 1);
+
+	procedure debug_read_and_display_one_large_nb(
+	                signal clk: in std_logic;
+	                signal axi: out axi_in_type;
+	                signal axo: in axi_out_type;
+	                constant valnn: in positive;
+	                constant addr: in natural range 0 to nblargenb - 1);
+
 end package ecc_tb_pkg;
 
 package body ecc_tb_pkg is
@@ -275,7 +334,7 @@ package body ecc_tb_pkg is
 	                 constant valnn : in positive) is
 	begin
 		wait until clk'event and clk = '1';
-		-- write PRIME_SIZE register
+		-- write W_PRIME_SIZE register
 		axi.awaddr <= W_PRIME_SIZE & "000"; axi.awvalid <= '1';
 		wait until clk'event and clk = '1' and axo.awready = '1';
 		axi.awaddr <= "XXXXXXXX"; axi.awvalid <= '0';
@@ -294,10 +353,11 @@ package body ecc_tb_pkg is
 	                    signal axo: in axi_out_type;
 	                    constant valnn : in positive;
 	                    constant addr : in natural range 0 to nblargenb - 1;
-											constant val : in std_logic_vector) is
+	                    constant val : in std_logic_vector) is
 		variable dw : std_logic_vector(AXIDW - 1 downto 0);
 	begin
 		poll_until_ready(clk, axi, axo);
+		wait until clk'event and clk = '1';
 		-- write W_CTRL register
 		axi.awaddr <= W_CTRL & "000"; axi.awvalid <= '1';
 		wait until clk'event and clk = '1' and axo.awready = '1';
@@ -324,6 +384,45 @@ package body ecc_tb_pkg is
 		end loop;
 	end procedure;
 
+	-- ------------------------------------------------------------------
+	-- Identical to write_big, except that here debug mode
+	-- is assumed, hence we do not poll the BUSY bit in R_STATUS register
+	-- (otherwise we'd create a deadlock if the IP was halted)
+	-- ------------------------------------------------------------------
+	procedure debug_write_big(signal clk: in std_logic;
+	                    signal axi: out axi_in_type;
+	                    signal axo: in axi_out_type;
+	                    constant valnn : in positive;
+	                    constant addr : in natural range 0 to nblargenb - 1;
+	                    constant val : in std_logic_vector) is
+		variable dw : std_logic_vector(AXIDW - 1 downto 0);
+	begin
+		wait until clk'event and clk = '1';
+		-- write W_CTRL register
+		axi.awaddr <= W_CTRL & "000"; axi.awvalid <= '1';
+		wait until clk'event and clk = '1' and axo.awready = '1';
+		axi.awaddr <= (others => 'X'); axi.awvalid <= '0';
+		dw := (others => '0');
+		dw(CTRL_WRITE_NB) := '1';
+		dw(CTRL_NBADDR_LSB + FP_ADDR_MSB - 1 downto CTRL_NBADDR_LSB)
+			:= std_logic_vector(to_unsigned(addr, FP_ADDR_MSB));
+		axi.wdata <= dw;
+		axi.wvalid <= '1';
+		wait until clk'event and clk = '1' and axo.wready = '1';
+		axi.wdata <= (others => 'X');
+		axi.wvalid <= '0';
+		-- now perform the proper nb of writes of the W_WRITE_DATA register
+		for i in 0 to div(valnn,AXIDW) - 1 loop
+			wait until clk'event and clk = '1';
+			axi.awaddr <= W_WRITE_DATA & "000"; axi.awvalid <= '1';
+			wait until clk'event and clk = '1' and axo.awready = '1';
+			axi.awaddr <= (others => 'X'); axi.awvalid <= '0';
+			axi.wdata <= val((AXIDW*i) + AXIDW - 1 downto AXIDW*i);
+			axi.wvalid <= '1';
+			wait until clk'event and clk = '1' and axo.wready = '1';
+			axi.wdata <= (others => 'X'); axi.wvalid <= '0';
+		end loop;
+	end procedure;
 	-- ------------------------------
 	-- emulate SW configuring shuffle
 	-- ------------------------------
@@ -406,7 +505,7 @@ package body ecc_tb_pkg is
 		variable dw : std_logic_vector(AXIDW - 1 downto 0);
 	begin
 		wait until clk'event and clk = '1';
-		-- write CTRL register
+		-- write W_CTRL register
 		axi.awaddr <= W_CTRL & "000"; axi.awvalid <= '1';
 		wait until clk'event and clk = '1' and axo.awready = '1';
 		axi.awaddr <= "XXXXXXXX"; axi.awvalid <= '0';
@@ -443,7 +542,7 @@ package body ecc_tb_pkg is
 	                 signal axo: in axi_out_type) is
 		variable dw : std_logic_vector(AXIDW - 1 downto 0);
 	begin
-		-- write CTRL register
+		-- write W_CTRL register
 		axi.awaddr <= W_CTRL & "000"; axi.awvalid <= '1';
 		wait until clk'event and clk = '1' and axo.awready = '1';
 		axi.awaddr <= "XXXXXXXX"; axi.awvalid <= '0';
@@ -631,8 +730,59 @@ package body ecc_tb_pkg is
 		variable tup, xup : integer;
 		variable dw : std_logic_vector(AXIDW - 1 downto 0);
 	begin
+		poll_until_ready(clk, axi, axo);
 		wait until clk'event and clk = '1';
-		-- write CTRL register
+		-- write W_CTRL register
+		axi.awaddr <= W_CTRL & "000"; axi.awvalid <= '1';
+		wait until clk'event and clk = '1' and axo.awready = '1';
+		axi.awaddr <= "XXXXXXXX"; axi.awvalid <= '0';
+		dw := (others => '0');
+		dw(CTRL_READ_NB) := '1';
+		dw(CTRL_NBADDR_LSB + FP_ADDR_MSB - 1 downto CTRL_NBADDR_LSB)
+			:= std_logic_vector(to_unsigned(addr, FP_ADDR_MSB));
+		axi.wdata <= dw;
+		axi.wvalid <= '1';
+		wait until clk'event and clk = '1' and axo.wready = '1';
+		-- now perform the exact required nb of reads of the DATA register
+		axi.wdata <= (others => 'X'); axi.wvalid <= '0';
+		for i in 0 to div(valnn,AXIDW) - 1 loop
+			axi.araddr <= R_READ_DATA & "000"; axi.arvalid <= '1';
+			wait until clk'event and clk = '1' and axo.arready = '1';
+			axi.araddr <= "XXXXXXXX"; axi.arvalid <= '0'; axi.rready <= '1';
+			wait until clk'event and clk = '1' and axo.rvalid = '1';
+			if ((i+1) * AXIDW) > bignb'length then
+				tup := bignb'length - 1;
+				xup := bignb'length mod AXIDW - 1;
+				assert FALSE
+					report "ecc_tb: error while reading back big number"
+						severity WARNING;
+			else
+				tup := ((i+1) * AXIDW) - 1;
+				xup := AXIDW - 1;
+			end if;
+			bignb(tup downto i * AXIDW) := axo.rdata(xup downto 0);
+			axi.rready <= '0';
+			wait until clk'event and clk = '1';
+		end loop;
+		wait until clk'event and clk = '1';
+	end procedure;
+
+	-- ------------------------------------------------------------------
+	-- Identical to read_big, except that here debug mode is assumed,
+	-- hence we do not poll the BUSY bit in R_STATUS register
+	-- (otherwise we'd create a deadlock if the IP was halted)
+	-- ------------------------------------------------------------------
+	procedure debug_read_big(signal clk: in std_logic;
+	                         signal axi: out axi_in_type;
+	                         signal axo: in axi_out_type;
+	                         constant valnn: in positive;
+	                         constant addr : in natural range 0 to nblargenb - 1;
+	                         variable bignb: inout std_logic_vector) is
+		variable tup, xup : integer;
+		variable dw : std_logic_vector(AXIDW - 1 downto 0);
+	begin
+		wait until clk'event and clk = '1';
+		-- write W_CTRL register
 		axi.awaddr <= W_CTRL & "000"; axi.awvalid <= '1';
 		wait until clk'event and clk = '1' and axo.awready = '1';
 		axi.awaddr <= "XXXXXXXX"; axi.awvalid <= '0';
@@ -841,7 +991,7 @@ package body ecc_tb_pkg is
 	                        signal axo: in axi_out_type) is
 		variable dw : std_logic_vector(AXIDW - 1 downto 0);
 	begin
-		-- write CTRL register
+		-- write W_CTRL register
 		axi.awaddr <= W_CTRL & "000"; axi.awvalid <= '1';
 		wait until clk'event and clk = '1' and axo.awready = '1';
 		axi.awaddr <= "XXXXXXXX"; axi.awvalid <= '0';
@@ -951,7 +1101,7 @@ package body ecc_tb_pkg is
 	                           signal axo: in axi_out_type) is
 		variable dw : std_logic_vector(AXIDW - 1 downto 0);
 	begin
-		-- write CTRL register
+		-- write W_CTRL register
 		axi.awaddr <= W_CTRL & "000"; axi.awvalid <= '1';
 		wait until clk'event and clk = '1' and axo.awready = '1';
 		axi.awaddr <= "XXXXXXXX"; axi.awvalid <= '0';
@@ -1047,7 +1197,7 @@ package body ecc_tb_pkg is
 	                           signal axo: in axi_out_type) is
 		variable dw : std_logic_vector(AXIDW - 1 downto 0);
 	begin
-		-- write CTRL register
+		-- write W_CTRL register
 		axi.awaddr <= W_CTRL & "000"; axi.awvalid <= '1';
 		wait until clk'event and clk = '1' and axo.awready = '1';
 		axi.awaddr <= "XXXXXXXX"; axi.awvalid <= '0';
@@ -1143,7 +1293,7 @@ package body ecc_tb_pkg is
 	                               signal axo: in axi_out_type) is
 		variable dw : std_logic_vector(AXIDW - 1 downto 0);
 	begin
-		-- write CTRL register
+		-- write W_CTRL register
 		axi.awaddr <= W_CTRL & "000"; axi.awvalid <= '1';
 		wait until clk'event and clk = '1' and axo.awready = '1';
 		axi.awaddr <= "XXXXXXXX"; axi.awvalid <= '0';
@@ -1245,6 +1395,131 @@ package body ecc_tb_pkg is
 		else
 			echol("ECC_TB: no answer :/");
 		end if;
+	end procedure;
+
+	-- -------------------------------
+	-- emulate SW setting a breakpoint (debug feature)
+	-- -------------------------------
+	procedure set_one_breakpoint(signal clk: in std_logic;
+                               signal axi: out axi_in_type;
+	                             signal axo: in axi_out_type;
+	                             constant id: in natural;
+	                             constant addr: in std_logic_vector(8 downto 0);
+	                             constant state: in std_logic_vector(3 downto 0);
+	                             constant nbbits: in natural) is
+	begin
+		-- write W_DBG_BKPT register
+		axi.awaddr <= W_DBG_BKPT & "000";
+		axi.awvalid <= '1';
+		wait until clk'event and clk = '1' and axo.awready = '1';
+		axi.awaddr <= "XXXXXXXX";
+		axi.awvalid <= '0';
+		axi.wdata(31 downto 28) <= state(3 downto 0);
+		axi.wdata(27 downto 16) <= std_logic_vector(to_unsigned(nbbits, 12));
+		axi.wdata(15 downto 13) <= "000";
+		axi.wdata(12 downto 4) <= addr(8 downto 0);
+		axi.wdata(3) <= '0';
+		axi.wdata(2 downto 1) <= std_logic_vector(to_unsigned(id, 2));
+		axi.wdata(0) <= '1';
+		axi.wvalid <= '1';
+		wait until clk'event and clk = '1' and axo.wready = '1';
+		axi.wdata <= (others => 'X');
+		axi.wvalid <= '0';
+		wait until clk'event and clk = '1';
+	end procedure;
+
+	-- -------------------------------------------------------------------------
+	-- emulate SW polling R_DBG_STATUS until it shows IP is halted (debug feat.)
+	-- -------------------------------------------------------------------------
+	procedure poll_until_debug_halted(signal clk: in std_logic;
+	                                  signal axi: out axi_in_type;
+	                                  signal axo: in axi_out_type) is
+		variable tmp : integer;
+	begin
+		loop
+			-- read R_DBG_STATUS register
+			axi.araddr <= R_DBG_STATUS & "000";
+			axi.arvalid <= '1';
+			wait until clk'event and clk = '1' and axo.arready = '1';
+			axi.araddr <= "XXXXXXXX";
+			axi.arvalid <= '0';
+			axi.rready <= '1';
+			wait until clk'event and clk = '1' and axo.rvalid = '1';
+			axi.rready <= '0';
+			if axo.rdata(0) = '1' then
+				echo("ECC_TB: IP halted: PC=0x");
+				hex_echo(axo.rdata(12 downto 4));
+				echo(" [bkpt #");
+				tmp := to_integer(unsigned(axo.rdata(2 downto 1)));
+				echo(integer'image(tmp));
+				echo(", state = 0x");
+				hex_echo(axo.rdata(31 downto 28));
+				echo(", nbbits = ");
+				tmp := to_integer(unsigned(axo.rdata(27 downto 16)));
+				echo(integer'image(tmp));
+				echol("] (" & time'image(now) & ")");
+				exit;
+			end if;
+			-- wait a little bit between each polling read (say 1 us, like software)
+			wait for 1 us;
+			wait until clk'event and clk = '1';
+		end loop;
+		wait until clk'event and clk = '1';
+	end procedure;
+
+	-- ------------------------------------------
+	-- emulate SW resuming execution of microcode (debug feature)
+	-- ------------------------------------------
+	procedure resume(signal clk: in std_logic;
+	                 signal axi: out axi_in_type;
+	                 signal axo: in axi_out_type) is
+	begin
+		-- write W_DBG_STEPS register
+		axi.awaddr <= W_DBG_STEPS & "000"; axi.awvalid <= '1';
+		wait until clk'event and clk = '1' and axo.awready = '1';
+		axi.awaddr <= "XXXXXXXX"; axi.awvalid <= '0';
+		axi.wdata <= "0001" & x"0000000"; axi.wvalid <= '1';
+		wait until clk'event and clk = '1' and axo.wready = '1';
+		axi.wdata <= (others => 'X'); axi.wvalid <= '0';
+		wait until clk'event and clk = '1';
+	end procedure;
+
+	-- -----------------------------------------------------------------
+	-- emulate SW reading of one large number & its display with console
+	-- -----------------------------------------------------------------
+	procedure read_and_display_one_large_nb(
+	                signal clk: in std_logic;
+	                signal axi: out axi_in_type;
+	                signal axo: in axi_out_type;
+	                constant valnn: in positive;
+	                constant addr: in natural range 0 to nblargenb - 1) is
+		variable lgnb: std_logic512 := (others => '0');
+	begin
+		lgnb := (others => '0');
+		read_big(clk, axi, axo, valnn, addr, lgnb);
+		echo("ECC_TB: read-back on AXI interface: @" & integer'image(addr)
+		     & " = 0x");
+		hex_echol(lgnb(valnn - 1 downto 0));
+	end procedure;
+
+	-- --------------------------------------------------------------------
+	-- Identical to read_and_display_kp_result, except that here debug mode
+	-- is assumed, hence we do not poll the BUSY bit in R_STATUS register
+	-- (otherwise we'd create a deadlock if the IP was halted)
+	-- --------------------------------------------------------------------
+	procedure debug_read_and_display_one_large_nb(
+	                signal clk: in std_logic;
+	                signal axi: out axi_in_type;
+	                signal axo: in axi_out_type;
+	                constant valnn: in positive;
+	                constant addr: in natural range 0 to nblargenb - 1) is
+		variable lgnb: std_logic512 := (others => '0');
+	begin
+		lgnb := (others => '0');
+		debug_read_big(clk, axi, axo, valnn, addr, lgnb);
+		echo("ECC_TB: read-back on AXI interface: @" & integer'image(addr)
+		     & " = 0x");
+		hex_echol(lgnb(valnn - 1 downto 0));
 	end procedure;
 
 end package body;

@@ -425,6 +425,7 @@ architecture rtl of ecc_axi is
 		trng : trng_reg_type;
 		fpwdata : std_logic_vector(ww - 1 downto 0);
 		halt : std_logic;
+		shwon : std_logic_vector(1 downto 0);
 	end record;
 
 	-- all registers
@@ -893,6 +894,7 @@ begin
 		v.debug.resume := '0'; -- (s173)
 		v.debug.dosomeopcodes := '0'; -- (s33)
 		v.ctrl.penupsh := '0' & r.ctrl.penupsh(1);
+		v.debug.shwon := '0' & r.debug.shwon(1);
 		if r.axi.awpending = '1' and r.axi.dwpending = '1' then
 			v.axi.awpending := '0';
 			v.axi.dwpending := '0';
@@ -1706,6 +1708,7 @@ begin
 			elsif debug and r.axi.waddr = W_DBG_FP_WDATA then
 				v.write.fpwe0 := '1'; -- stays asserted only 1 cycle thx to (s24)
 				v.debug.fpwdata := r.axi.wdatax(ww - 1 downto 0); -- (s145), see (s144)
+				v.debug.shwon(1) := '1';
 				-- assert both AWREADY & WREADY signals to allow a new AXI data-beat
 				-- to happen again
 				v.axi.awready := '1';
@@ -3426,7 +3429,8 @@ begin
 	-- a debug feature, we could set a multicycle constraint on
 	-- path dbghalted -> xwdata (but it is a debug feature so perf
 	-- is not really an issue)
-	xwdata <= r.debug.fpwdata when (debug and dbghalted = '1')
+	xwdata <= r.debug.fpwdata when (debug and dbghalted = '1' and
+						                      r.debug.shwon(0) = '1')
 	          else r.write.fpwdata;
 	xre <= r.read.fpre;
 
