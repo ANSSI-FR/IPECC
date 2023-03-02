@@ -114,6 +114,25 @@ package ecc_utils is
 	procedure hex_write(l: inout line; value: in std_logic_vector);
 	-- pragma translate_on
 
+	subtype std_logic2 is std_logic_vector(1 downto 0);
+	subtype std_logic3 is std_logic_vector(2 downto 0);
+	subtype std_logic4 is std_logic_vector(3 downto 0);
+	subtype std_logic5 is std_logic_vector(4 downto 0);
+	subtype std_logic8 is std_logic_vector(7 downto 0);
+	subtype std_logic15 is std_logic_vector(14 downto 0);
+	subtype std_logic16 is std_logic_vector(15 downto 0);
+	subtype std_logic17 is std_logic_vector(16 downto 0);
+	subtype std_logic24 is std_logic_vector(23 downto 0);
+	subtype std_logic192 is std_logic_vector(191 downto 0);
+	subtype std_logic256 is std_logic_vector(255 downto 0);
+	subtype std_logic272 is std_logic_vector(271 downto 0);
+	subtype std_logic288 is std_logic_vector(287 downto 0);
+	subtype std_logic320 is std_logic_vector(319 downto 0);
+	subtype std_logic323 is std_logic_vector(322 downto 0);
+	subtype std_logic352 is std_logic_vector(351 downto 0);
+	subtype std_logic384 is std_logic_vector(383 downto 0);
+	subtype std_logic512 is std_logic_vector(511 downto 0);
+
 end package ecc_utils;
 
 package body ecc_utils is
