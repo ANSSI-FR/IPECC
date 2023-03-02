@@ -17,7 +17,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
-use work.ecc_custom.all; -- for simnotrng
+use work.ecc_custom.all; -- for notrng
 use work.ecc_utils.all;
 use work.ecc_pkg.all;
 
@@ -180,7 +180,7 @@ architecture rtl of ecc_trng is
 
 begin
 
-	t0: if simnotrng = FALSE generate
+	t0: if notrng = FALSE generate
 		-- ES-TRNG: real physical entropy source based on Xilinx LUTs & DFFs
 		t0: es_trng
 			port map(
@@ -204,7 +204,7 @@ begin
 	end generate;
 
 	-- pragma translate_off
-	t1: if simnotrng = TRUE generate
+	t1: if notrng = TRUE generate
 		-- es_trng_stub reads randomness from local file
 		-- and provide them to ecc_trng_pp
 		t0: es_trng_stub

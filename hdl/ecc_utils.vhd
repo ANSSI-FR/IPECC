@@ -123,6 +123,7 @@ package ecc_utils is
 	subtype std_logic16 is std_logic_vector(15 downto 0);
 	subtype std_logic17 is std_logic_vector(16 downto 0);
 	subtype std_logic24 is std_logic_vector(23 downto 0);
+	subtype std_logic32 is std_logic_vector(31 downto 0);
 	subtype std_logic192 is std_logic_vector(191 downto 0);
 	subtype std_logic256 is std_logic_vector(255 downto 0);
 	subtype std_logic272 is std_logic_vector(271 downto 0);

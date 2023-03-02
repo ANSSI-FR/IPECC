@@ -37,8 +37,9 @@ package ecc_custom is
 	constant sramlat : positive range 1 to 2 := 1;
 	constant async : boolean := TRUE;
 	constant shuffle : boolean := FALSE;
+	constant notrng : boolean := TRUE; -- set to TRUE for simu, FALSE for syn
 	constant nbtrng : positive := 1;
-	constant trngta : natural range 1 to 4095 := 32; -- doc: see ecc_trng_pkg.vhd
+	constant trngta : natural range 1 to 4095 := 32;
 	constant axi32or64 : natural := 32;
 	constant debug : boolean := FALSE;
 	constant nblargenb : positive := 32;  -- change these two parameters only if
@@ -46,7 +47,6 @@ package ecc_custom is
 	-- below concerns simulation only
 	constant simkb : natural range 0 to natural'high := 0; -- if 0 then ignored
 	constant simlog : string := "/tmp/ecc.log";
-	constant simnotrng : boolean := FALSE; -- set to TRUE for simu, FALSE for syn
 	constant simtrngfile: string := "/tmp/random.txt";
 	-- --------------------------------
 	-- end of: user-editable parameters
@@ -497,6 +497,52 @@ end package ecc_custom;
 --
 -- ============================================================================
 -- NAME
+--       notrng
+--
+-- DEFINITION
+--       Used to amputate the testbench from the TRNG HDL despcription
+--       which is not fit to simulation and replace it with a file containing
+--       "random" data.
+--       MUST BE SET TO FALSE IN SYNTHESIS (otherwise synthesis will fail)
+--       AND TO TRUE IN SIMULATION (otherwise simulation will hang).
+--
+-- TYPE/VALUE
+--       Boolean (true or false).
+--       Default is TRUE, hence fitting simulation. Change to FALSE before
+--       synthesis!
+--
+-- DESCRIPTION
+--       The HDL description of the TRNG in the IP contains a combinational
+--       loop which cannot be simulated (it would hang the simulator engine
+--       by creating an infinite number of simulation steps (deltas) inside
+--       each physical instant). This is why you must set this parameter
+--       depending on what you're doing with the IP, simulating it or synthe-
+--       sizing it:
+--
+--         - when you're simulating, parameter 'notrng' must be set to TRUE.
+--           All the ES-TRNG instances are then removed from the HDL model, as
+--           well as the binary tree gathering their outputs (see above discus-
+--           sion of parameter 'nbtrng'). Instead a simulation-only process is
+--           instanciated that will read "random" data from the file specified
+--           in parameter 'simtrngfile' (see below this parameter).
+--
+--         - when you're synthesizing, parameter 'notrng' must be set to FALSE.
+--           The HDL model then embeds the ES-TRNG component with the combina-
+--           tional loop describing the ring oscillator.
+--
+--       If you provided the IP with a random post-processor (again refer to
+--       discussion for paramater 'nbtrng' above) it will still be part of
+--       the simulation model when 'notrng' = TRUE.
+--
+-- WARNING
+--       Vivado tool from ARM-Xilinx seems not comfortable with this parameter
+--       being set to either one of "/dev/random" or "/dev/urandom" (it will
+--       halt simulation from the begining).
+
+-- SEE ALSO
+--       simtrngfile
+-- ============================================================================
+-- NAME
 --       nbtrng
 --
 -- DEFINITION
@@ -633,7 +679,7 @@ end package ecc_custom;
 --       FIFO.
 --
 -- SEE ALSO
---       trngta, simnotrng
+--       trngta, notrng
 -- ============================================================================
 -- NAME
 --       trngta
@@ -674,7 +720,7 @@ end package ecc_custom;
 --       number properly.
 --
 -- SEE ALSO
---       nbtrng, simnotrng
+--       nbtrng, notrng
 -- ============================================================================
 -- NAME
 --       axi32or64
@@ -938,51 +984,6 @@ end package ecc_custom;
 --
 -- ============================================================================
 -- NAME
---       simnotrng
---
--- DEFINITION
---       Only used in simulation, MUST BE SET TO FALSE IN SYNTHESIS (otherwise
---       synthesis will fail).
---       Used to amputate the testbench from the TRNG HDL despcription
---       which is not fit to simulation and replace it with a file containing
---       "random" data.
---
--- TYPE/VALUE
---       Boolean (true or false).
---       Default is TRUE, hence fitting simulation. Change to FALSE before
---       synthesis!
---
--- DESCRIPTION
---       The HDL description of the TRNG in the IP contains a combinational
---       loop which cannot be simulated (it would hang the simulator engine
---       by creating an infinite number of simulation steps, or deltas, inside
---       each physical instant). This is why you must set parameter depending
---       on what you're doing with the IP, simulating it or synthesizing it:
---
---         - when you're simulating, parameter 'simnotrng' must be set to true.
---           All the ES-TRNG instances are then removed from the HDL model, as
---           well as the binary tree gathering their outputs (see above discus-
---           sion of parameter 'nbtrng'). Instead a simulation-only process is
---           instanciated that will read "random" data from the file specified
---           in parameter 'simtrngfile' (see below this parameter).
---
---         - when you're synthesizing, parameter 'simnotrng' must be set to
---           FALSE. The HDL model then embeds the ES-TRNG component with the
---           combinational loop describing the ring oscillator.
---
---       If you provided the IP with a random post-processor (again refer to
---       discussion for paramater 'nbtrng' above) it will still be part of
---       the simulation model when 'simnotrng' = TRUE.
---
--- WARNING
---       Vivado tool from ARM-Xilinx seems not comfortable with this parameter
---       being set to either one of "/dev/random" or "/dev/urandom" (it will
---       halt simulation from the begining).
-
--- SEE ALSO
---       simtrngfile
--- ============================================================================
--- NAME
 --       simtrngfile
 --
 -- DEFINITION
@@ -1005,4 +1006,4 @@ end package ecc_custom;
 --       command you can use to quickly generate this file.
 --
 -- SEE ALSO
---       simnotrng
+--       notrng
