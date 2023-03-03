@@ -43,7 +43,7 @@ The main features of IPECC are:
 
     1. Built-in
 
-        1. Point verification as absolute first and absolute last operations
+        1. Point verification as very first and very last operations
 
         2. Anti-address bit DPA, with extra layer of shuffling on intermediate point coordinates
 
