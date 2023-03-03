@@ -924,12 +924,12 @@ end package ecc_custom;
 -- DESCRIPTION
 --       Note that this is not a memory size in bytes or bits or whatever
 --       absolute unity of size, this is a relative number. For instance
---       if size of each opcode is 32 bit wide (the default) then the size
---       of the microcode memory will be given by 512 x 32 bit = 16 Kbit
---       (assuming the default of 512 for parameter 'nbopcodes').
+--       if size of each opcode is 32 bit wide (the default) then the
+--       physical size of the microcode memory will be given by 512 x 32 bit
+--       = 16 Kbit (assuming the default of 512 for parameter 'nbopcodes').
 --
---       Please refer to the discussion above for parameter 'nblargenb', which
---       also widely applies to 'nbopcodes'.
+--       Please refer to the discussion above for parameter 'nblargenb',
+--       as it also widely applies to 'nbopcodes'.
 --
 -- ============================================================================
 -- NAME
