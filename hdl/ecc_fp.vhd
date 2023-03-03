@@ -20,6 +20,7 @@ use ieee.numeric_std.all;
 use work.ecc_custom.all;
 use work.ecc_utils.all;
 use work.ecc_pkg.all;
+use work.ecc_vars.all; -- for LARGE_NB_x constants (& only for simu, see s(142))
 
 -- pragma translate_off
 use std.textio.all;
@@ -2336,6 +2337,8 @@ begin
 	end process regs;
 
 	-- pragma translate_off
+	-- (s142) simulation process to log all microcode execution in file which
+	-- pathname is given by constant 'simlog' of package ecc_customize.vhd
 	fplog: process(clk)
 		file output : TEXT open write_mode is simlog;
 		variable lineout : line;

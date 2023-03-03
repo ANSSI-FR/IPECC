@@ -1911,5 +1911,5 @@ elif sys.argv[1] == "-e":
     print("  -> Emulation of file %s" % sys.argv[2])
     emulate_file(sys.argv[2], initial_state)
 else:
-    print_error("Error: ", "", "uknown option '%s' (-a or -d expected)" % sys.argv[1])
+    print_error("Error: ", "", "uknown option '%s' (-a, -d or -e expected)" % sys.argv[1])
     sys.exit(-1)

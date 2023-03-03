@@ -20,6 +20,7 @@ use ieee.numeric_std.all;
 use work.ecc_custom.all;
 use work.ecc_utils.all;
 use work.ecc_pkg.all;
+use work.ecc_vars.all; -- for LARGE_NB_R_ADDR - see (s79), (s80) & (s81)
 use work.mm_ndsp_pkg.all;
 -- pragma translate_off
 use std.textio.all;

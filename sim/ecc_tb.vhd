@@ -226,7 +226,7 @@ begin
 			-- ------------------------------------------------------
 			configure_blinding(s_axi_aclk, axi, axo, FALSE,             0);
 			--                 blind/don't blind, nb blind bits
-			-- poll until IP has done the stuff related to blinding config and is ready
+			-- poll until IP has done the stuff related to blinding and is ready
 			poll_until_ready(s_axi_aclk, axi, axo);
 
 			-- ------------------------------------------------------
@@ -240,7 +240,8 @@ begin
 			-- scalar multiplication
 			-- ------------------------------------------------------
 			--
-			scalar_mult(s_axi_aclk, axi, axo, 160,     SCALAR_K160, BIG_XP_BPOOL160R1, BIG_YP_BPOOL160R1);
+			scalar_mult(s_axi_aclk, axi, axo, 160,
+			            SCALAR_K160, BIG_XP_BPOOL160R1, BIG_YP_BPOOL160R1);
 			--
 			-- poll until IP has completed [k]P computation and is ready
 			poll_until_ready(s_axi_aclk, axi, axo);

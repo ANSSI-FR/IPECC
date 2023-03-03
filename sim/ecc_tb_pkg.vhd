@@ -20,6 +20,7 @@ use ieee.numeric_std.all;
 use work.ecc_custom.all;
 use work.ecc_utils.all;
 use work.ecc_pkg.all;
+use work.ecc_vars.all;
 use work.ecc_tb_vec.all; -- for 'curve_param_type'
 
 use std.textio.all;
@@ -265,13 +266,14 @@ package ecc_tb_pkg is
 	                                         signal axo: in axi_out_type;
 	                                         constant valnn: in positive);
 
-	procedure set_one_breakpoint(signal clk: in std_logic;
-                               signal axi: out axi_in_type;
-	                             signal axo: in axi_out_type;
-	                             constant id: in natural;
-	                             constant addr: in std_logic_vector(8 downto 0);
-	                             constant state: in std_logic_vector(3 downto 0);
-	                             constant nbbits: in natural);
+	procedure set_one_breakpoint(
+	            signal clk: in std_logic;
+		          signal axi: out axi_in_type;
+		          signal axo: in axi_out_type;
+		          constant id: in natural;
+		          constant addr: in std_logic_vector(IRAM_ADDR_SZ - 1 downto 0);
+		          constant state: in std_logic_vector(3 downto 0);
+		          constant nbbits: in natural);
 	
 	procedure poll_until_debug_halted(signal clk: in std_logic;
 	                                  signal axi: out axi_in_type;
@@ -1400,13 +1402,14 @@ package body ecc_tb_pkg is
 	-- -------------------------------
 	-- emulate SW setting a breakpoint (debug feature)
 	-- -------------------------------
-	procedure set_one_breakpoint(signal clk: in std_logic;
-                               signal axi: out axi_in_type;
-	                             signal axo: in axi_out_type;
-	                             constant id: in natural;
-	                             constant addr: in std_logic_vector(8 downto 0);
-	                             constant state: in std_logic_vector(3 downto 0);
-	                             constant nbbits: in natural) is
+	procedure set_one_breakpoint(
+	            signal clk: in std_logic;
+		          signal axi: out axi_in_type;
+		          signal axo: in axi_out_type;
+		          constant id: in natural;
+		          constant addr: in std_logic_vector(IRAM_ADDR_SZ - 1 downto 0);
+		          constant state: in std_logic_vector(3 downto 0);
+							constant nbbits: in natural) is
 	begin
 		-- write W_DBG_BKPT register
 		axi.awaddr <= W_DBG_BKPT & "000";

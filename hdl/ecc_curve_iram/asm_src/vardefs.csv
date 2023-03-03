@@ -8,16 +8,19 @@
 # Contributors:
 #     Adrian THILLARD
 #     Emmanuel PROUFF
+#
 # address of variables (in ecc_fp_dram)
+
 # main variables (shared by several programs)
 p,0
 a,1
 b,2
 q,3
-XR1,6
-YR1,7
+k,4
 XR0,4
 YR0,5
+XR1,6
+YR1,7
 ZR01,26
 one,30
 zero,31
@@ -89,7 +92,7 @@ aZZZZ,8
 2YR1,8
 M,9
 MpSmT,9
-Q,9
+Qs,9
 YYYY,16
 QQ,16
 S,17
@@ -102,7 +105,7 @@ lambdacu,21
 Y1Z1,21
 Zsav,20
 # variables used by both <zadd[uc].s>
-A,8
+AZ,8
 BmX,8
 F,8
 C,9
@@ -113,7 +116,7 @@ J,9
 YmY,16
 XADD,17
 D,17
-K,16
+KK,16
 YADD,16
 DmB,17
 Xtmp,20
@@ -121,7 +124,7 @@ Ytmp,21
 # variables used specifically by <zaddc.s>
 XmXC,21
 G,20
-B,23
+BZ,23
 Ec,25
 CCmB,25
 XSUB,8
@@ -171,7 +174,7 @@ Ia,10
 I,12
 Ja,9
 # YmY,16
-r,11
+rA,11
 V,10
 rsq,12
 JpV,13

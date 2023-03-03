@@ -24,6 +24,7 @@ use std.textio.all;
 use work.ecc_custom.all;
 use work.ecc_utils.all;
 use work.ecc_pkg.all;
+use work.ecc_vars.all;
 
 -- code below conforms to Xilinx's synthesis recommandations for
 -- VHDL coding style of a simple dual-port BRAM with _two_clocks_
@@ -76,12 +77,12 @@ architecture syn of ecc_fp_dram is
 		vram((LARGE_NB_R_ADDR * n) + ((nn + 2)/ww)) := v_constant_r;
 		-- big number 1 constant
 		for i in 1 to n - 1 loop
-			vram((LARGE_NB_1_ADDR * n) + i) := (others => '0');
+			vram((LARGE_NB_ONE_ADDR * n) + i) := (others => '0');
 		end loop;
-		vram(LARGE_NB_1_ADDR * n) := std_logic_vector(to_unsigned(1, ww));
+		vram(LARGE_NB_ONE_ADDR * n) := std_logic_vector(to_unsigned(1, ww));
 		-- big number constant 0
 		for i in 0 to n - 1 loop
-			vram((LARGE_NB_0_ADDR * n) + i) := (others => '0');
+			vram((LARGE_NB_ZERO_ADDR * n) + i) := (others => '0');
 		end loop;
 		return vram;
 	end function;

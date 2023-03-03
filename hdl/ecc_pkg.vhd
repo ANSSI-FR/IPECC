@@ -19,6 +19,7 @@ use ieee.numeric_std.all;
 
 use work.ecc_custom.all;
 use work.ecc_utils.all;
+use work.ecc_vars.all;
 
 -- pragma translate_off
 use std.textio.all;
@@ -148,33 +149,6 @@ package ecc_pkg is
 		shr : std_logic_vector(NB_MSK_SH_REG - 1 downto 0);
 	end record;
 
-	-- address of some of t he large numbers in ecc_fp_dram memory
-	-- (note that these constants must be kept consistent with the values
-	-- in <vardesf.csv>)
-	--   prime field p
-	constant LARGE_NB_P_ADDR : integer := 0;
-	--   curve parmeters
-	constant LARGE_NB_A_ADDR : integer := 1;
-	constant LARGE_NB_B_ADDR : integer := 2;
-	constant LARGE_NB_Q_ADDR : integer := 3;
-	--   scalar k
-	constant LARGE_NB_K_ADDR : integer := 4;
-	--   R0 & R1 coordinates
-	constant LARGE_NB_XR0_ADDR : integer := 4;
-	constant LARGE_NB_YR0_ADDR : integer := 5;
-	constant LARGE_NB_XR1_ADDR : integer := 6;
-	constant LARGE_NB_YR1_ADDR : integer := 7;
-	constant LARGE_NB_ZR01_ADDR : integer := 26;
-	--   Montgomery constant R = 2**(nn+2)
-	constant LARGE_NB_R_ADDR : natural := 29;
-	--   number 1
-	constant LARGE_NB_1_ADDR : natural := 30;
-	--   number 0
-	constant LARGE_NB_0_ADDR : natural := 31;
-	--   back-up coordinates or R0 (used in point addition when R1 = 0)
-	constant LARGE_NB_XR0BK_ADDR : integer := 14;
-	constant LARGE_NB_YR0BK_ADDR : integer := 15;
-
 	subtype std_logic_operand is std_logic_vector(FP_ADDR_MSB - 1 downto 0);
 
 	constant CST_ADDR_P : std_logic_operand :=
@@ -200,9 +174,9 @@ package ecc_pkg is
 	constant CST_ADDR_R : std_logic_operand :=
 		std_logic_vector(to_unsigned(LARGE_NB_R_ADDR, FP_ADDR_MSB));
 	constant CST_ADDR_ONE : std_logic_operand :=
-		std_logic_vector(to_unsigned(LARGE_NB_1_ADDR, FP_ADDR_MSB));
+		std_logic_vector(to_unsigned(LARGE_NB_ONE_ADDR, FP_ADDR_MSB));
 	constant CST_ADDR_ZERO : std_logic_operand :=
-		std_logic_vector(to_unsigned(LARGE_NB_0_ADDR, FP_ADDR_MSB));
+		std_logic_vector(to_unsigned(LARGE_NB_ZERO_ADDR, FP_ADDR_MSB));
 	constant CST_ADDR_XR0BK : std_logic_operand :=
 		std_logic_vector(to_unsigned(LARGE_NB_XR0BK_ADDR, FP_ADDR_MSB));
 	constant CST_ADDR_YR0BK : std_logic_operand :=

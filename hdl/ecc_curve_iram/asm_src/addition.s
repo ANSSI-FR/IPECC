@@ -74,12 +74,12 @@
 	NNSUB	YpY	p	red
 	NNADD,p44	red	patchme	YpY
 # resume computation of r = 2 * (Y2 - Y1)
-	NNADD	YmY	YmY	r
-	NNSUB	r	twop	red
-	NNADD,p5	red	patchme	r
+	NNADD	YmY	YmY	rA
+	NNSUB	rA	twop	red
+	NNADD,p5	red	patchme	rA
 	BARRIER
 # X3 = r**2 - J - 2*V
-	FPREDC	r	r	rsq
+	FPREDC	rA	rA	rsq
 	NNADD	Ja	V	JpV
 	NNSUB	JpV	twop	red
 	NNADD,p5	red	patchme	JpV
@@ -100,7 +100,7 @@
 	NNADD,p5	red	patchme	tYmJ
 	NNSUB	V	XR1	VmX
 	NNADD,p5	VmX	patchme	VmX
-	FPREDC	r	VmX	rVmX
+	FPREDC	rA	VmX	rVmX
 	BARRIER
 	NNSUB	rVmX	tYmJ	YR1
 	NNADD,p5	YR1	patchme	YR1
