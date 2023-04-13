@@ -1,9 +1,7 @@
 library ieee;
 use ieee.std_logic_1164.all;
 
---use work.ecc_custom.all;
 use work.ecc_utils.all;
---use work.ecc_pkg.all;
 
 package ecc_tb_vec is
 
