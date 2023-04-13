@@ -2477,7 +2477,7 @@ begin
 					R_HW_VERSION(ADB - 2 downto 0))
 			then
 				-- version number, we use the first 32 bits of git commit checksum
-				dw := x"7a3c04ae";
+				dw := x"73dc15b3";
 				v.axi.rdatax := dw;
 				v.axi.rvalid := '1'; -- (s5)
 			-- ------------------------------
