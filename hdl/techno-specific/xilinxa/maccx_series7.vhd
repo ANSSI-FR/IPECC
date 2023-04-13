@@ -13,7 +13,6 @@
 --  See LICENSE file at the root folder of the project.
 --
 
-
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -25,7 +24,7 @@ use work.ecc_utils.all; -- for ln2()
 use work.ecc_pkg.all;
 use work.mm_ndsp_pkg.all; -- for 'ndsp'
 
-entity maccx_series7 is
+entity maccx is
 	port(
 		clk  : in std_logic;
 		rst  : in std_logic;
@@ -34,9 +33,9 @@ entity maccx_series7 is
 		dspi : in maccx_array_in_type;
 		P    : out std_logic_vector(2*ww + ln2(ndsp) - 1 downto 0)
 	);
-end entity maccx_series7;
+end entity maccx;
 
-architecture struct of maccx_series7 is
+architecture struct of maccx is
 
 	component macc_series7 is
 		generic(
@@ -132,7 +131,7 @@ begin
 	-- instead of 2 for the others)
 	d0: macc_series7
 		generic map(
-			acc => 2*ww + ln2(ndsp),
+			acc => 2*ww + ln2(ndsp), -- (s0), see (s101) in mm_ndsp.vhd
 			breg => 1,
 			ain => "DIRECT",
 			bin => "DIRECT")
@@ -142,7 +141,7 @@ begin
 			rstm => dspi(0).rstm,
 			rstp => dspi(0).rstp,
 			A => A_s,
-			B => B_s, -- (s39)
+			B => B_s,
 			C => gndxc,
 			P => dsp_pp(0), -- => could stay 'open'
 			inmode => CST_X7_INMODE_0, -- A_MULT <= A1, B_MULT <= B1
@@ -169,7 +168,7 @@ begin
 	d1: for i in 1 to ndsp - 1 generate
 		d0: macc_series7
 			generic map(
-				acc => 2*ww + ln2(ndsp), -- (s103) see (s101)
+				acc => 2*ww + ln2(ndsp), -- (s0), see (s101) in mm_ndsp.vhd
 				breg => 2,
 				ain => "CASCADE",
 				bin => "CASCADE")
@@ -189,9 +188,9 @@ begin
 				alumode => CST_X7_ALUMODE,
 				opmode => CST_X7_OPMODE_i,
 				acin => dsp_ac(i - 1),
-				bcin => dsp_bc(i - 1), -- (s41)
+				bcin => dsp_bc(i - 1),
 				acout => dsp_ac(i),
-				bcout => dsp_bc(i), -- (s42)
+				bcout => dsp_bc(i),
 				pcin => dsp_pc(i - 1),
 				pcout => dsp_pc(i),
 				-- CE of DSP registers
