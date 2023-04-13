@@ -89,8 +89,6 @@ entity ecc_curve is
 		dbgdecodepc : out std_logic_vector(IRAM_ADDR_SZ - 1 downto 0);
 		dbgbreakpointid : out std_logic_vector(1 downto 0);
 		dbgbreakpointhit : out std_logic;
-		dbgremainingopcodes : out std_logic_vector(15 downto 0);
-		dbgpdops : out unsigned(PENDING_OPS_NBBITS - 1 downto 0);
 		-- debug features (interface with ecc_scalar)
 		dbgpgmstate : in std_logic_vector(3 downto 0);
 		dbgnbbits : in std_logic_vector(15 downto 0)
@@ -3103,8 +3101,6 @@ begin
 	dbgdecodepc <= r.decode.pc;
 	dbgbreakpointid <= r.debug.breakpointid;
 	dbgbreakpointhit <= r.debug.breakpointhit;
-	dbgremainingopcodes <= std_logic_vector(r.debug.nbopcodes);
-	dbgpdops <= r.ctrl.pending_ops;
 
 	-- pragma translate_off
 	pc <= r.decode.pc;

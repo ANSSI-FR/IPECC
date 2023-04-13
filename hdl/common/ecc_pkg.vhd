@@ -449,8 +449,55 @@ package ecc_pkg is
 	-- software can rely on the following definitions for proper interaction
 	-- ADB = number of most significant bits in the address bus that are used
 	--       for decoding the access to the IP registers
-	-- ADB = AXIAW - 3 means the bits AXIAW - 1 downto AXIAW 
-	constant ADB : natural := AXIAW - 3; -- means bits AXIAW - 1 downto 
+	-- ADB = AXIAW - 3 on line just below means bits AXIAW - 2 downto 3
+	constant ADB : natural := AXIAW - 3;
+
+	-- a little ASCII art to illustrate how the IP decodes the AXI address
+	-- bus (either read or write) to determine which register is accessed
+	-- during an AXI transaction made by any AXI initiator (typically the
+	-- CPU if the transaction was initiated by a software driver):
+	--
+	--                                          AXIAW = 8 bits
+	--                                                ^
+	--                                          ______|______
+	--                                         /             \
+	--  bit index on AXI address bus ->      8 7 6 5 4 3 2 1 0
+	-- ... ---------------------------------------------------+
+	--                                        |1 1 0 1 1 . . .|
+	-- ... ---------------------------------------------------+
+	--                                         \___ ___/ \_ _/
+	--                                             |       |
+	--                                             V       V
+	--                               ADB = AXIAW - 3       the 3 LSbits
+	--                           (only 5 bits of the       of AXI address bus
+	--                           AXI address bus are       are not decoded by
+	--                          sampled by the IP to       IPECC as registers
+	--                              decode which reg       are aligned on
+	--                                  is accessed)       8-byte addresses
+	--                                         \______ ______/
+	--                                                |
+	--                                                V
+	--                                     that numerical example
+	--                                    (offset +0xd8 from base
+	--                                    address of the IP in the
+	--                                    system) matches register
+	--                                   W_DBG_FP_RADDR (see below)
+	--
+	-- Note that address decoding is not the same depending on value of
+	-- parameter 'debug' in ecc_customize.vhd:
+	--
+	--   if debug = TRUE:  the complete ADB (= 5) bits are decoded, allowing
+	--                     software driver to access the complete bank of 32
+	--                     registers
+	--
+	--   if debug = FALSE: only the lower subset of the bank made of the first
+	--                     16 registers can be accessed by the software driver
+	--
+	-- Hence both in write & read spaces, the nominal (not debug) 16 registers
+	-- (some of which are reserved) are mapped in address offset range +0x00 to
+	-- +0x78, while the remaining 16 debug registers (some of which also are
+	-- reserved) are mapped in address offset range +0x80 to +0xf8
+
 	subtype rat is std_logic_vector(ADB - 1 downto 0);
 	-- -----------------------------------------------
 	-- addresses of all AXI-accessible write registers
@@ -461,57 +508,53 @@ package ecc_pkg is
 	constant W_R1_NULL : rat := std_nat(3, ADB);           -- 0x18
 	constant W_PRIME_SIZE : rat := std_nat(4, ADB);        -- 0x20
 	constant W_BLINDING : rat := std_nat(5, ADB);          -- 0x28
-	-- reserved                                            -- 0x30
-	constant W_SHUFFLE : rat := std_nat(7, ADB);           -- 0x38
-	constant W_IRQ : rat := std_nat(8, ADB);               -- 0x40
-	constant W_ERR_ACK : rat := std_nat(9, ADB);           -- 0x48
-	constant W_SMALL_SCALAR : rat := std_nat(10, ADB);     -- 0x50
-	constant W_SOFT_RESET : rat := std_nat(11, ADB);       -- 0x58
-	-- reserved                                            -- 0x60...0x70
+	constant W_SHUFFLE : rat := std_nat(6, ADB);           -- 0x30
+	constant W_IRQ : rat := std_nat(7, ADB);               -- 0x38
+	constant W_ERR_ACK : rat := std_nat(8, ADB);           -- 0x40
+	constant W_SMALL_SCALAR : rat := std_nat(9, ADB);      -- 0x48
+	constant W_SOFT_RESET : rat := std_nat(10, ADB);       -- 0x50
+	-- reserved                                            -- 0x58...0x78
 	-- (start of write DEBUG registers)
-	constant W_DBG_HALT : rat := std_nat(15, ADB);         -- 0x78
-	constant W_DBG_BKPT : rat := std_nat(16, ADB);         -- 0x80
-	constant W_DBG_STEPS : rat := std_nat(17, ADB);        -- 0x88
-	constant W_DBG_TRIG_ACT : rat := std_nat(18, ADB);     -- 0x90
-	constant W_DBG_TRIG_UP : rat := std_nat(19, ADB);      -- 0x98
-	constant W_DBG_TRIG_DOWN : rat := std_nat(20, ADB);    -- 0xa0
-	constant W_DBG_OP_ADDR : rat := std_nat(21, ADB);      -- 0xa8
-	constant W_DBG_WR_OPCODE : rat := std_nat(22, ADB);    -- 0xb0
-	constant W_DBG_TRNGCTR : rat := std_nat(23, ADB);      -- 0xb8
-	constant W_DBG_TRNGCFG : rat := std_nat(24, ADB);      -- 0xc0
-	constant W_DBG_FP_WADDR : rat := std_nat(25, ADB);     -- 0xc8
-	constant W_DBG_FP_WDATA : rat := std_nat(26, ADB);     -- 0xd0
-	constant W_DBG_FP_RADDR : rat := std_nat(27, ADB);     -- 0xd8
-	constant W_DBG_CFG_NOXYSHUF : rat := std_nat(28, ADB); -- 0xe0
+	constant W_DBG_HALT : rat := std_nat(16, ADB);         -- 0x80
+	constant W_DBG_BKPT : rat := std_nat(17, ADB);         -- 0x88
+	constant W_DBG_STEPS : rat := std_nat(18, ADB);        -- 0x90
+	constant W_DBG_TRIG_ACT : rat := std_nat(19, ADB);     -- 0x98
+	constant W_DBG_TRIG_UP : rat := std_nat(20, ADB);      -- 0xa0
+	constant W_DBG_TRIG_DOWN : rat := std_nat(21, ADB);    -- 0xa8
+	constant W_DBG_OP_ADDR : rat := std_nat(22, ADB);      -- 0xb0
+	constant W_DBG_WR_OPCODE : rat := std_nat(23, ADB);    -- 0xb8
+	constant W_DBG_TRNGCTR : rat := std_nat(24, ADB);      -- 0xc0
+	constant W_DBG_TRNGCFG : rat := std_nat(25, ADB);      -- 0xc8
+	constant W_DBG_FP_WADDR : rat := std_nat(26, ADB);     -- 0xd0
+	constant W_DBG_FP_WDATA : rat := std_nat(27, ADB);     -- 0xd8
+	constant W_DBG_FP_RADDR : rat := std_nat(28, ADB);     -- 0xe0
+	constant W_DBG_CFG_NOXYSHUF : rat := std_nat(29, ADB); -- 0xe8
 	-- ----------------------------------------------
 	-- addresses of all AXI-accessible read registers
 	-- ----------------------------------------------
-	constant R_STATUS : rat := std_nat(0, ADB);             -- 0x00
-	constant R_READ_DATA : rat := std_nat(1, ADB);          -- 0x08
-	constant R_CAPABILITIES : rat := std_nat(2, ADB);       -- 0x10
-	constant R_PRIME_SIZE : rat := std_nat(3, ADB);         -- 0x18
-	constant R_HW_VERSION : rat := std_nat(4, ADB);         -- 0x20
+	constant R_STATUS : rat := std_nat(0, ADB);              -- 0x00
+	constant R_READ_DATA : rat := std_nat(1, ADB);           -- 0x08
+	constant R_CAPABILITIES : rat := std_nat(2, ADB);        -- 0x10
+	constant R_PRIME_SIZE : rat := std_nat(3, ADB);          -- 0x18
+	constant R_HW_VERSION : rat := std_nat(4, ADB);          -- 0x20
+	-- reserved                                              -- 0x28...0x78
 	-- (start of read DEBUG registers)
-	constant R_DBG_CAPABILITIES_0 : rat := std_nat(6, ADB); -- 0x30
-	constant R_DBG_CAPABILITIES_1 : rat := std_nat(7, ADB); -- 0x38
-	constant R_DBG_CAPABILITIES_2 : rat := std_nat(8, ADB); -- 0x40
-	-- reserved                                             -- 0x48...0x78
-	constant R_DBG_STATUS : rat := std_nat(16, ADB);        -- 0x80
-	constant R_DBG_RMN_STEPS : rat := std_nat(17, ADB);     -- 0x88 TODO: remove this one
-	constant R_DBG_TIME : rat := std_nat(18, ADB);          -- 0x90
-	constant R_DBG_RAWDUR : rat := std_nat(19, ADB);        -- 0x98
-	constant R_DBG_FLAGS : rat := std_nat(20, ADB);         -- 0xa0
-	constant R_DBG_EXP_FLAGS : rat := std_nat(21, ADB);     -- 0xa8
-	constant R_DBG_RD_OPCODE : rat := std_nat(22, ADB);     -- 0xb0
-	constant R_DBG_TRNG_STATUS : rat := std_nat(23, ADB);   -- 0xb8
-	constant R_DBG_TRNG_DATA : rat := std_nat(24, ADB);     -- 0xc0
-	constant R_DBG_FP_RDATA : rat := std_nat(25, ADB);      -- 0xc8
-	constant R_DBG_IRN_CNT_AXI : rat := std_nat(26, ADB);   -- 0xd0
-	constant R_DBG_IRN_CNT_EFP : rat := std_nat(27, ADB);   -- 0xd8
-	constant R_DBG_IRN_CNT_CUR : rat := std_nat(28, ADB);   -- 0xe0
-	constant R_DBG_IRN_CNT_SHF : rat := std_nat(29, ADB);   -- 0xe8
-	constant R_DBG_PENDING_OPS : rat := std_nat(30, ADB);   -- 0xf0
-	constant R_DBG_FP_RDATA_RDY : rat := std_nat(31, ADB);  -- 0xf8
+	constant R_DBG_CAPABILITIES_0 : rat := std_nat(16, ADB); -- 0x80
+	constant R_DBG_CAPABILITIES_1 : rat := std_nat(17, ADB); -- 0x88
+	constant R_DBG_CAPABILITIES_2 : rat := std_nat(18, ADB); -- 0x90
+	constant R_DBG_STATUS : rat := std_nat(19, ADB);         -- 0x98
+	constant R_DBG_TIME : rat := std_nat(20, ADB);           -- 0xa0
+	constant R_DBG_RAWDUR : rat := std_nat(21, ADB);         -- 0xa8
+	constant R_DBG_FLAGS : rat := std_nat(22, ADB);          -- 0xb0
+	constant R_DBG_RD_OPCODE : rat := std_nat(23, ADB);      -- 0xb8
+	constant R_DBG_TRNG_STATUS : rat := std_nat(24, ADB);    -- 0xc0
+	constant R_DBG_TRNG_DATA : rat := std_nat(25, ADB);      -- 0xc8
+	constant R_DBG_FP_RDATA : rat := std_nat(26, ADB);       -- 0xd0
+	constant R_DBG_IRN_CNT_AXI : rat := std_nat(27, ADB);    -- 0xd8
+	constant R_DBG_IRN_CNT_EFP : rat := std_nat(28, ADB);    -- 0xe0
+	constant R_DBG_IRN_CNT_CUR : rat := std_nat(29, ADB);    -- 0xe8
+	constant R_DBG_IRN_CNT_SHF : rat := std_nat(30, ADB);    -- 0xf0
+	constant R_DBG_FP_RDATA_RDY : rat := std_nat(31, ADB);   -- 0xf8
 
 	-- bit positions in W_CTRL register
 	constant CTRL_KP : natural := 0;

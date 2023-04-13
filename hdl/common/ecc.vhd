@@ -163,24 +163,6 @@ architecture struct of ecc is
 			doaop : out std_logic;
 			aopid : out std_logic_vector(2 downto 0); -- id defined in ecc_pkg
 			aopdone : in std_logic;
-			--   /debug only
-			laststep : in std_logic;
-			firstzdbl : in std_logic;
-			firstzaddu : in std_logic;
-			first2pz : in std_logic;
-			first3pz : in std_logic;
-			torsion2 : in std_logic;
-			kap : in std_logic;
-			kapp : in std_logic;
-			zu : in std_logic;
-			zc : in std_logic;
-			r0z : in std_logic;
-			r1z : in std_logic;
-			pts_are_equal : in std_logic;
-			pts_are_oppos : in std_logic;
-			phimsb : in std_logic;
-			kb0end : in std_logic;
-			--   end of debug only/
 			-- interface with ecc_curve
 			masklsb : out std_logic;
 			-- interface with ecc_fp (access to ecc_fp_dram)
@@ -232,8 +214,6 @@ architecture struct of ecc is
 			dbgdecodepc : in std_logic_vector(IRAM_ADDR_SZ - 1 downto 0);
 			dbgbreakpointid : in std_logic_vector(1 downto 0);
 			dbgbreakpointhit : in std_logic;
-			dbgremainingopcodes : in std_logic_vector(15 downto 0);
-			dbgpdops : in unsigned(PENDING_OPS_NBBITS - 1 downto 0);
 			-- debug features (interface with ecc_curve_iram)
 			dbgiaddr : out std_logic_vector(IRAM_ADDR_SZ - 1 downto 0);
 			dbgiwdata : out std_logic_vector(OPCODE_SZ - 1 downto 0);
@@ -426,8 +406,6 @@ architecture struct of ecc is
 			dbgdecodepc : out std_logic_vector(IRAM_ADDR_SZ - 1 downto 0);
 			dbgbreakpointid : out std_logic_vector(1 downto 0);
 			dbgbreakpointhit : out std_logic;
-			dbgremainingopcodes : out std_logic_vector(15 downto 0);
-			dbgpdops : out unsigned(PENDING_OPS_NBBITS - 1 downto 0);
 			-- debug features (interface with ecc_scalar shared w/ ecc_axi)
 			dbgpgmstate : in std_logic_vector(3 downto 0);
 			dbgnbbits : in std_logic_vector(15 downto 0)
@@ -879,8 +857,6 @@ architecture struct of ecc is
 	signal dbgdecodepc : std_logic_vector(IRAM_ADDR_SZ - 1 downto 0);
 	signal dbgbreakpointid : std_logic_vector(1 downto 0);
 	signal dbgbreakpointhit : std_logic;
-	signal dbgremainingopcodes : std_logic_vector(15 downto 0);
-	signal dbgpdops : unsigned(PENDING_OPS_NBBITS - 1 downto 0);
 	-- debug features (signals between ecc_axi & ecc_fp)
 	signal dbgtrnguse : std_logic;
 	-- debug features (signals between ecc_axi & ecc_trng)
@@ -1011,24 +987,6 @@ begin
 			doaop => doaop,
 			aopid => aopid,
 			aopdone => aopdone,
-			--   /debug only
-			laststep => laststep,
-			firstzdbl => firstzdbl,
-			firstzaddu => firstzaddu,
-			first2pz => first2pz,
-			first3pz => first3pz,
-			torsion2 => torsion2,
-			kap => kap,
-			kapp => kapp,
-			zu => zu,
-			zc => zc,
-			r0z => r0z,
-			r1z => r1z,
-			pts_are_equal => pts_are_equal,
-			pts_are_oppos => pts_are_oppos,
-			phimsb => phimsb,
-			kb0end => kb0end,
-			--   end of debug only/
 			-- interface with ecc_curve
 			masklsb => masklsb,
 			-- interface with ecc_fp (access to ecc_fp_dram)
@@ -1080,8 +1038,6 @@ begin
 			dbgdecodepc => dbgdecodepc,
 			dbgbreakpointid => dbgbreakpointid,
 			dbgbreakpointhit => dbgbreakpointhit,
-			dbgremainingopcodes => dbgremainingopcodes,
-			dbgpdops => dbgpdops,
 			-- debug features (interface with ecc_curve_iram)
 			dbgiaddr => dbgiaddr,
 			dbgiwdata => dbgiwdata,
@@ -1276,8 +1232,6 @@ begin
 			dbgdecodepc => dbgdecodepc,
 			dbgbreakpointid => dbgbreakpointid,
 			dbgbreakpointhit => dbgbreakpointhit,
-			dbgremainingopcodes => dbgremainingopcodes,
-			dbgpdops => dbgpdops,
 			-- debug features (interface with ecc_scalar)
 			dbgpgmstate => dbgpgmstate,
 			dbgnbbits => dbgnbbits

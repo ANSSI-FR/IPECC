@@ -103,24 +103,6 @@ entity ecc_axi is
 		doaop : out std_logic;
 		aopid : out std_logic_vector(2 downto 0); -- id defined in ecc_pkg
 		aopdone : in std_logic;
-		--   /debug only
-		laststep : in std_logic;
-		firstzdbl : in std_logic;
-		firstzaddu : in std_logic;
-		first2pz : in std_logic;
-		first3pz : in std_logic;
-		torsion2 : in std_logic;
-		kap : in std_logic;
-		kapp : in std_logic;
-		zu : in std_logic;
-		zc : in std_logic;
-		r0z : in std_logic;
-		r1z : in std_logic;
-		pts_are_equal : in std_logic;
-		pts_are_oppos : in std_logic;
-		phimsb : in std_logic;
-		kb0end : in std_logic;
-		--   end of debug only/
 		-- interface with ecc_curve
 		masklsb : out std_logic;
 		-- interface with ecc_fp (access to ecc_fp_dram)
@@ -172,8 +154,6 @@ entity ecc_axi is
 		dbgdecodepc : in std_logic_vector(IRAM_ADDR_SZ - 1 downto 0);
 		dbgbreakpointid : in std_logic_vector(1 downto 0);
 		dbgbreakpointhit : in std_logic;
-		dbgremainingopcodes : in std_logic_vector(15 downto 0);
-		dbgpdops : in unsigned(PENDING_OPS_NBBITS - 1 downto 0);
 		-- debug features (interface with ecc_curve_iram)
 		dbgiaddr : out std_logic_vector(IRAM_ADDR_SZ - 1 downto 0);
 		dbgiwdata : out std_logic_vector(OPCODE_SZ - 1 downto 0);
@@ -583,8 +563,7 @@ begin
 								trngshfirncount,
 								ar01zien, ar0zi, ar1zi, amtydone,
 	              -- debug features
-								dbghalted, dbgdecodepc, dbgbreakpointid, dbgremainingopcodes,
-								dbgpdops,
+								dbghalted, dbgdecodepc, dbgbreakpointid,
 	              dbgpgmstate, dbgnbbits, dbgirdata, dbgbreakpointhit,
 	              dbgtrngrawfull, dbgtrngrawwaddr,
 	              dbgtrngrawdata, dbgtrngrawduration
@@ -593,11 +572,9 @@ begin
                 nndyn_mask_is_zero_s, nndyn_mask_is_all1_but_msb_s,
                 nndyn_mask_wm2_s,
                 nndyn_wmin_s, nndyn_nnrnd_zerowm1_s, nndyn_nnm3_s,
-                small_k_sz_en_ack, small_k_sz_kpdone
+                small_k_sz_en_ack, small_k_sz_kpdone,
 								-- debug from ecc_scalar
-								, laststep, firstzdbl, firstzaddu, first2pz, first3pz, 
-								torsion2, kap, kapp, zu, zc, r0z, r1z, dbgjoyebit,
-								pts_are_equal, pts_are_oppos, phimsb, kb0end)
+								dbgjoyebit)
 		variable v : reg_type;
 		variable vbk : natural range 0 to 3;
 		variable v_nn_mod_ww_sub : unsigned(log2(ww) downto 0); -- log2(ww) + 1 bits
@@ -2510,7 +2487,8 @@ begin
 			-- for proper address decoding - now in the following registers,
 			-- 'debug=TRUE' is used as a required condition for the hardware
 			-- inference of each of them, meaning these registers only exist
-			-- in debug mode)
+			-- in debug mode - when not in debug mode, synthesizer will trim
+			-- them off)
 			-- -------------------------------------
 			-- decoding read of R_DBG_CAPABILITIES_0
 			-- -------------------------------------
@@ -2562,14 +2540,6 @@ begin
 					& dbgbreakpointhit -- 1 bit
 					& dbgbreakpointid & dbghalted; -- 3 bits (2..0)
 				v.axi.rvalid := '1'; -- (s5)
-			-- -----------------------------------------
-			-- decoding read of R_DBG_RMN_STEPS register
-			-- -----------------------------------------
-			elsif debug -- statically resolved by synthesizer
-			  and s_axi_araddr(ADB + 2 downto 3) = R_DBG_RMN_STEPS
-			then
-				v.axi.rdatax(31 downto 0) := x"00" & dbgremainingopcodes & x"00";
-				v.axi.rvalid := '1'; -- (s5)
 			-- ------------------------------------
 			-- decoding read of R_DBG_TIME register
 			-- ------------------------------------
@@ -2609,31 +2579,6 @@ begin
 				elsif r.ctrl.doblinding = '0' then
 					dw(FLAGS_NOT_BLN_OR_Q_NOT_SET) := '0';
 				end if;
-				v.axi.rdatax(31 downto 0) := dw;
-				v.axi.rvalid := '1'; -- (s5)
-			-- -----------------------------------------
-			-- decoding read of R_DBG_EXP_FLAGS register
-			-- -----------------------------------------
-			elsif debug -- statically resolved by synthesizer
-			  and s_axi_araddr(ADB + 2 downto 3) = R_DBG_EXP_FLAGS
-			then
-				dw(0) := r0z;
-				dw(1) := r1z;
-				dw(2) := kap;
-				dw(3) := kapp;
-				dw(4) := zu;
-				dw(5) := zc;
-				dw(6) := laststep;
-				dw(7) := firstzdbl;
-				dw(8) := firstzaddu;
-				dw(9) := first2pz;
-				dw(10) := first3pz;
-				dw(11) := torsion2;
-				dw(12) := pts_are_equal;
-				dw(13) := pts_are_oppos;
-				dw(14) := phimsb;
-				dw(15) := kb0end;
-				dw(31 downto 16) := std_logic_vector(resize(unsigned(dbgjoyebit), 16));
 				v.axi.rdatax(31 downto 0) := dw;
 				v.axi.rvalid := '1'; -- (s5)
 			-- -----------------------------------------
@@ -2733,14 +2678,6 @@ begin
 			then
 				v.axi.rdatax(31 downto 0) :=
 					std_logic_vector(resize(unsigned(trngshfirncount), 32));
-				v.axi.rvalid := '1'; -- (s5)
-			-- -------------------------------------------
-			-- decoding read of R_DBG_PENDING_OPS register
-			-- -------------------------------------------
-			elsif debug -- statically resolved by synthesizer
-			  and s_axi_araddr(ADB + 2 downto 3) = R_DBG_PENDING_OPS
-			then
-				v.axi.rdatax(31 downto 0) := std_logic_vector(resize(dbgpdops, 32));
 				v.axi.rvalid := '1'; -- (s5)
 			-- --------------------------------------------
 			-- decoding read of R_DBG_FP_RDATA_RDY register
