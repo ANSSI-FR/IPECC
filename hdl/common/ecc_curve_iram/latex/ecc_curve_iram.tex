@@ -1,0 +1,54 @@
+\documentclass[12pt]{article}
+\usepackage[utf8]{inputenc}
+
+\title{ECC opcodes}
+\author{karim.m.khalfallah }
+\date{May 2019}
+
+\renewcommand{\familydefault}{\sfdefault}
+\usepackage[cm]{sfmath}
+\usepackage{amsmath}
+\usepackage{xcolor}
+\usepackage{colortbl}
+\usepackage{hhline}
+\pagenumbering{gobble}
+\usepackage[a4paper,portrait,margin=1cm]{geometry}
+\usepackage{graphicx}
+%\usepackage{arydshln}
+\usepackage{pgf,tikz}
+\usepackage{longtable}
+\usepackage[document]{ragged2e}
+
+
+
+\usepackage{array}
+\newcolumntype{C}[1]{>{\centering\let\newline\\\arraybackslash\hspace{0pt}}m{#1}}
+\newcolumntype{C}[1]{>{\centering\let\newline\\\arraybackslash\hspace{0pt}}m{#1}}
+\newcolumntype{L}[1]{>{\raggedleft\let\newline\\\arraybackslash\hspace{0pt}}m{#1}}
+\newcolumntype{R}[1]{>{\raggedright\let\newline\\\arraybackslash\hspace{0pt}}m{#1}}
+
+\newcommand\red[1]{\textcolor{red!80!orange}{#1}}
+\newcommand\blue[1]{\textcolor{blue}{#1}}
+\newcommand\foo[1]{\textcolor{black}{\footnotesize #1}}
+\newcommand\gray[1]{\textcolor{gray}{#1}}
+\newcommand\gn[1]{\textcolor{green!50!black}{#1}}
+\newcommand\br[1]{\textcolor{brown}{#1}}
+\newcommand\vi[1]{\textcolor{violet}{#1}}
+\newcommand\oj[1]{\textcolor{orange}{#1}}
+\newcommand\ft[1]{\footnotesize {#1}}
+
+\setlength\tabcolsep{1.5pt}
+\setlength{\LTleft}{0pt}
+
+\begin{document}
+
+\begin{flushleft}
+
+\footnotesize
+\ttfamily
+
+\input{all-progs}
+
+\end{flushleft}
+
+\end{document}
