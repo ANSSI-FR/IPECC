@@ -2492,6 +2492,17 @@ begin
 					resize(r.nndyn.valnn, C_S_AXI_DATA_WIDTH));
 				v.axi.rdatax := dw;
 				v.axi.rvalid := '1'; -- (s5)
+			-- --------------------------------------
+			-- decoding read of R_HW_VERSION register
+			-- --------------------------------------
+			elsif (debug and s_axi_araddr(ADB + 2 downto 3) = R_HW_VERSION)
+				or ((not debug) and s_axi_araddr(ADB + 1 downto 3) =
+					R_HW_VERSION(ADB - 2 downto 0))
+			then
+				-- version number, we use the first 32 bits of git commit checksum
+				dw := x"05455e91";
+				v.axi.rdatax := dw;
+				v.axi.rvalid := '1'; -- (s5)
 			-- ------------------------------
 			-- below are DEBUG only registers
 			-- ------------------------------
