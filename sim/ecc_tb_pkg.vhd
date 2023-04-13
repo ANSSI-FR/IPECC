@@ -739,10 +739,6 @@ package body ecc_tb_pkg is
 		else
 			set_r1_non_null(clk, axi, axo);
 		end if;
-		-- display R0 & R1 coordinate values before computation
-		echol("ECC_TB: R0 & R1 coord values before computation:");
-		check_and_display_if_r0_r1_null(clk, axi, axo);
-		read_and_display_r0_and_r1_coords(clk, axi, axo, valnn);
 		-- give [k]P computation a go
 		poll_until_ready(clk, axi, axo);
 		run_kp(clk, axi, axo);
@@ -1239,10 +1235,6 @@ package body ecc_tb_pkg is
 			poll_until_ready(clk, axi, axo);
 			set_r1_null(clk, axi, axo);
 		end if;
-		-- display R0 & R1 coordinate values before computation
-		echol("ECC_TB: R0 & R1 coord values before computation:");
-		check_and_display_if_r0_r1_null(clk, axi, axo);
-		read_and_display_r0_and_r1_coords(clk, axi, axo, valnn);
 		-- give P + Q computation a go
 		poll_until_ready(clk, axi, axo);
 		run_point_add(clk, axi, axo);
@@ -1377,10 +1369,6 @@ package body ecc_tb_pkg is
 		else
 			set_r0_non_null(clk, axi, axo);
 		end if;
-		-- display R0 & R1 coordinate values before computation
-		echol("ECC_TB: R0 & R1 coord values before computation:");
-		check_and_display_if_r0_r1_null(clk, axi, axo);
-		read_and_display_r0_and_r1_coords(clk, axi, axo, valnn);
 		-- give [2]P computation a go
 		poll_until_ready(clk, axi, axo);
 		run_point_double(clk, axi, axo);
@@ -1400,10 +1388,6 @@ package body ecc_tb_pkg is
 		wait until clk'event and clk = '1';
 		-- set R0 to be the 0 point
 		set_r0_null(clk, axi, axo);
-		-- display R0 & R1 coordinate values before computation
-		echol("ECC_TB: R0 & R1 coord values before computation:");
-		check_and_display_if_r0_r1_null(clk, axi, axo);
-		read_and_display_r0_and_r1_coords(clk, axi, axo, valnn);
 		-- give [2]P computation a go
 		poll_until_ready(clk, axi, axo);
 		run_point_double(clk, axi, axo);
@@ -1507,10 +1491,6 @@ package body ecc_tb_pkg is
 			poll_until_ready(clk, axi, axo);
 			set_r0_null(clk, axi, axo);
 		end if;
-		-- display R0 & R1 coordinate values before computation
-		echol("ECC_TB: R0 & R1 coord values before computation:");
-		check_and_display_if_r0_r1_null(clk, axi, axo);
-		read_and_display_r0_and_r1_coords(clk, axi, axo, valnn);
 		-- give -P computation a go
 		poll_until_ready(clk, axi, axo);
 		run_point_negate(clk, axi, axo);
@@ -1628,10 +1608,6 @@ package body ecc_tb_pkg is
 			poll_until_ready(clk, axi, axo);
 			set_r1_null(clk, axi, axo);
 		end if;
-		-- display R0 & R1 coordinate values before computation
-		echol("ECC_TB: R0 & R1 coord values before computation:");
-		check_and_display_if_r0_r1_null(clk, axi, axo);
-		read_and_display_r0_and_r1_coords(clk, axi, axo, valnn);
 		-- give P==Q test computation a go
 		poll_until_ready(clk, axi, axo);
 		run_point_test_equal(clk, axi, axo);
@@ -1698,10 +1674,6 @@ package body ecc_tb_pkg is
 			poll_until_ready(clk, axi, axo);
 			set_r1_null(clk, axi, axo);
 		end if;
-		-- display R0 & R1 coordinate values before computation
-		echol("ECC_TB: R0 & R1 coord values before computation:");
-		check_and_display_if_r0_r1_null(clk, axi, axo);
-		read_and_display_r0_and_r1_coords(clk, axi, axo, valnn);
 		-- give P-==Q test computation a go
 		poll_until_ready(clk, axi, axo);
 		run_point_test_opposite(clk, axi, axo);
@@ -1753,10 +1725,6 @@ package body ecc_tb_pkg is
 		else
 			set_r0_non_null(clk, axi, axo);
 		end if;
-		-- display R0 & R1 coordinate values before computation
-		echol("ECC_TB: R0 & R1 coord values before computation:");
-		check_and_display_if_r0_r1_null(clk, axi, axo);
-		read_and_display_r0_and_r1_coords(clk, axi, axo, valnn);
 		-- give 'is on curve' test computation a go
 		poll_until_ready(clk, axi, axo);
 		run_point_test_on_curve(clk, axi, axo);
