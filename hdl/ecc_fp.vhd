@@ -17,7 +17,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
-use work.ecc_custom.all;
+use work.ecc_customize.all;
 use work.ecc_utils.all;
 use work.ecc_pkg.all;
 use work.ecc_vars.all; -- for LARGE_NB_x constants (& only for simu, see s(142))
@@ -115,7 +115,7 @@ architecture rtl of ecc_fp is
 
 	constant sramlatp2 : positive range 3 to 4 := sramlat + 2;
 
-	type mm_opc_type is array(natural range 0 to nbmult - 1) of std_logic_operand;
+	type mm_opc_type is array(natural range 0 to nbmult - 1) of stdop;
 
 	type push_async_state_type is (waitread, waitenack, waitgoack, waitackack);
 
@@ -198,6 +198,7 @@ architecture rtl of ecc_fp is
 		opamsb : std_logic;
 		opbmsb : std_logic;
 		zero : std_logic;
+		testz : std_logic;
 	end record;
 
 	type xor_type is record
@@ -442,18 +443,8 @@ architecture rtl of ecc_fp is
 				hex_write(lineo, pca);
 				write(lineo, string'("]"));
 				newprg := TRUE;
-			when ECC_IRAM_DBL_ADDR =>
-				write(lineo, string'(".dblL [0x"));
-				hex_write(lineo, pca);
-				write(lineo, string'("]"));
-				newprg := TRUE;
-			when ECC_IRAM_SWITCH3P_ADDR =>
-				write(lineo, string'(".switch3pL [0x"));
-				hex_write(lineo, pca);
-				write(lineo, string'("]"));
-				newprg := TRUE;
-			when ECC_IRAM_JOYECOZ_ADDR =>
-				write(lineo, string'(".joyecozL [0x"));
+			when ECC_IRAM_ITOH_ADDR =>
+				write(lineo, string'(".itohL [0x"));
 				hex_write(lineo, pca);
 				write(lineo, string'("]"));
 				newprg := TRUE;
@@ -497,25 +488,36 @@ architecture rtl of ecc_fp is
 				hex_write(lineo, pca);
 				write(lineo, string'("]"));
 				newprg := TRUE;
+			when ECC_IRAM_ADDITION_BEGIN_ADDR =>
+				write(lineo, string'(".addition_beginL [0x"));
+				hex_write(lineo, pca);
+				write(lineo, string'("]"));
+				newprg := TRUE;
+			when ECC_IRAM_ADDITION_END_ADDR =>
+				write(lineo, string'(".addition_endL [0x"));
+				hex_write(lineo, pca);
+				write(lineo, string'("]"));
+				newprg := TRUE;
 			when others =>
 				newprg := FALSE;
 		end case;
 	end procedure is_new_routine;
 
-	procedure log_coords(strcoord : string;
-		coord : std_logic_vector; addr : in natural; lineo : inout line) is
+	procedure log_coords(strcoord : string; coord : std_logic_vector;
+		addr : in natural; lineo : inout line; iszero : std_logic;
+		namecoord : string) is
 	begin
-		write(lineo, string'("     @ "));
+		write(lineo, string'("[VHD-CMP-SAGE]     @ "));
 		write(lineo, addr);
 		write(lineo, string'(" "));
-		write(lineo, string'(strcoord));
+		write(lineo, strcoord);
 		write(lineo, string'(" = 0x"));
 		hex_write(lineo, coord((to_integer(nndyn_w) * ww) - 1 downto 0));
-		write(lineo, string'(" =  "));
-		for i in to_integer(nndyn_wm1) downto 0 loop
-			hex_write(lineo, coord(ww - 1 + (i*ww) downto 0+(i*ww)));
-			write(lineo, string'(" "));
-		end loop;
+		if iszero = '1' then
+			write(lineo, string'(" but "));
+			write(lineo, namecoord);
+			write(lineo, string'(" = 0"));
+		end if;
 	end procedure log_coords;
 
 	-- vtophys() is declared impure so that it can access signal fprwmask
@@ -1175,6 +1177,7 @@ begin
 		--       set a multicycle of 6 periods on paths:
 		--       r.addsub.busy -> r.addsub.res
 		--       r.addsub.busy -> r.addsub.carry
+		v.addsub.testz := '0';
 		if shuffle then -- statically resolved by synthesizer
 			if sramlatp2 mod 2 = 0 then
 				if r.addsub.act = '1'	and r.fpram.raddrmuxsel = "01" then
@@ -1191,6 +1194,7 @@ begin
 						v.addsub.res := std_logic_vector(v_subres(ww - 1 downto 0));
 						v.addsub.borrow := v_subres(ww); -- (s89) bypassed by (s90)
 					end if;
+					v.addsub.testz := '1';
 				end if;
 			else -- sramlatp2 mod 2 = 1
 				if r.addsub.act = '1' and r.fpram.raddrmuxsel = "00" then
@@ -1207,6 +1211,7 @@ begin
 						v.addsub.res := std_logic_vector(v_subres(ww - 1 downto 0));
 						v.addsub.borrow := v_subres(ww); -- (s89) bypassed by (s90)
 					end if;
+					v.addsub.testz := '1';
 				end if;
 			end if;
 		else -- not shuffle
@@ -1225,6 +1230,7 @@ begin
 						v.addsub.res := std_logic_vector(v_subres(ww - 1 downto 0));
 						v.addsub.borrow := v_subres(ww); -- (s89) bypassed by (s90)
 					end if;
+					v.addsub.testz := '1';
 				end if;
 			else -- sramlat mod 2 = 1
 				if r.addsub.act = '1' and r.fpram.raddrmuxsel = "00" then
@@ -1241,6 +1247,7 @@ begin
 						v.addsub.res := std_logic_vector(v_subres(ww - 1 downto 0));
 						v.addsub.borrow := v_subres(ww); -- (s89) bypassed by (s90)
 					end if;
+					v.addsub.testz := '1';
 				end if;
 			end if;
 		end if;
@@ -1303,8 +1310,13 @@ begin
 		end if;
 
 		-- detection of a null result
-		if r.addsub.busy = '1' and r.fpram.we = '1' then
-			if r.fpram.wdata /= std_logic_vector(to_unsigned(0, ww)) then
+			-- if r.addsub.busy = '1' and r.fpram.we = '1' then
+			-- 	if r.fpram.wdata /= std_logic_vector(to_unsigned(0, ww)) then
+			-- 		v.addsub.zero := '0'; -- (s69) bypass of (s68)
+			-- 	end if;
+			-- end if;
+		if r.addsub.testz = '1' then
+			if r.addsub.res /= std_logic_vector(to_unsigned(0, ww)) then
 				v.addsub.zero := '0'; -- (s69) bypass of (s68)
 			end if;
 		end if;
@@ -2307,6 +2319,7 @@ begin
 			-- r.mm.pull.done_id[01], r.mm.pull.zrencnt,
 			-- r.mm.pull.opc,
 			-- r.add.res, r.add.op0, r.add.op1, r.add.carry, r.add.sh,
+			-- r.addsub.testz
 			-- r.fpram.re (does no harm if it is reset to a high value),
 			-- r.fpram.raddr, r.fpram.raddrmuxsel, r.fpram.waddr, r.fpram.wdata,
 			-- r.fpram.waddrmuxsel
@@ -3108,12 +3121,14 @@ begin
 				-- =====================================
 				if logr0r1 = '1' then
 					-- get randomized coordinates of the four point [XY]R[01]
-					if logr0r1step = 0 or logr0r1step = 1 or logr0r1step = 2 then
+					if logr0r1step = 1 or logr0r1step = 2 or logr0r1step = 3 then
 						v_addr_xr0 := 4 + to_integer(unsigned(xr0addr));
 						v_addr_yr0 := 4 + to_integer(unsigned(yr0addr));
 						v_addr_xr1 := 4 + to_integer(unsigned(xr1addr));
 						v_addr_yr1 := 4 + to_integer(unsigned(yr1addr));
-					elsif logr0r1step = 3 then -- at debut or at end (no shuffling)
+					elsif logr0r1step = 0 or logr0r1step = 4 or logr0r1step = 5 or
+					logr0r1step = 6 then
+						-- at debut or at end (no shuffling)
 						v_addr_xr0 := LARGE_NB_XR0_ADDR;
 						v_addr_yr0 := LARGE_NB_YR0_ADDR;
 						v_addr_xr1 := LARGE_NB_XR1_ADDR;
@@ -3141,118 +3156,102 @@ begin
 							z(ww*(i+1) - 1 downto ww*i) := fpdram((LARGE_NB_ZR01_ADDR*n) + i);
 						end loop;
 					end if;
-					if logr0r1step = 0 then -- a step other than zaddu or zaddc
-						write(lineout, string'("R0/R1 coordinates :"));
-						writeline(output, lineout);
-					else
-						if logr0r1step = 1 then -- zaddu
-							write(lineout, string'("R0/R1 coordinates after ZADDU of BIT "));
-						elsif logr0r1step = 2 then -- zaddc
-							write(lineout, string'("R0/R1 coordinates after ZADDC of BIT "));
-						elsif logr0r1step = 3 then -- last zaddc
-							write(lineout, string'(
-								"R0/R1 coordinates (addresses not shuffled here)"));
+					case logr0r1step is
+						when 0 => -- first step of .setupL routine
+							write(lineout, string'("[VHD-CMP-SAGE] R0/R1 coordinates " &
+								"(first part of setup, R0 <- [2]P), R1 <- [P])"));
+						when 1 => -- second (last) step of .setupL routine (after zaddu)
+							write(lineout, string'("[VHD-CMP-SAGE] R0/R1 coordinates " &
+								"(second part of setup, [3]P <- [2]P + P by ZADDU completed)"));
+						when 2 => -- zaddu
+							write(lineout, string'("[VHD-CMP-SAGE] R0/R1 coordinates " &
+								"after ZADDU of BIT "));
+						when 3 => -- zaddc
+							write(lineout, string'("[VHD-CMP-SAGE] R0/R1 coordinates " &
+								"after ZADDC of BIT "));
+						when 4 => -- after first part of .subtracPL routine
+							        -- ([k + 1 - (k mod 2)]P & P made Co-Z)
+							write(lineout, string'("[VHD-CMP-SAGE] R0/R1 coordinates " &
+								"(first part of subtractP, [k + 1 - (k mod 2)]P " &
+								"& P made Co-Z)"));
+						when 5 => -- after second part of .subtracPL routine
+							        -- (conditional subtraction [k + 1 - (k mod 2)]P - P completed)
+							write(lineout, string'("[VHD-CMP-SAGE] R1 coordinates " &
+								"(second part of subtractP, cond. sub. " & 
+								"[k + 1 - (k mod 2)]P - P completed)"));
+						when 6 => -- after exitL routine (end of computation, result is in R1)
+							write(lineout, string'("[VHD-CMP-SAGE] R1 coordinates " &
+							"(after exit routine, end of computation, result is in R1 " &
+							"if not null)"));
+						when others => null;
+					end case;
+					if logr0r1step = 2 or logr0r1step = 3 then
+						write(lineout, simbit);
+						write(lineout, string'(" (kap"));
+						write(lineout, simbit);
+						write(lineout, string'(" = "));
+						if kap = '0' then
+							write(lineout, string'("0"));
+						elsif kap = '1' then
+							write(lineout, string'("1"));
+						else
+							write(lineout, string'("X"));
 						end if;
-						if logr0r1step = 1 or logr0r1step = 2 then
-							write(lineout, simbit);
-							write(lineout, string'(" (kappa_"));
-							write(lineout, simbit);
-							write(lineout, string'(" = "));
-							if kap = '0' then
-								write(lineout, string'("0"));
-							elsif kap = '1' then
-								write(lineout, string'("1"));
-							else
-								write(lineout, string'("X"));
-							end if;
-							write(lineout, string'(", "));
-							write(lineout, string'(" kappa'_"));
-							write(lineout, simbit);
-							write(lineout, string'(" = "));
-							if kapp = '0' then
-								write(lineout, string'("0"));
-							elsif kapp = '1' then
-								write(lineout, string'("1"));
-							else
-								write(lineout, string'("X"));
-							end if;
-							write(lineout, string'(")"));
+						write(lineout, string'(", "));
+						write(lineout, string'(" kap'"));
+						write(lineout, simbit);
+						write(lineout, string'(" = "));
+						if kapp = '0' then
+							write(lineout, string'("0"));
+						elsif kapp = '1' then
+							write(lineout, string'("1"));
+						else
+							write(lineout, string'("X"));
 						end if;
+						write(lineout, string'(")"));
+					end if;
+					writeline(output, lineout);
+					if logr0r1step = 0 or logr0r1step = 4 or logr0r1step = 5
+						or logr0r1step = 6
+					then -- last zaddc
+						write(lineout, string'("               (addresses not shuffled here)"));
 						writeline(output, lineout);
 					end if;
 					-- due to the countermeasure aiming at balancing the address of
 					-- coordinates of points R0 & R1 in ZADD[UC], we have to switch the
 					-- display of their coordinates for them to match the Sage log
 					-- script result (otherwise user might get confused)
-					if logr0r1step = 1 then
-						-- ZADDU
-						log_coords("  XR0", x0, v_addr_xr0, lineout);
-						if r0z = '1' then
-							write(lineout, string'("  but R0 = 0"));
-						end if;
+					if logr0r1step = 1 or logr0r1step = 2 or logr0r1step = 3 then
+						-- ZADDU or ZADDC (or after first step of setup)
+						log_coords("  XR0", x0, v_addr_xr0, lineout, r0z, "R0");
 						writeline(output, lineout);
-						log_coords("  YR0", y0, v_addr_yr0, lineout);
-						if r0z = '1' then
-							write(lineout, string'("  but R0 = 0"));
-						end if;
+						log_coords("  YR0", y0, v_addr_yr0, lineout, r0z, "R0");
 						writeline(output, lineout);
-						log_coords("  XR1", x1, v_addr_xr1, lineout);
-						if r1z = '1' then
-							write(lineout, string'("  but R1 = 0"));
-						end if;
+						log_coords("  XR1", x1, v_addr_xr1, lineout, r1z, "R1");
 						writeline(output, lineout);
-						log_coords("  YR1", y1, v_addr_yr1, lineout);
-						if r1z = '1' then
-							write(lineout, string'("  but R1 = 0"));
-						end if;
+						log_coords("  YR1", y1, v_addr_yr1, lineout, r1z, "R1");
 						writeline(output, lineout);
-					elsif logr0r1step = 0 or logr0r1step = 2 then
-						-- ZADDC
-						log_coords("  XR0", x0, v_addr_xr0, lineout);
-						if r0z = '1' then
-							write(lineout, string'("  but R0 = 0"));
-						end if;
+						log_coords("ZR01", z, LARGE_NB_ZR01_ADDR, lineout, '0', "");
 						writeline(output, lineout);
-						log_coords("  YR0", y0, v_addr_yr0, lineout);
-						if r0z = '1' then
-							write(lineout, string'("  but R0 = 0"));
-						end if;
+					elsif logr0r1step = 0 or logr0r1step = 4 then
+						log_coords("  XR0", x0, LARGE_NB_XR0_ADDR, lineout, r0z, "R0");
 						writeline(output, lineout);
-						log_coords("  XR1", x1, v_addr_xr1, lineout);
-						if r1z = '1' then
-							write(lineout, string'("  but R1 = 0"));
-						end if;
+						log_coords("  YR0", y0, LARGE_NB_YR0_ADDR, lineout, r0z, "R0");
 						writeline(output, lineout);
-						log_coords("  YR1", y1, v_addr_yr1, lineout);
-						if r1z = '1' then
-							write(lineout, string'("  but R1 = 0"));
-						end if;
+						log_coords("  XR1", x1, LARGE_NB_XR1_ADDR, lineout, r1z, "R1");
 						writeline(output, lineout);
-					elsif logr0r1step = 3 then
-						-- last ZADDC (the one to condtionnaly subtract P)
-						log_coords("  XR0", x0, LARGE_NB_XR0_ADDR, lineout);
-						if r0z = '1' then
-							write(lineout, string'("  but R0 = 0"));
-						end if;
+						log_coords("  YR1", y1, LARGE_NB_YR1_ADDR, lineout, r1z, "R1");
 						writeline(output, lineout);
-						log_coords("  YR0", y0, LARGE_NB_YR0_ADDR, lineout);
-						if r0z = '1' then
-							write(lineout, string'("  but R0 = 0"));
-						end if;
+						log_coords("ZR01", z, LARGE_NB_ZR01_ADDR, lineout, '0', "");
 						writeline(output, lineout);
-						log_coords("  XR1", x1, LARGE_NB_XR1_ADDR, lineout);
-						if r1z = '1' then
-							write(lineout, string'("  but R1 = 0"));
-						end if;
+					elsif logr0r1step = 5 or logr0r1step = 6 then
+						-- end of computation
 						writeline(output, lineout);
-						log_coords("  YR1", y1, LARGE_NB_YR1_ADDR, lineout);
-						if r1z = '1' then
-							write(lineout, string'("  but R1 = 0"));
-						end if;
+						log_coords("  XR1", x1, LARGE_NB_XR1_ADDR, lineout, r1z, "R1");
+						writeline(output, lineout);
+						log_coords("  YR1", y1, LARGE_NB_YR1_ADDR, lineout, r1z, "R1");
 						writeline(output, lineout);
 					end if;
-					log_coords("ZR01", z, LARGE_NB_ZR01_ADDR, lineout);
-					writeline(output, lineout);
 					write(lineout, string'(""));
 					writeline(output, lineout);
 				end if;

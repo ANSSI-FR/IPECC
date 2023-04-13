@@ -46,7 +46,7 @@ $(OUT_VHD): $(OUT_ASM) $(ECCPKG_VHD) $(CUSTOM_VHD) $(ASM_VAR_DEFINITIONS)
 
 # Disassemble if asked to
 disass: $(OUT_DISASS)
-$(OUT_DISASS):	$(OUT_VHD) $(ECCPKG_VHD) $(CUSTOM_VHD) $(ASM_VAR_DEFINITIONS)
+$(OUT_DISASS): $(OUT_VHD) $(ECCPKG_VHD) $(CUSTOM_VHD) $(ASM_VAR_DEFINITIONS)
 	@if [ -a $(OUT_VHD) ]; then \
 		python3 ipecc_assembler.py -d $(OUT_VHD) $(ECCPKG_VHD) $(CUSTOM_VHD) $(ASM_VAR_DEFINITIONS); \
 	else \

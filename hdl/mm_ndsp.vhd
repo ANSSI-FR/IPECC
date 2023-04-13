@@ -21,7 +21,7 @@ use ieee.numeric_std.all;
 use std.textio.all;
 -- pragma translate_on
 
-use work.ecc_custom.all;
+use work.ecc_customize.all;
 use work.ecc_utils.all;
 use work.ecc_pkg.all; -- for 'ww' & others
 use work.mm_ndsp_pkg.all; -- for 'ndsp'
@@ -73,7 +73,7 @@ architecture rtl of mm_ndsp is
 			rst  : in std_logic;
 			A    : in std_logic_vector(ww - 1 downto 0);
 			B    : in std_logic_vector(ww - 1 downto 0);
-			dspii: in maccx_array_in_type;
+			dspi : in maccx_array_in_type;
 			P    : out std_logic_vector(2*ww + ln2(ndsp) - 1 downto 0)
 		);
 	end component maccx;
@@ -635,7 +635,7 @@ begin
 			rst => rst22,
 			A => r.prod.aa,
 			B => r.prod.bb, -- (s39)
-			dspii => dspi,
+			dspi => dspi,
 			P => dsp_p); -- (s123)
 
 	-- DSP block #0 connections

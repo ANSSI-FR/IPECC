@@ -17,7 +17,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
-use work.ecc_custom.all;
+use work.ecc_customize.all;
 use work.ecc_utils.all;
 use work.ecc_pkg.all;
 use work.mm_ndsp_pkg.all;
@@ -29,9 +29,9 @@ use std.textio.all;
 entity ecc is
 	generic(
 		-- width of AXI data bus
-		constant C_S_AXI_DATA_WIDTH : integer := axi32or64;
+		constant C_S_AXI_DATA_WIDTH : integer := axi32or64; -- in ecc_customize
 		-- width of AXI address bus
-		constant C_S_AXI_ADDR_WIDTH : integer := 8
+		constant C_S_AXI_ADDR_WIDTH : integer := AXIAW -- in ecc_pkg
 	);
 	port(
 		-- AXI clock
@@ -89,9 +89,9 @@ architecture struct of ecc is
 	component ecc_axi is
 		generic(
 			-- Width of S_AXI data bus
-			C_S_AXI_DATA_WIDTH  : integer := axi32or64;
+			C_S_AXI_DATA_WIDTH  : integer := axi32or64; -- in ecc_customize
 			-- Width of S_AXI address bus
-			C_S_AXI_ADDR_WIDTH  : integer := 8);
+			C_S_AXI_ADDR_WIDTH  : integer := AXIAW); -- in ecc_pkg
 		port (
 			-- AXI clock & reset
 			s_axi_aclk : in  std_logic;
@@ -163,6 +163,24 @@ architecture struct of ecc is
 			doaop : out std_logic;
 			aopid : out std_logic_vector(2 downto 0); -- id defined in ecc_pkg
 			aopdone : in std_logic;
+			--   /debug only
+			laststep : in std_logic;
+			firstzdbl : in std_logic;
+			firstzaddu : in std_logic;
+			first2pz : in std_logic;
+			first3pz : in std_logic;
+			torsion2 : in std_logic;
+			kap : in std_logic;
+			kapp : in std_logic;
+			zu : in std_logic;
+			zc : in std_logic;
+			r0z : in std_logic;
+			r1z : in std_logic;
+			pts_are_equal : in std_logic;
+			pts_are_oppos : in std_logic;
+			phimsb : in std_logic;
+			kb0end : in std_logic;
+			--   end of debug only/
 			-- interface with ecc_curve
 			masklsb : out std_logic;
 			-- interface with ecc_fp (access to ecc_fp_dram)
@@ -202,12 +220,14 @@ architecture struct of ecc is
 			-- debug features (interface with ecc_scalar shared w/ ecc_curve)
 			dbgpgmstate : in std_logic_vector(3 downto 0);
 			dbgnbbits : in std_logic_vector(15 downto 0);
+			dbgjoyebit : in std_logic_vector(log2(2*nn - 1) - 1 downto 0);
 			-- debug features (interface with ecc_curve)
 			dbgbreakpoints : out breakpoints_type;
 			dbgnbopcodes : out std_logic_vector(15 downto 0);
 			dbgdosomeopcodes : out std_logic;
 			dbgresume : out std_logic;
 			dbghalt : out std_logic;
+			dbgnoxyshuf : out std_logic;
 			dbghalted : in std_logic;
 			dbgdecodepc : in std_logic_vector(IRAM_ADDR_SZ - 1 downto 0);
 			dbgbreakpointid : in std_logic_vector(1 downto 0);
@@ -296,20 +316,18 @@ architecture struct of ecc is
 			ferr : in std_logic;
 			zero : in std_logic;
 			laststep : out std_logic;
-			setup : out std_logic;
+			firstzdbl : out std_logic;
+			firstzaddu : out std_logic;
 			iterate_shuffle_valid : out std_logic;
 			iterate_shuffle_rdy : in std_logic;
 			iterate_shuffle_force : out std_logic;
 			fr0z : out std_logic;
 			fr1z : out std_logic;
-			x_are_equal : in std_logic;
-			y_are_equal : in std_logic;
-			y_are_opposite : in std_logic;
-			first_2p_is_null : in std_logic;
-			p_is_of_order_3 : out std_logic;
+			first2pz : in std_logic;
+			first3pz : out std_logic;
+			torsion2 : in std_logic;
 			xmxz : in std_logic;
 			ymyz : in std_logic;
-			torsion2 : in std_logic;
 			kap : in std_logic;
 			kapp : in std_logic;
 			zu : out std_logic;
@@ -320,18 +338,20 @@ architecture struct of ecc is
 			pts_are_oppos : out std_logic;
 			phimsb : in std_logic;
 			kb0end : in std_logic;
+			ptadd : out std_logic;
 			-- interface with ecc_fp
-			compkp : out std_logic; -- also driven to ecc_curve
+			compkp : out std_logic;
 			compcstmty : out std_logic;
-			comppop : out std_logic; -- also driven to ecc_curve
-			compaop : out std_logic; -- also driven to ecc_curve
+			comppop : out std_logic;
+			compaop : out std_logic;
 			-- interface with ecc_fp_dram_sh (used only in the 'shuffle' case)
 			permute : out std_logic;
 			permuterdy : in std_logic;
 			permuteundo : out std_logic;
 			-- debug features
 			dbgpgmstate : out std_logic_vector(3 downto 0);
-			dbgnbbits : out std_logic_vector(15 downto 0)
+			dbgnbbits : out std_logic_vector(15 downto 0);
+			dbgjoyebit : out std_logic_vector(log2(2*nn - 1) - 1 downto 0)
 			-- pragma translate_off
 			-- interface with ecc_fp (simu only)
 			; logr0r1 : out std_logic;
@@ -359,25 +379,20 @@ architecture struct of ecc is
 			ferr : out std_logic;
 			zero : out std_logic;
 			laststep : in std_logic;
-			setup : in std_logic;
+			firstzdbl : in std_logic;
+			firstzaddu : in std_logic;
 			iterate_shuffle_valid : in std_logic;
 			iterate_shuffle_rdy : out std_logic;
 			iterate_shuffle_force : in std_logic;
 			fr0z : in std_logic;
 			fr1z : in std_logic;
-			x_are_equal : out std_logic;
-			y_are_equal : out std_logic;
-			y_are_opposite : out std_logic;
-			first_2p_is_null : out std_logic;
-			p_is_of_order_3 : in std_logic;
+			first2pz : out std_logic;
+			first3pz : in std_logic;
+			torsion2 : out std_logic;
 			xmxz : out std_logic;
 			ymyz : out std_logic;
-			torsion2 : out std_logic;
 			kap : out std_logic;
 			kapp : out std_logic;
-			compkp : in std_logic;
-			comppop : in std_logic;
-			compaop : in std_logic;
 			zu : in std_logic;
 			zc : in std_logic;
 			r0z : in std_logic;
@@ -386,6 +401,7 @@ architecture struct of ecc is
 			pts_are_oppos : in std_logic;
 			phimsb : out std_logic;
 			kb0end : out std_logic;
+			ptadd : in std_logic;
 			-- interface with ecc_curve_iram
 			ire : out std_logic;
 			iraddr : out std_logic_vector (IRAM_ADDR_SZ - 1 downto 0);
@@ -405,6 +421,7 @@ architecture struct of ecc is
 			dbgdosomeopcodes : in std_logic;
 			dbgresume : in std_logic;
 			dbghalt : in std_logic;
+			dbgnoxyshuf : in std_logic;
 			dbghalted : out std_logic;
 			dbgdecodepc : out std_logic_vector(IRAM_ADDR_SZ - 1 downto 0);
 			dbgbreakpointid : out std_logic_vector(1 downto 0);
@@ -748,19 +765,17 @@ architecture struct of ecc is
 	signal faddr : std_logic_vector(IRAM_ADDR_SZ - 1 downto 0);
 	signal zero : std_logic;
 	signal laststep : std_logic;
-	signal setup : std_logic;
+	signal firstzdbl : std_logic;
+	signal firstzaddu : std_logic;
 	signal iterate_shuffle_valid : std_logic;
 	signal iterate_shuffle_rdy : std_logic;
 	signal iterate_shuffle_force : std_logic;
 	signal fr0z : std_logic;
 	signal fr1z : std_logic;
-	signal x_are_equal : std_logic;
-	signal y_are_equal : std_logic;
-	signal y_are_opposite : std_logic;
-	signal first_2p_is_null : std_logic;
-	signal p_is_of_order_3 : std_logic;
-	signal xmxz, ymyz : std_logic;
+	signal first2pz : std_logic;
+	signal first3pz : std_logic;
 	signal torsion2 : std_logic;
+	signal xmxz, ymyz : std_logic;
 	signal kap, kapp : std_logic;
 	signal zu, zc : std_logic;
 	signal r0z, r1z : std_logic;
@@ -768,6 +783,7 @@ architecture struct of ecc is
 	signal pts_are_oppos : std_logic;
 	signal phimsb : std_logic;
 	signal kb0end : std_logic;
+	signal ptadd : std_logic;
 	-- signals between ecc_curve & ecc_curve_iram
 	signal ire : std_logic;
 	signal iraddr : std_logic_vector(IRAM_ADDR_SZ - 1 downto 0);
@@ -846,6 +862,7 @@ architecture struct of ecc is
 	-- debug features (signals between ecc_axi & ecc_scalar)
 	signal dbgpgmstate : std_logic_vector(3 downto 0);
 	signal dbgnbbits : std_logic_vector(15 downto 0);
+	signal dbgjoyebit : std_logic_vector(log2(2*nn - 1) - 1 downto 0);
 	signal dbghalted_s : std_logic;
 	-- debug features (signals between ecc_axi & ecc_curve_iram)
 	signal dbgiaddr : std_logic_vector(IRAM_ADDR_SZ - 1 downto 0);
@@ -858,6 +875,7 @@ architecture struct of ecc is
 	signal dbgdosomeopcodes : std_logic;
 	signal dbgresume : std_logic;
 	signal dbghalt : std_logic;
+	signal dbgnoxyshuf : std_logic;
 	signal dbgdecodepc : std_logic_vector(IRAM_ADDR_SZ - 1 downto 0);
 	signal dbgbreakpointid : std_logic_vector(1 downto 0);
 	signal dbgbreakpointhit : std_logic;
@@ -901,7 +919,8 @@ architecture struct of ecc is
 begin
 
 	assert (axi32or64 = 32 or axi32or64 = 64)
-		report "wrong value of paramter axi32or64 in ecc_custom (must be 32 or 64)"
+		report "wrong value of paramter axi32or64 in ecc_customize.vhd "
+		     & "(must be 32 or 64)"
 			severity FAILURE;
 
 	-- force resynchronization of input reset s_axi_aresetn in the
@@ -992,6 +1011,24 @@ begin
 			doaop => doaop,
 			aopid => aopid,
 			aopdone => aopdone,
+			--   /debug only
+			laststep => laststep,
+			firstzdbl => firstzdbl,
+			firstzaddu => firstzaddu,
+			first2pz => first2pz,
+			first3pz => first3pz,
+			torsion2 => torsion2,
+			kap => kap,
+			kapp => kapp,
+			zu => zu,
+			zc => zc,
+			r0z => r0z,
+			r1z => r1z,
+			pts_are_equal => pts_are_equal,
+			pts_are_oppos => pts_are_oppos,
+			phimsb => phimsb,
+			kb0end => kb0end,
+			--   end of debug only/
 			-- interface with ecc_curve
 			masklsb => masklsb,
 			-- interface with ecc_fp (access to ecc_fp_dram)
@@ -1031,12 +1068,14 @@ begin
 			-- debug features (interface with ecc_scalar)
 			dbgpgmstate => dbgpgmstate,
 			dbgnbbits => dbgnbbits,
+			dbgjoyebit => dbgjoyebit,
 			-- debug features (interface with ecc_curve)
 			dbgbreakpoints => dbgbreakpoints,
 			dbgnbopcodes => dbgnbopcodes,
 			dbgdosomeopcodes => dbgdosomeopcodes,
 			dbgresume => dbgresume,
 			dbghalt => dbghalt,
+			dbgnoxyshuf => dbgnoxyshuf,
 			dbghalted => dbghalted_s,
 			dbgdecodepc => dbgdecodepc,
 			dbgbreakpointid => dbgbreakpointid,
@@ -1128,20 +1167,18 @@ begin
 			ferr => ferr,
 			zero => zero,
 			laststep => laststep,
-			setup => setup,
+			firstzdbl => firstzdbl,
+			firstzaddu => firstzaddu,
 			iterate_shuffle_valid => iterate_shuffle_valid,
 			iterate_shuffle_rdy => iterate_shuffle_rdy,
 			iterate_shuffle_force => iterate_shuffle_force,
 			fr0z => fr0z,
 			fr1z => fr1z,
-			x_are_equal => x_are_equal,
-			y_are_equal => y_are_equal,
-			y_are_opposite => y_are_opposite,
-			first_2p_is_null => first_2p_is_null,
-			p_is_of_order_3 => p_is_of_order_3,
+			first2pz => first2pz,
+			first3pz => first3pz,
+			torsion2 => torsion2,
 			xmxz => xmxz,
 			ymyz => ymyz,
-			torsion2 => torsion2,
 			kap => kap,
 			kapp => kapp,
 			zu => zu,
@@ -1152,6 +1189,7 @@ begin
 			pts_are_oppos => pts_are_oppos,
 			phimsb => phimsb,
 			kb0end => kb0end,
+			ptadd => ptadd,
 			-- interface with ecc_fp
 			compkp => compkp, -- also driven to ecc_curve
 			compcstmty => compcstmty,
@@ -1163,7 +1201,8 @@ begin
 			permuteundo => permuteundo,
 			-- debug features (interface with ecc_axi)
 			dbgpgmstate => dbgpgmstate,
-			dbgnbbits => dbgnbbits
+			dbgnbbits => dbgnbbits,
+			dbgjoyebit => dbgjoyebit
 			-- pragma translate_off
 			-- interface with ecc_fp (simu only)
 			, logr0r1 => logr0r1,
@@ -1190,20 +1229,18 @@ begin
 			ferr => ferr,
 			zero => zero,
 			laststep => laststep,
-			setup => setup,
+			firstzdbl => firstzdbl,
+			firstzaddu => firstzaddu,
 			iterate_shuffle_valid => iterate_shuffle_valid,
 			iterate_shuffle_rdy => iterate_shuffle_rdy,
 			iterate_shuffle_force => iterate_shuffle_force,
 			fr0z => fr0z,
 			fr1z => fr1z,
-			x_are_equal => x_are_equal,
-			y_are_equal => y_are_equal,
-			y_are_opposite => y_are_opposite,
-			first_2p_is_null => first_2p_is_null,
-			p_is_of_order_3 => p_is_of_order_3,
+			first2pz => first2pz,
+			first3pz => first3pz,
+			torsion2 => torsion2,
 			xmxz => xmxz,
 			ymyz => ymyz,
-			torsion2 => torsion2,
 			kap => kap,
 			kapp => kapp,
 			zu => zu,
@@ -1214,9 +1251,7 @@ begin
 			pts_are_oppos => pts_are_oppos,
 			phimsb => phimsb,
 			kb0end => kb0end,
-			compkp => compkp,
-			comppop => comppop,
-			compaop => compaop,
+			ptadd => ptadd,
 			-- interface with ecc_curve_iram
 			ire => ire,
 			iraddr => iraddr,
@@ -1236,6 +1271,7 @@ begin
 			dbgdosomeopcodes => dbgdosomeopcodes,
 			dbgresume => dbgresume,
 			dbghalt => dbghalt,
+			dbgnoxyshuf => dbgnoxyshuf,
 			dbghalted => dbghalted_s,
 			dbgdecodepc => dbgdecodepc,
 			dbgbreakpointid => dbgbreakpointid,

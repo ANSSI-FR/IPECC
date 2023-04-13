@@ -17,7 +17,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
-use work.ecc_custom.all;
+use work.ecc_customize.all;
 
 -- pragma translate_off
 use std.textio.all;
@@ -133,6 +133,8 @@ package ecc_utils is
 	subtype std_logic352 is std_logic_vector(351 downto 0);
 	subtype std_logic384 is std_logic_vector(383 downto 0);
 	subtype std_logic512 is std_logic_vector(511 downto 0);
+
+	function std_nat(arg, size: natural) return std_logic_vector;
 
 end package ecc_utils;
 
@@ -260,6 +262,11 @@ package body ecc_utils is
 			return 0;
 		end if;
 	end function set_op_branch_fill;
+
+	function std_nat(arg, size: natural) return std_logic_vector is
+	begin
+		return std_logic_vector(to_unsigned(arg, size));
+	end function std_nat;
 
 	-- pragma translate_off
 	-- write something to the console (without flushing the line)

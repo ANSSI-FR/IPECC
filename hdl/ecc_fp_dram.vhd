@@ -21,7 +21,7 @@ use ieee.numeric_std.all;
 use std.textio.all;
 -- pragma translate_on
 
-use work.ecc_custom.all;
+use work.ecc_customize.all;
 use work.ecc_utils.all;
 use work.ecc_pkg.all;
 use work.ecc_vars.all;

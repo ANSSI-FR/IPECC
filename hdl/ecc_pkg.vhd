@@ -17,7 +17,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
-use work.ecc_custom.all;
+use work.ecc_customize.all;
 use work.ecc_utils.all;
 use work.ecc_vars.all;
 
@@ -82,17 +82,18 @@ package ecc_pkg is
 	-- FP_ADDR_MSB
 	--
 	-- this is the number of bits required to encode the address of one of the
-	-- large numbers in ecc_fp_dram (in qty nblargenb). This parameter obiously
-	-- has an effect on the size of opcodes in ecc_curve_iram, that's why modi-
-	-- fying parameter nblargenb in ecc_customize.vhd should be made with caution
+	-- large numbers in ecc_fp_dram (in qty nblargenb). This parameter obviously
+	-- has an effect on the size of opcode words in ecc_curve_iram, that's why
+	-- modifying parameter nblargenb in ecc_customize.vhd should be made with
+	-- caution
 	constant FP_ADDR_MSB : positive := log2(nblargenb - 1);
 
 	-- FP_ADDR_LSB
 	--
 	-- this is the number of bits required to encode the address of one of the
 	-- ww-bit limbs that form one large number. This parameter has no effect
-	-- on the size of opcodes, but modification should not be made has parameter
-	-- n is computed automatically based on nn and ww
+	-- on the size of opcode words, but modification should not be made has
+	-- parameter n is computed automatically based on nn and ww
 	constant FP_ADDR_LSB : positive := log2(n - 1);
 
 	-- FP_ADDR
@@ -149,38 +150,23 @@ package ecc_pkg is
 		shr : std_logic_vector(NB_MSK_SH_REG - 1 downto 0);
 	end record;
 
-	subtype std_logic_operand is std_logic_vector(FP_ADDR_MSB - 1 downto 0);
+	subtype stdop is std_logic_vector(FP_ADDR_MSB - 1 downto 0);
 
-	constant CST_ADDR_P : std_logic_operand :=
-		std_logic_vector(to_unsigned(LARGE_NB_P_ADDR, FP_ADDR_MSB));
-	constant CST_ADDR_A : std_logic_operand :=
-		std_logic_vector(to_unsigned(LARGE_NB_A_ADDR, FP_ADDR_MSB));
-	constant CST_ADDR_B : std_logic_operand :=
-		std_logic_vector(to_unsigned(LARGE_NB_B_ADDR, FP_ADDR_MSB));
-	constant CST_ADDR_Q : std_logic_operand :=
-		std_logic_vector(to_unsigned(LARGE_NB_Q_ADDR, FP_ADDR_MSB));
-	constant CST_ADDR_K : std_logic_operand :=
-		std_logic_vector(to_unsigned(LARGE_NB_K_ADDR, FP_ADDR_MSB));
-	constant CST_ADDR_XR0 : std_logic_operand :=
-		std_logic_vector(to_unsigned(LARGE_NB_XR0_ADDR, FP_ADDR_MSB));
-	constant CST_ADDR_YR0 : std_logic_operand :=
-		std_logic_vector(to_unsigned(LARGE_NB_YR0_ADDR, FP_ADDR_MSB));
-	constant CST_ADDR_XR1 : std_logic_operand :=
-		std_logic_vector(to_unsigned(LARGE_NB_XR1_ADDR, FP_ADDR_MSB));
-	constant CST_ADDR_YR1 : std_logic_operand :=
-		std_logic_vector(to_unsigned(LARGE_NB_YR1_ADDR, FP_ADDR_MSB));
-	constant CST_ADDR_ZR01 : std_logic_operand :=
-		std_logic_vector(to_unsigned(LARGE_NB_ZR01_ADDR, FP_ADDR_MSB));
-	constant CST_ADDR_R : std_logic_operand :=
-		std_logic_vector(to_unsigned(LARGE_NB_R_ADDR, FP_ADDR_MSB));
-	constant CST_ADDR_ONE : std_logic_operand :=
-		std_logic_vector(to_unsigned(LARGE_NB_ONE_ADDR, FP_ADDR_MSB));
-	constant CST_ADDR_ZERO : std_logic_operand :=
-		std_logic_vector(to_unsigned(LARGE_NB_ZERO_ADDR, FP_ADDR_MSB));
-	constant CST_ADDR_XR0BK : std_logic_operand :=
-		std_logic_vector(to_unsigned(LARGE_NB_XR0BK_ADDR, FP_ADDR_MSB));
-	constant CST_ADDR_YR0BK : std_logic_operand :=
-		std_logic_vector(to_unsigned(LARGE_NB_YR0BK_ADDR, FP_ADDR_MSB));
+	constant CST_ADDR_P : stdop := std_nat(LARGE_NB_P_ADDR, FP_ADDR_MSB);
+	constant CST_ADDR_A : stdop := std_nat(LARGE_NB_A_ADDR, FP_ADDR_MSB);
+	constant CST_ADDR_B : stdop := std_nat(LARGE_NB_B_ADDR, FP_ADDR_MSB);
+	constant CST_ADDR_Q : stdop := std_nat(LARGE_NB_Q_ADDR, FP_ADDR_MSB);
+	constant CST_ADDR_K : stdop := std_nat(LARGE_NB_K_ADDR, FP_ADDR_MSB);
+	constant CST_ADDR_XR0 : stdop := std_nat(LARGE_NB_XR0_ADDR, FP_ADDR_MSB);
+	constant CST_ADDR_YR0 : stdop := std_nat(LARGE_NB_YR0_ADDR, FP_ADDR_MSB);
+	constant CST_ADDR_XR1 : stdop := std_nat(LARGE_NB_XR1_ADDR, FP_ADDR_MSB);
+	constant CST_ADDR_YR1 : stdop := std_nat(LARGE_NB_YR1_ADDR, FP_ADDR_MSB);
+	constant CST_ADDR_ZR01 : stdop := std_nat(LARGE_NB_ZR01_ADDR, FP_ADDR_MSB);
+	constant CST_ADDR_R : stdop := std_nat(LARGE_NB_R_ADDR, FP_ADDR_MSB);
+	constant CST_ADDR_ONE : stdop := std_nat(LARGE_NB_ONE_ADDR, FP_ADDR_MSB);
+	constant CST_ADDR_ZERO : stdop := std_nat(LARGE_NB_ZERO_ADDR, FP_ADDR_MSB);
+	constant CST_ADDR_XR0BK : stdop := std_nat(LARGE_NB_XR0BK_ADDR, FP_ADDR_MSB);
+	constant CST_ADDR_YR0BK : stdop := std_nat(LARGE_NB_YR0BK_ADDR, FP_ADDR_MSB);
 
 	constant CST_ARITH_MASK_0 : integer := 10;
 	constant CST_ARITH_MASK_1 : integer := 11;
@@ -461,65 +447,70 @@ package ecc_pkg is
 	constant AXIAW : integer := 8;
 
 	-- software can rely on the following definitions for proper interaction
-	constant ADB : natural := AXIAW - 3;
+	-- ADB = number of most significant bits in the address bus that are used
+	--       for decoding the access to the IP registers
+	-- ADB = AXIAW - 3 means the bits AXIAW - 1 downto AXIAW 
+	constant ADB : natural := AXIAW - 3; -- means bits AXIAW - 1 downto 
 	subtype rat is std_logic_vector(ADB - 1 downto 0);
 	-- -----------------------------------------------
 	-- addresses of all AXI-accessible write registers
 	-- -----------------------------------------------
-	constant W_CTRL : rat := std_logic_vector(to_unsigned(0, ADB));           -- 0x00
-	constant W_WRITE_DATA : rat := std_logic_vector(to_unsigned(1, ADB));     -- 0x08
-	constant W_R0_NULL : rat := std_logic_vector(to_unsigned(2, ADB));        -- 0x10
-	constant W_R1_NULL : rat := std_logic_vector(to_unsigned(3, ADB));        -- 0x18
-	constant W_PRIME_SIZE : rat := std_logic_vector(to_unsigned(4, ADB));     -- 0x20
-	constant W_BLINDING : rat := std_logic_vector(to_unsigned(5, ADB));       -- 0x28
-	-- reserved                                                               -- 0x30
-	constant W_SHUFFLE : rat := std_logic_vector(to_unsigned(7, ADB));        -- 0x38
-	constant W_IRQ : rat := std_logic_vector(to_unsigned(8, ADB));            -- 0x40
-	constant W_ERR_ACK : rat := std_logic_vector(to_unsigned(9, ADB));        -- 0x48
-	constant W_SMALL_SCALAR : rat := std_logic_vector(to_unsigned(10, ADB));  -- 0x50
-	constant W_SOFT_RESET : rat := std_logic_vector(to_unsigned(11, ADB));    -- 0x58
-	-- reserved                                                           0x60...0x70
+	constant W_CTRL : rat := std_nat(0, ADB);              -- 0x00
+	constant W_WRITE_DATA : rat := std_nat(1, ADB);        -- 0x08
+	constant W_R0_NULL : rat := std_nat(2, ADB);           -- 0x10
+	constant W_R1_NULL : rat := std_nat(3, ADB);           -- 0x18
+	constant W_PRIME_SIZE : rat := std_nat(4, ADB);        -- 0x20
+	constant W_BLINDING : rat := std_nat(5, ADB);          -- 0x28
+	-- reserved                                            -- 0x30
+	constant W_SHUFFLE : rat := std_nat(7, ADB);           -- 0x38
+	constant W_IRQ : rat := std_nat(8, ADB);               -- 0x40
+	constant W_ERR_ACK : rat := std_nat(9, ADB);           -- 0x48
+	constant W_SMALL_SCALAR : rat := std_nat(10, ADB);     -- 0x50
+	constant W_SOFT_RESET : rat := std_nat(11, ADB);       -- 0x58
+	-- reserved                                            -- 0x60...0x70
 	-- (start of write DEBUG registers)
-	constant W_DBG_HALT : rat := std_logic_vector(to_unsigned(15, ADB));      -- 0x78
-	constant W_DBG_BKPT : rat := std_logic_vector(to_unsigned(16, ADB));      -- 0x80
-	constant W_DBG_STEPS : rat := std_logic_vector(to_unsigned(17, ADB));     -- 0x88
-	constant W_DBG_TRIG_ACT : rat := std_logic_vector(to_unsigned(18, ADB));  -- 0x90
-	constant W_DBG_TRIG_UP : rat := std_logic_vector(to_unsigned(19, ADB));   -- 0x98
-	constant W_DBG_TRIG_DOWN : rat := std_logic_vector(to_unsigned(20, ADB)); -- 0xa0
-	constant W_DBG_OP_ADDR : rat := std_logic_vector(to_unsigned(21, ADB));   -- 0xa8
-	constant W_DBG_WR_OPCODE : rat := std_logic_vector(to_unsigned(22, ADB)); -- 0xb0
-	constant W_DBG_TRNGCTR : rat := std_logic_vector(to_unsigned(23, ADB));   -- 0xb8
-	constant W_DBG_TRNGCFG : rat := std_logic_vector(to_unsigned(24, ADB));   -- 0xc0
-	constant W_DBG_FP_ADDR : rat := std_logic_vector(to_unsigned(25, ADB));   -- 0xc8
-	constant W_DBG_FP_WDATA : rat := std_logic_vector(to_unsigned(26, ADB));  -- 0xd0 DONE (but not simulated)
+	constant W_DBG_HALT : rat := std_nat(15, ADB);         -- 0x78
+	constant W_DBG_BKPT : rat := std_nat(16, ADB);         -- 0x80
+	constant W_DBG_STEPS : rat := std_nat(17, ADB);        -- 0x88
+	constant W_DBG_TRIG_ACT : rat := std_nat(18, ADB);     -- 0x90
+	constant W_DBG_TRIG_UP : rat := std_nat(19, ADB);      -- 0x98
+	constant W_DBG_TRIG_DOWN : rat := std_nat(20, ADB);    -- 0xa0
+	constant W_DBG_OP_ADDR : rat := std_nat(21, ADB);      -- 0xa8
+	constant W_DBG_WR_OPCODE : rat := std_nat(22, ADB);    -- 0xb0
+	constant W_DBG_TRNGCTR : rat := std_nat(23, ADB);      -- 0xb8
+	constant W_DBG_TRNGCFG : rat := std_nat(24, ADB);      -- 0xc0
+	constant W_DBG_FP_WADDR : rat := std_nat(25, ADB);     -- 0xc8
+	constant W_DBG_FP_WDATA : rat := std_nat(26, ADB);     -- 0xd0
+	constant W_DBG_FP_RADDR : rat := std_nat(27, ADB);     -- 0xd8
+	constant W_DBG_CFG_NOXYSHUF : rat := std_nat(28, ADB); -- 0xe0
 	-- ----------------------------------------------
 	-- addresses of all AXI-accessible read registers
 	-- ----------------------------------------------
-	constant R_STATUS : rat := std_logic_vector(to_unsigned(0, ADB));         -- 0x00
-	constant R_READ_DATA : rat := std_logic_vector(to_unsigned(1, ADB));      -- 0x08
-	constant R_CAPABILITIES : rat := std_logic_vector(to_unsigned(2, ADB));   -- 0x10
-	constant R_PRIME_SIZE : rat := std_logic_vector(to_unsigned(3, ADB));     -- 0x18
+	constant R_STATUS : rat := std_nat(0, ADB);             -- 0x00
+	constant R_READ_DATA : rat := std_nat(1, ADB);          -- 0x08
+	constant R_CAPABILITIES : rat := std_nat(2, ADB);       -- 0x10
+	constant R_PRIME_SIZE : rat := std_nat(3, ADB);         -- 0x18
 	-- (start of read DEBUG registers)
-	constant R_DBG_CAPABILITIES_0 : rat := std_logic_vector(to_unsigned(4, ADB)); -- 0x20 DONE (ww)
-	constant R_DBG_CAPABILITIES_1 : rat := std_logic_vector(to_unsigned(5, ADB)); -- 0x28 DONE (taille & nb d'opcodes)
-	constant R_DBG_CAPABILITIES_2 : rat := std_logic_vector(to_unsigned(6, ADB)); -- 0x30 DONE (raw fifo size)
-	-- reserved                                                           0x38...0x78
-	constant R_DBG_STATUS : rat := std_logic_vector(to_unsigned(16, ADB));    -- 0x80
-	constant R_DBG_RMN_STEPS : rat := std_logic_vector(to_unsigned(17, ADB)); -- 0x88 TODO : à enlever à terme
-	constant R_DBG_TIME : rat := std_logic_vector(to_unsigned(18, ADB));      -- 0x90 DONE (étendu à ttes opérations: ADD, DBL, Fp, etc)
-	constant R_DBG_RAWDUR : rat := std_logic_vector(to_unsigned(19, ADB));    -- 0x98
-	constant R_DBG_FLAGS : rat := std_logic_vector(to_unsigned(20, ADB));     -- 0xa0
-	-- reserved                                                               -- 0xa8
-	constant R_DBG_RD_OPCODE : rat := std_logic_vector(to_unsigned(22, ADB)); -- 0xb0
-	constant R_DBG_TRNG_STATUS : rat := std_logic_vector(to_unsigned(23, ADB)); -- 0xb8
-	constant R_DBG_TRNG_DATA : rat := std_logic_vector(to_unsigned(24, ADB)); -- 0xc0
-	constant R_DBG_FP_RDATA : rat := std_logic_vector(to_unsigned(25, ADB));  -- 0xc8
-	constant R_DBG_IRN_CNT_AXI : rat := std_logic_vector(to_unsigned(26, ADB)); -- 0xd0
-	constant R_DBG_IRN_CNT_EFP : rat := std_logic_vector(to_unsigned(27, ADB)); -- 0xd8
-	constant R_DBG_IRN_CNT_CUR : rat := std_logic_vector(to_unsigned(28, ADB)); -- 0xe0
-	constant R_DBG_IRN_CNT_SHF : rat := std_logic_vector(to_unsigned(29, ADB)); -- 0xe8
-	constant R_DBG_PENDING_OPS : rat := std_logic_vector(to_unsigned(30, ADB)); -- 0xf0
-	-- reserved                                                           0xf8...0xf8
+	constant R_DBG_CAPABILITIES_0 : rat := std_nat(4, ADB); -- 0x20
+	constant R_DBG_CAPABILITIES_1 : rat := std_nat(5, ADB); -- 0x28
+	constant R_DBG_CAPABILITIES_2 : rat := std_nat(6, ADB); -- 0x30
+	-- reserved                                             -- 0x38...0x78
+	constant R_DBG_STATUS : rat := std_nat(16, ADB);        -- 0x80
+	constant R_DBG_RMN_STEPS : rat := std_nat(17, ADB);     -- 0x88 TODO: remove this one
+	constant R_DBG_TIME : rat := std_nat(18, ADB);          -- 0x90
+	constant R_DBG_RAWDUR : rat := std_nat(19, ADB);        -- 0x98
+	constant R_DBG_FLAGS : rat := std_nat(20, ADB);         -- 0xa0
+	constant R_DBG_EXP_FLAGS : rat := std_nat(21, ADB);     -- 0xa8
+	constant R_DBG_RD_OPCODE : rat := std_nat(22, ADB);     -- 0xb0
+	constant R_DBG_TRNG_STATUS : rat := std_nat(23, ADB);   -- 0xb8
+	constant R_DBG_TRNG_DATA : rat := std_nat(24, ADB);     -- 0xc0
+	constant R_DBG_FP_RDATA : rat := std_nat(25, ADB);      -- 0xc8
+	constant R_DBG_IRN_CNT_AXI : rat := std_nat(26, ADB);   -- 0xd0
+	constant R_DBG_IRN_CNT_EFP : rat := std_nat(27, ADB);   -- 0xd8
+	constant R_DBG_IRN_CNT_CUR : rat := std_nat(28, ADB);   -- 0xe0
+	constant R_DBG_IRN_CNT_SHF : rat := std_nat(29, ADB);   -- 0xe8
+	constant R_DBG_PENDING_OPS : rat := std_nat(30, ADB);   -- 0xf0
+	constant R_DBG_FP_RDATA_RDY : rat := std_nat(31, ADB);  -- 0xf8
 
 	-- bit positions in W_CTRL register
 	constant CTRL_KP : natural := 0;

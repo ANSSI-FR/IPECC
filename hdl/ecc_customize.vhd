@@ -17,14 +17,15 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
-package ecc_custom is
-
-	-- A small doc on the following parameters is provided at the end of the
-	-- package description, in the same order as they appear below.
+package ecc_customize is
 
 	-- ----------------------------------
 	-- start of: user-editable parameters
 	-- ----------------------------------
+	--
+	-- A small doc on the following parameters is provided
+	-- at the end of the package description, in the same
+	-- order as they appear below
 	constant nn : positive := 528;
 	constant nn_dynamic : boolean := TRUE;
 	type techno_type is (spartan6, virtex6, series7, ialtera, asic);
@@ -37,13 +38,13 @@ package ecc_custom is
 	constant sramlat : positive range 1 to 2 := 1;
 	constant async : boolean := TRUE;
 	constant shuffle : boolean := FALSE;
-	constant notrng : boolean := TRUE; -- set to TRUE for simu, FALSE for syn
+	constant notrng : boolean := TRUE; -- set to TRUE for simu, to FALSE for syn
 	constant nbtrng : positive := 1;
 	constant trngta : natural range 1 to 4095 := 32;
 	constant axi32or64 : natural := 32;
 	constant debug : boolean := FALSE;
 	constant nblargenb : positive := 32;  -- change these two parameters only if
-	constant nbopcodes : positive := 1024; -- you really know what you're doing
+	constant nbopcodes : positive := 512; -- you really know what you're doing
 	-- below concerns simulation only
 	constant simkb : natural range 0 to natural'high := 0; -- if 0 then ignored
 	constant simlog : string := "/tmp/ecc.log";
@@ -52,11 +53,11 @@ package ecc_custom is
 	-- end of: user-editable parameters
 	-- --------------------------------
 	
-end package ecc_custom;
+end package ecc_customize;
 
 --                         ******************************
---                         *      DOCUMENTATION OF     *
---                         *      PARAMETERS ABOVE      *
+--                         *      DOCUMENTATION OF      *
+--                         *      ABOVE PARAMETERS      *
 --                         ******************************
 
 -- ============================================================================

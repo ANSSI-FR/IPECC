@@ -17,7 +17,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
-use work.ecc_custom.all;
+use work.ecc_customize.all;
 use work.ecc_utils.all;
 use work.ecc_pkg.all;
 
@@ -83,20 +83,18 @@ entity ecc_scalar is
 		ferr : in std_logic;
 		zero : in std_logic;
 		laststep : out std_logic;
-		setup : out std_logic;
+		firstzdbl : out std_logic;
+		firstzaddu : out std_logic;
 		iterate_shuffle_valid : out std_logic;
 		iterate_shuffle_rdy : in std_logic;
 		iterate_shuffle_force : out std_logic;
 		fr0z : out std_logic;
 		fr1z : out std_logic;
-		x_are_equal : in std_logic;
-		y_are_equal : in std_logic;
-		y_are_opposite : in std_logic;
-		first_2p_is_null : in std_logic;
-		p_is_of_order_3 : out std_logic;
+		first2pz : in std_logic;
+		first3pz : out std_logic;
+		torsion2 : in std_logic;
 		xmxz : in std_logic;
 		ymyz : in std_logic;
-		torsion2 : in std_logic;
 		kap : in std_logic;
 		kapp : in std_logic;
 		zu : out std_logic;
@@ -107,6 +105,7 @@ entity ecc_scalar is
 		pts_are_oppos : out std_logic;
 		phimsb : in std_logic;
 		kb0end : in std_logic;
+		ptadd : out std_logic;
 		-- interface with ecc_fp
 		compkp : out std_logic;
 		compcstmty : out std_logic;
@@ -118,7 +117,8 @@ entity ecc_scalar is
 		permuteundo : out std_logic;
 		-- debug features
 		dbgpgmstate : out std_logic_vector(3 downto 0);
-		dbgnbbits : out std_logic_vector(15 downto 0)
+		dbgnbbits : out std_logic_vector(15 downto 0);
+		dbgjoyebit : out std_logic_vector(log2(2*nn - 1) - 1 downto 0)
 		-- pragma translate_off
 		-- interface with ecc_fp (simu only)
 		; logr0r1 : out std_logic;
@@ -134,7 +134,7 @@ architecture rtl of ecc_scalar is
 	type state_type is (idle, cst, set, kp, pop, aop);
 
 	type program_type is (idle, checkoncurve, blindinit, blindbit, blindexit,
-	                      adpa, ssetup, switch3p, joyecoz, subtractp, exits,
+	                      adpa, ssetup, joyecoz, subtractp, exits,
 	                      wait_xyr01_permute);
 
 	-- main control signals
@@ -160,6 +160,8 @@ architecture rtl of ecc_scalar is
 		state : joye_state_type;
 	end record;
 
+	type subptype_type is (last_zaddc, last_zdblc, last_znegc);
+
 	-- registers involved in [k]P computation
 	type kp_reg_type is record
 		initkp : std_logic;
@@ -168,20 +170,21 @@ architecture rtl of ecc_scalar is
 		substate : program_type;
 		nextsubstate : program_type;
 		done : std_logic;
-		firstzaddu : std_logic;
 		blind_nbbits : unsigned(log2(nn) - 1 downto 0);
 		laststep : std_logic;
-		setup : std_logic;
+		firstzdbl : std_logic;
+		firstzaddu : std_logic;
 		iterate_shuffle_valid : std_logic;
 		iterate_shuffle_force : std_logic;
 		k_is_null : std_logic;
 		subpstep : std_logic;
-		subptype : std_logic_vector(1 downto 0);
+		subptype : subptype_type; --std_logic_vector(1 downto 0);
 		zu, zc : std_logic;
 		pts_are_equal : std_logic;
 		pts_are_oppos : std_logic;
 		ssetup_step : std_logic;
 		first3pz : std_logic;
+		--firstitoh : std_logic;
 	end record;
 
 	-- registers involved in computation of Montgomery constants
@@ -245,12 +248,12 @@ architecture rtl of ecc_scalar is
 		permuteundo : std_logic;
 		small_k_sz_en_ack : std_logic;
 		small_k_sz_kpdone : std_logic;
+		ptadd : std_logic;
 	end record;
 
 	-- debug features
 	type debug_reg_type is record
-		dbgnextstate : program_type;
-		dbgnextjoyestate : joye_state_type;
+		joyebit : std_logic_vector(log2(2*nn - 1) - 1 downto 0);
 	end record;
 
 	type reg_type is record
@@ -281,30 +284,30 @@ architecture rtl of ecc_scalar is
 	constant BLINDSTOP_ROUTINE : natural := 4;
 	constant ADPA_ROUTINE : natural := 5;
 	constant SETUP_ROUTINE : natural := 6;
-	constant SWITCH3P_ROUTINE : natural := 7;
-	constant ITOH_ROUTINE : natural := 8;
-	constant ZADDU_ROUTINE : natural := 9;
-	constant ZADDC_ROUTINE : natural := 10;
-	constant SUBTRACTP_ROUTINE : natural := 11;
-	constant EXIT_ROUTINE : natural := 12;
-	constant ADDITION_ROUTINE : natural := 13;
-	constant DOUBLE_ROUTINE : natural := 14;
-	constant NEGATIVE_ROUTINE : natural := 15;
-	constant EQUALX_ROUTINE : natural := 16;
-	constant EQUALY_ROUTINE : natural := 17;
-	constant OPPOSITEY_ROUTINE : natural := 18;
-	constant IS_ON_CURVE_ROUTINE : natural := 19;
-	constant FPADD_ROUTINE : natural := 20;
-	constant FPSUB_ROUTINE : natural := 21;
-	constant FPMULT_ROUTINE : natural := 22;
-	constant FPINV_ROUTINE : natural := 23;
-	constant FPINVEXP_ROUTINE : natural := 24;
-	constant AMONTY_ROUTINE : natural := 25;
-	constant PRE_ZADDU_ROUTINE : natural := 26;
-	constant PRE_ZADDC_ROUTINE : natural := 27;
-	constant ZDBL_ROUTINE : natural := 28;
-	constant ZNEGC_ROUTINE : natural := 29;
-	constant SETUP_END_ROUTINE : natural := 30;
+	constant ITOH_ROUTINE : natural := 7;
+	constant ZADDU_ROUTINE : natural := 8;
+	constant ZADDC_ROUTINE : natural := 9;
+	constant SUBTRACTP_ROUTINE : natural := 10;
+	constant EXIT_ROUTINE : natural := 11;
+	constant ADDITION_BEGIN_ROUTINE : natural := 12;
+	constant DOUBLE_ROUTINE : natural := 13;
+	constant NEGATIVE_ROUTINE : natural := 14;
+	constant EQUALX_ROUTINE : natural := 15;
+	constant EQUALY_ROUTINE : natural := 16;
+	constant OPPOSITEY_ROUTINE : natural := 17;
+	constant IS_ON_CURVE_ROUTINE : natural := 18;
+	constant FPADD_ROUTINE : natural := 19;
+	constant FPSUB_ROUTINE : natural := 20;
+	constant FPMULT_ROUTINE : natural := 21;
+	constant FPINV_ROUTINE : natural := 22;
+	constant FPINVEXP_ROUTINE : natural := 23;
+	constant AMONTY_ROUTINE : natural := 24;
+	constant PRE_ZADDU_ROUTINE : natural := 25;
+	constant PRE_ZADDC_ROUTINE : natural := 26;
+	constant ZDBL_ROUTINE : natural := 27;
+	constant ZNEGC_ROUTINE : natural := 28;
+	constant SETUP_END_ROUTINE : natural := 29;
+	constant ADDITION_END_ROUTINE : natural := 30;
 	-- Address of the routines below (all starting with ECC_IRAM_) are defined in
 	-- package ecc_addr (see file <ecc_addr.vhd> which is automatically generated
 	-- when running 'make' in folder hdl/ecc_curve_iram/.
@@ -342,14 +345,13 @@ architecture rtl of ecc_scalar is
 		ADPA_ROUTINE => ECC_IRAM_ADPA_ADDR,
 		SETUP_ROUTINE => ECC_IRAM_SETUP_ADDR,
 		SETUP_END_ROUTINE => ECC_IRAM_SETUP_END_ADDR,
-		SWITCH3P_ROUTINE => ECC_IRAM_SWITCH3P_ADDR,
-		ITOH_ROUTINE => ECC_IRAM_JOYECOZ_ADDR,
+		ITOH_ROUTINE => ECC_IRAM_ITOH_ADDR,
 		ZADDU_ROUTINE => ECC_IRAM_ZADDU_ADDR,
 		ZADDC_ROUTINE => ECC_IRAM_ZADDC_ADDR,
 		SUBTRACTP_ROUTINE => ECC_IRAM_SUBTRACTP_ADDR,
 		EXIT_ROUTINE => ECC_IRAM_EXIT_ADDR,
 		-- extra point-level routines
-		ADDITION_ROUTINE => ECC_IRAM_ADDITION_ADDR,
+		ADDITION_BEGIN_ROUTINE => ECC_IRAM_ADDITION_BEGIN_ADDR,
 		DOUBLE_ROUTINE => ECC_IRAM_DOUBLE_ADDR,
 		NEGATIVE_ROUTINE => ECC_IRAM_NEGATIVE_ADDR,
 		EQUALX_ROUTINE => ECC_IRAM_EQUALX_ADDR,
@@ -366,7 +368,8 @@ architecture rtl of ecc_scalar is
 		PRE_ZADDU_ROUTINE => ECC_IRAM_PRE_ZADDU_ADDR,
 		PRE_ZADDC_ROUTINE => ECC_IRAM_PRE_ZADDC_ADDR,
 		ZDBL_ROUTINE => ECC_IRAM_ZDBL_ADDR,
-		ZNEGC_ROUTINE => ECC_IRAM_ZNEGC_ADDR
+		ZNEGC_ROUTINE => ECC_IRAM_ZNEGC_ADDR,
+		ADDITION_END_ROUTINE => ECC_IRAM_ADDITION_END_ADDR
 	);
 
 	-- pragma translate_off
@@ -392,8 +395,7 @@ begin
 	               frdy, ferr, zero, iterate_shuffle_rdy, permuterdy, doshuffle,
 	               k_is_null, aerr_inpt_ack, aerr_outpt_ack,
 	               nndyn_nnm3, dopop, popid, doaop, aopid, ar0zo, ar1zo,
-								 x_are_equal, y_are_equal, y_are_opposite, swrst,
-								 first_2p_is_null, xmxz, ymyz, torsion2, kap, kapp,
+								 swrst, first2pz, xmxz, ymyz, torsion2, kap, kapp,
 								 phimsb, kb0end, small_k_sz_en, small_k_sz_en_en, small_k_sz)
 		variable v : reg_type;
 		variable v_simkb : integer;
@@ -447,7 +449,8 @@ begin
 				v.mty.computing := '1';
 				v.mty.done := '0';
 				v.kp.laststep := '0';
-				v.kp.setup := '0';
+				v.kp.firstzdbl := '0';
+				v.kp.firstzaddu := '0';
 			elsif (r.int.ardy = '1' and agomtya = '1') then
 				-- trigger computation of 'a' parameter into Montgomery domain
 				v.ctrl.state := cst;
@@ -478,10 +481,12 @@ begin
 				v.int.aerr_outpt_not_on_curve := '0';
 				v.kp.done := '0';
 				v.kp.laststep := '0';
-				v.kp.setup := '0';
-				v.kp.firstzaddu := '1';
+				v.kp.firstzdbl := '0';
+				v.kp.firstzaddu := '0';
 				v.kp.zu := '0';
 				v.kp.zc := '0';
+				v.kp.pts_are_equal := '0';
+				v.kp.pts_are_oppos := '0';
 				v.kp.first3pz := '0';
 				if r.ctrl.small_k_sz_en = '1' then
 					v.kp.joye.nbbits :=
@@ -516,6 +521,7 @@ begin
 				end if;
 				v.sim.simbit := 1;
 				-- pragma translate_on
+				v.dbg.joyebit := std_nat(1, log2(2*nn - 1));
 				v.ctrl.r1z_init := ar1zo; -- state of R1 before starting [k]P saved here
 				v.ctrl.r1z := ar1zo; -- as opposed to .r1z_init, this one now may evolve
 				v.ctrl.r0z := '0';
@@ -540,8 +546,10 @@ begin
 				v.pop.neg := '0';
 				case popid is
 					when ECC_AXI_POINT_ADD =>
-						v.int.faddr := EXEC_ADDR(ADDITION_ROUTINE); -- point addition
+						v.int.faddr := EXEC_ADDR(ADDITION_BEGIN_ROUTINE); -- point addition
 						v.pop.add := '1';
+						v.pop.step := '0'; -- (s61)
+						v.int.ptadd := '1';
 					when ECC_AXI_POINT_DBL =>
 						v.int.faddr := EXEC_ADDR(DOUBLE_ROUTINE); -- point doubling
 						v.pop.dbl := '1';
@@ -554,11 +562,11 @@ begin
 					when ECC_AXI_POINT_EQU =>
 						v.int.faddr := EXEC_ADDR(EQUALX_ROUTINE); -- are X-coords equal?
 						v.pop.equal := '1';       -- (equality of Y-coords tested later)
-						v.pop.step := '0';
+						v.pop.step := '0'; -- (s62)
 					when ECC_AXI_POINT_OPP =>
 						v.int.faddr := EXEC_ADDR(EQUALX_ROUTINE); -- are X-coords equal?
 						v.pop.opp := '1';       -- (opposition of Y-coords tested later)
-						v.pop.step := '0';
+						v.pop.step := '0'; -- (s63)
 					when others =>
 						null; -- no error, ids should be filtered by ecc_axi
 				end case;
@@ -650,9 +658,10 @@ begin
 						v.sim.perfcnten := '0';
 						-- pragma translate_on
 						if r.kp.k_is_null = '1' -- the scalar was null to begin with
+							or r.ctrl.r1z_init = '1' -- the point was null to being with
+							or r.ctrl.r1z = '1' -- [k]P is null by computation
 							-- TODO: the possible nullity of [k]P result should in the end
 							-- only based on signal r.ctrl.r1z
-							or r.ctrl.r1z = '1'
 						then
 							-- [k]P is therefore also null
 							v.int.ar1zi := '1';
@@ -668,7 +677,7 @@ begin
 					end if;
 				when pop =>
 					-- (s24) - following assignments on .active./.state/.ardy/.pop.done/
-					-- .computing have possible bypasses in (s25) & (s26) below
+					-- .computing have possible bypasses in (s25), (s26) & (s60) below
 					v.ctrl.active := '0';
 					v.ctrl.state := idle;
 					v.int.ardy := '1';
@@ -688,65 +697,117 @@ begin
 							v.pop.yesen := '1'; -- stays asserted only 1 cycle thx to (s27)
 						end if;
 					elsif r.pop.add = '1' then
-						-- -------------------------
-						-- operation was a point ADD
-						-- -------------------------
-						v01z := r.ctrl.r1z_init & r.ctrl.r0z_init;
-						case v01z is
-							when "00" =>
-								-- neither R0 nor R1 input points were null to begin with
-								-- we need to catch if the resulting P + Q point happens to be
-								-- the null point - that's the reason for patch ,p42 & ,p43
-								-- in addition.s
-								if x_are_equal = '1' and y_are_equal = '1' then
-									-- SW asked for a P + Q computation with P = Q: assert error
-									-- to ecc_axi (r.int.aerr will stay asserted until a new com-
-									-- putation order comes from ecc_axi)
-									--v.int.aerr := '1'; -- TODO: switch to DOUBLE!
-								elsif x_are_equal = '1' and y_are_opposite = '1' then
-									-- SW asked for a P + Q operation with P = -Q: assert ar1zi
-									-- so that SW can see in R_STATUS register that R1 is now
-									-- the null point
-									v.int.ar1zi := '1';
+						-- ------------------------
+						-- operation is a point ADD
+						-- ------------------------
+						if r.pop.step = '0' then
+							v.pop.step := '1';
+							-- ---------------------------------------------------------
+							-- ecc_curve has just finished executing .pre_zadduL routine
+							-- ---------------------------------------------------------
+							v.kp.pts_are_equal := xmxz and ymyz;
+							v.kp.pts_are_oppos := xmxz and not ymyz;
+							--if r.ctrl.r0z_init = '0' and r.ctrl.r1z_init = '0'
+							-- neither XR0 nor XR1 is 0
+							if xmxz = '1' and ymyz = '1' -- R0 = R1 (pts are equal)
+							then
+								-- R0 = R1 are equal, we need to call ZDBL to handle this case
+								v.int.faddr := EXEC_ADDR(ZDBL_ROUTINE); -- (s33) bypass of (s31)
+								v.kp.joye.state := zdblu; -- (s34), bypass of (s32)
+							else
+								-- All other cases, including are supported by calling the
+								-- zaddU routine as in the nominal case
+								--v.int.faddr := EXEC_ADDR(ADDITION_1_ROUTINE);
+								v.int.faddr := EXEC_ADDR(ZADDU_ROUTINE);
+							end if;
+							v.int.fgo := '1';
+							-- (s26), following statements are bypasses of the ones
+							-- in (s24) above
+							v.ctrl.active := '1';
+							v.ctrl.state := pop;
+							v.int.ardy := '0';
+							v.pop.done := '0';
+							v.pop.computing := '1';
+							-- inglorious hack: keeping r.int.ptadd high is used here to
+							-- create a third intermediate state between the two states
+							-- r.pop.step = 0 and r.pop.step = 1 (this of course is done
+							-- only for the point addition operation)
+							-- (1st state is: r.pop.step = 0
+							--  2nd state is: r.pop.step = 1 and r.int.ptadd = 1
+							--  3rt state is: r.pop.step = 1 and r.int.ptadd = 0)
+						elsif r.pop.step = '1' and r.int.ptadd = '1' then
+							v.int.faddr := EXEC_ADDR(ADDITION_END_ROUTINE);
+							v.int.fgo := '1';
+							-- (s60), following statements are bypasses of the ones
+							-- in (s24) above
+							v.ctrl.active := '1';
+							v.ctrl.state := pop;
+							v.int.ardy := '0';
+							v.pop.done := '0';
+							v.pop.computing := '1';
+							v.int.ptadd := '0';
+						elsif r.pop.step = '1' and r.int.ptadd = '0' then
+							v01z := r.ctrl.r1z_init & r.ctrl.r0z_init;
+							case v01z is
+								when "00" =>
+									-- neither R0 nor R1 input points were null to begin with
+									-- we need to catch if the resulting P + Q point happens to be
+									-- the null point, which can happen in two and only two cases:
+									-- if the input points were equal and this common point happe-
+									-- ned to be a 2-torsion point; and if the input points were
+									-- opposite.
+									-- Input signals xmxz and ymyz (driven by ecc_curve) are valid
+									-- because routine .pre_zadduL was executed prior (while in
+									-- "state" r.pop.step = 0)
+									if xmxz = '1' and ymyz = '1' then
+										-- input points were equal, the result is null iff input
+										-- torsion2 is asserted by ecc_curve
+										v.int.ar1zi := torsion2;
+										v.int.ar01zien := '1'; -- asserted only 1 cycle thx to (s28)
+									elsif xmxz = '1' and ymyz = '0' then
+										-- input points were opposite, the result is null
+										v.int.ar1zi := '1';
+										v.int.ar01zien := '1'; -- asserted only 1 cycle thx to (s28)
+									end if;
+								when "01" =>
+									-- R0 was null, R1 was not
+									-- patch mechanism in ecc_curve has ensured that coordinates
+									-- XR1 & YR1 of output point R1 have in fact been overwritten,
+									-- at the end of routine .additionL, with what they were when
+									-- point addition operation was started
+									-- both points R0 & R1 stays in the same state, we don't even
+									-- assert ar01zien
+									null;
+								when "10" =>
+									-- R1 was null, R0 was not
+									-- patch mechanism in ecc_curve has ensured that coordinates
+									-- XR1 & YR1 of output point R1 have in fact been overwritten,
+									-- at the end of routine .additionL, with values of XR0 & YR0
+									-- at the time point addition operation was started
+									-- R1 is no longer null (nor R0 but no need to set it)
+									v.int.ar1zi := '0';
 									v.int.ar01zien := '1'; -- stays asserted 1 cycle thx to (s28)
-									-- (state of R0 point should not change)
-								end if;
-							when "01" =>
-								-- R0 was null, R1 was not
-								-- patch mechanism in ecc_curve has ensured that coordinates
-								-- XR1 & YR1 of output point R1 have in fact been overwritten,
-								-- at the end of routine .additionL, with what they were when
-								-- point addition operation was started
-								-- both points R0 & R1 stays in the same state, we don't even
-								-- assert ar01zien
-								null;
-							when "10" =>
-								-- R1 was null, R0 was not
-								-- patch mechanism in ecc_curve has ensured that coordinates
-								-- XR1 & YR1 of output point R1 have in fact been overwritten,
-								-- at the end of routine .additionL, with values of XR0 & YR0
-								-- at the time point addition operation was started
-								-- R1 is no longer null (nor R0 but no need to set it)
-								v.int.ar1zi := '0';
-								v.int.ar01zien := '1'; -- stays asserted 1 cycle thx to (s28)
-							when "11" =>
-								-- both R0 & R1 were null, they stay so
-								null;
-							when others => null;
-						end case;
+								when "11" =>
+									-- both R0 & R1 were null, they stay so
+									null;
+								when others => null;
+							end case;
+							-- v.pop.step := '0'; -- no need to reset r.pop.step, this will
+							-- be done by either (s61), (s62) or (s63)
+						end if; -- r.pop.step
 					elsif r.pop.dbl = '1' then
 						-- -------------------------
 						-- operation was a point DBL
 						-- -------------------------
-						-- since R1 <= [2]R0, R1 gets the state (regarding nullity) that
+						-- since R1 <- [2]R0, R1 gets the state (regarding nullity) that
 						-- R0 was showing at the time computation was set
-						v.int.ar1zi := r.ctrl.r0z_init;
+						v.int.ar1zi := r.ctrl.r0z_init or torsion2;
 						v.int.ar01zien := '1'; -- stays asserted 1 cycle thx to (s28)
 					elsif r.pop.neg = '1' then
 						-- -------------------------
 						-- operation was a point NEG
 						-- -------------------------
-						-- since R1 <= -R0, R1 gets the state (regarding nullity) that
+						-- since R1 <- -R0, R1 gets the state (regarding nullity) that
 						-- R0 was showing at the time computation was set
 						v.int.ar1zi := r.ctrl.r0z_init;
 						v.int.ar01zien := '1'; -- stays asserted 1 cycle thx to (s28)
@@ -807,6 +868,8 @@ begin
 									v.pop.yesen := '1'; -- stays high only 1 cycle thx to (s27)
 								when others => null;
 							end case;
+							-- v.pop.step := '0'; -- no need to reset r.pop.step, this will
+							-- be done by either (s61), (s62) or (s63)
 						end if;
 					end if;
 				when aop =>
@@ -858,10 +921,6 @@ begin
 							v.int.aerr_inpt_not_on_curve := '0';
 						end if;
 					end if;
-					-- pragma translate_off
-					v.sim.logr0r1 := '1';
-					v.sim.logr0r1step := 3;
-					-- pragma translate_on
 				-- ----------------------------------------------------
 				-- blindinit: initialization of blinding countermeasure
 				-- ----------------------------------------------------
@@ -914,12 +973,8 @@ begin
 					-- & 2nd pass of 'ssetup' state: here we set it low to know
 					-- we're starting the 1st pass
 					v.kp.ssetup_step := '0';
-					v.kp.setup := '1';
+					v.kp.firstzdbl := '1';
 					v.int.fgo := '1';
-					-- pragma translate_off
-					v.sim.logr0r1 := '1';
-					v.sim.logr0r1step := 3;
-					-- pragma translate_on
 				-- -----------------------------------------------------
 				-- ssetup: enter  Montgomery domain,  switch to Jacobian
 				--         coordinates, compute [2]P & [3]P, set R0 & R1
@@ -930,83 +985,106 @@ begin
 						-- ----------------------------------
 						-- 1st pass of state 'ssetup' is done
 						-- ----------------------------------
-						v.kp.pts_are_equal := '0'; -- points can't be equal (P would be 0)
-						v.kp.pts_are_oppos := xmxz and not ymyz; -- (s55)
-						v.int.faddr := EXEC_ADDR(SETUP_END_ROUTINE);
+						-- we just have finished executing the .pre_zadduL routine that the
+						-- code of .setupL has branched to at its end
+						if r.ctrl.r1z = '1' then
+							-- P was the null point to begin with
+							v.ctrl.r0z := '1';
+							-- we execute .zadduL but as a dummy operation
+						elsif r.ctrl.r1z = '0' then
+							-- P is not the null point
+							-- There is no need to detect if [2]P == P (this would mean that
+							-- software gave us the null point without telling us so: this
+							-- is not possible because the only way to give us the null point
+							-- it to tell it through metadata: software gives us point P
+							-- using affine coordinates, and there is no representation of
+							-- the null point in affine coordinates)
+							-- Hence: [2]P and P are not equal
+							v.kp.pts_are_equal := '0';
+							-- but [2]P might be null if P is a 2-torsion point, which is
+							-- the case if ecc_curve asserts signal 'first2pz' (as a result
+							-- of patch ,p56 in .zdblL)
+							v.ctrl.r0z := first2pz;
+							-- points [2]P and P might also be opposite (meaning [3]P = 0,
+							-- that is P is a 3-torsion point). In this situation there is
+							-- no need to specifically call routine .zdblL, we simply call
+							-- .zadduL as a dummy operation
+							-- if this case we must also drive output 'first3pz' high to
+							-- ecc_curve so that patches in .zadduL ensure proper processing
+							v.kp.first3pz := xmxz and not ymyz; -- (s55) R0 = -R1
+						end if;
+						-- R1 still holds point P after .zdblL (& .pre_zadduL) execution
+						v.int.faddr := EXEC_ADDR(ZADDU_ROUTINE);
 						v.int.fgo := '1';
-						-- we stay in the same 'ssetup' state, but the 2nd pass
-						-- is enforced by asserting .kp.ssetup_step high
+						v.kp.firstzdbl := '0';
+						v.kp.firstzaddu := '1';
+						-- we stay in the same 'ssetup' state, but the 2nd pass (executing
+						-- zaddU routine in order to perform [3]P <- [2]P + P) is enforced
+						-- by asserting .kp.ssetup_step high
 						v.kp.ssetup_step := '1';
-						v.kp.zu := '1';
-						-- if the two points R0 & R1 are opposite (and non null), we must
-						-- drive output 'p_is_of_order_3' high to ecc_curve so that patches
-						-- in .zadduL ensure proper processing
-						if r.ctrl.r0z = '0' and r.ctrl.r1z = '0' -- neither XR0 nor XR1 = 0
-							and xmxz = '1' and ymyz = '0' -- XR0 = -XR1
-						then
-							v.kp.first3pz := '1';
-							-- pragma translate_off
-							v.sim.logr0r1 := '1';
-							v.sim.logr0r1step := 3;
-							-- pragma translate_on
-						end if;
-					elsif r.kp.ssetup_step = '1' then
-						-- ----------------------------------
-						-- 2nd pass of state 'ssetup' is done
-						-- ----------------------------------
-						v.kp.ssetup_step := '0';
-						v.int.faddr := EXEC_ADDR(SWITCH3P_ROUTINE); -- (s9)
-						v.kp.setup := '0';
-						if iterate_shuffle_rdy = '1' then
-							-- switch from 'ssetup' state to 'switch3p' state
-							v.kp.substate := switch3p;
-							v.int.fgo := '1';
-							-- pragma translate_off
-							v.sim.logr0r1 := '1';
-							v.sim.logr0r1step := 0;
-							-- pragma translate_on
-						elsif iterate_shuffle_rdy = '0' then
-							v.kp.substate := wait_xyr01_permute;
-							v.kp.nextsubstate := switch3p;
-						end if;
-						if r.kp.pts_are_oppos = '1' then -- set by (s55)
-							if kap = '0' then -- R0 & R1 must switch places
-								-- R0 contains initial point P, which is non null
-								v.ctrl.r0z := '0';
-								-- R1 contains the double, which is null
-								v.ctrl.r1z := '1';
-							elsif kap = '1' then -- no R0/R1 switch
-								-- R0 contains the double, which is null
-								v.ctrl.r0z := '1';
-								-- R1 contains initial point P, which is non null
-								v.ctrl.r1z := '0';
-							end if;
-						end if;
-					end if;
-				-- ------------------------------------
-				-- possible switch of R0 & R1 registers
-				-- ------------------------------------
-				when switch3p =>
-					-- switch from 'switch3p' state to 'joyecoz' state to perform the
-					-- loop of the Joye Double-&-Add scalar arithmetic level algorithm
-					-- TODO: state 'switch3p' is obsolete (as well as its associated
-					-- routine .switch3PL, which now contains only a NOP) -> remove them
-					v.int.faddr := EXEC_ADDR(ITOH_ROUTINE);
-					v.kp.substate := joyecoz;
-					if (not debug and shuffle) or
-					  (debug and shuffle and doshuffle = '1') -- (s8)
-					then
-						v.kp.joye.state := permutation;
-						v.int.permute := '1'; -- stays asserted only 1 cycle thx to (s4)
-					else
-						v.kp.joye.state := itoh;
-						v.int.fgo := '1';
+						v.kp.zu := '1'; --TODO: is it necessary?
 						-- pragma translate_off
 						v.sim.logr0r1 := '1';
 						v.sim.logr0r1step := 0;
 						-- pragma translate_on
+					elsif r.kp.ssetup_step = '1' then
+						-- ----------------------------------
+						-- 2nd pass of state 'ssetup' is done
+						-- ----------------------------------
+						-- we just have finished executing the .zadduL routine called
+						-- as the 2nd part of the state 'ssetup', in order to compute
+						-- ([2]P, P) -> ([3]P, P)
+						v.kp.ssetup_step := '0';
+						v.int.faddr := EXEC_ADDR(ITOH_ROUTINE); -- (s9)
+						v.kp.firstzaddu := '0';
+						--v.kp.firstitoh := '1';
+						v.kp.substate := joyecoz;
+						v.kp.joye.state := itoh;
+						v.int.fgo := '1';
+						-- pragma translate_off
+						v.sim.logr0r1 := '1';
+						v.sim.logr0r1step := 1;
+						-- pragma translate_on
+						--if iterate_shuffle_rdy = '1' then
+						--	-- switch from 'ssetup' state to 'switch3p' state
+						--	v.kp.substate := switch3p;
+						--	v.int.fgo := '1';
+						--	-- pragma translate_off
+						--	v.sim.logr0r1 := '1';
+						--	v.sim.logr0r1step := 1;
+						--	-- pragma translate_on
+						--elsif iterate_shuffle_rdy = '0' then
+						--	v.kp.substate := wait_xyr01_permute;
+						--	v.kp.nextsubstate := switch3p;
+						--end if;
+						if kap = '0' then
+							-- R0 contains initial point P, so it is non null if P isn't
+							v.ctrl.r0z := r.ctrl.r1z_init;
+							-- R1 contains [3]P, which is null iif P is a 3-torsion point
+							-- Remark: obviously [3]P would also be the null point if initial
+							-- point P was null to begin with. However we can't rely on signal
+							-- r.kp.first3pz to be asserted when P is null, because signal
+							-- r.kp.first3pz is based on input xmxz and ymyz (see (s55) above)
+							-- that ecc_curve drives on the basis of arithmetic computations
+							-- made on actual points coordinates. Now when P is null to begin
+							-- with, point coordinates in ecc_fp_dram contain random noise,
+							-- because the information that P is null is not encoded in its
+							-- coordinates but only by the fact that software driver has
+							-- written the W_R1_NULL register (see ecc_axi.vhd).
+							-- We don't need r.ctrl.r1z to be asserted here when P is ini-
+							-- tially 0. The final result [k]P will simply tagged as null
+							-- when whole computation is over at the end of 'exits state',
+							-- see (s64) below
+							v.ctrl.r1z := r.kp.first3pz; -- set by (s55)
+						elsif kap = '1' then
+							-- R0 contains [3]P, which is null iif P is a 3-torsion point
+							-- or if initial point P was null to begin with (same remarks
+							-- apply as discussed just above for the kap = 0 case)
+							v.ctrl.r0z := r.kp.first3pz;
+							-- R1 contains initial point P, so it is non null if P isn't
+							v.ctrl.r1z := r.ctrl.r1z_init; -- set by (s55)
+						end if;
 					end if;
-					v.kp.iterate_shuffle_valid := '1';
 				-- ------------------------
 				-- Joye Double-&-Add always (s5), see also (s6)
 				-- ------------------------
@@ -1025,14 +1103,15 @@ begin
 							-- enter Joye FSM state 'prezaddu'
 							v.kp.joye.state := prezaddu; -- (s12)
 							v.int.fgo := '1';
-							if r.kp.firstzaddu = '1' then
-								v.kp.firstzaddu := '0';
-							elsif r.kp.firstzaddu = '0' then
-								v.kp.iterate_shuffle_valid := '1';
-							end if;
+							--if r.kp.firstitoh = '1' then
+							--	v.kp.firstitoh := '0';
+							--elsif r.kp.firstitoh = '0' then
+							v.kp.iterate_shuffle_valid := '1';
+							--end if;
 							-- pragma translate_off
 							v.sim.simbit := r.sim.simbit + 1;
 							-- pragma translate_on
+							v.dbg.joyebit := std_logic_vector(unsigned(r.dbg.joyebit) + 1);
 						elsif iterate_shuffle_rdy = '0' then
 							-- random is not available yet to ensure shuffle of [XR]R[01]
 							-- coords, switch from substate joyecoz to wait_xyr01_permute.
@@ -1062,8 +1141,15 @@ begin
 						-- if the two points R0 & R1 are equal (and non null), we must
 						-- call .zdblL instead of .zadduL (and switch to zdblu state
 						-- instead of zaddu)
+						-- Note that otherwise, all other cases, including:
+						--   - pts R0 & R1 are opposite and both non null
+						--   - R0 = 0 but not R1
+						--   - R1 = 0 but not R0
+						--   - R0 = R1 = 0
+						-- are supported by calling the zaddU routine as in the nominal case
+						-- (see (s31) just above)
 						if r.ctrl.r0z = '0' and r.ctrl.r1z = '0' -- neither XR0 nor XR1 is 0
-							and xmxz = '1' and ymyz = '1' -- XR0 = XR1
+							and xmxz = '1' and ymyz = '1' -- R0 = R1 (pts are equal)
 						then
 							-- we need to call ZDBL to handle this case
 							v.int.faddr := EXEC_ADDR(ZDBL_ROUTINE); -- (s33), bypass of (s31)
@@ -1080,7 +1166,7 @@ begin
 							v.kp.iterate_shuffle_valid := '1';
 							-- pragma translate_off
 							v.sim.logr0r1 := '1';
-							v.sim.logr0r1step := 1;
+							v.sim.logr0r1step := 2;
 							-- pragma translate_on
 						elsif iterate_shuffle_rdy = '0' then
 							-- switch from substate joyecoz to wait_xyr01_permute.
@@ -1102,7 +1188,7 @@ begin
 						--    - kap & kapp inputs (driven by ecc_curve), also used in patchs
 						--    - (torsion2 plays no role here, only in ZDBL - see below)
 						if r.ctrl.r0z = '0' and r.ctrl.r1z = '0' then
-							-- neither R0 nor R1 was null when starting ZADDU
+							-- neither R0 nor R1 were null when starting ZADDU
 							if r.kp.pts_are_equal = '1' then -- was set by (s45)
 								assert (FALSE)
 									report "ERROR - points were equal in pre-ZADDU: "
@@ -1118,7 +1204,7 @@ begin
 									-- v.ctrl.r1z := '0' -- useless (R1 wasn't null, it stays so)
 								end if;
 							else
-								-- points were neither equal nor opposed (and non null)
+								-- points were neither equal nor opposite (and non null)
 								-- so they stay non-null
 								--v.ctrl.r0z := '0'; -- useless (R0 wasn't null, it stays so)
 								--v.ctrl.r1z := '0'; -- useless (R0 wasn't null, it stays so)
@@ -1159,7 +1245,7 @@ begin
 							v.kp.iterate_shuffle_valid := '1';
 							-- pragma translate_off
 							v.sim.logr0r1 := '1';
-							v.sim.logr0r1step := 1;
+							v.sim.logr0r1step := 2;
 							-- pragma translate_on
 						elsif iterate_shuffle_rdy = '0' then
 							-- switch from substate itoh to wait_xyr01_permute.
@@ -1193,7 +1279,7 @@ begin
 							elsif r.kp.pts_are_oppos = '1' then -- was set by (s46)
 								-- pragma translate_off
 								assert (FALSE)
-									report "ERROR - points were opposed in pre-ZADDU: "
+									report "ERROR - points were opposite in pre-ZADDU: "
 									& "we shouldn't be at the end of ZDBLU but at the "
 									& "end of ZADDU"
 										severity FAILURE;
@@ -1264,8 +1350,8 @@ begin
 						-- we must call .negativeL instead of .zaddcL
 						-- (and switch to znegc state instead of zaddc)
 						if r.ctrl.r0z = '0' and r.ctrl.r1z = '0' -- neither XR0 nor XR1 = 0
-							and ((xmxz = '1' and ymyz = '1') -- XR0 = XR1
-									 or (xmxz = '1' and ymyz = '0')) -- XR0 == -XR1
+							and ((xmxz = '1' and ymyz = '1') -- R0 = R1 (pts are equal)
+									 or (xmxz = '1' and ymyz = '0')) -- R0 = -R1 (opposite pts)
 							then
 							-- we need to call .zdblL to handle this case
 							v.int.faddr := EXEC_ADDR(ZDBL_ROUTINE); -- (s41), bypass of (s39)
@@ -1277,6 +1363,11 @@ begin
 							v.int.faddr := EXEC_ADDR(ZNEGC_ROUTINE); -- (s43), bypass of (s39)
 							v.kp.joye.state := znegc; -- (s44), bypass of (s40)
 						end if;
+						-- note that in case both R1 and R1 are null, the situation is
+						-- "handled" artificially by going through .zaddcL routine (see
+						-- (s39) above) as some kind of dummy operation (both points being
+						-- null means that all mathematical computation are useless from
+						-- now on)
 					elsif r.kp.joye.state = zdblc then
 						-- -------------------------------------------
 						--                end of ZDBLC
@@ -1400,6 +1491,7 @@ begin
 						if r.kp.joye.nbbits(log2(nn)) = '0' and
 							v.kp.joye.nbbits(log2(nn)) = '1'
 						then
+							-- (s59)
 							-- Joye Double-&-Add-Always loop is now complete (blinded
 							-- scalar had all its bits parsed one by one to complete [k]P
 							-- computation like a "fast exponentiation")
@@ -1413,15 +1505,6 @@ begin
 							v.kp.laststep := '1';
 							v.kp.joye.state := idle;
 							v.int.fgo := '1';
-							--if r.kp.joye.state = zdblc then
-							--	-- TODO (flags?) -- > the last ZADDC when it happens in subtractp
-							--	-- should be patched to test for exceptions too: do we need to
-							--	-- prepare its job with something here?
-							--elsif r.kp.joye.state = znegc then
-							--	-- TODO (flags?) -- > the last ZADDC when it happens in subtractp
-							--	-- should be patched to test for exceptions too: do we need to
-							--	-- prepare its job with something here?
-							--end if;
 						else
 							-- Double-&-Add loop is not over, loop back to 'itoh'
 							-- (or to 'permutation' if shuffle = TRUE)
@@ -1443,7 +1526,7 @@ begin
 						v.kp.zc := '0';
 						-- pragma translate_off
 						v.sim.logr0r1 := '1';
-						v.sim.logr0r1step := 2;
+						v.sim.logr0r1step := 3;
 						-- pragma translate_on
 					end if; -- common 'if' of zaddc, zdblc & znegc states
 
@@ -1453,52 +1536,107 @@ begin
 				when subtractp =>
 					if r.kp.subpstep = '0' then
 						-- we just have finished executing the .pre_zaddcL routine that the
-						-- code of .subtractP has branched to at its end, so we can use the
-						-- values of XmXC (difference of X-coords when entering .pre_zaddcL)
-						-- and YmY (same for Y-coords) to determine:
-						--   - if the [k + 1 - k%2]P and P points are possibly equal
-						--     (this is the case if XmXC = YmY = 0) in which situation we
-						--     must execute .zdblL (with zc = 1)
-						--   - if the [k + 1 - k%2]P and P points are possibly opposite
-						--     (this is the case if XmXC = 0, YmY != 0) in which situation
-						--     we must execute also .zdblL (with zc = 1)
-						--   - if point [k + 1 - k%2]P is possibly null
-						--     (this is the case if the last %par bit sampled by the opcode
-						--     "TESTPARs  phi0  3  %par" in .subtractPL:
-					  --     	 - either was 0 and R0 was null at the end of the last
+						-- code of .subtractPL has branched to at its end, so we can use the
+						-- values of XmXC (difference of X coordinates when entering routine
+						-- .pre_zaddcL) and YmY (same for Y coordinates) that just have been
+						-- computed to determine:
+						--   - if the [k + 1 - k%2]P and P points are possibly equal (and
+						--     both non null). This is the case if XmXC = YmY = 0.
+						--     We must then execute routine .zdblL (with zc = 1)
+						--   - if the [k + 1 - k%2]P and P points are possibly opposite (and
+						--     both non null). This is the case if XmXC = 0, YmY != 0.
+						--     We must also execute routine .zdblL (with zc = 1)
+						--   - if point [k + 1 - k%2]P is possibly null. This is the case
+						--     if the last %par bit sampled by the opcode :
+						--        "TESTPARs  phi0  3  %par"
+						--     in .subtractPL:
+						--       - either was 0 and R0 was null at the end of the last
 						--         "regular" zdblc or znegc
-						--       - or was 1 and it was R1 which was null)
-						--     This is because the bit sampled by the TESTPARs indicates
+						--       - or was 1 and it was R1 which was null.
+						--     (This is because the bit sampled by the TESTPARs indicates
 						--     in which point (R0 or R1) is the final "regular" result
-						--     before conditional subtraction
-						--     In this last situation we must execute .znegcL
-						if ((phimsb = '0' and r.ctrl.r0z = '1') or
-							(phimsb = '1' and r.ctrl.r1z = '1')) then
+						--     before conditional subtraction).
+						--     We must then execute routine .znegcL.
+						--   - in the trivial case where point P was null to begin with,
+						--     then [k + 1 - k%2]P is also null.
+						--     We then choose to execute routine .zaddcL, to simply act
+						--     as a dummy operation.
+						-- In all cases we also reassign r0z & r1z flags since the content
+						-- of R0 and R1 is now known deterministically: R0 = [k+1-k%2]P
+						-- and R1 = P (the transition from random to deterministic was done
+						-- by the first instructions of .subtractPL routine (before bran-
+						-- ching to subroutine .pre_zaddcL) - we couldn't do the reassign-
+						-- ment of r[01]z flags at the time we started execution of routine
+						-- subtractPL (see (s59) above) because in order to perform the
+						-- transition we need signal phimsb to be set, and this is done
+						-- by executing the first instruction of "TESTPARs phi0   %par"
+						-- (see (s108) & (s109) in ecc_curve.vhd)
+						if phimsb = '0' then
+							-- [k + 1 - (k%2)]P was in R0 before transition from random to
+							-- deterministic R0/R1 positions, and after transition it is still
+							-- in R0, while R1 now contains P
+							v.ctrl.r0z := r.ctrl.r0z; -- (useless just for readability's sake)
+							v.ctrl.r1z := r.ctrl.r1z_init;
+						elsif phimsb = '1' then
+							-- [k + 1 - (k%2)]P was in R1 before transition from random to
+							-- deterministic R0/R1 positions, and after transition it is now
+							-- in R0, while R1 now contains P
+							v.ctrl.r0z := r.ctrl.r1z;
+							v.ctrl.r1z := r.ctrl.r1z_init;
+						end if;
+						if v.ctrl.r0z = '1' and v.ctrl.r1z = '0'
+							-- note tests are made on v.ctrl.r[01]z (not r.ctrl.r[01]z)
+							then
+							-- point [k + 1 - k%2]P is null but initial point P is not
 							v.kp.pts_are_equal := '0';
 							v.kp.pts_are_oppos := '0';
 							-- execute .znegcL
 							v.int.faddr := EXEC_ADDR(ZNEGC_ROUTINE);
-							v.kp.subptype := "10";
-						elsif xmxz = '1' and ymyz = '1' then
-							v.kp.pts_are_equal := '1';
-							v.kp.pts_are_oppos := '0';
-							-- execute .zdblL with flag zc high
-							v.int.faddr := EXEC_ADDR(ZDBL_ROUTINE);
-							v.kp.zc := '1';
-							v.kp.subptype := "01";
-						elsif xmxz = '1' and ymyz = '0' then
-							v.kp.pts_are_oppos := '1';
-							v.kp.pts_are_equal := '0';
-							-- execute .zdblL with flag zc high
-							v.int.faddr := EXEC_ADDR(ZDBL_ROUTINE);
-							v.kp.zc := '1';
-							v.kp.subptype := "01";
-						else
+							v.kp.subptype := last_znegc;
+							-- back from .znegcL routine, we will properly assign r0z and r1z
+							-- flags, depending on the parity of the scalar (see (s56) below)
+						elsif v.ctrl.r0z = '0' and v.ctrl.r1z = '0' then
+							-- note tests are made on v.ctrl.r[01]z (not r.ctrl.r[01]z)
+							if xmxz = '1' and ymyz = '1' then
+								-- points [k + 1 - k%2]P  and  P are equal (and both non null)
+								v.kp.pts_are_equal := '1';
+								v.kp.pts_are_oppos := '0';
+								-- execute .zdblL with flag zc high
+								v.int.faddr := EXEC_ADDR(ZDBL_ROUTINE);
+								v.kp.zc := '1';
+								v.kp.subptype := last_zdblc;
+							elsif xmxz = '1' and ymyz = '0' then
+								-- points [k + 1 - k%2]P and P are opposite (and both non null)
+								v.kp.pts_are_oppos := '1';
+								v.kp.pts_are_equal := '0';
+								-- execute .zdblL with flag zc high
+								v.int.faddr := EXEC_ADDR(ZDBL_ROUTINE);
+								v.kp.zc := '1';
+								v.kp.subptype := last_zdblc;
+							else -- means xmxz = ymyz = 0
+								-- this corresponds to the nominal case ([k + 1 - k%2]P and P
+								-- are both non null, and not equal nor opposite).
+								v.kp.pts_are_equal := '0';
+								v.kp.pts_are_oppos := '0';
+								-- execute zaddcL (nominal situation, no exception)
+								v.int.faddr := EXEC_ADDR(ZADDC_ROUTINE);
+								v.kp.subptype := last_zaddc;
+							end if;
+						elsif v.ctrl.r0z = '1' and v.ctrl.r1z = '1' then
+							-- note tests are made on v.ctrl.r[01]z (not r.ctrl.r[01]z)
+							-- R0 = [k + 1 - k%2]P = 0 = P = R1  (R0=R1=0)
+							-- this is treated by calling zaddC just as in the default case
+							-- (no exception)
 							v.kp.pts_are_equal := '0';
 							v.kp.pts_are_oppos := '0';
 							-- execute zaddcL (nominal situation, no exception)
 							v.int.faddr := EXEC_ADDR(ZADDC_ROUTINE);
-							v.kp.subptype := "00";
+							v.kp.subptype := last_zaddc;
+						elsif v.ctrl.r0z = '0' and v.ctrl.r1z = '1' then
+							-- this situation is actually not possible
+							-- (R1 = 0 means initial point P is null, therefore R0 can't be
+							-- but the null point too)
+							null; -- there's no point in signaling an error
 						end if;
 						v.int.fgo := '1';
 						-- we stay in state 'subtractp' to execute the last ZADDC/ZNEGC/
@@ -1507,42 +1645,57 @@ begin
 						v.kp.subpstep := '1';
 						-- pragma translate_off
 						v.sim.logr0r1 := '1';
-						v.sim.logr0r1step := 3;
+						v.sim.logr0r1step := 4;
 						-- pragma translate_on
 					elsif r.kp.subpstep = '1' then
-						if r.kp.subptype = "01" then
-							-- we're back from .zdblL routine
+						if r.kp.subptype = last_zdblc then
+							-- ------------------------------
+							-- we're back from .zdblL routine (with zc = 1)
+							-- ------------------------------
 							-- R1 (final [k]P point) might be null! This is the case in two
 							-- situations:
-							--   1st situation:
-							--        - if the input scalar is even
-							--    and - twe two points [k + 1 - k%2]P and P turned out to be
-							--          equal
-							--   2nd situation:
-							--        - if the 2-torsion flag ('torsion2') driven by ecc_curve
-							--          (set by patch ,p56 & used by patches ,p22/,p23/,p61)
-							--          is high
-							--    and - if the input scalar is even
-							--    and - twe two points [k + 1 - k%2]P and P turned to be
-							--          opposed
-							if (r.kp.pts_are_equal = '1' and kb0end = '0') or
-								(r.kp.pts_are_oppos = '1' and kb0end = '0' and torsion2 = '1')
+							--   1st situation: (see first if condition in (s57) below)
+							--         - if the input scalar is even
+							--     and - the two points [k + 1 - k%2]P and P turned out to be
+							--           equal when running subroutine .pre_zaddcL
+							--   2nd situation: (see second if condition in (s58) below)
+							--         - if the input scalar is even
+							--     and - the two points [k + 1 - k%2]P and P turned out to be
+							--           opposite when running subroutine .pre_zadduCL
+							--     and - if point [k + 1 - k%2]P turned out to be a 2-torsion
+							--           point. This shows in the 2-torsion flag ('torsion2')
+							--           driven by ecc_curve (set by patch ,p56 & used by
+							--           patches ,p22/,p23/,p61 in .zdblL routine) is high
+							-- note/reminder: the parity of the scalar is taken into account
+							-- here because the point subtraction computed during the second
+							-- phase of subtractp state is only effective if the scalar was
+							-- EVEN to being with - if it was ODD, the subtraction didn't
+							-- actually took place in the sense that neither R0 not R1 were
+							-- modified by it by routine .zdblL.
+							if (r.kp.pts_are_equal = '1' and kb0end = '0') -- (s57)
+								or (r.kp.pts_are_oppos = '1' and kb0end = '0' and -- (s58)
+								    torsion2 = '1')
 							then
-								v.ctrl.r1z := '1'; -- final point is null
+								v.ctrl.r1z := '1'; -- final point R1 (result [k]P) is null
 							else
-								v.ctrl.r1z := '0'; -- final point is non null
+								v.ctrl.r1z := '0'; -- final point R1 (result [k]P) is not null
 							end if;
-						elsif r.kp.subptype = "10" then
+						elsif r.kp.subptype = last_znegc then
+							-- --------------------------------
 							-- we're back from .znegcL routine
+							-- --------------------------------
 							-- R1 (final [k]P point) might be null! This is the case if the
 							-- input scalar is odd
-							if kb0end = '1' then
-								v.ctrl.r1z := '1'; -- final point is null
+							if kb0end = '1' then -- (s56) (see (s106)-(s107) in ecc_curve.vhd)
+								v.ctrl.r1z := '1'; -- final point R1 (result [k]P) is null
 							else
-								v.ctrl.r1z := '0'; -- final point is non null
+								v.ctrl.r1z := '0'; -- final point R1 (result [k]P) is not null
 							end if;
-						else -- r.kp.subptype = "00"
-							-- we're back from .zaddcL routine, final point R1 can't be null
+						else -- r.kp.subptype = last_zaddc
+							-- -------------------------------
+							-- we're back from .zaddcL routine (nominal case), final point R1
+							-- can't be null
+							-- -------------------------------
 							v.ctrl.r1z := '0';
 						end if;
 						v.kp.subpstep := '0'; -- probably useless
@@ -1553,23 +1706,25 @@ begin
 						v.int.fgo := '1';
 						-- pragma translate_off
 						v.sim.logr0r1 := '1';
-						v.sim.logr0r1step := 3;
+						v.sim.logr0r1step := 5;
 						-- pragma translate_on
 					end if;
 				-----------------------------------------
 				-- exits:   return to  affine coordinates
 				--        & check final point is on curve
 				-----------------------------------------
-				when others => -- ("others" stands for exits)
+				when exits => -- ("others" stands for exits)
 					-- test input 'zero' driven by ecc_curve to check if the
 					-- result [k]P actually belongs to the curve
-					if r.ctrl.r1z = '1' then
+					if r.ctrl.r1z = '1' or r.ctrl.r1z_init = '1' then
 						v.int.aerr_outpt_not_on_curve := '0'; -- no error (0 is on curve)
-					elsif r.ctrl.r1z = '0' then
+					elsif r.ctrl.r1z = '0' and r.ctrl.r1z_init = '0' then
 						if zero = '0' then
-							v.int.aerr_outpt_not_on_curve := '1'; -- error (output point NOT on curve)
+							-- error (output point NOT on curve)
+							v.int.aerr_outpt_not_on_curve := '1';
 						elsif zero = '1' then
-							v.int.aerr_outpt_not_on_curve := '0'; -- no error (output point on curve)
+							-- no error (output point on curve)
+							v.int.aerr_outpt_not_on_curve := '0';
 						end if;
 					end if;
 					-- this is the only substate where we don't reassert
@@ -1577,10 +1732,22 @@ begin
 					-- nothing to do, return to idle state is handled
 					-- by the main state machine (see (s2) above)
 					v.kp.done := '1';
+					-- the final state of R1 (nut or not null) must be forced high if
+					-- initial point P was null to begin with. This is because value
+					-- of signal r.ctrl.r1z is based on arithmetic operations all along
+					-- the [k]P computation that, when P is actually null, are made on
+					-- random noise data. Therefore this register is not reliable to
+					-- identify R1 as being null at the end of whole [k]P computation
+					-- in this case)
+					if r.ctrl.r1z_init = '1' then
+						v.ctrl.r1z := '1'; -- (s64)
+					end if;
 					-- pragma translate_off
 					v.sim.logr0r1 := '1';
-					v.sim.logr0r1step := 0;
+					v.sim.logr0r1step := 6;
 					-- pragma translate_on
+				when others =>
+					null;
 			end case;
 		end if;
 
@@ -1619,23 +1786,20 @@ begin
 				v.int.fgo := '1';
 				-- no need to set r.int.faddr, it was done:
 				--   - by (s9) at the end of substate 'ssetup'
-				--       (r.int.faddr was then set to EXEC_ADDR(SWITCH3P_ROUTINE))
+				--       (r.int.faddr was then set to EXEC_ADDR(ITOH_ROUTINE))
 				--   - by (s10) at the end of Joye-state 'itoh'
 				--       (r.int.faddr was then set to EXEC_ADDR(PRE_ZADDU_ROUTINE))
 				--   - by (s11) at the end of Joye-state 'zaddu'
 				--       (r.int.faddr was then set to EXEC_ADDR(PRE_ZADDC_ROUTINE))
 				--   - by (s37) at the end of Joye-state 'zdblu'
 				--       (r.int.faddr was then set to EXEC_ADDR(PRE_ZADDC_ROUTINE))
-				if r.kp.nextsubstate = switch3p then
-					-- v.kp.substate := r.kp.nextsubstate; -- useless, see (s15)
-					-- in this case we must not have the permutation set in
-					-- ecc_curve (on the [XY]R[01] coordinates) taking effet
-					-- right now, so we do not assert r.kp.iterate_shuffle_valid
-					-- pragma translate_off
-					v.sim.logr0r1 := '1';
-					v.sim.logr0r1step := 3;
-					-- pragma translate_on
-				elsif r.kp.joye.state = itoh then -- (s13)
+				-- if r.kp.nextsubstate = switch3p then
+				-- 	-- v.kp.substate := r.kp.nextsubstate; -- useless, see (s15)
+				-- 	-- in this case we must not have the permutation set in
+				-- 	-- ecc_curve (on the [XY]R[01] coordinates) taking effet
+				-- 	-- right now, so we do not assert r.kp.iterate_shuffle_valid
+				-- 	null;
+				if r.kp.joye.state = itoh then -- (s13)
 					-- v.kp.substate := joyecoz; -- useless already coded by (s14)/(s15)
 					v.kp.joye.state := prezaddu;
 					if r.kp.firstzaddu = '1' then
@@ -1646,6 +1810,7 @@ begin
 					-- pragma translate_off
 					v.sim.simbit := r.sim.simbit + 1;
 					-- pragma translate_on
+					v.dbg.joyebit := std_logic_vector(unsigned(r.dbg.joyebit) + 1);
 				elsif r.kp.joye.state = zaddu then -- (s18)
 					-- v.kp.substate := joyecoz; -- useless already coded by (s16)/(s15)
 					v.kp.joye.state := prezaddc;
@@ -1719,6 +1884,7 @@ begin
 			v.ctrl.r1z_init := '0';
 			-- no need to reset r.kp.ssetup_step nor r.kp.subpstep
 			-- no need to reset r.kp.subptype
+			-- no need to reset r.kp.first3pz
 			v.int.small_k_sz_en_ack := '0';
 			v.int.small_k_sz_kpdone := '0';
 			v.ctrl.small_k_sz_en := '0';
@@ -1756,7 +1922,8 @@ begin
 	faddr <= r.int.faddr;
 	initkp <= r.kp.initkp;
 	laststep <= r.kp.laststep;
-	setup <= r.kp.setup;
+	firstzdbl <= r.kp.firstzdbl;
+	firstzaddu <= r.kp.firstzaddu;
 	iterate_shuffle_valid <= r.kp.iterate_shuffle_valid;
 	iterate_shuffle_force <= r.kp.iterate_shuffle_force;
 	fr0z <= r.ctrl.r0z_init;
@@ -1767,7 +1934,8 @@ begin
 	r1z <= r.ctrl.r1z;
 	pts_are_equal <= r.kp.pts_are_equal;
 	pts_are_oppos <= r.kp.pts_are_oppos;
-	p_is_of_order_3 <= r.kp.first3pz;
+	first3pz <= r.kp.first3pz;
+	ptadd <= r.int.ptadd;
 	--   interface with ecc_fp
 	compkp <= r.kp.computing; -- also driven to ecc_curve
 	compcstmty <= r.mty.computing_del;
@@ -1783,8 +1951,9 @@ begin
 	simbit <= r.sim.simbit;
 	-- pragma translate_on
 	-- debug features
-	-- TODO: many multicycles can be set on paths r.[sub]state -> dbg*
-	--                                          & r.dbgnextstate -> dbg*
+	dbgjoyebit <= r.dbg.joyebit;
+	-- TODO: many multicycles can be set on paths r.ctrl.state -> dbg*
+	-- TODO: many multicycles can be set on paths r.kp.substate -> dbg*
 	dbgpgmstate <= DEBUG_STATE_IDLE when r.ctrl.state = idle
 	  else DEBUG_STATE_CSTMTY when r.ctrl.state = cst
 	  else DEBUG_STATE_CHECKONCURVE when r.kp.substate = checkoncurve
@@ -1793,15 +1962,15 @@ begin
 	  else DEBUG_STATE_BLINDEXIT when r.kp.substate = blindexit
 	  else DEBUG_STATE_ADPA when r.kp.substate = adpa
 	  else DEBUG_STATE_SETUP when r.kp.substate = ssetup
-	  else DEBUG_STATE_SWITCH3P when r.kp.substate = switch3p
 	  else DEBUG_STATE_ITOH
 			when r.kp.substate = joyecoz and r.kp.joye.state = itoh
 	  else DEBUG_STATE_ZADDU
 			when r.kp.substate = joyecoz and (r.kp.joye.state = prezaddu
-			or r.kp.joye.state = zaddu)
+			or r.kp.joye.state = zaddu or r.kp.joye.state = zdblu)
 	  else DEBUG_STATE_ZADDC
 			when r.kp.substate = joyecoz and (r.kp.joye.state = prezaddc
-			or r.kp.joye.state = zaddc)
+			or r.kp.joye.state = zaddc or r.kp.joye.state = zdblc
+			or r.kp.joye.state = znegc)
 	  else DEBUG_STATE_SUBTRACTP when r.kp.substate = subtractp
 	  else DEBUG_STATE_EXIT when r.kp.substate = exits
 	  else "1111";
@@ -1942,11 +2111,11 @@ begin
 				echol(")");
 				r_sim_prevbit <= 2;
 				r_sim_prevblbit <= 0;
-			elsif (r.kp.substate = switch3p and rbak_substate /= switch3p) then
-				echo("ECC_SCALAR: ");
-				echo("entering substate 'switch3p' (");
-				echo(time'image(now));
-				echol(")");
+			--elsif (r.kp.substate = switch3p and rbak_substate /= switch3p) then
+			--	echo("ECC_SCALAR: ");
+			--	echo("entering substate 'switch3p' (");
+			--	echo(time'image(now));
+			--	echol(")");
 			elsif (r.kp.substate = joyecoz and rbak_substate /= joyecoz) then
 				echo("ECC_SCALAR: ");
 				echo("entering substate 'joyecoz' (");

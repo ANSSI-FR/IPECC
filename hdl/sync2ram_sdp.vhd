@@ -1,25 +1,10 @@
---
---  Copyright (C) 2023 - This file is part of IPECC project
---
---  Authors:
---      Karim KHALFALLAH <karim.khalfallah@ssi.gouv.fr>
---      Ryad BENADJILA <ryadbenadjila@gmail.com>
---
---  Contributors:
---      Adrian THILLARD
---      Emmanuel PROUFF
---
---  This software is licensed under GPL v2 license.
---  See LICENSE file at the root folder of the project.
---
-
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
 use work.ecc_utils.all; -- for log2()
 use work.ecc_pkg.all;
-use work.ecc_custom.all; -- for techno
+use work.ecc_customize.all; -- for techno
 
 -- code below conforms to Xilinx's synthesis recommandations for
 -- VHDL coding style of a simple dual-port BRAM with two asynchronous clocks

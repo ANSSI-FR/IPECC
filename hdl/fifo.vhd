@@ -19,7 +19,7 @@ use ieee.numeric_std.all;
 
 use work.ecc_utils.all; -- for log2()
 use work.ecc_pkg.all; -- for syncram_sdp
-use work.ecc_custom.all; -- for 'debug'
+use work.ecc_customize.all; -- for 'debug'
 
 entity fifo is
 	generic(

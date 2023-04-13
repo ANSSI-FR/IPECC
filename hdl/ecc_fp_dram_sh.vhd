@@ -21,7 +21,7 @@ use ieee.numeric_std.all;
 use std.textio.all;
 -- pragma translate_on
 
-use work.ecc_custom.all; -- for rdlat
+use work.ecc_customize.all; -- for rdlat
 use work.ecc_utils.all;
 use work.ecc_pkg.all;
 --use work.ecc_trng_pkg.all;

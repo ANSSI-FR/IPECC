@@ -17,7 +17,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
-use work.ecc_custom.all;
+use work.ecc_customize.all;
 use work.ecc_utils.all;
 use work.ecc_pkg.all;
 use work.ecc_vars.all; -- for LARGE_NB_R_ADDR - see (s79), (s80) & (s81)
@@ -31,7 +31,7 @@ entity ecc_axi is
 		-- Width of S_AXI data bus
 		C_S_AXI_DATA_WIDTH : integer := axi32or64; -- (s194), see (s195)
 		-- Width of S_AXI address bus
-		C_S_AXI_ADDR_WIDTH : integer := 8);
+		C_S_AXI_ADDR_WIDTH : integer := AXIAW); -- in ecc_pkg
 	port(
 		-- AXI clock & reset
 		s_axi_aclk : in std_logic;
@@ -103,6 +103,24 @@ entity ecc_axi is
 		doaop : out std_logic;
 		aopid : out std_logic_vector(2 downto 0); -- id defined in ecc_pkg
 		aopdone : in std_logic;
+		--   /debug only
+		laststep : in std_logic;
+		firstzdbl : in std_logic;
+		firstzaddu : in std_logic;
+		first2pz : in std_logic;
+		first3pz : in std_logic;
+		torsion2 : in std_logic;
+		kap : in std_logic;
+		kapp : in std_logic;
+		zu : in std_logic;
+		zc : in std_logic;
+		r0z : in std_logic;
+		r1z : in std_logic;
+		pts_are_equal : in std_logic;
+		pts_are_oppos : in std_logic;
+		phimsb : in std_logic;
+		kb0end : in std_logic;
+		--   end of debug only/
 		-- interface with ecc_curve
 		masklsb : out std_logic;
 		-- interface with ecc_fp (access to ecc_fp_dram)
@@ -142,12 +160,14 @@ entity ecc_axi is
 		-- debug features (interface with ecc_scalar)
 		dbgpgmstate : in std_logic_vector(3 downto 0);
 		dbgnbbits : in std_logic_vector(15 downto 0);
+		dbgjoyebit : in std_logic_vector(log2(2*nn - 1) - 1 downto 0);
 		-- debug features (interface with ecc_curve)
 		dbgbreakpoints : out breakpoints_type;
 		dbgnbopcodes : out std_logic_vector(15 downto 0);
 		dbgdosomeopcodes : out std_logic;
 		dbgresume : out std_logic;
 		dbghalt : out std_logic;
+		dbgnoxyshuf : out std_logic;
 		dbghalted : in std_logic;
 		dbgdecodepc : in std_logic_vector(IRAM_ADDR_SZ - 1 downto 0);
 		dbgbreakpointid : in std_logic_vector(1 downto 0);
@@ -412,7 +432,8 @@ architecture rtl of ecc_axi is
 	type debug_reg_type is record
 		iaddr : std_logic_vector(IRAM_ADDR_SZ - 1 downto 0);
 		iwdata : std_logic_vector(OPCODE_SZ - 1 downto 0);
-		iwe, ire : std_logic;
+		iwe : std_logic;
+		iresh : std_logic_vector(sramlat downto 0);
 		idatabeat : std_logic;
 		counter : unsigned(31 downto 0);
 		trigger : std_logic;
@@ -427,6 +448,9 @@ architecture rtl of ecc_axi is
 		fpwdata : std_logic_vector(ww - 1 downto 0);
 		halt : std_logic;
 		shwon : std_logic_vector(1 downto 0);
+		readrdy : std_logic;
+		readsh: std_logic_vector(sramlat + 1 downto 0);
+		noxyshuf : std_logic;
 	end record;
 
 	-- all registers
@@ -511,7 +535,8 @@ begin
 
 	-- (s195), see (s194)
 	assert (axi32or64 = 32 or axi32or64 = 64)
-		report "wrong value of parameter axi32or64 in ecc_custom (must be 32 or 64)"
+		report "wrong value of parameter axi32or64 in ecc_customize.vhd "
+		     & " (must be 32 or 64)"
 			severity FAILURE;
 
 	-- (s144), see (s145)
@@ -568,7 +593,11 @@ begin
                 nndyn_mask_is_zero_s, nndyn_mask_is_all1_but_msb_s,
                 nndyn_mask_wm2_s,
                 nndyn_wmin_s, nndyn_nnrnd_zerowm1_s, nndyn_nnm3_s,
-                small_k_sz_en_ack, small_k_sz_kpdone)
+                small_k_sz_en_ack, small_k_sz_kpdone
+								-- debug from ecc_scalar
+								, laststep, firstzdbl, firstzaddu, first2pz, first3pz, 
+								torsion2, kap, kapp, zu, zc, r0z, r1z, dbgjoyebit,
+								pts_are_equal, pts_are_oppos, phimsb, kb0end)
 		variable v : reg_type;
 		variable vbk : natural range 0 to 3;
 		variable v_nn_mod_ww_sub : unsigned(log2(ww) downto 0); -- log2(ww) + 1 bits
@@ -891,11 +920,15 @@ begin
 		-- -----------------------------------------------------------
 		-- debug feature
 		v.debug.iwe := '0'; -- (s82)
-		v.debug.ire := '0'; -- (s86)
+		v.debug.iresh := '0' & r.debug.iresh(sramlat downto 1); -- (s86)
 		v.debug.resume := '0'; -- (s173)
 		v.debug.dosomeopcodes := '0'; -- (s33)
 		v.ctrl.penupsh := '0' & r.ctrl.penupsh(1);
 		v.debug.shwon := '0' & r.debug.shwon(1);
+		v.debug.readsh := '0' & r.debug.readsh(sramlat + 1 downto 1);
+		if r.debug.readsh(0) = '1' then
+			v.debug.readrdy := '1';
+		end if;
 		if r.axi.awpending = '1' and r.axi.dwpending = '1' then
 			v.axi.awpending := '0';
 			v.axi.dwpending := '0';
@@ -1600,11 +1633,16 @@ begin
 			elsif debug and r.axi.waddr = W_DBG_OP_ADDR then
 				v.debug.iaddr := r.axi.wdatax(IRAM_ADDR_SZ - 1 downto 0);
 				v.debug.idatabeat := '0';
-				v.debug.ire := '1'; -- stays asserted only 1 cycle thx to (s86)
-				v.axi.wready := '1';
-				v.axi.awready := '1';
-				v.axi.arready := '1';
-				v.axi.bvalid := '1';
+				-- (s201)
+				-- to allow the read into ecc_curve_iram to happen before the
+				-- software reads data back using a read to register R_DBG_RD_OPCODE
+				-- (see (s199)) we temporize the assertion of the 4 AXI handshake
+				-- signals with the small shift register .iresh - see (s200) below
+				v.debug.iresh(sramlat) := '1'; -- asserted only 1 cycle thx to (s86)
+					--v.axi.wready := '1';
+					--v.axi.awready := '1';
+					--v.axi.arready := '1';
+					--v.axi.bvalid := '1';
 			-- ---------------------------------------------------------------
 			-- decoding write of W_DBG_WR_OPCODE register
 			-- ---------------------------------------------------------------
@@ -1691,11 +1729,10 @@ begin
 				-- drive write-response to initiator
 				v.axi.bvalid := '1';
 			-- -------------------------------------------------------------
-			-- decoding write of W_DBG_FP_ADDR register
+			-- decoding write of W_DBG_FP_WADDR register
 			-- -------------------------------------------------------------
-			elsif debug and r.axi.waddr = W_DBG_FP_ADDR then
+			elsif debug and r.axi.waddr = W_DBG_FP_WADDR then
 				v.fpaddr0 := r.axi.wdatax(FP_ADDR - 1 downto 0);
-				v.read.fpre0 := '1'; -- stays asserted only 1 cycle thx to (s49)
 				-- assert both AWREADY & WREADY signals to allow a new AXI data-beat
 				-- to happen again
 				v.axi.awready := '1';
@@ -1710,6 +1747,35 @@ begin
 				v.write.fpwe0 := '1'; -- stays asserted only 1 cycle thx to (s24)
 				v.debug.fpwdata := r.axi.wdatax(ww - 1 downto 0); -- (s145), see (s144)
 				v.debug.shwon(1) := '1';
+				-- assert both AWREADY & WREADY signals to allow a new AXI data-beat
+				-- to happen again
+				v.axi.awready := '1';
+				v.axi.wready := '1';
+				v.axi.arready := '1';
+				-- drive write-response to initiator
+				v.axi.bvalid := '1';
+			-- -------------------------------------------------------------
+			-- decoding write of W_DBG_FP_RADDR register
+			-- -------------------------------------------------------------
+			elsif debug and r.axi.waddr = W_DBG_FP_RADDR then
+				v.fpaddr0 := r.axi.wdatax(FP_ADDR - 1 downto 0);
+				v.read.fpre0 := '1'; -- stays asserted only 1 cycle thx to (s49)
+				-- assert both AWREADY & WREADY signals to allow a new AXI data-beat
+				-- to happen again
+				v.axi.awready := '1';
+				v.axi.wready := '1';
+				v.axi.arready := '1';
+				-- deassert ready bit in R_DBG_FP_RDATA_RDY register
+				v.debug.readrdy := '0';
+				-- arm latency counter (shift-reg)
+				v.debug.readsh(sramlat + 1) := '1';
+				-- drive write-response to initiator
+				v.axi.bvalid := '1';
+			-- -------------------------------------------------------------
+			-- decoding write of W_DBG_CFG_NOXYSHUF register
+			-- -------------------------------------------------------------
+			elsif debug and r.axi.waddr = W_DBG_CFG_NOXYSHUF then
+				v.debug.noxyshuf := r.axi.wdatax(0);
 				-- assert both AWREADY & WREADY signals to allow a new AXI data-beat
 				-- to happen again
 				v.axi.awready := '1';
@@ -1736,6 +1802,14 @@ begin
 		-- otherwise)
 		if r.write.new32 = '1' then
 			v.write.doshift := '1';
+		end if;
+
+		-- (s200), see (s201) register R_DBG_RD_OPCODE
+		if r.debug.iresh(0) = '1' then
+			v.axi.wready := '1';
+			v.axi.awready := '1';
+			v.axi.arready := '1';
+			v.axi.bvalid := '1';
 		end if;
 
 		-- --------------------------------
@@ -2297,15 +2371,16 @@ begin
 			-- by immediately deasserting r.axi.arready (which directly drives
 			-- s_axi_arready) in (s143) below, we're telling AXI fabric that
 			-- we're not ready to accept a new read address again, not until...
-			--   - (in the case of a read targeting the DATA register) ...we have
+			--   - [in the case of a read targeting the DATA register] ...we have
 			--     a 32-bit data available that has been gathered from different
 			--     reads & shifts from ecc_fp_dram
-			--   - (in the case of a read targeting any of the registers that
-			--     does not require further processing, like R_STATUS) ...the AXI
-			--     fabric actually reads the content of the register on the data-
-			--     read channel - that's the reason why we immediately assert
+			--   - [in the case of a read targeting any of the registers that
+			--     does not require further processing and for which read payload
+			--     can be directly driven back to initiator, like R_STATUS] ...the
+			--     AXI fabric actually reads the content of the register on the
+			--     data-read channel - that's the reason why we immediately assert
 			--     r.axi.rvalid in this case (which directly drives s_axi_rvalid) -
-			--     see all cases tagged (s5) down below
+			--     see all cases tagged (s5) down below.
 			-- In both cases, s_axi_arready will be reasserted upon actual transfer
 			-- of the 32-bit data on the AXI read-data channel, see (s6) below
 			v.axi.arready := '0'; -- (s143)
@@ -2526,27 +2601,51 @@ begin
 				v.axi.rdatax(31 downto 0) := dw;
 				v.axi.rvalid := '1'; -- (s5)
 			-- -----------------------------------------
+			-- decoding read of R_DBG_EXP_FLAGS register
+			-- -----------------------------------------
+			elsif debug -- statically resolved by synthesizer
+			  and s_axi_araddr(ADB + 2 downto 3) = R_DBG_EXP_FLAGS
+			then
+				dw(0) := r0z;
+				dw(1) := r1z;
+				dw(2) := kap;
+				dw(3) := kapp;
+				dw(4) := zu;
+				dw(5) := zc;
+				dw(6) := laststep;
+				dw(7) := firstzdbl;
+				dw(8) := firstzaddu;
+				dw(9) := first2pz;
+				dw(10) := first3pz;
+				dw(11) := torsion2;
+				dw(12) := pts_are_equal;
+				dw(13) := pts_are_oppos;
+				dw(14) := phimsb;
+				dw(15) := kb0end;
+				dw(31 downto 16) := std_logic_vector(resize(unsigned(dbgjoyebit), 16));
+				v.axi.rdatax(31 downto 0) := dw;
+				v.axi.rvalid := '1'; -- (s5)
+			-- -----------------------------------------
 			-- decoding read of R_DBG_RD_OPCODE register
 			-- -----------------------------------------
 			elsif debug -- statically resolved by synthesizer
 			  and s_axi_araddr(ADB + 2 downto 3) = R_DBG_RD_OPCODE
 			then
+				-- (s199), see also (s200) & (s201)
 				if OPCODE_SZ > C_S_AXI_DATA_WIDTH then -- statically resolved by synth.
 					if r.debug.idatabeat = '0' then
 						v.debug.idatabeat := '1';
 						v.axi.rdatax := dbgirdata(C_S_AXI_DATA_WIDTH - 1 downto 0);
-						v.axi.rvalid := '1'; -- (s5)
 					elsif r.debug.idatabeat = '1' then
 						v.debug.idatabeat := '0';
 						v.axi.rdatax((OPCODE_SZ mod C_S_AXI_DATA_WIDTH) - 1 downto 0) :=
 							dbgirdata(C_S_AXI_DATA_WIDTH+(OPCODE_SZ mod C_S_AXI_DATA_WIDTH)-1
 							          downto C_S_AXI_DATA_WIDTH); -- (s85), see (s83)
-						v.axi.rvalid := '1'; -- (s5)
 					end if;
 				else
 					v.axi.rdatax(OPCODE_SZ - 1 downto 0) := dbgirdata;
-					v.axi.rvalid := '1'; -- (s5)
 				end if;
+				v.axi.rvalid := '1'; -- (s5)
 			-- -------------------------------------------
 			-- decoding read of R_DBG_TRNG_STATUS register
 			-- -------------------------------------------
@@ -2586,6 +2685,7 @@ begin
 			then
 				v.axi.rdatax(31 downto 0) :=
 					(C_S_AXI_DATA_WIDTH-1 downto ww => '0') & xrdata; -- (s50), see (s51)
+				v.debug.readrdy := '0';
 				v.axi.rvalid := '1'; -- (s5)
 			-- -------------------------------------------
 			-- decoding read of R_DBG_IRN_CNT_AXI register
@@ -2632,12 +2732,22 @@ begin
 				v.axi.rdatax(31 downto 0) := std_logic_vector(resize(dbgpdops, 32));
 				v.axi.rvalid := '1'; -- (s5)
 			-- --------------------------------------------
+			-- decoding read of R_DBG_FP_RDATA_RDY register
+			-- --------------------------------------------
+			elsif debug -- statically resolved by synthesizer
+			  and s_axi_araddr(ADB + 2 downto 3) = R_DBG_FP_RDATA_RDY
+			then
+				--v.axi.rdatax(0) := r.debug.readrdy;
+				--v.axi.rdatax(31 downto 1) := (others => '0');
+				v.axi.rdatax(31 downto 0) := (0 => r.debug.readrdy, others => '0');
+				v.axi.rvalid := '1'; -- (s5)
+			-- --------------------------------------------
 			-- unknown target address, drive back dumb data (all 1's)
 			-- --------------------------------------------
 			else
 				v.axi.rdatax := (others => '1'); -- 0xFFFFFFFF
 				v.axi.rvalid := '1'; -- (s5)
-				-- raise error flag (illicite register acess)
+				-- raise error flag (illicite register access)
 				v.ctrl.ierrid(STATUS_ERR_UNKNOWN_REG) := '1';
 			end if;
 		end if;
@@ -3377,6 +3487,9 @@ begin
 				v.debug.trng.ppdeact := '0';
 				-- no need to reset r.debug.i[rw]datacnt
 				v.debug.halt := '0';
+				-- no need to reset r.debug.readsh
+				v.debug.readrdy := '0';
+				v.debug.noxyshuf := '0';
 			else
 				v.debug.trng.using := '1'; -- present also when debug=FALSE, see (s38)
 			end if;
@@ -3542,7 +3655,7 @@ begin
 	dbgiaddr <= r.debug.iaddr;
 	dbgiwdata <= r.debug.iwdata;
 	dbgiwe <= r.debug.iwe;
-	dbgire <= r.debug.ire;
+	dbgire <= r.debug.iresh(sramlat);
 	dbgtrigger <= r.debug.trigger;
 
 	-- debug features (to ecc_curve)
@@ -3551,6 +3664,7 @@ begin
 	dbgdosomeopcodes <= r.debug.dosomeopcodes;
 	dbgresume <= r.debug.resume;
 	dbghalt <= r.debug.halt;
+	dbgnoxyshuf <= r.debug.noxyshuf;
 
 	-- debug features (to trng)
 	dbgtrnguse <= r.debug.trng.using; -- (s38)
