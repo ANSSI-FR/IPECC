@@ -490,11 +490,12 @@ package ecc_pkg is
 	constant R_READ_DATA : rat := std_nat(1, ADB);          -- 0x08
 	constant R_CAPABILITIES : rat := std_nat(2, ADB);       -- 0x10
 	constant R_PRIME_SIZE : rat := std_nat(3, ADB);         -- 0x18
+	constant R_HW_VERSION : rat := std_nat(4, ADB);         -- 0x20
 	-- (start of read DEBUG registers)
-	constant R_DBG_CAPABILITIES_0 : rat := std_nat(4, ADB); -- 0x20
-	constant R_DBG_CAPABILITIES_1 : rat := std_nat(5, ADB); -- 0x28
-	constant R_DBG_CAPABILITIES_2 : rat := std_nat(6, ADB); -- 0x30
-	-- reserved                                             -- 0x38...0x78
+	constant R_DBG_CAPABILITIES_0 : rat := std_nat(4, ADB); -- 0x30
+	constant R_DBG_CAPABILITIES_1 : rat := std_nat(5, ADB); -- 0x38
+	constant R_DBG_CAPABILITIES_2 : rat := std_nat(6, ADB); -- 0x40
+	-- reserved                                             -- 0x48...0x78
 	constant R_DBG_STATUS : rat := std_nat(16, ADB);        -- 0x80
 	constant R_DBG_RMN_STEPS : rat := std_nat(17, ADB);     -- 0x88 TODO: remove this one
 	constant R_DBG_TIME : rat := std_nat(18, ADB);          -- 0x90
