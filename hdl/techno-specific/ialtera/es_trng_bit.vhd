@@ -43,18 +43,18 @@ architecture behav of es_trng_bit is
 	signal valid_d, valid_q : std_logic;
 	signal ro1en_n : std_logic;
 
-	attribute DONT_TOUCH : string;
-	attribute DONT_TOUCH of ro1out : signal is "TRUE";
-	attribute DONT_TOUCH of ro2out : signal is "TRUE";
-	attribute DONT_TOUCH of stage0 : signal is "TRUE";
-	attribute DONT_TOUCH of stage1 : signal is "TRUE";
-	attribute DONT_TOUCH of stage2 : signal is "TRUE";
-	attribute DONT_TOUCH of stage3 : signal is "TRUE";
-	attribute DONT_TOUCH of ro1en_n : signal is "TRUE";
-	attribute DONT_TOUCH of raw_d : signal is "TRUE";
-	attribute DONT_TOUCH of valid_d : signal is "TRUE";
-	attribute DONT_TOUCH of raw_q : signal is "TRUE";
-	attribute DONT_TOUCH of valid_q : signal is "TRUE";
+	attribute KEEP : string;
+	attribute KEEP of ro1out : signal is "TRUE";
+	attribute KEEP of ro2out : signal is "TRUE";
+	attribute KEEP of stage0 : signal is "TRUE";
+	attribute KEEP of stage1 : signal is "TRUE";
+	attribute KEEP of stage2 : signal is "TRUE";
+	attribute KEEP of stage3 : signal is "TRUE";
+	attribute KEEP of ro1en_n : signal is "TRUE";
+	attribute KEEP of raw_d : signal is "TRUE";
+	attribute KEEP of valid_d : signal is "TRUE";
+	attribute KEEP of raw_q : signal is "TRUE";
+	attribute KEEP of valid_q : signal is "TRUE";
 
 begin
 

@@ -65,10 +65,6 @@ architecture syn of ecc_fp_dram is
 		variable vram : fp_dram_type;
 		variable v_constant_r : std_logic_ww;
 	begin
-		--for i in 0 to (nblargenb * n) - 1 loop
-		--	vram(i) := (others => '0');
-		--end loop;
-		-- big number R constant (for Montgomery representation), R = 2**(nn + 3)
 		for i in 0 to n - 1 loop
 			vram((LARGE_NB_R_ADDR * n) + i) := (others => '0');
 		end loop;

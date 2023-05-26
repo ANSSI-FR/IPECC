@@ -61,6 +61,7 @@ entity ecc_trng is
 		dbgtrngrawdata : out std_logic;
 		dbgtrngppdeact : in std_logic;
 		dbgtrngcompletebypass : in std_logic;
+		dbgtrngcompletebypassbit : in std_logic;
 		dbgtrngrawduration : out unsigned(31 downto 0);
 		dbgtrngvonneuman : in std_logic;
 		dbgtrngidletime : in unsigned(3 downto 0)
@@ -165,7 +166,8 @@ architecture rtl of ecc_trng is
 			data3 : out std_logic_vector(FP_ADDR - 1 downto 0);
 			irncount3 : out std_logic_vector(log2(irn_fifo_size_sh) - 1 downto 0);
 			-- interface with ecc_axi (only usable in debug mode)
-			dbgtrngcompletebypass : in std_logic
+			dbgtrngcompletebypass : in std_logic;
+			dbgtrngcompletebypassbit : in std_logic
 		);
 	end component ecc_trng_srv;
 
@@ -276,7 +278,8 @@ begin
 			data3 => data3,
 			irncount3 => irncount3,
 			-- following signals are for debug (statistics)
-			dbgtrngcompletebypass => dbgtrngcompletebypass
+			dbgtrngcompletebypass => dbgtrngcompletebypass,
+			dbgtrngcompletebypassbit => dbgtrngcompletebypassbit
 		);
 
 end architecture rtl;

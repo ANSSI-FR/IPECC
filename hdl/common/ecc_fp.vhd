@@ -403,8 +403,18 @@ architecture rtl of ecc_fp is
 		-- (without it simulators won't know how to differentiate between
 		-- string or bit_vector for the 2nd parameter and will issue an error)
 		case v_pca is
-			when ECC_IRAM_CONSTMTY_ADDR =>
-				write(lineo, string'(".constMTYL [0x"));
+			when ECC_IRAM_CONSTMTY0_ADDR =>
+				write(lineo, string'(".constMTY0L [0x"));
+				hex_write(lineo, pca);
+				write(lineo, string'("]"));
+				newprg := TRUE;
+			when ECC_IRAM_CONSTMTY1_ADDR =>
+				write(lineo, string'(".constMTY1L [0x"));
+				hex_write(lineo, pca);
+				write(lineo, string'("]"));
+				newprg := TRUE;
+			when ECC_IRAM_CONSTMTY2_ADDR =>
+				write(lineo, string'(".constMTY2L [0x"));
 				hex_write(lineo, pca);
 				write(lineo, string'("]"));
 				newprg := TRUE;
@@ -438,8 +448,13 @@ architecture rtl of ecc_fp is
 				hex_write(lineo, pca);
 				write(lineo, string'("]"));
 				newprg := TRUE;
-			when ECC_IRAM_SETUP_ADDR =>
-				write(lineo, string'(".setupL [0x"));
+			when ECC_IRAM_SETUP0_ADDR =>
+				write(lineo, string'(".setup0L [0x"));
+				hex_write(lineo, pca);
+				write(lineo, string'("]"));
+				newprg := TRUE;
+			when ECC_IRAM_SETUP1_ADDR =>
+				write(lineo, string'(".setup1L [0x"));
 				hex_write(lineo, pca);
 				write(lineo, string'("]"));
 				newprg := TRUE;
@@ -533,6 +548,13 @@ architecture rtl of ecc_fp is
 	-- pragma translate_on
 
 	signal redc_2nd_input_s : boolean := FALSE;
+
+	-- this constant is used to replace all data coming from ecc_trng
+	-- by a ww-bit vector all made of 1's (better than 0's to avoid
+	-- a few possible arithmetic errors, e.g if the random at first
+	-- was aimed at multiply-masking the coordinates of a point)
+	constant CST_REPLACE_TRNG_BY_ONES : std_logic_vector(ww - 1 downto 0) :=
+		(others => '1');
 
 begin
 
@@ -1865,29 +1887,35 @@ begin
 				if r.rnd.masked = '0' then
 					v.rnd.data := trngdata(ww - 1 downto 0);
 				elsif r.rnd.masked = '1' then
+					-- this is an NNRNDm instruction that is being executed
 					if r.rnd.opccnt = to_unsigned(0, log2(w - 1)) then
-						-- last word case
+						-- this is the most significant ww-bit word (last one in the burst,
+						-- the one of weight w - 1, with w dynamic if nn_dynamic = TRUE)
 						if nndyn_nnrnd_zerowm1 = '1' then
-							-- (s101) last word must be set to 0 (see also (s102) below)
+							-- (s101) most significant ww-bit word must be set to 0
+							-- (see also (s102) below)
 							v.rnd.data := (others => '0');
 						elsif nndyn_nnrnd_zerowm1 = '0' then
-							-- last word must be masked w/ nndyn_nnrnd_mask
+							-- last ww-bit word must be masked w/ nndyn_nnrnd_mask
 							if dbgtrnguse = '1' then
 								v.rnd.data := trngdata(ww - 1 downto 0) and nndyn_nnrnd_mask;
 							elsif dbgtrnguse = '0' then
-								v.rnd.data := nndyn_nnrnd_mask; -- set 1 where mask bits are 1
+								v.rnd.data := CST_REPLACE_TRNG_BY_ONES and
+									nndyn_nnrnd_mask; -- set 1 where mask bits are 1
 							end if;
 						end if;
 					elsif r.rnd.opccnt = to_unsigned(1, log2(w - 1)) then
-						-- nex-to-the-last word case
+						-- this is the ww-bit word just before the most significant one
+						-- (and therefore also the one before the last in the burst)
 						if nndyn_nnrnd_zerowm1 = '1' then
-							-- (s102) if last word must be set to 0 (see (s101) above)
-							-- then it means mask 'nndyn_nnrnd_mask' is to be applied
-							-- to the next-to-the-last one, i.e now
+							-- (s102) if most significant ww-bit word must be set to 0
+							-- (see (s101) above) then it means mask 'nndyn_nnrnd_mask'
+							-- is to be applied to the one before the last, i.e now
 							if dbgtrnguse = '1' then
 								v.rnd.data := trngdata(ww - 1 downto 0) and nndyn_nnrnd_mask;
 							elsif dbgtrnguse = '0' then
-								v.rnd.data := nndyn_nnrnd_mask; -- set 1 where mask bits are 1
+								v.rnd.data := CST_REPLACE_TRNG_BY_ONES and
+									nndyn_nnrnd_mask; -- set 1 where mask bits are 1
 							end if;
 						elsif nndyn_nnrnd_zerowm1 = '0' then
 							-- if last word is not to be set to 0 (see (s101) above)
@@ -2182,7 +2210,8 @@ begin
 		v.comppopdel := comppop;
 		v.compaopdel := compaop;
 		if (compkp = '0' and compcstmty = '0' and comppop = '0' and compaop = '0')
-			or (debug and dbghalted = '1') then -- (s98), see (s100) in ecc_curve.vhd
+			or (debug and dbghalted = '1')
+		then -- (s98), see (s100) in ecc_curve.vhd
 			v.fpram.waddrmuxsel := "111"; -- (s37), see (s20)
 			v.fpram.raddrmuxsel := "11"; -- (s36), see (s17)
 			v.fpram.we := xwe;

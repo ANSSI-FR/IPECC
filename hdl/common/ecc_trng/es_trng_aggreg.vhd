@@ -18,10 +18,13 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
+use work.ecc_customize.all; -- for 'debug'
+
 entity es_trng_aggreg is
 	port(
 		clk : in std_logic;
 		rstn : in std_logic;
+		swrst : in std_logic;
 		-- interface with downstream es_trng_aggreg
 		raw : out std_logic;
 		valid : out std_logic;
@@ -33,7 +36,9 @@ entity es_trng_aggreg is
 		-- interface with second upstream es_trng_aggreg
 		raw1 : in std_logic;
 		valid1 : in std_logic;
-		rdy1 : out std_logic
+		rdy1 : out std_logic;
+		-- following signals are for debug & statistics
+		dbgtrngrawreset : in std_logic
 	);
 end entity es_trng_aggreg;
 
@@ -53,7 +58,8 @@ architecture rtl of es_trng_aggreg is
 begin
 
 	-- combinational logic
-	comb: process(r, rstn, rdy, raw0, valid0, raw1, valid1)
+	comb: process(r, rstn, rdy, raw0, valid0, raw1, valid1,
+			swrst, dbgtrngrawreset)
 		variable v : reg_type;
 		variable valid01 : std_logic_vector(0 to 1);
 	begin
@@ -108,7 +114,7 @@ begin
 		end if;
 
 		-- synchronous reset
-		if rstn = '0' then
+		if rstn = '0' or (debug and dbgtrngrawreset = '1') or swrst = '1' then
 			v.priority := '0';
 			v.valid := '0';
 			v.rdy0 := '1';

@@ -31,6 +31,7 @@ entity es_trng_bitctrl is
 		valid : out std_logic;
 		rdy : in std_logic;
 		-- following signals are for debug & statistics
+		dbgtrngrawreset : in std_logic;
 		dbgtrngta : in unsigned(19 downto 0);
 		dbgtrngvonneuman : in std_logic;
 		dbgtrngidletime : in unsigned(3 downto 0)
@@ -94,7 +95,7 @@ begin
 		);
 
 	-- combinational logic
-	comb: process(r, rstn, swrst, rawin, validin, rdy,
+	comb: process(r, rstn, swrst, rawin, validin, dbgtrngrawreset,
 	              dbgtrngta, dbgtrngvonneuman, dbgtrngidletime)
 		variable v : reg_type;
 	begin
@@ -172,7 +173,7 @@ begin
 		end if;
 
 		-- synchronous reset
-		if rstn = '0' or swrst = '1' then
+		if rstn = '0' or (debug and dbgtrngrawreset = '1') or swrst = '1' then
 			v.state := idle;
 			-- no need to reset r.debug.idlecnt other than in behav simulation
 			-- pragma translate_off

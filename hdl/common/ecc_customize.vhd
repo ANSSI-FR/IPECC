@@ -29,23 +29,23 @@ package ecc_customize is
 	constant nn : positive := 528;
 	constant nn_dynamic : boolean := TRUE;
 	type techno_type is (spartan6, virtex6, series7, ialtera, asic);
-	constant techno : techno_type := series7; -- choose one of 'techno_type' value
+	constant techno : techno_type := series7; -- a 'techno_type' value
 	-- multwidth is only used if 'techno' = 'asic'
 	-- (otherwise its value has no meaning and can be ignored)
 	constant multwidth : positive := 32; -- 32 seems fair for an ASIC default
 	constant nbmult : positive range 1 to 2 := 2;
-	constant nbdsp : positive := 4;
+	constant nbdsp : positive range 2 to positive'high := 4; -- must be >= 2
 	constant sramlat : positive range 1 to 2 := 1;
 	constant async : boolean := TRUE;
 	constant shuffle : boolean := FALSE;
 	constant notrng : boolean := TRUE; -- set to TRUE for simu, to FALSE for syn
-	constant nbtrng : positive := 1;
+	constant nbtrng : positive := 4;
 	constant trngta : natural range 1 to 4095 := 32;
-	constant axi32or64 : natural := 32;
+	constant axi32or64 : natural := 32; -- 32 or 64 only allowed values
 	constant debug : boolean := FALSE;
 	constant nblargenb : positive := 32;  -- change these two parameters only if
 	constant nbopcodes : positive := 512; -- you really know what you're doing
-	-- below concerns simulation only
+	-- parameters below only concern simulation
 	constant simkb : natural range 0 to natural'high := 0; -- if 0 then ignored
 	constant simlog : string := "/tmp/ecc.log";
 	constant simtrngfile: string := "/tmp/random.txt";
@@ -124,7 +124,7 @@ end package ecc_customize;
 --
 -- TYPE/VALUE
 --       Enumerate. Choices are between:
---         - 'series7', 'spartan6' for ARM/Xilinx FPGAs (more should follow)
+--         - 'series7', 'spartan6', 'ultrascale' for ARM/Xilinx FPGAs
 --         - 'ialtera' for Intel-Altera FPGAs
 --         - 'asic' if you're designing an ASIC or a system-on-a-chip
 --
@@ -198,12 +198,12 @@ end package ecc_customize;
 --           'techno' parameter:
 --             - for ARM-Xilinx FPGAs, 'ww' is set to 16.
 --               Note: the reason for this number is that Xilinx DSP blocks
---               being either SIGNED 25x18 multipliers (in 7-series) or SIGNED
---               18x18 multipliers (in Spartan-6) multipliers, only 17 bits are
---               actually available when doing unsigned arithmetics (which is
---               what we need when splitting large multiplications into smaller
---               ones performed on limbs). The MSBit is necessarily tied to a
---               logic 0.
+--               being either SIGNED 25x18 multipliers (in 7-series & ultra-
+--               scale) or SIGNED 18x18 multipliers (in Spartan-6) multipliers,
+--               only 17 bits are actually available when doing unsigned
+--               arithmetics (which is what we need when splitting large
+--               multiplications into smaller ones performed on limbs).
+--               The MSBit is necessarily tied to a logic 0.
 --               For sake of number readability when simulating the IP, the
 --               value of 16 was chosen instead of 17, which should not incur
 --               a significant difference in the final area nor the performance
@@ -361,9 +361,9 @@ end package ecc_customize;
 --       data bus. This can be of interest in particular in FPGAs as the
 --       SRAM blocks are natively provided with this extra layer of registers
 --       inside the block itself, which is why synthesizer will most probably
---       infer using these internal registers instead of consuming flip-flops
---       from the general logic fabric. That's why for an FPGA technology
---       you probably want to set this parameter to 2.
+--       infer to use these internal registers instead of consuming flip-flops
+--       from the general logic fabric. Hence for an FPGA technology you pro-
+--       bably want to set this parameter to 2.
 --
 -- ============================================================================
 -- NAME

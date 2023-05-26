@@ -39,20 +39,22 @@
 	NNMOV	ZR01		dx
 	JL	.modinvL
 # call routine to normalize XR1 and YR1 coordinates
+# the barrier is important so that computations made in .modinvL
+# are over by the time we call .normalizeL
+	BARRIER
 	JL	.normalizeL
 # call routine to exit XR1 & YR1 out of Montgomery domain
+# the barrier is important so that computations made in .normalizeL
+# are over by the time we call .exitMontyL
+	BARRIER
 	JL	.exitMontyL
-# restore intial value of R
-# (this is necessary for the computation of Montgomery constants
-# to work properly next time the software will send a new value of p)
-	NNADD	Rmodp	twop	R
-	NNADD	R	twop	R
-	NNADD	R	twop	R
-	NNADD	R	p	R
 # ****************************************************************
 # finally call routine to check that point (XR1:YR1) is actually
 # on the curve
 # ****************************************************************
+# the barrier is important so that computations made in .exitMontyL
+# are over by the time we call .chkcurveL
+	BARRIER
 	JL	.chkcurveL
 	NOP
 	STOP

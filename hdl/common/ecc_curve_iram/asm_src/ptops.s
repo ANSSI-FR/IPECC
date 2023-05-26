@@ -80,7 +80,8 @@
 	NNADD,p4	red	patchme	YR1
 # compute YR0 + YR1
 	NNADD	YR0	YR1	Ytmp
-	NNSUB	Ytmp	p	Ytmp
+	NNSUB	Ytmp	p	red
+	NNADD,p4	red	patchme	Ytmp
 	STOP
 
 .is_on_curveL:

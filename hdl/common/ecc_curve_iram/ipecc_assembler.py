@@ -734,7 +734,7 @@ def key_words_regexp(l):
 BIGNUM_BITS_SIZE = 528
 OPERANDS_BITS_SIZE = 5
 PATCH_BITS_SIZE = 6
-IMMEDIATE_BITS_SIZE = 10
+IMMEDIATE_BITS_SIZE = 9
 CONSTANTS_BITS_SIZE = 2
 OPCODE_BITS_SIZE = 4
 OPCODE_CLASS_BITS_SIZE = 2
@@ -743,6 +743,7 @@ ipecc_operands_dict = {
 	"a": "00001",
 	"b": "00010",
 	"q": "00011",
+	"k": "00100",
 	"XR1": "00110",
 	"YR1": "00111",
 	"XR0": "00100",
@@ -765,7 +766,7 @@ ipecc_operands_dict = {
 	"ZPBK": "10110",
 	"inverse": "10101",
 	"dtmp": "10100",
-	"XmXU": "10010",
+	"XmXU": "01000",
 	"twop": "11000",
 	"red": "10110",
 	"dy1": "01111",
@@ -783,13 +784,13 @@ ipecc_operands_dict = {
 	"idx": "01111",
 	"aX": "01111",
 	"right": "01111",
-	"mustbezero": "01111",
+	"mustbezero": "10101",
 	"YY": "10000",
 	"left": "10000",
 	"XX": "10001",
 	"XXX": "10001",
 	"XR": "10001",
-	"R3modp": "10010",
+	"R3modp": "10100",
 	"mu0": "11010",
 	"mu1": "11011",
 	"kap0msk": "01000",
@@ -852,7 +853,7 @@ ipecc_operands_dict = {
 	"ZR01sq": "10101",
 	"ZR01cu": "10101",
 	"ZR01END": "11001",
-	"XR1tmp": "10010",
+	"XR1tmp": "10110",
 	"YR1tmp": "10100",
 	"invsq": "01010",
 	"invcu": "01011",
@@ -874,7 +875,7 @@ ipecc_operands_dict = {
 	"XR0bk": "01110",
 	"YR0bk": "01111",
 	"XR1bk": "11100",
-	"YR1bk": "10010",
+	"YR1bk": "01100",
     "XADD": "10001",
     "K": "10000",
     "YADD": "10000",
@@ -883,7 +884,8 @@ ipecc_operands_dict = {
     "MD": "01000",
     "Msq": "10101",
     "N": "01000",
-    "Nsq": "10010",
+    "Nsq": "01000",
+    "Nsq0": "10111",
     "E": "01001",
     "L": "10000",
     "XpE": "10100",
@@ -893,7 +895,19 @@ ipecc_operands_dict = {
     "EpN": "11001",
     "YpZ": "10101",
     "YpZsq": "10101",
-    "twoS": "10010",
+    "twoS": "10111",
+	"Rmodp": "11101",
+    "Qs": "01001",
+    "AZ": "01000",
+    "KK": "10000",
+    "BZ": "10111",
+    "BZd": "10111",
+    "Xup": "01000",
+    "Yup": "01001",
+    "Ztmp": "11001",
+    "Yopp": "10101",
+    "Ykeep": "10000",
+    "Xkeep": "10100",
     # "Patch" operand, dummy value
     "patchme": "10101",
     ### Disassembly registers for
@@ -1469,7 +1483,7 @@ def emulate_file(infile, initial_state):
             continue
         check = re.search(r"^\s*("+ipecc_operand()+"|"+ipecc_flag()+"|"+ipecc_internal_flag()+"|mem\[([0-9]+|0x[0-9a-fA-F]+|0b[0-1]+)\]|ip|lrip|breakip|verbose)\s*=\s*([0-9]+|0x[0-9a-fA-F]+|0b[0-1]+)\s*(#.*)*$", l)
         if check is None:
-            print_error("Error line %d: " % line_num, "%s syntax error" % l, " uknown token")
+            print_error("Error line %d: " % line_num, "%s syntax error" % l, " unknown token")
             sys.exit(-1)
         ## Find our initial state, this consists of
         ## Getting registers values and flags
@@ -1503,7 +1517,7 @@ def emulate_file(infile, initial_state):
             elif check.group(1) == "breakip":
                 breakip = val
             else:
-                print_error("Error line %d: " % line_num, "%s syntax error" % l, " uknown token")
+                print_error("Error line %d: " % line_num, "%s syntax error" % l, " unknown token")
                 sys.exit(-1)
         ## Getting verbosity
         check = re.search(r"^\s*(verbose)\s*=\s*([0-9]+|0x[0-9a-fA-F]+|0b[0-1]+)\s*(#.*)*$", l)
@@ -1911,5 +1925,5 @@ elif sys.argv[1] == "-e":
     print("  -> Emulation of file %s" % sys.argv[2])
     emulate_file(sys.argv[2], initial_state)
 else:
-    print_error("Error: ", "", "uknown option '%s' (-a, -d or -e expected)" % sys.argv[1])
+    print_error("Error: ", "", "unknown option '%s' (-a, -d or -e expected)" % sys.argv[1])
     sys.exit(-1)

@@ -12,28 +12,23 @@
 #####################################################################
 #      C O M P U T E   M O N T G O M E R Y   C O N S T A N T S
 #####################################################################
-.constMTYL:
 .constMTY0L:
-.constMTYL_export:
-# *****************************************************************
-# clear both the logical and arithmetical masks (mu0, mu1, m0 & m1).
-# If the size of prime p was lowered down since last computation, 
-# there may remain pernicious bits in the upper part of the masks
-# *****************************************************************
-#	BARRIER
-	NNCLR			mu0
-	NNCLR			mu1
-	NNCLR			m0
-	NNCLR			m1
-	NNCLR			phi0
-	NNCLR			phi1
-	NNCLR			kb1
+.constMTY0L_export:
+	NNMOV	one		R
+	STOP
+
+.constMTY1L:
+.constMTY1L_export:
+	NNSLL	R		R
+	STOP
+
+.constMTY2L:
+.constMTY2L_export:
 # compute quantity 2 times p
 	NNADD	p	p	twop
 # *****************************************************************
 #        C O M P U T E   - (p ^ -1)    m o d   2 ^ (nn + 2)
 # *****************************************************************
-	BARRIER
 # *****************************************************************
 # call euclidian division with: dx  <-  p
 #                               dy  assumed to hold R = 2**(nn+2)
@@ -45,7 +40,6 @@
 # finally take the opposite modulo R of result 'inverse'
 # *****************************************************************
 	NNSUB,M	dy	inverse	inverse
-.constMTY1L:
 # *****************************************************************
 #                C O M P U T E   ( R ^ 2 )   m o d   p
 # *****************************************************************
@@ -67,6 +61,24 @@
 	NNMOV	inverse		R2modp
 	NNSUB	R2modp	twop	red
 	NNADD,p5	red	patchme	R2modp
+.computeRL:
+# *****************************************************************
+# reduce R mod p
+# *****************************************************************
+# we have:
+#   4p < R = 2^(nn+2) < 8p
+# hence we subtract three times quantity 2p to R to get R - 6p with:
+#  -2p <    R - 6p    < 2p
+# we then ensure that the result is not negative, adding back the qty
+# 2p to it in case it is, see patch p5 below
+	NNSUB	R	twop	R
+	NNSUB	R	twop	R
+	NNSUB	R	twop	red
+# if the result of last NNSUB is negative, patch p5 on line below will
+# replace virtual operand patchme with address of variable twop, hence
+# restoring a positive value. It the result is positive, effect of patch
+# is to replace patchme with the address of of variable zero
+	NNADD,p5	red	patchme	Rmodp
 	STOP
 
 .aMontyL:

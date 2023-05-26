@@ -12,19 +12,20 @@
 #####################################################################
 #                            S E T U P
 #####################################################################
-.setupL:
-.setupL_export:
-# *****************************************************************
-# start by reducing R mod p
-# Since R is the power-of-2 strictly greater than p, we have
-# R = p + eps with R < 8p which means eps < 7p. Therefore to
-# reduce R mod p we simply need to subtract 7 times value of p
-# *****************************************************************
+.setup0L:
+.setup0L_export:
+# ****************************************************************
+# generate lambda random value (Z-mask)
+# ****************************************************************
+.drawZL:
 	BARRIER
-	NNSUB	R	twop	R
-	NNSUB	R	twop	R
-	NNSUB	R	twop	R
-	NNSUB	R	p	Rmodp
+	NNRNDm			lambda
+	NNSUB	lambda	p	red
+	NNADD,p4	red	patchme	lambda
+	STOP
+
+.setup1L:
+.setup1L_export:
 # ****************************************************************
 # switch to Montgomery representation
 # ****************************************************************
@@ -43,12 +44,9 @@
 	BARRIER
 	FPREDC	one	R2modp	ZR01
 # ****************************************************************
-# randomize coordinates (Z-masking aka point blinding)
+# randomize coordinates (Z-masking aka point blinding) w/ lambda
 # ****************************************************************
-.drawZL:
-	NNRNDm			lambda
-	NNSUB	lambda	p	red
-	NNADD,p4	red	patchme	lambda
+.taglambdaL_export:
 	FPREDC	lambda	R2modp	lambda
 	BARRIER
 	FPREDC	ZR01	lambda	ZR01
@@ -72,11 +70,3 @@
 # ****************************************************************
 	J	.pre_zadduL
 
-.setup_endL:
-.setup_endL_export:
-# ****************************************************************
-# Branch to .zadduL to compute [3]P and update P with the same Z
-# This call won't return
-# ****************************************************************
-	BARRIER
-	J	.zadduL

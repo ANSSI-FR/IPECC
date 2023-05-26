@@ -63,6 +63,7 @@ architecture struct of es_trng is
 			valid : out std_logic;
 			rdy : in std_logic;
 			-- following signals are for debug & statistics
+			dbgtrngrawreset : in std_logic;
 			dbgtrngta : in unsigned(19 downto 0);
 			dbgtrngvonneuman : in std_logic;
 			dbgtrngidletime : in unsigned(3 downto 0)
@@ -85,7 +86,9 @@ architecture struct of es_trng is
 			-- interface with second upstream es_trng_aggreg
 			raw1 : in std_logic;
 			valid1 : in std_logic;
-			rdy1 : out std_logic
+			rdy1 : out std_logic;
+			-- following signal is for debug
+			dbgtrngrawreset : in std_logic
 		);
 	end component es_trng_aggreg;
 
@@ -147,6 +150,7 @@ begin
 				valid => validi,
 				rdy => r.rdyi,
 				-- following signals are for debug & statistics
+				dbgtrngrawreset => dbgtrngrawreset,
 				dbgtrngta => dbgtrngta,
 				dbgtrngvonneuman => dbgtrngvonneuman,
 				dbgtrngidletime => dbgtrngidletime
@@ -167,6 +171,7 @@ begin
 					valid => valid0(i),
 					rdy => rdy0(i),
 					-- following signals are for debug & statistics
+					dbgtrngrawreset => dbgtrngrawreset,
 					dbgtrngta => dbgtrngta,
 					dbgtrngvonneuman => dbgtrngvonneuman,
 					dbgtrngidletime => dbgtrngidletime
@@ -190,7 +195,9 @@ begin
 					-- interface with second upstream es_trng_aggreg
 					raw1 => raw1(i + 1),
 					valid1 => valid1(i + 1),
-					rdy1 => rdy1(i + 1)
+					rdy1 => rdy1(i + 1),
+					-- debug
+					dbgtrngrawreset => dbgtrngrawreset
 				);
 		end generate; -- i
 		raw1(nbtrng - 1) <= raw0(nbtrng - 1);

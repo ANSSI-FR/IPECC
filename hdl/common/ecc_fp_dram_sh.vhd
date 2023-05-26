@@ -46,7 +46,7 @@ entity ecc_fp_dram_sh is
 		-- interface with ecc_scalar
 		permute : in std_logic;
 		permuterdy : out std_logic;
-		permuteundo :in std_logic;
+		permuteundo : in std_logic;
 		-- interface with ecc_trng
 		trngvalid : in std_logic;
 		trngrdy : out std_logic;

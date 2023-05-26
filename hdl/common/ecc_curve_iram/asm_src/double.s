@@ -29,6 +29,9 @@
 	BARRIER
 	JL	.dozdblL
 # back from .dozdblL routine we need to invert Z coordinate
+# the barrier is important so that computations made in .dozdblL
+# are over by the time we call .modinvL
+	BARRIER
 	NNMOV	ZR01		dx
 	JL	.modinvL
 # back from .modinvL routine we need to renormalize X & Y
@@ -37,8 +40,14 @@
 	NNMOV	XR0		XR1
 	NNMOV	YR0		YR1
 # call routine to normalize XR1 and YR1 coordinates
+# the barrier is important so that computations made in .modinvL
+# are over by the time we call .normalizeL
+	BARRIER
 	JL	.normalizeL
 # call routine to exit XR1 & YR1 out of Montgomery domain
+# the barrier is important so that computations made in .normalizeL
+# are over by the time we call .exitMontyL
+	BARRIER
 	JL	.exitMontyL
 # restore R0 coordinates
 	NNMOV	XR0bk		XR0

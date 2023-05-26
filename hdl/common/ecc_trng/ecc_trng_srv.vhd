@@ -57,6 +57,7 @@ entity ecc_trng_srv is
 		data3 : out std_logic_vector(FP_ADDR - 1 downto 0);
 		irncount3 : out std_logic_vector(log2(irn_fifo_size_sh) - 1 downto 0);
 		-- interface with ecc_axi (only usable in debug mode)
+		dbgtrngcompletebypassbit : in std_logic;
 		dbgtrngcompletebypass : in std_logic
 	);
 end entity ecc_trng_srv;
@@ -606,26 +607,30 @@ begin
 
 	-- drive outputs
 	--   client 0
-	valid0 <= r.valid(0);
+	valid0 <= r.valid(0) when ((not debug) or dbgtrngcompletebypass = '0')
+						else '1';
 	-- if complete bypass of TRNG wasn't a debug feature, we could set
 	-- a multi-cycle constraint on path: dbgtrngcompletebypass -> data[0-3]
 	data0 <= r.data0 when ((not debug) or dbgtrngcompletebypass = '0')
-	         else (data0'range => '1');
+	         else (data0'range => dbgtrngcompletebypassbit);
 	irncount0 <= count0;
 	--   client 1
-	valid1 <= r.valid(1);
+	valid1 <= r.valid(1) when ((not debug) or dbgtrngcompletebypass = '0')
+						else '1';
 	data1 <= r.data1 when ((not debug) or dbgtrngcompletebypass = '0')
-	         else (data1'range => '1');
+	         else (data1'range => dbgtrngcompletebypassbit);
 	irncount1 <= count1;
 	--   client 2
-	valid2 <= r.valid(2);
+	valid2 <= r.valid(2) when ((not debug) or dbgtrngcompletebypass = '0')
+						else '1';
 	data2 <= r.data2 when ((not debug) or dbgtrngcompletebypass = '0')
-	         else (data2'range => '1');
+	         else (data2'range => dbgtrngcompletebypassbit);
 	irncount2 <= count2;
 	--   client 3
-	valid3 <= r.valid(3);
+	valid3 <= r.valid(3) when ((not debug) or dbgtrngcompletebypass = '0')
+						else '1';
 	data3 <= r.data3 when ((not debug) or dbgtrngcompletebypass = '0')
-	         else (data3'range => '1');
+	         else (data3'range => dbgtrngcompletebypassbit);
 	irncount3 <= count3;
 	--   handshake with ecc_trng_pp
 	rdy_s <= r.rdy_s;

@@ -26,14 +26,10 @@
 	NNMOV	XR1		XR1bk
 	NNMOV	YR1		YR1bk
 # Enter XR0, YR0, XR1 & YR1 in Montgomery domain.
-# Doing so we invert R0 & R1 to comply with the way zadduL routine
-# interprets its two input points - only one of them being updated
-# (and therefore preserved) while the other one is clobbered with
-# the result of the addition
-	FPREDC	XR0bk	R2modp	XR1
-	FPREDC	YR0bk	R2modp	YR1
-	FPREDC	XR1bk	R2modp	XR0
-	FPREDC	YR1bk	R2modp	YR0
+	FPREDC	XR0bk	R2modp	XR0
+	FPREDC	YR0bk	R2modp	YR0
+	FPREDC	XR1bk	R2modp	XR1
+	FPREDC	YR1bk	R2modp	YR1
 	FPREDC	one	R2modp	ZR01
 	BARRIER
 # this call won't return
@@ -45,21 +41,38 @@
 	NNMOV	ZR01		dx
 	JL	.modinvL
 # call routine to normalize XR1 and YR1 coordinates
+# the barrier is important so that computations made in .modinvL
+# are over by the time we call .normalizeL
+	BARRIER
 	JL	.normalizeL
 # call routine to exit XR1 & YR1 out of Montgomery domain
+# the barrier is important so that computations made in .normalizeL
+# are over by the time we call .exitMontyL
+	BARRIER
 	JL	.exitMontyL
-# do the same thing (normalize + Mont. out) for R0
+# restore R0 (it is never affected by point addition operation)
+# (and even if .zdblL was called, instead of .zadduL, to perform
+# the addition, the code of .zdblL does not modify XR0bk nor YR0bk)
+	BARRIER
+	NNMOV	XR0bk		XR0
+	NNMOV	YR0bk		YR0
+# patch mechanism ensures that these two lasts will only have
+# effect in specific exception situations
+	NNMOV,p42	XR1bk		XR1
+	NNMOV,p43	YR1bk		YR1
+	STOP
+
+.zdbl_swL:
+.zdbl_swL_export:
+	BARRIER
+	JL	.dozdblL
+# back from .dozdblL routine, we must switch R0 & R1 points
+# because for point addition operation software expects result
+# in R1 but .dozdblL sets its result in R0
 	NNMOV	XR1		XR1bk
 	NNMOV	YR1		YR1bk
 	NNMOV	XR0		XR1
 	NNMOV	YR0		YR1
-# normalize coordinates
-	JL	.normalizeL
-# leave Montgomery domain
-	JL	.exitMontyL
-#	NNMOV	XR1		XR0
-#	NNMOV	YR1		YR0
-# restore R1
-	NNMOV,p42	XR1bk		XR0
-	NNMOV,p43	YR1bk		YR0
+	NNMOV	XR1bk		XR0
+	NNMOV	YR1bk		YR0
 	STOP

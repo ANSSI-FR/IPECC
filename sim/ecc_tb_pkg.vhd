@@ -60,391 +60,516 @@ package ecc_tb_pkg is
 
 	type curve_param_addr_type is
 		array(integer range 0 to 3) of integer;
-	constant CURVE_PARAM_ADDR : curve_param_addr_type :=
+		constant CURVE_PARAM_ADDR : curve_param_addr_type :=
 		(0 => LARGE_NB_P_ADDR,
 		 1 => LARGE_NB_A_ADDR,
 		 2 => LARGE_NB_B_ADDR,
 		 3 => LARGE_NB_Q_ADDR);
 
 	-- emulate software driver polling the R_STATUS register until it shows ready
-	procedure poll_until_ready(signal clk : in std_logic;
-	                           signal axi: out axi_in_type;
-	                           signal axo: in axi_out_type);
+	procedure poll_until_ready(
+		signal clk : in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type);
 
 	-- emulate software driver writing prime size (nn)
 	--   (option nn_dynamic = TRUE in ecc_customize.vhd)
-	procedure set_nn(signal clk : in std_logic;
-	                 signal axi: out axi_in_type;
-	                 signal axo: in axi_out_type;
-	                 constant valnn : in positive);
+	procedure set_nn(
+		signal clk : in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant valnn : in positive);
 
 	-- emulate software driver writing one large number (but the scalar)
-	procedure write_big(signal clk: in std_logic;
-	                    signal axi: out axi_in_type;
-	                    signal axo: in axi_out_type;
-	                    constant valnn : in positive;
-	                    constant addr : in natural range 0 to nblargenb - 1;
-	                    constant bignb : in std_logic_vector);
+	procedure write_big(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant valnn : in positive;
+		constant addr : in natural range 0 to nblargenb - 1;
+		constant bignb : in std_logic_vector);
 
 	-- Identical to write_big, except that here debug mode
 	-- is assumed, hence we do not poll the BUSY bit in R_STATUS register
 	-- (otherwise we would be creating a deadlock)
-	procedure debug_write_big(signal clk: in std_logic;
-	                    signal axi: out axi_in_type;
-	                    signal axo: in axi_out_type;
-	                    constant valnn : in positive;
-	                    constant addr : in natural range 0 to nblargenb - 1;
-	                    constant bignb : in std_logic_vector);
+	procedure debug_write_big(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant valnn : in positive;
+		constant addr : in natural range 0 to nblargenb - 1;
+		constant bignb : in std_logic_vector);
 
-	-- emulate software driver configuring shuffle
-	procedure configure_shuffle(signal clk: in std_logic;
-	                            signal axi: out axi_in_type;
-	                            signal axo: in axi_out_type;
-	                            constant sh : in boolean);
+	-- emulate software driver activating ecc_fp_dram memory shuffle
+	procedure debug_activate_shuffle(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type);
+
+	-- emulate software driver deactivating ecc_fp_dram memory shuffle
+	procedure debug_deactivate_shuffle(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type);
 
 	-- emulate software driver configuring IRQ
-	procedure configure_irq(signal clk: in std_logic;
-	                        signal axi: out axi_in_type;
-	                        signal axo: in axi_out_type;
-	                        constant irq : in boolean);
+	procedure configure_irq(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant irq : in boolean);
 
 	-- emulate software driver configuring blinding
-	procedure configure_blinding(signal clk: in std_logic;
-	                             signal axi: out axi_in_type;
-	                             signal axo: in axi_out_type;
-	                             constant blind : in boolean;
-	                             constant blindbits : in natural);
+	procedure configure_blinding(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant blind : in boolean;
+		constant blindbits : in natural);
 
 	-- emulate software driver writing the large number of the scalar
-	procedure write_scalar(signal clk: in std_logic;
-	                       signal axi: out axi_in_type;
-	                       signal axo: in axi_out_type;
-	                       constant valnn : in positive;
-	                       constant val : in std_logic_vector);
+	procedure write_scalar(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant valnn : in positive;
+		constant val : in std_logic_vector);
 
 	-- emulate software driver issuing command 'do [k]P-computation'
-	procedure run_kp(signal clk: in std_logic;
-	                 signal axi: out axi_in_type;
-	                 signal axo: in axi_out_type);
+	procedure run_kp(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type);
 
 	-- emulate software driver writing base-point & scalar
 	-- and giving [k]P computation a go
-	procedure scalar_mult(signal clk: in std_logic;
-	                      signal axi: out axi_in_type;
-	                      signal axo: in axi_out_type;
-	                      constant valnn : in positive;
-	                      constant scalar : in std_logic_vector;
-	                      constant xx : in std_logic_vector;
-	                      constant yy : in std_logic_vector;
-	                      constant z : in boolean);
+	procedure scalar_mult(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant valnn : in positive;
+		constant scalar : in std_logic_vector;
+		constant xx : in std_logic_vector;
+		constant yy : in std_logic_vector;
+		constant z : in boolean);
 
 	-- emulate software driver checking if R0 is the null point
-	procedure check_if_r0_null(signal clk: in std_logic;
-	                           signal axi: out axi_in_type;
-	                           signal axo: in axi_out_type;
-	                           variable isnull : out boolean);
+	procedure check_if_r0_null(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		variable isnull : out boolean);
 
 	-- emulate software driver checking if R1 is the null point
-	procedure check_if_r1_null(signal clk: in std_logic;
-	                           signal axi: out axi_in_type;
-	                           signal axo: in axi_out_type;
-	                           variable isnull : out boolean);
+	procedure check_if_r1_null(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		variable isnull : out boolean);
 
 	-- emulate software driver checking if R0/R1 is pt 0 & display it on console
-	procedure check_and_display_if_r0_r1_null(signal clk: in std_logic;
-	                                          signal axi: out axi_in_type;
-	                                          signal axo: in axi_out_type);
+	procedure check_and_display_if_r0_r1_null(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type);
 
 	-- emulate software driver checking if any error & display them on console
-	procedure display_errors(signal clk: in std_logic;
-	                         signal axi: out axi_in_type;
-	                         signal axo: in axi_out_type);
+	procedure display_errors(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type);
 
 	-- emulate software driver reading one large number
-	procedure read_big(signal clk: in std_logic;
-	                   signal axi: out axi_in_type;
-	                   signal axo: in axi_out_type;
-	                   constant valnn: in positive;
-	                   constant addr : in natural range 0 to nblargenb - 1;
-	                   variable bignb: inout std_logic_vector);
+	procedure read_big(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant valnn: in positive;
+		constant addr : in natural range 0 to nblargenb - 1;
+		variable bignb: inout std_logic_vector);
 
 	-- Identical to read_big, except that here debug mode is assumed,
 	-- hence we do not poll the BUSY bit in R_STATUS register
 	-- (otherwise we would be creating a deadlock)
-	procedure debug_read_big(signal clk: in std_logic;
-	                         signal axi: out axi_in_type;
-	                         signal axo: in axi_out_type;
-	                         constant valnn: in positive;
-	                         constant addr : in natural range 0 to nblargenb - 1;
-	                         variable bignb: inout std_logic_vector);
+	procedure debug_read_big(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant valnn: in positive;
+		constant addr : in natural range 0 to nblargenb - 1;
+		variable bignb: inout std_logic_vector);
 
 	-- emulate software driver reading [k]P result's coordinates
-	procedure read_and_display_kp_result(signal clk: in std_logic;
-	                                     signal axi: out axi_in_type;
-	                                     signal axo: in axi_out_type;
-	                                     constant valnn: in positive);
+	procedure read_and_display_kp_result(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant valnn: in positive);
 
 	-- emulate software driver acknowledging all errors
-	procedure ack_all_errors(signal clk: in std_logic;
-	                         signal axi: out axi_in_type;
-	                         signal axo: in axi_out_type);
+	procedure ack_all_errors(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type);
 
 	-- emulate software driver setting all curve parameters
-	procedure set_curve(signal clk: in std_logic;
-	                    signal axi: out axi_in_type;
-	                    signal axo: in axi_out_type;
-	                    constant size: in positive;
-	                    constant curve: curve_param_type);
+	procedure set_curve(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant size: in positive;
+		constant curve: curve_param_type);
 
 	-- emulate software driver setting R0 to be the null point
-	procedure set_r0_null(signal clk: in std_logic;
-	                      signal axi: out axi_in_type;
-	                      signal axo: in axi_out_type);
+	procedure set_r0_null(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type);
 
 	-- emulate software driver setting R0 NOT to be the null point
-	procedure set_r0_non_null(signal clk: in std_logic;
-	                          signal axi: out axi_in_type;
-	                          signal axo: in axi_out_type);
+	procedure set_r0_non_null(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type);
 
 	-- emulate software driver setting R1 to be the null point
-	procedure set_r1_null(signal clk: in std_logic;
-	                      signal axi: out axi_in_type;
-	                      signal axo: in axi_out_type);
+	procedure set_r1_null(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type);
 
 	-- emulate software driver setting R1 NOT to be the null point
-	procedure set_r1_non_null(signal clk: in std_logic;
-	                          signal axi: out axi_in_type;
-	                          signal axo: in axi_out_type);
+	procedure set_r1_non_null(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type);
 
 	-- emulate software driver issuing command 'do point-addition'
-	procedure run_point_add(signal clk: in std_logic;
-	                        signal axi: out axi_in_type;
-	                        signal axo: in axi_out_type);
+	procedure run_point_add(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type);
 
 	-- emulate software driver writing coords of two points to add
 	-- and giving computation a go
-	procedure point_add(signal clk: in std_logic;
-	                    signal axi: out axi_in_type;
-	                    signal axo: in axi_out_type;
-	                    constant valnn : positive;
-	                    constant x0 : in std_logic_vector;
-	                    constant y0 : in std_logic_vector;
-	                    constant x1 : in std_logic_vector;
-	                    constant y1 : in std_logic_vector;
-	                    constant z0 : in boolean;
-	                    constant z1 : in boolean);
+	procedure point_add(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant valnn : positive;
+		constant x0 : in std_logic_vector;
+		constant y0 : in std_logic_vector;
+		constant x1 : in std_logic_vector;
+		constant y1 : in std_logic_vector;
+		constant z0 : in boolean;
+		constant z1 : in boolean);
 
 	-- emulate software driver reading result coords after point-add
 	-- & display on console
-	procedure read_and_display_ptadd_result(signal clk: in std_logic;
-	                                        signal axi: out axi_in_type;
-	                                        signal axo: in axi_out_type;
-	                                        constant valnn: in positive);
+	procedure read_and_display_ptadd_result(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant valnn: in positive);
 
 	-- emulate software driver issuing command 'do point-doubling'
-	procedure run_point_double(signal clk: in std_logic;
-	                           signal axi: out axi_in_type;
-	                           signal axo: in axi_out_type);
+	procedure run_point_double(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type);
 
 	-- emulate software driver writing coords of a point to double
 	-- and giving computation a go
-	procedure point_double(signal clk: in std_logic;
-	                       signal axi: out axi_in_type;
-	                       signal axo: in axi_out_type;
-	                       constant valnn : in positive;
-	                       constant x : in std_logic_vector;
-	                       constant y : in std_logic_vector;
-	                       constant z : in boolean);
+	procedure point_double(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant valnn : in positive;
+		constant x : in std_logic_vector;
+		constant y : in std_logic_vector;
+		constant z : in boolean);
 
 	-- emulate software driver running a point double computation on the
 	-- null point, and therefore without setting the coordinates of the
 	-- input points
 	procedure point_double_zero_without_coords(
-	                       signal clk: in std_logic;
-	                       signal axi: out axi_in_type;
-	                       signal axo: in axi_out_type;
-	                       constant valnn : in positive);
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant valnn : in positive);
 
 	-- emulate software driver reading result's coords after point-double
 	-- and display on console
-	procedure read_and_display_ptdbl_result(signal clk: in std_logic;
-	                                        signal axi: out axi_in_type;
-	                                        signal axo: in axi_out_type;
-	                                        constant valnn: in positive);
+	procedure read_and_display_ptdbl_result(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant valnn: in positive);
 	
 	-- emulate software driver issuing command 'do point-negate'
-	procedure run_point_negate(signal clk: in std_logic;
-	                           signal axi: out axi_in_type;
-	                           signal axo: in axi_out_type);
+	procedure run_point_negate(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type);
 
 	-- emulate software driver writing coords of point to negate (-P)
 	-- and give computation a go
-	procedure point_negate(signal clk: in std_logic;
-	                       signal axi: out axi_in_type;
-	                       signal axo: in axi_out_type;
-	                       constant valnn: in positive;
-	                       constant x: in std_logic_vector;
-	                       constant y: in std_logic_vector; 
-	                       constant z: in boolean);
+	procedure point_negate(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant valnn: in positive;
+		constant x: in std_logic_vector;
+		constant y: in std_logic_vector; 
+		constant z: in boolean);
 
 	-- emulate software driver reading result coords after point-negate
 	-- and display on console
-	procedure read_and_display_ptneg_result(signal clk: in std_logic;
-	                                        signal axi: out axi_in_type;
-	                                        signal axo: in axi_out_type;
-	                                        constant valnn: in positive);
+	procedure read_and_display_ptneg_result(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant valnn: in positive);
 
 	-- emulate software driver issuing command 'do P == Q test'
-	procedure run_point_test_equal(signal clk: in std_logic;
-	                               signal axi: out axi_in_type;
-	                               signal axo: in axi_out_type);
+	procedure run_point_test_equal(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type);
 
 	-- emulate software driver writing coords of 2 points to compare (P==Q)
 	-- and giving computation a go
-	procedure point_test_equal(signal clk: in std_logic;
-	                           signal axi: out axi_in_type;
-	                           signal axo: in axi_out_type;
-	                           constant valnn : positive;
-	                           constant x0 : in std_logic_vector;
-	                           constant y0 : in std_logic_vector;
-	                           constant x1 : in std_logic_vector;
-	                           constant y1 : in std_logic_vector;
-	                           constant z0 : in boolean;
-	                           constant z1 : in boolean);
+	procedure point_test_equal(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant valnn : positive;
+		constant x0 : in std_logic_vector;
+		constant y0 : in std_logic_vector;
+		constant x1 : in std_logic_vector;
+		constant y1 : in std_logic_vector;
+		constant z0 : in boolean;
+		constant z1 : in boolean);
 
 	-- emulate software driver issuing command 'do P -== Q test'
-	procedure run_point_test_opposite(signal clk: in std_logic;
-	                                  signal axi: out axi_in_type;
-	                                  signal axo: in axi_out_type);
+	procedure run_point_test_opposite(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type);
 
 	-- emulate software driver writing coords of 2 points to test if points
 	-- are opposite, and giving computation a go
-	procedure point_test_opposite(signal clk: in std_logic;
-	                              signal axi: out axi_in_type;
-	                              signal axo: in axi_out_type;
-	                              constant valnn : positive;
-	                              constant x0 : in std_logic_vector;
-	                              constant y0 : in std_logic_vector;
-	                              constant x1 : in std_logic_vector;
-	                              constant y1 : in std_logic_vector;
-	                              constant z0 : in boolean;
-	                              constant z1 : in boolean);
+	procedure point_test_opposite(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant valnn : positive;
+		constant x0 : in std_logic_vector;
+		constant y0 : in std_logic_vector;
+		constant x1 : in std_logic_vector;
+		constant y1 : in std_logic_vector;
+		constant z0 : in boolean;
+		constant z1 : in boolean);
 
 	-- emulate software driver issuing command 'is P on point test'
-	procedure run_point_test_on_curve(signal clk: in std_logic;
-	                                  signal axi: out axi_in_type;
-	                                  signal axo: in axi_out_type);
+	procedure run_point_test_on_curve(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type);
 
 	-- emulate software driver writing coord of a point and test
 	-- if it is on curve
-	procedure point_test_on_curve(signal clk: in std_logic;
-	                              signal axi: out axi_in_type;
-	                              signal axo: in axi_out_type;
-	                              constant valnn : positive;
-	                              constant xx : in std_logic_vector;
-	                              constant yy : in std_logic_vector;
-	                              constant z : in boolean);
+	procedure point_test_on_curve(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant valnn : positive;
+		constant xx : in std_logic_vector;
+		constant yy : in std_logic_vector;
+		constant z : in boolean);
 
 	-- emulate software driver getting answer to a test it's asked on R0 and/or R1
-	procedure check_test_answer(signal clk: in std_logic;
-                              signal axi: out axi_in_type;
-	                            signal axo: in axi_out_type;
-	                            variable yes_or_no: out boolean;
-	                            variable answer_right: out boolean);
+	procedure check_test_answer(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		variable yes_or_no: out boolean;
+		variable answer_right: out boolean);
 
 	-- Identical to check_test_answer with display on console
-	procedure read_and_display_pttest_result(signal clk: in std_logic;
-                                           signal axi: out axi_in_type;
-	                                         signal axo: in axi_out_type;
-	                                         constant valnn: in positive);
+	procedure read_and_display_pttest_result(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant valnn: in positive);
 
 	-- emulate software driver setting a breakpoint (debug feature)
-	procedure set_one_breakpoint(
-	            signal clk: in std_logic;
-	            signal axi: out axi_in_type;
-	            signal axo: in axi_out_type;
-	            constant id: in natural;
-	            constant addr: in std_logic_vector(IRAM_ADDR_SZ - 1 downto 0);
-	            constant state: in std_logic_vector(3 downto 0);
-	            constant nbbits: in natural);
-	
+	procedure set_breakpoint(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant id: in natural;
+		constant addr: in std_logic_vector(IRAM_ADDR_SZ - 1 downto 0);
+		constant state: in std_logic_vector(3 downto 0);
+		constant nbbits: in natural);
+
+	-- emulate software driver unsetting a breakpoint (debug feature)
+	procedure remove_breakpoint(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant id: in natural);
+
 	-- emulate software driver polling R_DBG_STATUS until it shows
 	-- IP is halted (debug feat.)
-	procedure poll_until_debug_halted(signal clk: in std_logic;
-	                                  signal axi: out axi_in_type;
-	                                  signal axo: in axi_out_type);
+	procedure poll_until_debug_halted(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type);
 
 	-- emulate software driver read of the R_DBG_STATUS and returns the value
-	procedure read_dbg_status(signal clk: in std_logic;
-	                          signal axi: out axi_in_type;
-	                          signal axo: in axi_out_type;
-	                          variable dbgstatus : inout std_logic_vector);
+	procedure read_dbg_status(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		variable dbgstatus : inout std_logic_vector);
 
 	-- emulate software driver resuming execution of microcode (debug feature)
-	procedure resume(signal clk: in std_logic;
-	                 signal axi: out axi_in_type;
-	                 signal axo: in axi_out_type);
+	procedure resume_execution(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type);
 
 	-- emulate software driver asking for execution of a specific number
 	-- of opcodes
-	procedure run_n_opcodes(signal clk: in std_logic;
-	                        signal axi: out axi_in_type;
-	                        signal axo: in axi_out_type;
-	                        constant nbop : in natural);
+	procedure run_n_opcodes(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant nbop : in natural);
+
+	-- emulate software driver asking for a single-step of microcode
+	procedure single_step(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type);
 
 	-- emulate software driver reading of one large number
 	-- with display on console
 	procedure read_and_display_one_large_nb(
-	                signal clk: in std_logic;
-	                signal axi: out axi_in_type;
-	                signal axo: in axi_out_type;
-	                constant valnn: in positive;
-	                constant addr: in natural range 0 to nblargenb - 1);
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant valnn: in positive;
+		constant addr: in natural range 0 to nblargenb - 1);
 
 	-- Identical to read_and_display_kp_result, except that here debug mode
 	-- is assumed, hence we do not poll the BUSY bit in R_STATUS register
 	-- (otherwise we'd create a deadlock if the IP was halted)
 	procedure debug_read_and_display_one_large_nb(
-	                signal clk: in std_logic;
-	                signal axi: out axi_in_type;
-	                signal axo: in axi_out_type;
-	                constant valnn: in positive;
-	                constant addr: in natural range 0 to nblargenb - 1);
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant valnn: in positive;
+		constant addr: in natural range 0 to nblargenb - 1);
 
 	-- emulate software driver reading both R0 and R1 point coordinate values
 	-- (whether or not they are null according to R_STATUS)
 	procedure read_and_display_r0_and_r1_coords(
-	                signal clk: in std_logic;
-	                signal axi: out axi_in_type;
-	                signal axo: in axi_out_type;
-	                constant valnn: in positive);
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant valnn: in positive);
+
+	-- to test exceptions case
+	procedure test_exception(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant valnn: integer;
+		constant V_K: std_logic512;
+		constant V_X: std_logic512;
+		constant V_Y: std_logic512;
+		constant V_PHI_VALUE: std_logic32;
+		constant testid : integer);
 
 	-- to activate [XY]R[01] coords shuffle
-	procedure debug_activate_xyshuf(signal clk: in std_logic;
-	                                signal axi: out axi_in_type;
-	                                signal axo: in axi_out_type);
+	procedure debug_activate_xyshuf(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type);
 
 	-- to deactivate [XY]R[01] coords shuffle
-	procedure debug_deactivate_xyshuf(signal clk: in std_logic;
-	                                  signal axi: out axi_in_type;
-	                                  signal axo: in axi_out_type);
+	procedure debug_deactivate_xyshuf(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type);
+
+	-- to activate AXI on-the-fly masking of the scalar
+	procedure debug_activate_aximask(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type);
+
+	-- to deactivate AXI on-the-fly masking of the scalar
+	procedure debug_deactivate_aximask(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type);
 
 	-- emulate software driver reading an opcode value from ecc_curve_iram 
-	procedure get_opcode(signal clk: in std_logic;
-	                     signal axi: out axi_in_type;
-	                     signal axo: in axi_out_type;
-	                     constant addr: in natural range 0 to nbopcodes - 1);
+	procedure get_opcode(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant addr: in natural range 0 to nbopcodes - 1);
+
+	-- emulate software driver modifying an opcode value in ecc_curve_iram 
+	procedure modify_opcode(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant addr: in natural range 0 to nbopcodes - 1;
+		constant val: in std_logic_vector(OPCODE_SZ - 1 downto 0));
+
+	-- emulate software driver writing a specific ww-bit word at a specific
+	-- location of ecc_fp_dram
+	-- (assumes IP is already halted in debug mode)
+	procedure dbgwrite_one_limb_into_ecc_fp_dram(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant valnn : in positive;
+		constant lgnb: in natural range 0 to nblargenb - 1;
+		constant limb: in natural range 0 to n - 1;
+		constant val: in std_logic_ww);
+
+	-- emulate software driver clearing an entire large number in ecc_fp_dram
+	-- (assumes IP is already halted in debug mode)
+	procedure clear_one_lgnb_hw_ecc_fp_dram(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant valnn : in positive;
+		constant lgnb : in natural range 0 to n - 1);
+
+	procedure dbgread_one_limb_from_ecc_fp_dram(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant valnn : in positive;
+		constant lgnb: in natural range 0 to nblargenb - 1;
+		constant limb: in natural range 0 to n - 1;
+		variable val : inout std_logic_ww);
 
 end package ecc_tb_pkg;
 
 package body ecc_tb_pkg is
 
-	-- --------------------------------------------------------------------------
-	-- emulate software driver polling the R_STATUS register until it shows ready
-	-- --------------------------------------------------------------------------
-	procedure poll_until_ready(signal clk: in std_logic;
-	                           signal axi: out axi_in_type;
-	                           signal axo: in axi_out_type) is
+	procedure poll_until_ready(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type) is
 	begin
 		loop
 			wait until clk'event and clk = '1';
@@ -452,7 +577,7 @@ package body ecc_tb_pkg is
 			axi.araddr <= R_STATUS & "000";
 			axi.arvalid <= '1';
 			wait until clk'event and clk = '1' and axo.arready = '1';
-			axi.araddr <= "XXXXXXXX";
+			axi.araddr <= (others => 'X');
 			axi.arvalid <= '0';
 			axi.rready <= '1';
 			wait until clk'event and clk = '1' and axo.rvalid = '1';
@@ -464,20 +589,18 @@ package body ecc_tb_pkg is
 		end loop;
 	end procedure;
 
-	-- -------------------------------------------------
-	-- emulate software driver writing prime size (nn)
-	--   (option nn_dynamic = TRUE in ecc_customize.vhd)
-	-- -------------------------------------------------
-	procedure set_nn(signal clk: in std_logic;
-	                 signal axi: out axi_in_type;
-	                 signal axo: in axi_out_type;
-	                 constant valnn : in positive) is
+	procedure set_nn(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant valnn : in positive) is
 	begin
 		wait until clk'event and clk = '1';
+		poll_until_ready(clk, axi, axo);
 		-- write W_PRIME_SIZE register
 		axi.awaddr <= W_PRIME_SIZE & "000"; axi.awvalid <= '1';
 		wait until clk'event and clk = '1' and axo.awready = '1';
-		axi.awaddr <= "XXXXXXXX"; axi.awvalid <= '0';
+		axi.awaddr <= (others => 'X'); axi.awvalid <= '0';
 		axi.wdata <= std_logic_vector(to_unsigned(valnn, AXIDW));
 		axi.wvalid <= '1';
 		wait until clk'event and clk = '1' and axo.wready = '1';
@@ -485,15 +608,13 @@ package body ecc_tb_pkg is
 		wait until clk'event and clk = '1';
 	end procedure;
 
-	-- -----------------------------------------------------------------
-	-- emulate software driver writing one large number (but the scalar)
-	-- -----------------------------------------------------------------
-	procedure write_big(signal clk: in std_logic;
-	                    signal axi: out axi_in_type;
-	                    signal axo: in axi_out_type;
-	                    constant valnn : in positive;
-	                    constant addr : in natural range 0 to nblargenb - 1;
-	                    constant bignb : in std_logic_vector) is
+	procedure write_big(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant valnn : in positive;
+		constant addr : in natural range 0 to nblargenb - 1;
+		constant bignb : in std_logic_vector) is
 		variable dw : std_logic_vector(AXIDW - 1 downto 0);
 	begin
 		wait until clk'event and clk = '1';
@@ -525,17 +646,13 @@ package body ecc_tb_pkg is
 		end loop;
 	end procedure;
 
-	-- ------------------------------------------------------------------
-	-- Identical to write_big, except that here debug mode
-	-- is assumed, hence we do not poll the BUSY bit in R_STATUS register
-	-- (otherwise we would be creating a deadlock)
-	-- ------------------------------------------------------------------
-	procedure debug_write_big(signal clk: in std_logic;
-	                    signal axi: out axi_in_type;
-	                    signal axo: in axi_out_type;
-	                    constant valnn : in positive;
-	                    constant addr : in natural range 0 to nblargenb - 1;
-	                    constant bignb : in std_logic_vector) is
+	procedure debug_write_big(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant valnn : in positive;
+		constant addr : in natural range 0 to nblargenb - 1;
+		constant bignb : in std_logic_vector) is
 		variable tup, xup : integer;
 		variable dw : std_logic_vector(AXIDW - 1 downto 0);
 		variable vw : natural := div(valnn + 4, ww);
@@ -546,7 +663,7 @@ package body ecc_tb_pkg is
 			-- write W_DBG_FP_WADDR register
 			axi.awaddr <= W_DBG_FP_WADDR & "000"; axi.awvalid <= '1';
 			wait until clk'event and clk = '1' and axo.awready = '1';
-			axi.awaddr <= "XXXXXXXX"; axi.awvalid <= '0';
+			axi.awaddr <= (others => 'X'); axi.awvalid <= '0';
 			dw := (others => '0');
 			dw(FP_ADDR - 1 downto 0)
 				:= std_logic_vector(to_unsigned((addr * n) + limb, FP_ADDR));
@@ -577,21 +694,19 @@ package body ecc_tb_pkg is
 		wait until clk'event and clk = '1';
 	end procedure;
 
-	-- -------------------------------------------
-	-- emulate software driver configuring shuffle
-	-- -------------------------------------------
-	procedure configure_shuffle(signal clk: in std_logic;
-	                            signal axi: out axi_in_type;
-	                            signal axo: in axi_out_type;
-	                            constant sh : in boolean) is
+	procedure debug_activate_shuffle(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type)
+	is
 		variable dw : std_logic_vector(AXIDW - 1 downto 0);
 	begin
 		wait until clk'event and clk = '1';
-		axi.awaddr <= W_SHUFFLE & "000"; axi.awvalid <= '1';
+		axi.awaddr <= W_DBG_CFG_NOMEMSHUF & "000"; axi.awvalid <= '1';
 		wait until clk'event and clk = '1' and axo.awready = '1';
-		axi.awaddr <= "XXXXXXXX"; axi.awvalid <= '0';
+		axi.awaddr <= (others => 'X'); axi.awvalid <= '0';
 		dw := (others => '0');
-		if sh then dw(SHF_EN) := '1'; end if;
+		dw(MEMSHF_DIS) := '0'; -- for sake of readability
 		axi.wdata <= dw;
 		axi.wvalid <= '1';
 		wait until clk'event and clk = '1' and axo.wready = '1';
@@ -599,19 +714,37 @@ package body ecc_tb_pkg is
 		wait until clk'event and clk = '1';
 	end procedure;
 
-	-- ---------------------------------------
-	-- emulate software driver configuring IRQ
-	-- ---------------------------------------
-	procedure configure_irq(signal clk: in std_logic;
-	                        signal axi: out axi_in_type;
-	                        signal axo: in axi_out_type;
-	                        constant irq : in boolean) is
+	procedure debug_deactivate_shuffle(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type)
+	is
+		variable dw : std_logic_vector(AXIDW - 1 downto 0);
+	begin
+		wait until clk'event and clk = '1';
+		axi.awaddr <= W_DBG_CFG_NOMEMSHUF & "000"; axi.awvalid <= '1';
+		wait until clk'event and clk = '1' and axo.awready = '1';
+		axi.awaddr <= (others => 'X'); axi.awvalid <= '0';
+		dw := (others => '0');
+		dw(MEMSHF_DIS) := '1';
+		axi.wdata <= dw;
+		axi.wvalid <= '1';
+		wait until clk'event and clk = '1' and axo.wready = '1';
+		axi.wdata <= (others => 'X'); axi.wvalid <= '0';
+		wait until clk'event and clk = '1';
+	end procedure;
+
+	procedure configure_irq(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant irq : in boolean) is
 		variable dw : std_logic_vector(AXIDW - 1 downto 0);
 	begin
 		wait until clk'event and clk = '1';
 		axi.awaddr <= W_IRQ & "000"; axi.awvalid <= '1';
 		wait until clk'event and clk = '1' and axo.awready = '1';
-		axi.awaddr <= "XXXXXXXX"; axi.awvalid <= '0';
+		axi.awaddr <= (others => 'X'); axi.awvalid <= '0';
 		dw := (others => '0');
 		if irq then dw(IRQ_EN) := '1'; end if;
 		axi.wdata <= dw;
@@ -621,21 +754,19 @@ package body ecc_tb_pkg is
 		wait until clk'event and clk = '1';
 	end procedure;
 
-	-- --------------------------------------------
-	-- emulate software driver configuring blinding
-	-- --------------------------------------------
-	procedure configure_blinding(signal clk: in std_logic;
-	                             signal axi: out axi_in_type;
-	                             signal axo: in axi_out_type;
-	                             constant blind : in boolean;
-	                             constant blindbits : in natural) is
+	procedure configure_blinding(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant blind : in boolean;
+		constant blindbits : in natural) is
 		variable dw : std_logic_vector(AXIDW - 1 downto 0);
 	begin
 		wait until clk'event and clk = '1';
 		-- write W_BLINDING register
 		axi.awaddr <= W_BLINDING & "000"; axi.awvalid <= '1';
 		wait until clk'event and clk = '1' and axo.awready = '1';
-		axi.awaddr <= "XXXXXXXX"; axi.awvalid <= '0';
+		axi.awaddr <= (others => 'X'); axi.awvalid <= '0';
 		dw := (others => '0');
 		if blind then dw(BLD_EN) := '1'; end if;
 		assert (blindbits <= nn)
@@ -650,21 +781,19 @@ package body ecc_tb_pkg is
 		wait until clk'event and clk = '1';
 	end procedure;
 
-	-- --------------------------------------------------------------
-	-- emulate software driver writing the large number of the scalar
-	-- --------------------------------------------------------------
-	procedure write_scalar(signal clk: in std_logic;
-	                       signal axi: out axi_in_type;
-	                       signal axo: in axi_out_type;
-	                       constant valnn : in positive;
-	                       constant val : in std_logic_vector) is
+	procedure write_scalar(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant valnn : in positive;
+		constant val : in std_logic_vector) is
 		variable dw : std_logic_vector(AXIDW - 1 downto 0);
 	begin
 		wait until clk'event and clk = '1';
 		-- write W_CTRL register
 		axi.awaddr <= W_CTRL & "000"; axi.awvalid <= '1';
 		wait until clk'event and clk = '1' and axo.awready = '1';
-		axi.awaddr <= "XXXXXXXX"; axi.awvalid <= '0';
+		axi.awaddr <= (others => 'X'); axi.awvalid <= '0';
 		dw := (others => '0');
 		dw(CTRL_WRITE_NB) := '1';
 		dw(CTRL_NBADDR_LSB + FP_ADDR_MSB - 1 downto CTRL_NBADDR_LSB) := CST_ADDR_K;
@@ -680,7 +809,7 @@ package body ecc_tb_pkg is
 			end loop;
 			axi.awaddr <= W_WRITE_DATA & "000"; axi.awvalid <= '1';
 			wait until clk'event and clk = '1' and axo.awready = '1';
-			axi.awaddr <= "XXXXXXXX"; axi.awvalid <= '0';
+			axi.awaddr <= (others => 'X'); axi.awvalid <= '0';
 			axi.wdata <= val((AXIDW*i) + AXIDW - 1 downto AXIDW*i);
 			axi.wvalid <= '1';
 			wait until clk'event and clk = '1' and axo.wready = '1';
@@ -690,19 +819,17 @@ package body ecc_tb_pkg is
 		wait until clk'event and clk = '1';
 	end procedure;
 
-	-- -------------------------------------------------------------
-	-- emulate software driver issuing command 'do [k]P-computation'
-	-- -------------------------------------------------------------
-	procedure run_kp(signal clk: in std_logic;
-	                 signal axi: out axi_in_type;
-	                 signal axo: in axi_out_type) is
+	procedure run_kp(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type) is
 		variable dw : std_logic_vector(AXIDW - 1 downto 0);
 	begin
 		wait until clk'event and clk = '1';
 		-- write W_CTRL register
 		axi.awaddr <= W_CTRL & "000"; axi.awvalid <= '1';
 		wait until clk'event and clk = '1' and axo.awready = '1';
-		axi.awaddr <= "XXXXXXXX"; axi.awvalid <= '0';
+		axi.awaddr <= (others => 'X'); axi.awvalid <= '0';
 		dw := (others => '0');
 		dw(CTRL_KP) := '1';
 		axi.wdata <= dw;
@@ -712,18 +839,15 @@ package body ecc_tb_pkg is
 		wait until clk'event and clk = '1';
 	end procedure;
 
-	-- ---------------------------------------------------
-	-- emulate software driver writing base-point & scalar
-	-- and give [k]P computation a go
-	-- ---------------------------------------------------
-	procedure scalar_mult(signal clk: in std_logic;
-	                      signal axi: out axi_in_type;
-	                      signal axo: in axi_out_type;
-	                      constant valnn : in positive;
-	                      constant scalar : in std_logic_vector;
-	                      constant xx : in std_logic_vector;
-	                      constant yy : in std_logic_vector;
-												constant z : in boolean) is
+	procedure scalar_mult(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant valnn : in positive;
+		constant scalar : in std_logic_vector;
+		constant xx : in std_logic_vector;
+		constant yy : in std_logic_vector;
+		constant z : in boolean) is
 	begin
 		wait until clk'event and clk = '1';
 		-- write base-point's X & Y coordinates
@@ -744,20 +868,18 @@ package body ecc_tb_pkg is
 		run_kp(clk, axi, axo);
 	end procedure;
 
-	-- --------------------------------------------------------
-	-- emulate software driver checking if R0 is the null point
-	-- --------------------------------------------------------
-	procedure check_if_r0_null(signal clk: in std_logic;
-	                           signal axi: out axi_in_type;
-	                           signal axo: in axi_out_type;
-	                           variable isnull : out boolean) is
+	procedure check_if_r0_null(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		variable isnull : out boolean) is
 	begin
 		wait until clk'event and clk = '1';
 		-- read R_STATUS register
 		axi.araddr <= R_STATUS & "000";
 		axi.arvalid <= '1';
 		wait until clk'event and clk = '1' and axo.arready = '1';
-		axi.araddr <= "XXXXXXXX";
+		axi.araddr <= (others => 'X');
 		axi.arvalid <= '0';
 		axi.rready <= '1';
 		wait until clk'event and clk = '1' and axo.rvalid = '1';
@@ -773,20 +895,18 @@ package body ecc_tb_pkg is
 		end if;
 	end procedure;
 
-	-- --------------------------------------------------------
-	-- emulate software driver checking if R1 is the null point
-	-- --------------------------------------------------------
-	procedure check_if_r1_null(signal clk: in std_logic;
-	                           signal axi: out axi_in_type;
-	                           signal axo: in axi_out_type;
-	                           variable isnull : out boolean) is
+	procedure check_if_r1_null(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		variable isnull : out boolean) is
 	begin
 		wait until clk'event and clk = '1';
 		-- read R_STATUS register
 		axi.araddr <= R_STATUS & "000";
 		axi.arvalid <= '1';
 		wait until clk'event and clk = '1' and axo.arready = '1';
-		axi.araddr <= "XXXXXXXX";
+		axi.araddr <= (others => 'X');
 		axi.arvalid <= '0';
 		axi.rready <= '1';
 		wait until clk'event and clk = '1' and axo.rvalid = '1';
@@ -802,12 +922,10 @@ package body ecc_tb_pkg is
 		end if;
 	end procedure;
 
-	-- -------------------------------------------------------------------------
-	-- emulate software driver checking if R0/R1 is pt 0 & display it on console
-	-- -------------------------------------------------------------------------
-	procedure check_and_display_if_r0_r1_null(signal clk: in std_logic;
-	                                          signal axi: out axi_in_type;
-	                                          signal axo: in axi_out_type) is
+	procedure check_and_display_if_r0_r1_null(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type) is
 		variable vz0, vz1 : boolean;
 		variable vz : std_logic_vector(1 downto 0);
 	begin
@@ -835,19 +953,17 @@ package body ecc_tb_pkg is
 		end case;
 	end procedure;
 
-	-- -----------------------------------------------------------------------
-	-- emulate software driver checking if any error & display them on console
-	-- -----------------------------------------------------------------------
-	procedure display_errors(signal clk: in std_logic;
-	                         signal axi: out axi_in_type;
-	                         signal axo: in axi_out_type) is
+	procedure display_errors(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type) is
 	begin
 		wait until clk'event and clk = '1';
 		-- read R_STATUS register
 		axi.araddr <= R_STATUS & "000";
 		axi.arvalid <= '1';
 		wait until clk'event and clk = '1' and axo.arready = '1';
-		axi.araddr <= "XXXXXXXX";
+		axi.araddr <= (others => 'X');
 		axi.arvalid <= '0';
 		axi.rready <= '1';
 		wait until clk'event and clk = '1' and axo.rvalid = '1';
@@ -885,15 +1001,13 @@ package body ecc_tb_pkg is
 		wait until clk'event and clk = '1';
 	end procedure;
 
-	-- ------------------------------------------------
-	-- emulate software driver reading one large number
-	-- ------------------------------------------------
-	procedure read_big(signal clk: in std_logic;
-	                   signal axi: out axi_in_type;
-	                   signal axo: in axi_out_type;
-	                   constant valnn: in positive;
-	                   constant addr : in natural range 0 to nblargenb - 1;
-	                   variable bignb: inout std_logic_vector) is
+	procedure read_big(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant valnn: in positive;
+		constant addr : in natural range 0 to nblargenb - 1;
+		variable bignb: inout std_logic_vector) is
 		variable tup, xup : integer;
 		variable dw : std_logic_vector(AXIDW - 1 downto 0);
 	begin
@@ -903,7 +1017,7 @@ package body ecc_tb_pkg is
 		-- write W_CTRL register
 		axi.awaddr <= W_CTRL & "000"; axi.awvalid <= '1';
 		wait until clk'event and clk = '1' and axo.awready = '1';
-		axi.awaddr <= "XXXXXXXX"; axi.awvalid <= '0';
+		axi.awaddr <= (others => 'X'); axi.awvalid <= '0';
 		dw := (others => '0');
 		dw(CTRL_READ_NB) := '1';
 		dw(CTRL_NBADDR_LSB + FP_ADDR_MSB - 1 downto CTRL_NBADDR_LSB)
@@ -916,7 +1030,7 @@ package body ecc_tb_pkg is
 		for i in 0 to div(valnn,AXIDW) - 1 loop
 			axi.araddr <= R_READ_DATA & "000"; axi.arvalid <= '1';
 			wait until clk'event and clk = '1' and axo.arready = '1';
-			axi.araddr <= "XXXXXXXX"; axi.arvalid <= '0'; axi.rready <= '1';
+			axi.araddr <= (others => 'X'); axi.arvalid <= '0'; axi.rready <= '1';
 			wait until clk'event and clk = '1' and axo.rvalid = '1';
 			if ((i + 1) * AXIDW) > bignb'length then
 				tup := bignb'length - 1;
@@ -935,17 +1049,13 @@ package body ecc_tb_pkg is
 		wait until clk'event and clk = '1';
 	end procedure;
 
-	-- --------------------------------------------------------------
-	-- Identical to read_big, except that here debug mode is assumed,
-	-- hence we do not poll the BUSY bit in R_STATUS register
-	-- (otherwise we would be creating a deadlock)
-	-- --------------------------------------------------------------
-	procedure debug_read_big(signal clk: in std_logic;
-	                         signal axi: out axi_in_type;
-	                         signal axo: in axi_out_type;
-	                         constant valnn: in positive;
-	                         constant addr : in natural range 0 to nblargenb - 1;
-	                         variable bignb: inout std_logic_vector) is
+	procedure debug_read_big(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant valnn: in positive;
+		constant addr : in natural range 0 to nblargenb - 1;
+		variable bignb: inout std_logic_vector) is
 		variable tup, xup : integer;
 		variable dw : std_logic_vector(AXIDW - 1 downto 0);
 		variable vw : natural := div(valnn + 4, ww);
@@ -955,7 +1065,7 @@ package body ecc_tb_pkg is
 			-- write W_DBG_FP_RADDR register
 			axi.awaddr <= W_DBG_FP_RADDR & "000"; axi.awvalid <= '1';
 			wait until clk'event and clk = '1' and axo.awready = '1';
-			axi.awaddr <= "XXXXXXXX"; axi.awvalid <= '0';
+			axi.awaddr <= (others => 'X'); axi.awvalid <= '0';
 			dw := (others => '0');
 			dw(FP_ADDR - 1 downto 0)
 				:= std_logic_vector(to_unsigned((addr * n) + limb, FP_ADDR));
@@ -970,7 +1080,7 @@ package body ecc_tb_pkg is
 				axi.araddr <= R_DBG_FP_RDATA_RDY & "000";
 				axi.arvalid <= '1';
 				wait until clk'event and clk = '1' and axo.arready = '1';
-				axi.araddr <= "XXXXXXXX";
+				axi.araddr <= (others => 'X');
 				axi.arvalid <= '0';
 				axi.rready <= '1';
 				wait until clk'event and clk = '1' and axo.rvalid = '1';
@@ -984,7 +1094,7 @@ package body ecc_tb_pkg is
 			-- now perform one read on the R_DBG_FP_RDATA register
 			axi.araddr <= R_DBG_FP_RDATA & "000"; axi.arvalid <= '1';
 			wait until clk'event and clk = '1' and axo.arready = '1';
-			axi.araddr <= "XXXXXXXX"; axi.arvalid <= '0'; axi.rready <= '1';
+			axi.araddr <= (others => 'X'); axi.arvalid <= '0'; axi.rready <= '1';
 			wait until clk'event and clk = '1' and axo.rvalid = '1';
 			if ((limb + 1) * ww) > bignb'length then
 				tup := bignb'length - 1;
@@ -1002,13 +1112,11 @@ package body ecc_tb_pkg is
 		end loop; -- ww-bit limbs
 	end procedure;
 
-	-- ---------------------------------------------------------
-	-- emulate software driver reading [k]P result's coordinates
-	-- ---------------------------------------------------------
-	procedure read_and_display_kp_result(signal clk: in std_logic;
-	                                     signal axi: out axi_in_type;
-	                                     signal axo: in axi_out_type;
-	                                     constant valnn: in positive) is
+	procedure read_and_display_kp_result(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant valnn: in positive) is
 		variable kpx : std_logic512 := (others => '0');
 		variable kpy : std_logic512 := (others => '0');
 		variable xmsb, ymsb : integer;
@@ -1046,12 +1154,10 @@ package body ecc_tb_pkg is
 		hex_echol(kpy(max(xmsb, ymsb) downto 0));
 	end procedure;
 
-	-- ------------------------------------------------
-	-- emulate software driver acknowledging all errors
-	-- ------------------------------------------------
-	procedure ack_all_errors(signal clk: in std_logic;
-	                         signal axi: out axi_in_type;
-	                         signal axo: in axi_out_type) is
+	procedure ack_all_errors(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type) is
 		variable dw : std_logic_vector(AXIDW - 1 downto 0);
 	begin
 		wait until clk'event and clk = '1';
@@ -1069,14 +1175,12 @@ package body ecc_tb_pkg is
 		wait until clk'event and clk = '1';
 	end procedure;
 
-	-- ----------------------------------------------------
-	-- emulate software driver setting all curve parameters
-	-- ----------------------------------------------------
-	procedure set_curve(signal clk: in std_logic;
-	                    signal axi: out axi_in_type;
-	                    signal axo: in axi_out_type;
-	                    constant size: in positive;
-	                    constant curve: curve_param_type) is
+	procedure set_curve(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant size: in positive;
+		constant curve: curve_param_type) is
 		variable dw : std_logic_vector(AXIDW - 1 downto 0);
 	begin
 		wait until clk'event and clk = '1';
@@ -1086,19 +1190,17 @@ package body ecc_tb_pkg is
 		end loop;
 	end procedure;
 
-	-- -------------------------------------------------------
-	-- emulate software driver setting R0 to be the null point
-	-- -------------------------------------------------------
-	procedure set_r0_null(signal clk: in std_logic;
-	                      signal axi: out axi_in_type;
-	                      signal axo: in axi_out_type) is
+	procedure set_r0_null(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type) is
 		variable dw : std_logic_vector(AXIDW - 1 downto 0);
 	begin
 		wait until clk'event and clk = '1';
 		-- write W_R0_NULL register
 		axi.awaddr <= W_R0_NULL & "000"; axi.awvalid <= '1';
 		wait until clk'event and clk = '1' and axo.awready = '1';
-		axi.awaddr <= "XXXXXXXX"; axi.awvalid <= '0';
+		axi.awaddr <= (others => 'X'); axi.awvalid <= '0';
 		dw := (others => '0');
 		dw(WR0_IS_NULL) := '1';
 		axi.wdata <= dw;
@@ -1108,19 +1210,17 @@ package body ecc_tb_pkg is
 		wait until clk'event and clk = '1';
 	end procedure;
 
-	-- -----------------------------------------------------------
-	-- emulate software driver setting R0 NOT to be the null point
-	-- -----------------------------------------------------------
-	procedure set_r0_non_null(signal clk: in std_logic;
-	                          signal axi: out axi_in_type;
-	                          signal axo: in axi_out_type) is
+	procedure set_r0_non_null(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type) is
 		variable dw : std_logic_vector(AXIDW - 1 downto 0);
 	begin
 		wait until clk'event and clk = '1';
 		-- write W_R0_NULL register
 		axi.awaddr <= W_R0_NULL & "000"; axi.awvalid <= '1';
 		wait until clk'event and clk = '1' and axo.awready = '1';
-		axi.awaddr <= "XXXXXXXX"; axi.awvalid <= '0';
+		axi.awaddr <= (others => 'X'); axi.awvalid <= '0';
 		dw := (others => '0');
 		dw(WR0_IS_NULL) := '0';
 		axi.wdata <= dw;
@@ -1130,19 +1230,17 @@ package body ecc_tb_pkg is
 		wait until clk'event and clk = '1';
 	end procedure;
 
-	-- -------------------------------------------------------
-	-- emulate software driver setting R1 to be the null point
-	-- -------------------------------------------------------
-	procedure set_r1_null(signal clk: in std_logic;
-	                      signal axi: out axi_in_type;
-	                      signal axo: in axi_out_type) is
+	procedure set_r1_null(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type) is
 		variable dw : std_logic_vector(AXIDW - 1 downto 0);
 	begin
 		wait until clk'event and clk = '1';
 		-- write W_R1_NULL register
 		axi.awaddr <= W_R1_NULL & "000"; axi.awvalid <= '1';
 		wait until clk'event and clk = '1' and axo.awready = '1';
-		axi.awaddr <= "XXXXXXXX"; axi.awvalid <= '0';
+		axi.awaddr <= (others => 'X'); axi.awvalid <= '0';
 		dw := (others => '0');
 		dw(WR1_IS_NULL) := '1';
 		axi.wdata <= dw;
@@ -1152,19 +1250,17 @@ package body ecc_tb_pkg is
 		wait until clk'event and clk = '1';
 	end procedure;
 
-	-- -----------------------------------------------------------
-	-- emulate software driver setting R1 NOT to be the null point
-	-- -----------------------------------------------------------
-	procedure set_r1_non_null(signal clk: in std_logic;
-	                          signal axi: out axi_in_type;
-	                          signal axo: in axi_out_type) is
+	procedure set_r1_non_null(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type) is
 		variable dw : std_logic_vector(AXIDW - 1 downto 0);
 	begin
 		wait until clk'event and clk = '1';
 		-- write W_R1_NULL register
 		axi.awaddr <= W_R1_NULL & "000"; axi.awvalid <= '1';
 		wait until clk'event and clk = '1' and axo.awready = '1';
-		axi.awaddr <= "XXXXXXXX"; axi.awvalid <= '0';
+		axi.awaddr <= (others => 'X'); axi.awvalid <= '0';
 		dw := (others => '0');
 		dw(WR1_IS_NULL) := '0';
 		axi.wdata <= dw;
@@ -1174,19 +1270,17 @@ package body ecc_tb_pkg is
 		wait until clk'event and clk = '1';
 	end procedure;
 
-	-- -----------------------------------------------------------
-	-- emulate software driver issuing command 'do point-addition'
-	-- -----------------------------------------------------------
-	procedure run_point_add(signal clk: in std_logic;
-	                        signal axi: out axi_in_type;
-	                        signal axo: in axi_out_type) is
+	procedure run_point_add(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type) is
 		variable dw : std_logic_vector(AXIDW - 1 downto 0);
 	begin
 		wait until clk'event and clk = '1';
 		-- write W_CTRL register
 		axi.awaddr <= W_CTRL & "000"; axi.awvalid <= '1';
 		wait until clk'event and clk = '1' and axo.awready = '1';
-		axi.awaddr <= "XXXXXXXX"; axi.awvalid <= '0';
+		axi.awaddr <= (others => 'X'); axi.awvalid <= '0';
 		dw := (others => '0');
 		dw(CTRL_PT_ADD) := '1';
 		axi.wdata <= dw;
@@ -1196,20 +1290,17 @@ package body ecc_tb_pkg is
 		wait until clk'event and clk = '1';
 	end procedure;
 
-	-- -----------------------------------------------------------
-	-- emulate software driver writing coords of two points to add
-	-- and giving computation a go
-	-- -----------------------------------------------------------
-	procedure point_add(signal clk: in std_logic;
-	                    signal axi: out axi_in_type;
-	                    signal axo: in axi_out_type;
-		                  constant valnn : in positive;
-		                  constant x0 : in std_logic_vector;
-	                    constant y0 : in std_logic_vector;
-		                  constant x1 : in std_logic_vector;
-	                    constant y1 : in std_logic_vector;
-		                  constant z0 : in boolean;
-	                    constant z1 : in boolean) is
+	procedure point_add(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant valnn : in positive;
+		constant x0 : in std_logic_vector;
+		constant y0 : in std_logic_vector;
+		constant x1 : in std_logic_vector;
+		constant y1 : in std_logic_vector;
+		constant z0 : in boolean;
+		constant z1 : in boolean) is
 	begin
 		wait until clk'event and clk = '1';
 		-- write two points' X & Y coordinates
@@ -1240,14 +1331,11 @@ package body ecc_tb_pkg is
 		run_point_add(clk, axi, axo);
 	end procedure;
 
-	-- -------------------------------------------------------------
-	-- emulate software driver reading result coords after point-add
-	-- with display on console
-	-- -------------------------------------------------------------
-	procedure read_and_display_ptadd_result(signal clk: in std_logic;
-	                                        signal axi: out axi_in_type;
-	                                        signal axo: in axi_out_type;
-	                                        constant valnn: in positive) is
+	procedure read_and_display_ptadd_result(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant valnn: in positive) is
 		variable pax : std_logic512 := (others => '0');
 		variable pay : std_logic512 := (others => '0');
 		variable xmsb, ymsb : integer;
@@ -1323,19 +1411,17 @@ package body ecc_tb_pkg is
 		hex_echol(pay(max(xmsb, ymsb) downto 0));
 	end procedure;
 
-	-- -----------------------------------------------------------
-	-- emulate software driver issuing command 'do point-doubling'
-	-- -----------------------------------------------------------
-	procedure run_point_double(signal clk: in std_logic;
-	                           signal axi: out axi_in_type;
-	                           signal axo: in axi_out_type) is
+	procedure run_point_double(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type) is
 		variable dw : std_logic_vector(AXIDW - 1 downto 0);
 	begin
 		wait until clk'event and clk = '1';
 		-- write W_CTRL register
 		axi.awaddr <= W_CTRL & "000"; axi.awvalid <= '1';
 		wait until clk'event and clk = '1' and axo.awready = '1';
-		axi.awaddr <= "XXXXXXXX"; axi.awvalid <= '0';
+		axi.awaddr <= (others => 'X'); axi.awvalid <= '0';
 		dw := (others => '0');
 		dw(CTRL_PT_DBL) := '1';
 		axi.wdata <= dw;
@@ -1345,17 +1431,14 @@ package body ecc_tb_pkg is
 		wait until clk'event and clk = '1';
 	end procedure;
 
-	-- -----------------------------------------------------------
-	-- emulate software driver writing coords of a point to double
-	-- and giving computation a go
-	-- -----------------------------------------------------------
-	procedure point_double(signal clk: in std_logic;
-	                       signal axi: out axi_in_type;
-	                       signal axo: in axi_out_type;
-	                       constant valnn : in positive;
-	                       constant x : in std_logic_vector;
-	                       constant y : in std_logic_vector;
-	                       constant z : in boolean) is
+	procedure point_double(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant valnn : in positive;
+		constant x : in std_logic_vector;
+		constant y : in std_logic_vector;
+		constant z : in boolean) is
 	begin
 		wait until clk'event and clk = '1';
 		-- write point's X & Y coordinates
@@ -1374,16 +1457,11 @@ package body ecc_tb_pkg is
 		run_point_double(clk, axi, axo);
 	end procedure;
 
-	-- -----------------------------------------------------------------
-	-- emulate software driver running a point double computation on the
-	-- null point, and therefore without setting the coordinates of the
-	-- input points
-	-- -----------------------------------------------------------------
 	procedure point_double_zero_without_coords(
-	                       signal clk: in std_logic;
-	                       signal axi: out axi_in_type;
-	                       signal axo: in axi_out_type;
-												 constant valnn : in positive) is
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant valnn : in positive) is
 	begin
 		wait until clk'event and clk = '1';
 		-- set R0 to be the 0 point
@@ -1393,14 +1471,11 @@ package body ecc_tb_pkg is
 		run_point_double(clk, axi, axo);
 	end procedure;
 
-	-- ------------------------------------------------------------------
-	-- emulate software driver reading result's coords after point-double
-	-- with display on console
-	-- ------------------------------------------------------------------
-	procedure read_and_display_ptdbl_result(signal clk: in std_logic;
-	                                        signal axi: out axi_in_type;
-	                                        signal axo: in axi_out_type;
-	                                        constant valnn: in positive) is
+	procedure read_and_display_ptdbl_result(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant valnn: in positive) is
 		variable pax : std_logic512 := (others => '0');
 		variable pay : std_logic512 := (others => '0');
 		variable xmsb, ymsb : integer;
@@ -1444,19 +1519,17 @@ package body ecc_tb_pkg is
 		end if;
 	end procedure;
 
-	-- ---------------------------------------------------------
-	-- emulate software driver issuing command 'do point-negate'
-	-- ---------------------------------------------------------
-	procedure run_point_negate(signal clk: in std_logic;
-	                           signal axi: out axi_in_type;
-	                           signal axo: in axi_out_type) is
+	procedure run_point_negate(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type) is
 		variable dw : std_logic_vector(AXIDW - 1 downto 0);
 	begin
 		wait until clk'event and clk = '1';
 		-- write W_CTRL register
 		axi.awaddr <= W_CTRL & "000"; axi.awvalid <= '1';
 		wait until clk'event and clk = '1' and axo.awready = '1';
-		axi.awaddr <= "XXXXXXXX"; axi.awvalid <= '0';
+		axi.awaddr <= (others => 'X'); axi.awvalid <= '0';
 		dw := (others => '0');
 		dw(CTRL_PT_NEG) := '1';
 		axi.wdata <= dw;
@@ -1466,17 +1539,14 @@ package body ecc_tb_pkg is
 		wait until clk'event and clk = '1';
 	end procedure;
 
-	-- --------------------------------------------------------------
-	-- emulate software driver writing coords of point to negate (-P)
-	-- and giving computation a go
-	-- --------------------------------------------------------------
-	procedure point_negate(signal clk: in std_logic;
-	                       signal axi: out axi_in_type;
-	                       signal axo: in axi_out_type;
-	                       constant valnn: in positive;
-	                       constant x: in std_logic_vector;
-	                       constant y: in std_logic_vector; 
-	                       constant z: in boolean) is
+	procedure point_negate(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant valnn: in positive;
+		constant x: in std_logic_vector;
+		constant y: in std_logic_vector; 
+		constant z: in boolean) is
 	begin
 		wait until clk'event and clk = '1';
 		-- write point's X & Y coordinates
@@ -1496,14 +1566,11 @@ package body ecc_tb_pkg is
 		run_point_negate(clk, axi, axo);
 	end procedure;
 
-	-- ----------------------------------------------------------------
-	-- emulate software driver reading result coords after point-negate
-	-- with display on console
-	-- ----------------------------------------------------------------
-	procedure read_and_display_ptneg_result(signal clk: in std_logic;
-	                                        signal axi: out axi_in_type;
-	                                        signal axo: in axi_out_type;
-	                                        constant valnn: in positive) is
+	procedure read_and_display_ptneg_result(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant valnn: in positive) is
 		variable pax : std_logic512 := (others => '0');
 		variable pay : std_logic512 := (others => '0');
 		variable xmsb, ymsb : integer;
@@ -1547,19 +1614,17 @@ package body ecc_tb_pkg is
 		end if;
 	end procedure;
 
-	-- --------------------------------------------------------
-	-- emulate software driver issuing command 'do P == Q test'
-	-- --------------------------------------------------------
-	procedure run_point_test_equal(signal clk: in std_logic;
-	                               signal axi: out axi_in_type;
-	                               signal axo: in axi_out_type) is
+	procedure run_point_test_equal(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type) is
 		variable dw : std_logic_vector(AXIDW - 1 downto 0);
 	begin
 		wait until clk'event and clk = '1';
 		-- write W_CTRL register
 		axi.awaddr <= W_CTRL & "000"; axi.awvalid <= '1';
 		wait until clk'event and clk = '1' and axo.awready = '1';
-		axi.awaddr <= "XXXXXXXX"; axi.awvalid <= '0';
+		axi.awaddr <= (others => 'X'); axi.awvalid <= '0';
 		dw := (others => '0');
 		dw(CTRL_PT_EQU) := '1';
 		axi.wdata <= dw;
@@ -1569,20 +1634,17 @@ package body ecc_tb_pkg is
 		wait until clk'event and clk = '1';
 	end procedure;
 
-	-- --------------------------------------------------------------------
-	-- emulate software driver writing coords of 2 points to compare (P==Q)
-	-- and giving computation a go
-	-- --------------------------------------------------------------------
-	procedure point_test_equal(signal clk: in std_logic;
-	                           signal axi: out axi_in_type;
-	                           signal axo: in axi_out_type;
-	                           constant valnn : positive;
-	                           constant x0 : in std_logic_vector;
-	                           constant y0 : in std_logic_vector;
-	                           constant x1 : in std_logic_vector;
-	                           constant y1 : in std_logic_vector;
-	                           constant z0 : in boolean;
-	                           constant z1 : in boolean) is
+	procedure point_test_equal(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant valnn : positive;
+		constant x0 : in std_logic_vector;
+		constant y0 : in std_logic_vector;
+		constant x1 : in std_logic_vector;
+		constant y1 : in std_logic_vector;
+		constant z0 : in boolean;
+		constant z1 : in boolean) is
 	begin
 		wait until clk'event and clk = '1';
 		-- write point's X & Y coordinates
@@ -1613,19 +1675,17 @@ package body ecc_tb_pkg is
 		run_point_test_equal(clk, axi, axo);
 	end procedure;
 
-	-- ---------------------------------------------------------
-	-- emulate software driver issuing command 'do P -== Q test'
-	-- ---------------------------------------------------------
-	procedure run_point_test_opposite(signal clk: in std_logic;
-	                                  signal axi: out axi_in_type;
-																		signal axo: in axi_out_type) is
+	procedure run_point_test_opposite(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type) is
 		variable dw : std_logic_vector(AXIDW - 1 downto 0);
 	begin
 		wait until clk'event and clk = '1';
 		-- write W_CTRL register
 		axi.awaddr <= W_CTRL & "000"; axi.awvalid <= '1';
 		wait until clk'event and clk = '1' and axo.awready = '1';
-		axi.awaddr <= "XXXXXXXX"; axi.awvalid <= '0';
+		axi.awaddr <= (others => 'X'); axi.awvalid <= '0';
 		dw := (others => '0');
 		dw(CTRL_PT_OPP) := '1';
 		axi.wdata <= dw;
@@ -1635,20 +1695,17 @@ package body ecc_tb_pkg is
 		wait until clk'event and clk = '1';
 	end procedure;
 
-	-- --------------------------------------------------------------------
-	-- emulate software driver writing coords of 2 points to test if points
-	-- are opposite, and giving computation a go
-	-- --------------------------------------------------------------------
-	procedure point_test_opposite(signal clk: in std_logic;
-	                              signal axi: out axi_in_type;
-	                              signal axo: in axi_out_type;
-	                              constant valnn : positive;
-	                              constant x0 : in std_logic_vector;
-	                              constant y0 : in std_logic_vector;
-	                              constant x1 : in std_logic_vector;
-	                              constant y1 : in std_logic_vector;
-	                              constant z0 : in boolean;
-																constant z1 : in boolean) is
+	procedure point_test_opposite(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant valnn : positive;
+		constant x0 : in std_logic_vector;
+		constant y0 : in std_logic_vector;
+		constant x1 : in std_logic_vector;
+		constant y1 : in std_logic_vector;
+		constant z0 : in boolean;
+		constant z1 : in boolean) is
 	begin
 		wait until clk'event and clk = '1';
 		-- write point's X & Y coordinates
@@ -1679,19 +1736,17 @@ package body ecc_tb_pkg is
 		run_point_test_opposite(clk, axi, axo);
 	end procedure;
 
-	-- ------------------------------------------------------------
-	-- emulate software driver issuing command 'is P on point test'
-	-- ------------------------------------------------------------
-	procedure run_point_test_on_curve(signal clk: in std_logic;
-	                                  signal axi: out axi_in_type;
-																		signal axo: in axi_out_type) is
+	procedure run_point_test_on_curve(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type) is
 		variable dw : std_logic_vector(AXIDW - 1 downto 0);
 	begin
 		wait until clk'event and clk = '1';
 		-- write W_CTRL register
 		axi.awaddr <= W_CTRL & "000"; axi.awvalid <= '1';
 		wait until clk'event and clk = '1' and axo.awready = '1';
-		axi.awaddr <= "XXXXXXXX"; axi.awvalid <= '0';
+		axi.awaddr <= (others => 'X'); axi.awvalid <= '0';
 		dw := (others => '0');
 		dw(CTRL_PT_CHK) := '1';
 		axi.wdata <= dw;
@@ -1701,17 +1756,14 @@ package body ecc_tb_pkg is
 		wait until clk'event and clk = '1';
 	end procedure;
 
-	-- ---------------------------------------------------------
-	-- emulate software driver writing coord of a point and test
-	-- if it is on curve
-	-- ---------------------------------------------------------
-	procedure point_test_on_curve(signal clk: in std_logic;
-	                              signal axi: out axi_in_type;
-	                              signal axo: in axi_out_type;
-	                              constant valnn : positive;
-	                              constant xx : in std_logic_vector;
-	                              constant yy : in std_logic_vector;
-																constant z : in boolean) is
+	procedure point_test_on_curve(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant valnn : positive;
+		constant xx : in std_logic_vector;
+		constant yy : in std_logic_vector;
+		constant z : in boolean) is
 	begin
 		wait until clk'event and clk = '1';
 		-- write point's X & Y coordinate into R0
@@ -1730,21 +1782,19 @@ package body ecc_tb_pkg is
 		run_point_test_on_curve(clk, axi, axo);
 	end procedure;
 
-	-- ---------------------------------------------------------------------------
-	-- emulate software driver getting answer to a test it's asked on R0 and/or R1
-	-- ---------------------------------------------------------------------------
-	procedure check_test_answer(signal clk: in std_logic;
-                              signal axi: out axi_in_type;
-	                            signal axo: in axi_out_type;
-	                            variable yes_or_no: out boolean;
-	                            variable answer_right: out boolean) is
+	procedure check_test_answer(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		variable yes_or_no: out boolean;
+		variable answer_right: out boolean) is
 	begin
 		wait until clk'event and clk = '1';
 		-- read R_STATUS register
 		axi.araddr <= R_STATUS & "000";
 		axi.arvalid <= '1';
 		wait until clk'event and clk = '1' and axo.arready = '1';
-		axi.araddr <= "XXXXXXXX";
+		axi.araddr <= (others => 'X');
 		axi.arvalid <= '0';
 		axi.rready <= '1';
 		wait until clk'event and clk = '1' and axo.rvalid = '1';
@@ -1757,13 +1807,11 @@ package body ecc_tb_pkg is
 		answer_right := TRUE;
 	end procedure;
 
-	-- ------------------------------------------------------
-	-- Identical to check_test_answer with display on console
-	-- ------------------------------------------------------
-	procedure read_and_display_pttest_result(signal clk: in std_logic;
-                                           signal axi: out axi_in_type;
-	                                         signal axo: in axi_out_type;
-	                                         constant valnn: in positive) is
+	procedure read_and_display_pttest_result(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant valnn: in positive) is
 		variable yes_or_no, answer_right : boolean;
 	begin
 		wait until clk'event and clk = '1';
@@ -1779,32 +1827,35 @@ package body ecc_tb_pkg is
 		end if;
 	end procedure;
 
-	-- ------------------------------------------------------------
-	-- emulate software driver setting a breakpoint (debug feature)
-	-- ------------------------------------------------------------
-	procedure set_one_breakpoint(
-	            signal clk: in std_logic;
-		          signal axi: out axi_in_type;
-		          signal axo: in axi_out_type;
-		          constant id: in natural;
-		          constant addr: in std_logic_vector(IRAM_ADDR_SZ - 1 downto 0);
-		          constant state: in std_logic_vector(3 downto 0);
-							constant nbbits: in natural) is
+	procedure set_breakpoint(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant id: in natural;
+		constant addr: in std_logic_vector(IRAM_ADDR_SZ - 1 downto 0);
+		constant state: in std_logic_vector(3 downto 0);
+		constant nbbits: in natural)
+	is
+		variable dw : std_logic_vector(AXIDW - 1 downto 0);
 	begin
 		wait until clk'event and clk = '1';
 		-- write W_DBG_BKPT register
 		axi.awaddr <= W_DBG_BKPT & "000";
 		axi.awvalid <= '1';
 		wait until clk'event and clk = '1' and axo.awready = '1';
-		axi.awaddr <= "XXXXXXXX";
+		axi.awaddr <= (others => 'X');
 		axi.awvalid <= '0';
-		axi.wdata(31 downto 28) <= state(3 downto 0);
-		axi.wdata(27 downto 16) <= std_logic_vector(to_unsigned(nbbits, 12));
-		axi.wdata(15 downto 13) <= "000";
-		axi.wdata(12 downto 4) <= addr(8 downto 0);
-		axi.wdata(3) <= '0';
-		axi.wdata(2 downto 1) <= std_logic_vector(to_unsigned(id, 2));
-		axi.wdata(0) <= '1';
+		dw := (others => '0');
+		dw(DBG_BKPT_STATE_MSB downto DBG_BKPT_STATE_LSB) :=
+			state(3 downto 0);
+		dw(DBG_BKPT_NBBIT_MSB downto DBG_BKPT_NBBIT_LSB) :=
+			std_logic_vector(to_unsigned(nbbits, 12));
+		dw(DBG_BKPT_ADDR_MSB downto DBG_BKPT_ADDR_LSB) :=
+			addr(IRAM_ADDR_SZ - 1 downto 0);
+		dw(DBG_BKPT_ID_MSB downto DBG_BKPT_ID_LSB) :=
+			std_logic_vector(to_unsigned(id, 2));
+		dw(DBG_BKPT_EN) := '1';
+		axi.wdata <= dw;
 		axi.wvalid <= '1';
 		wait until clk'event and clk = '1' and axo.wready = '1';
 		axi.wdata <= (others => 'X');
@@ -1812,13 +1863,37 @@ package body ecc_tb_pkg is
 		wait until clk'event and clk = '1';
 	end procedure;
 
-	-- -----------------------------------------------------------
-	-- emulate software driver polling R_DBG_STATUS until it shows
-	-- IP is halted (debug feat.)
-	-- -----------------------------------------------------------
-	procedure poll_until_debug_halted(signal clk: in std_logic;
-	                                  signal axi: out axi_in_type;
-	                                  signal axo: in axi_out_type) is
+	procedure remove_breakpoint(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant id: in natural)
+	is
+		variable dw : std_logic_vector(AXIDW - 1 downto 0);
+	begin
+		wait until clk'event and clk = '1';
+		-- write W_DBG_BKPT register
+		axi.awaddr <= W_DBG_BKPT & "000";
+		axi.awvalid <= '1';
+		wait until clk'event and clk = '1' and axo.awready = '1';
+		axi.awaddr <= (others => 'X');
+		axi.awvalid <= '0';
+		dw := (others => '0');
+		dw(DBG_BKPT_ID_MSB downto DBG_BKPT_ID_LSB) :=
+			std_logic_vector(to_unsigned(id, 2));
+		dw(DBG_BKPT_EN) := '0';
+		axi.wdata <= dw;
+		axi.wvalid <= '1';
+		wait until clk'event and clk = '1' and axo.wready = '1';
+		axi.wdata <= (others => 'X');
+		axi.wvalid <= '0';
+		wait until clk'event and clk = '1';
+	end procedure;
+
+	procedure poll_until_debug_halted(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type) is
 		variable tmp : integer;
 	begin
 		wait until clk'event and clk = '1';
@@ -1828,7 +1903,7 @@ package body ecc_tb_pkg is
 			axi.araddr <= R_DBG_STATUS & "000";
 			axi.arvalid <= '1';
 			wait until clk'event and clk = '1' and axo.arready = '1';
-			axi.araddr <= "XXXXXXXX";
+			axi.araddr <= (others => 'X');
 			axi.arvalid <= '0';
 			axi.rready <= '1';
 			wait until clk'event and clk = '1' and axo.rvalid = '1';
@@ -1854,78 +1929,85 @@ package body ecc_tb_pkg is
 		wait until clk'event and clk = '1';
 	end procedure;
 
-	-- ----------------------------------------------------------------------
-	-- emulate software driver read of the R_DBG_STATUS and returns the value
-	-- ----------------------------------------------------------------------
-	procedure read_dbg_status(signal clk: in std_logic;
-	                          signal axi: out axi_in_type;
-	                          signal axo: in axi_out_type;
-													  variable dbgstatus : inout std_logic_vector) is
+	procedure read_dbg_status(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		variable dbgstatus : inout std_logic_vector) is
 	begin
 		wait until clk'event and clk = '1';
 		-- read R_DBG_STATUS register
 		axi.araddr <= R_DBG_STATUS & "000";
 		axi.arvalid <= '1';
 		wait until clk'event and clk = '1' and axo.arready = '1';
-		axi.araddr <= "XXXXXXXX";
+		axi.araddr <= (others => 'X');
 		axi.arvalid <= '0';
 		axi.rready <= '1';
 		wait until clk'event and clk = '1' and axo.rvalid = '1';
 		axi.rready <= '0';
-		dbgstatus := axo.rdata;
+		dbgstatus(AXIDW - 1 downto 0) := axo.rdata;
 		wait until clk'event and clk = '1';
 	end procedure;
 
-	-- -----------------------------------------------------------------------
-	-- emulate software driver resuming execution of microcode (debug feature)
-	-- -----------------------------------------------------------------------
-	procedure resume(signal clk: in std_logic;
-	                 signal axi: out axi_in_type;
-	                 signal axo: in axi_out_type) is
+	procedure resume_execution(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type)
+	is
+		variable dw : std_logic_vector(AXIDW - 1 downto 0);
 	begin
 		wait until clk'event and clk = '1';
 		-- write W_DBG_STEPS register
 		axi.awaddr <= W_DBG_STEPS & "000"; axi.awvalid <= '1';
 		wait until clk'event and clk = '1' and axo.awready = '1';
-		axi.awaddr <= "XXXXXXXX"; axi.awvalid <= '0';
-		axi.wdata <= "0001" & x"0000000"; axi.wvalid <= '1';
+		axi.awaddr <= (others => 'X'); axi.awvalid <= '0';
+		dw := (others => '0');
+		dw(DBG_RESUME) := '1';
+		axi.wdata <= dw; axi.wvalid <= '1';
 		wait until clk'event and clk = '1' and axo.wready = '1';
 		axi.wdata <= (others => 'X'); axi.wvalid <= '0';
 		wait until clk'event and clk = '1';
 	end procedure;
 
-	-- -----------------------------------------------------------------
-	-- emulate software driver asking for execution of a specific number
-	-- of opcodes
-	-- -----------------------------------------------------------------
-	procedure run_n_opcodes(signal clk: in std_logic;
-	                        signal axi: out axi_in_type;
-	                        signal axo: in axi_out_type;
-													constant nbop : in natural) is
+	procedure run_n_opcodes(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant nbop : in natural)
+	is
 		variable vnbop : std_logic_vector(15 downto 0);
+		variable dw : std_logic_vector(AXIDW - 1 downto 0);
 	begin
 		wait until clk'event and clk = '1';
 		-- write W_DBG_STEPS register
 		axi.awaddr <= W_DBG_STEPS & "000"; axi.awvalid <= '1';
 		wait until clk'event and clk = '1' and axo.awready = '1';
-		axi.awaddr <= "XXXXXXXX"; axi.awvalid <= '0';
+		axi.awaddr <= (others => 'X'); axi.awvalid <= '0';
 		vnbop := std_nat(nbop, 16);
-		axi.wdata <= x"00" & vnbop & x"01"; axi.wvalid <= '1';
+		dw := (others => '0');
+		dw(DBG_OPCODE_NB_MSB downto DBG_OPCODE_NB_LSB) := vnbop;
+		dw(DBG_OPCODE_RUN) := '1';
+		axi.wdata <= dw;
+		axi.wvalid <= '1';
 		wait until clk'event and clk = '1' and axo.wready = '1';
 		axi.wdata <= (others => 'X'); axi.wvalid <= '0';
 		wait until clk'event and clk = '1';
 	end procedure;
 
-	-- ---------------------------------------------------
-	-- emulate software driver reading of one large number
-	-- and its display with console
-	-- ---------------------------------------------------
+	procedure single_step(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type) is
+	begin
+		run_n_opcodes(clk, axi, axo, 1);
+	end procedure;
+
 	procedure read_and_display_one_large_nb(
-	                signal clk: in std_logic;
-	                signal axi: out axi_in_type;
-	                signal axo: in axi_out_type;
-	                constant valnn: in positive;
-	                constant addr: in natural range 0 to nblargenb - 1) is
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant valnn: in positive;
+		constant addr: in natural range 0 to nblargenb - 1) is
 		variable lgnb: std_logic512 := (others => '0');
 	begin
 		wait until clk'event and clk = '1';
@@ -1936,17 +2018,12 @@ package body ecc_tb_pkg is
 		hex_echol(lgnb(valnn - 1 downto 0));
 	end procedure;
 
-	-- --------------------------------------------------------------------
-	-- Identical to read_and_display_kp_result, except that here debug mode
-	-- is assumed, hence we do not poll the BUSY bit in R_STATUS register
-	-- (otherwise we'd create a deadlock if the IP was halted)
-	-- --------------------------------------------------------------------
 	procedure debug_read_and_display_one_large_nb(
-	                signal clk: in std_logic;
-	                signal axi: out axi_in_type;
-	                signal axo: in axi_out_type;
-	                constant valnn: in positive;
-	                constant addr: in natural range 0 to nblargenb - 1) is
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant valnn: in positive;
+		constant addr: in natural range 0 to nblargenb - 1) is
 		variable lgnb: std_logic512 := (others => '0');
 	begin
 		wait until clk'event and clk = '1';
@@ -1957,15 +2034,11 @@ package body ecc_tb_pkg is
 		hex_echol(lgnb(valnn - 1 downto 0));
 	end procedure;
 
-	-- ----------------------------------------------------------------------
-	-- emulate software driver reading both R0 and R1 point coordinate values
-	-- (whether or not they are null according to R_STATUS)
-	-- ----------------------------------------------------------------------
 	procedure read_and_display_r0_and_r1_coords(
-	                signal clk: in std_logic;
-	                signal axi: out axi_in_type;
-	                signal axo: in axi_out_type;
-									constant valnn: in positive) is
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant valnn: in positive) is
 		variable pax : std_logic512 := (others => '0');
 		variable pay : std_logic512 := (others => '0');
 		variable xmsb, ymsb : integer;
@@ -2035,67 +2108,131 @@ package body ecc_tb_pkg is
 		hex_echol(pay(max(xmsb, ymsb) downto 0));
 	end procedure;
 
-	-- ------------------------------------
-	-- to activate [XY]R[01] coords shuffle
-	-- ------------------------------------
-	procedure debug_activate_xyshuf(signal clk: in std_logic;
-	                                signal axi: out axi_in_type;
-	                                signal axo: in axi_out_type) is
+	procedure test_exception(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant valnn: integer;
+		constant V_K: std_logic512;
+		constant V_X: std_logic512;
+		constant V_Y: std_logic512;
+		constant V_PHI_VALUE: std_logic32;
+		constant testid : integer) is
+	begin
+		wait until clk'event and clk = '1';
+		echol("");
+		echol("****");
+		echol("****  test #" & integer'image(testid));
+		echol("****");
+		-- launch [k]P (all these tests are made on a non-null point,
+		-- hence the FALSE on line below)
+		scalar_mult(clk, axi, axo, valnn, V_K, V_X, V_Y, FALSE);
+		-- wait until IP is halted
+		poll_until_debug_halted(clk, axi, axo);
+		-- patch value of phi_0 ADPA mask
+		debug_write_big(clk, axi, axo, valnn, LARGE_NB_PHI0_ADDR, V_PHI_VALUE);
+		-- read back value number from memory to check written data
+		debug_read_and_display_one_large_nb(clk, axi, axo, valnn, LARGE_NB_PHI0_ADDR);
+		-- resume microcode execution
+		resume_execution(clk, axi, axo);
+		poll_until_ready(clk, axi, axo);
+		-- check & display if final R0/R1 are null or not
+		check_and_display_if_r0_r1_null(clk, axi, axo);
+		-- check & display possible errors
+		display_errors(clk, axi, axo);
+		-- read back & display [k]P result
+		read_and_display_kp_result(clk, axi, axo, valnn);
+		-- acknowledge possible errors
+		ack_all_errors(clk, axi, axo);
+	end procedure;
+
+	procedure debug_activate_xyshuf(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type) is
 	begin
 		wait until clk'event and clk = '1';
 		-- write W_DBG_CFG_NOXYSHUF register
 		axi.awaddr <= W_DBG_CFG_NOXYSHUF & "000"; axi.awvalid <= '1';
 		wait until clk'event and clk = '1' and axo.awready = '1';
-		axi.awaddr <= "XXXXXXXX"; axi.awvalid <= '0';
-		axi.wdata <= (others => '0'); axi.wvalid <= '1';
+		axi.awaddr <= (others => 'X'); axi.awvalid <= '0';
+		axi.wdata <= (XYSHF_DIS => '0', others => '0'); axi.wvalid <= '1';
 		wait until clk'event and clk = '1' and axo.wready = '1';
 		axi.wdata <= (others => 'X'); axi.wvalid <= '0';
 		wait until clk'event and clk = '1';
 	end procedure;
 
-	-- --------------------------------------
-	-- to deactivate [XY]R[01] coords shuffle
-	-- --------------------------------------
-	procedure debug_deactivate_xyshuf(signal clk: in std_logic;
-	                                  signal axi: out axi_in_type;
-	                                  signal axo: in axi_out_type) is
+	procedure debug_deactivate_xyshuf(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type) is
 	begin
 		wait until clk'event and clk = '1';
 		-- write W_DBG_CFG_NOXYSHUF register
 		axi.awaddr <= W_DBG_CFG_NOXYSHUF & "000"; axi.awvalid <= '1';
 		wait until clk'event and clk = '1' and axo.awready = '1';
-		axi.awaddr <= "XXXXXXXX"; axi.awvalid <= '0';
-		axi.wdata <= (0 => '1', others => '0'); axi.wvalid <= '1';
+		axi.awaddr <= (others => 'X'); axi.awvalid <= '0';
+		axi.wdata <= (XYSHF_DIS => '1', others => '0'); axi.wvalid <= '1';
 		wait until clk'event and clk = '1' and axo.wready = '1';
 		axi.wdata <= (others => 'X'); axi.wvalid <= '0';
 		wait until clk'event and clk = '1';
 	end procedure;
 
-	-- -------------------------------------------------------------------
-	-- emulate software driver reading an opcode value from ecc_curve_iram 
-	-- -------------------------------------------------------------------
-	procedure get_opcode(signal clk: in std_logic;
-	                     signal axi: out axi_in_type;
-	                     signal axo: in axi_out_type;
-											 constant addr: in natural range 0 to nbopcodes - 1) is
+	-- to activate AXI on-the-fly masking of the scalar
+	procedure debug_activate_aximask(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type) is
+	begin
+		wait until clk'event and clk = '1';
+		-- write W_DBG_CFG_NOAXIMSK register
+		axi.awaddr <= W_DBG_CFG_NOAXIMSK & "000"; axi.awvalid <= '1';
+		wait until clk'event and clk = '1' and axo.awready = '1';
+		axi.awaddr <= (others => 'X'); axi.awvalid <= '0';
+		axi.wdata <= (AXIMSK_DIS => '0', others => '0'); axi.wvalid <= '1';
+		wait until clk'event and clk = '1' and axo.wready = '1';
+		axi.wdata <= (others => 'X'); axi.wvalid <= '0';
+		wait until clk'event and clk = '1';
+	end procedure;
+
+	-- to deactivate AXI on-the-fly masking of the scalar
+	procedure debug_deactivate_aximask(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type) is
+	begin
+		wait until clk'event and clk = '1';
+		-- write W_DBG_CFG_NOAXIMSK register
+		axi.awaddr <= W_DBG_CFG_NOAXIMSK & "000"; axi.awvalid <= '1';
+		wait until clk'event and clk = '1' and axo.awready = '1';
+		axi.awaddr <= (others => 'X'); axi.awvalid <= '0';
+		axi.wdata <= (AXIMSK_DIS => '1', others => '0'); axi.wvalid <= '1';
+		wait until clk'event and clk = '1' and axo.wready = '1';
+		axi.wdata <= (others => 'X'); axi.wvalid <= '0';
+		wait until clk'event and clk = '1';
+	end procedure;
+
+	procedure get_opcode(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant addr: in natural range 0 to nbopcodes - 1) is
 	begin
 		wait until clk'event and clk = '1';
 		-- write W_DBG_OP_ADDR register
 		axi.awaddr <= W_DBG_OP_ADDR & "000"; axi.awvalid <= '1';
 		wait until clk'event and clk = '1' and axo.awready = '1';
-		axi.awaddr <= "XXXXXXXX"; axi.awvalid <= '0';
+		axi.awaddr <= (others => 'X'); axi.awvalid <= '0';
 		axi.wdata <= std_logic_vector(to_unsigned(addr, AXIDW));
 		axi.wvalid <= '1';
 		wait until clk'event and clk = '1' and axo.wready = '1';
 		axi.wdata <= (others => 'X'); axi.wvalid <= '0';
 		wait until clk'event and clk = '1';
-		--wait until clk'event and clk = '1';
-		--wait until clk'event and clk = '1';
 		-- read R_DBG_RD_OPCODE register
 		axi.araddr <= R_DBG_RD_OPCODE & "000";
 		axi.arvalid <= '1';
 		wait until clk'event and clk = '1' and axo.arready = '1';
-		axi.araddr <= "XXXXXXXX";
+		axi.araddr <= (others => 'X');
 		axi.arvalid <= '0';
 		axi.rready <= '1';
 		wait until clk'event and clk = '1' and axo.rvalid = '1';
@@ -2106,5 +2243,136 @@ package body ecc_tb_pkg is
 		hex_echol(axo.rdata);
 		wait until clk'event and clk = '1';
 	end procedure;
+
+	procedure modify_opcode(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant addr: in natural range 0 to nbopcodes - 1;
+		constant val: in std_logic_vector(OPCODE_SZ - 1 downto 0)) is
+	begin
+		wait until clk'event and clk = '1';
+		-- write W_DBG_OP_ADDR register
+		axi.awaddr <= W_DBG_OP_ADDR & "000"; axi.awvalid <= '1';
+		wait until clk'event and clk = '1' and axo.awready = '1';
+		axi.awaddr <= (others => 'X'); axi.awvalid <= '0';
+		axi.wdata <= std_logic_vector(to_unsigned(addr, AXIDW));
+		axi.wvalid <= '1';
+		wait until clk'event and clk = '1' and axo.wready = '1';
+		axi.wdata <= (others => 'X'); axi.wvalid <= '0';
+		wait until clk'event and clk = '1';
+		-- write W_DBG_WR_OPCODE register
+		axi.awaddr <= W_DBG_WR_OPCODE & "000"; axi.awvalid <= '1';
+		wait until clk'event and clk = '1' and axo.awready = '1';
+		axi.awaddr <= (others => 'X'); axi.awvalid <= '0';
+		axi.wdata <= std_logic_vector(resize(unsigned(val), AXIDW));
+		axi.wvalid <= '1';
+		wait until clk'event and clk = '1' and axo.wready = '1';
+		axi.wdata <= (others => 'X'); axi.wvalid <= '0';
+		wait until clk'event and clk = '1';
+	end procedure;
+
+	procedure dbgwrite_one_limb_into_ecc_fp_dram(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant valnn : in positive;
+		constant lgnb: in natural range 0 to nblargenb - 1;
+		constant limb: in natural range 0 to n - 1;
+		constant val: in std_logic_ww)
+	is
+		variable dw : std_logic_vector(AXIDW - 1 downto 0);
+	begin
+		wait until clk'event and clk = '1';
+		-- write W_DBG_FP_WADDR register witn large nb address
+		axi.awaddr <= W_DBG_FP_WADDR & "000"; axi.awvalid <= '1';
+		wait until clk'event and clk = '1' and axo.awready = '1';
+		axi.awaddr <= (others => 'X'); axi.awvalid <= '0';
+		dw := (others => '0');
+		dw(FP_ADDR - 1 downto 0)
+			:= std_logic_vector(to_unsigned((lgnb * n) + limb, FP_ADDR));
+		axi.wdata <= dw;
+		axi.wvalid <= '1';
+		wait until clk'event and clk = '1' and axo.wready = '1';
+		axi.wdata <= (others => 'X'); axi.wvalid <= '0';
+		-- write value into register W_DBG_FP_WDATA
+		wait until clk'event and clk = '1';
+		axi.awaddr <= W_DBG_FP_WDATA & "000"; axi.awvalid <= '1';
+		wait until clk'event and clk = '1' and axo.awready = '1';
+		axi.awaddr <= (others => 'X'); axi.awvalid <= '0';
+		dw(AXIDW - 1 downto ww) := (others => '0'); dw(ww - 1 downto 0) := val;
+		axi.wdata <= dw;
+		axi.wvalid <= '1';
+		wait until clk'event and clk = '1' and axo.wready = '1';
+		axi.wdata <= (others => 'X'); axi.wvalid <= '0';
+		wait until clk'event and clk = '1';
+	end procedure dbgwrite_one_limb_into_ecc_fp_dram;
+
+	procedure clear_one_lgnb_hw_ecc_fp_dram(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant valnn : in positive;
+		constant lgnb : in natural range 0 to n - 1)
+	is
+		variable vww : std_logic_ww;
+	begin
+		vww := (others => '0');
+		for limb in 0 to n - 1 loop
+			dbgwrite_one_limb_into_ecc_fp_dram(clk, axi, axo, valnn, lgnb, limb, vww);
+		end loop;
+	end procedure clear_one_lgnb_hw_ecc_fp_dram;
+
+	procedure dbgread_one_limb_from_ecc_fp_dram(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant valnn : in positive;
+		constant lgnb: in natural range 0 to nblargenb - 1;
+		constant limb: in natural range 0 to n - 1;
+		variable val : inout std_logic_ww)
+	is
+		variable dw : std_logic_vector(AXIDW - 1 downto 0);
+	begin
+		wait until clk'event and clk = '1';
+		-- write large nb address into register W_DBG_FP_RADDR
+		axi.awaddr <= W_DBG_FP_RADDR & "000"; axi.awvalid <= '1';
+		wait until clk'event and clk = '1' and axo.awready = '1';
+		axi.awaddr <= (others => 'X'); axi.awvalid <= '0';
+		dw := std_logic_vector(to_unsigned((lgnb * n) + limb, AXIDW));
+		axi.wdata <= dw;
+		axi.wvalid <= '1';
+		wait until clk'event and clk = '1' and axo.wready = '1';
+		axi.wdata <= (others => 'X'); axi.wvalid <= '0';
+		-- poll regsiter R_DBG_FP_RDATA_RDY until it shows data ready
+		loop
+			wait until clk'event and clk = '1';
+			-- read R_DBG_FP_RDATA_RDY register
+			axi.araddr <= R_DBG_FP_RDATA_RDY & "000";
+			axi.arvalid <= '1';
+			wait until clk'event and clk = '1' and axo.arready = '1';
+			axi.araddr <= (others => 'X');
+			axi.arvalid <= '0';
+			axi.rready <= '1';
+			wait until clk'event and clk = '1' and axo.rvalid = '1';
+			axi.rready <= '0';
+			if axo.rdata(DBG_FP_RDATA_IS_RDY) = '1' then
+				-- means bit 'ready' is asserted
+				exit;
+			end if;
+		end loop;
+		-- read back value from register R_DBG_FP_RDATA
+		wait until clk'event and clk = '1';
+		axi.araddr <= R_DBG_FP_RDATA & "000";
+		axi.arvalid <= '1';
+		wait until clk'event and clk = '1' and axo.arready = '1';
+		axi.araddr <= (others => 'X');
+		axi.arvalid <= '0';
+		axi.rready <= '1';
+		wait until clk'event and clk = '1' and axo.rvalid = '1';
+		axi.rready <= '0';
+		val := axo.rdata(ww - 1 downto 0);
+		wait until clk'event and clk = '1';
+	end procedure dbgread_one_limb_from_ecc_fp_dram;
 
 end package body;

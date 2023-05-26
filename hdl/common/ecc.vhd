@@ -163,6 +163,24 @@ architecture struct of ecc is
 			doaop : out std_logic;
 			aopid : out std_logic_vector(2 downto 0); -- id defined in ecc_pkg
 			aopdone : in std_logic;
+			--   /debug only
+			laststep : in std_logic;
+			firstzdbl : in std_logic;
+			firstzaddu : in std_logic;
+			first2pz : in std_logic;
+			first3pz : in std_logic;
+			torsion2 : in std_logic;
+			kap : in std_logic;
+			kapp : in std_logic;
+			zu : in std_logic;
+			zc : in std_logic;
+			r0z : in std_logic;
+			r1z : in std_logic;
+			pts_are_equal : in std_logic;
+			pts_are_oppos : in std_logic;
+			phimsb : in std_logic;
+			kb0end : in std_logic;
+			--   end of debug only/
 			-- interface with ecc_curve
 			masklsb : out std_logic;
 			-- interface with ecc_fp (access to ecc_fp_dram)
@@ -194,6 +212,7 @@ architecture struct of ecc is
 			nndyn_wmin_excp_val : out unsigned(log2(2*w - 1) - 1 downto 0);
 			nndyn_wmin_excp : out std_logic;
 			nndyn_mask_wm2 : out std_logic;
+			nndyn_nnp1 : out unsigned(log2(nn + 1) - 1 downto 0);
 			nndyn_nnm3 : out unsigned(log2(nn) - 1 downto 0);
 			-- busy signal for [k]P computation
 			kppending : out std_logic;
@@ -203,6 +222,7 @@ architecture struct of ecc is
 			dbgpgmstate : in std_logic_vector(3 downto 0);
 			dbgnbbits : in std_logic_vector(15 downto 0);
 			dbgjoyebit : in std_logic_vector(log2(2*nn - 1) - 1 downto 0);
+			dbgnbstarvrndxyshuf : in std_logic_vector(15 downto 0);
 			-- debug features (interface with ecc_curve)
 			dbgbreakpoints : out breakpoints_type;
 			dbgnbopcodes : out std_logic_vector(15 downto 0);
@@ -232,6 +252,7 @@ architecture struct of ecc is
 			dbgtrngrawdata : in std_logic;
 			dbgtrngppdeact : out std_logic;
 			dbgtrngcompletebypass : out std_logic;
+			dbgtrngcompletebypassbit : out std_logic;
 			dbgtrngrawduration : in unsigned(31 downto 0);
 			dbgtrngvonneuman : out std_logic;
 			dbgtrngidletime : out unsigned(3 downto 0);
@@ -259,6 +280,7 @@ architecture struct of ecc is
 			ar1zi : out std_logic;
 			ar0zo : in std_logic;
 			ar1zo : in std_logic;
+			nndyn_nnp1 : in unsigned(log2(nn + 1) - 1 downto 0);
 			nndyn_nnm3 : in unsigned(log2(nn) - 1 downto 0);
 			--   [k]P computation
 			agokp : in  std_logic;
@@ -301,8 +323,6 @@ architecture struct of ecc is
 			iterate_shuffle_valid : out std_logic;
 			iterate_shuffle_rdy : in std_logic;
 			iterate_shuffle_force : out std_logic;
-			fr0z : out std_logic;
-			fr1z : out std_logic;
 			first2pz : in std_logic;
 			first3pz : out std_logic;
 			torsion2 : in std_logic;
@@ -331,7 +351,8 @@ architecture struct of ecc is
 			-- debug features
 			dbgpgmstate : out std_logic_vector(3 downto 0);
 			dbgnbbits : out std_logic_vector(15 downto 0);
-			dbgjoyebit : out std_logic_vector(log2(2*nn - 1) - 1 downto 0)
+			dbgjoyebit : out std_logic_vector(log2(2*nn - 1) - 1 downto 0);
+			dbgnbstarvrndxyshuf : out std_logic_vector(15 downto 0)
 			-- pragma translate_off
 			-- interface with ecc_fp (simu only)
 			; logr0r1 : out std_logic;
@@ -364,8 +385,6 @@ architecture struct of ecc is
 			iterate_shuffle_valid : in std_logic;
 			iterate_shuffle_rdy : out std_logic;
 			iterate_shuffle_force : in std_logic;
-			fr0z : in std_logic;
-			fr1z : in std_logic;
 			first2pz : out std_logic;
 			first3pz : in std_logic;
 			torsion2 : out std_logic;
@@ -580,6 +599,7 @@ architecture struct of ecc is
 			dbgtrngrawdata : out std_logic;
 			dbgtrngppdeact : in std_logic;
 			dbgtrngcompletebypass : in std_logic;
+			dbgtrngcompletebypassbit : in std_logic;
 			dbgtrngrawduration : out unsigned(31 downto 0);
 			dbgtrngvonneuman : in std_logic;
 			dbgtrngidletime : in unsigned(3 downto 0)
@@ -705,6 +725,7 @@ architecture struct of ecc is
 	signal kpdone, mtydone : std_logic;
 	signal agomtya : std_logic;
 	signal amtydone : std_logic;
+	signal nndyn_nnp1 : unsigned(log2(nn + 1) - 1 downto 0);
 	signal nndyn_nnm3 : unsigned(log2(nn) - 1 downto 0);
 	signal dopop : std_logic;
 	signal popid : std_logic_vector(2 downto 0);
@@ -748,8 +769,6 @@ architecture struct of ecc is
 	signal iterate_shuffle_valid : std_logic;
 	signal iterate_shuffle_rdy : std_logic;
 	signal iterate_shuffle_force : std_logic;
-	signal fr0z : std_logic;
-	signal fr1z : std_logic;
 	signal first2pz : std_logic;
 	signal first3pz : std_logic;
 	signal torsion2 : std_logic;
@@ -841,6 +860,7 @@ architecture struct of ecc is
 	signal dbgpgmstate : std_logic_vector(3 downto 0);
 	signal dbgnbbits : std_logic_vector(15 downto 0);
 	signal dbgjoyebit : std_logic_vector(log2(2*nn - 1) - 1 downto 0);
+	signal dbgnbstarvrndxyshuf : std_logic_vector(15 downto 0);
 	signal dbghalted_s : std_logic;
 	-- debug features (signals between ecc_axi & ecc_curve_iram)
 	signal dbgiaddr : std_logic_vector(IRAM_ADDR_SZ - 1 downto 0);
@@ -868,7 +888,7 @@ architecture struct of ecc is
 	signal dbgtrngrawraddr : std_logic_vector(log2(raw_ram_size-1) - 1 downto 0);
 	signal dbgtrngrawdata : std_logic;
 	signal dbgtrngppdeact : std_logic;
-	signal dbgtrngcompletebypass : std_logic;
+	signal dbgtrngcompletebypass, dbgtrngcompletebypassbit : std_logic;
 	signal dbgtrngrawduration : unsigned(31 downto 0);
 	signal dbgtrngvonneuman : std_logic;
 	signal dbgtrngidletime : unsigned(3 downto 0);
@@ -987,6 +1007,24 @@ begin
 			doaop => doaop,
 			aopid => aopid,
 			aopdone => aopdone,
+			--   /debug only
+			laststep => laststep,
+			firstzdbl => firstzdbl,
+			firstzaddu => firstzaddu,
+			first2pz => first2pz,
+			first3pz => first3pz,
+			torsion2 => torsion2,
+			kap => kap,
+			kapp => kapp,
+			zu => zu,
+			zc => zc,
+			r0z => r0z,
+			r1z => r1z,
+			pts_are_equal => pts_are_equal,
+			pts_are_oppos => pts_are_oppos,
+			phimsb => phimsb,
+			kb0end => kb0end,
+			--   end of debug only/
 			-- interface with ecc_curve
 			masklsb => masklsb,
 			-- interface with ecc_fp (access to ecc_fp_dram)
@@ -1018,6 +1056,7 @@ begin
 			nndyn_wmin_excp_val => nndyn_wmin_excp_val,
 			nndyn_wmin_excp => nndyn_wmin_excp,
 			nndyn_mask_wm2 => nndyn_mask_wm2,
+			nndyn_nnp1 => nndyn_nnp1,
 			nndyn_nnm3 => nndyn_nnm3,
 			-- general busy signal
 			kppending => busy,
@@ -1027,6 +1066,7 @@ begin
 			dbgpgmstate => dbgpgmstate,
 			dbgnbbits => dbgnbbits,
 			dbgjoyebit => dbgjoyebit,
+			dbgnbstarvrndxyshuf => dbgnbstarvrndxyshuf,
 			-- debug features (interface with ecc_curve)
 			dbgbreakpoints => dbgbreakpoints,
 			dbgnbopcodes => dbgnbopcodes,
@@ -1056,6 +1096,7 @@ begin
 			dbgtrngrawdata => dbgtrngrawdata,
 			dbgtrngppdeact => dbgtrngppdeact,
 			dbgtrngcompletebypass => dbgtrngcompletebypass,
+			dbgtrngcompletebypassbit => dbgtrngcompletebypassbit,
 			dbgtrngrawduration => dbgtrngrawduration,
 			dbgtrngvonneuman => dbgtrngvonneuman,
 			dbgtrngidletime => dbgtrngidletime,
@@ -1086,6 +1127,7 @@ begin
 			ar1zi => ar1zi,
 			ar0zo => ar0zo,
 			ar1zo => ar1zo,
+			nndyn_nnp1 => nndyn_nnp1,
 			nndyn_nnm3 => nndyn_nnm3,
 			--   [k]P computation
 			agokp => agokp,
@@ -1128,8 +1170,6 @@ begin
 			iterate_shuffle_valid => iterate_shuffle_valid,
 			iterate_shuffle_rdy => iterate_shuffle_rdy,
 			iterate_shuffle_force => iterate_shuffle_force,
-			fr0z => fr0z,
-			fr1z => fr1z,
 			first2pz => first2pz,
 			first3pz => first3pz,
 			torsion2 => torsion2,
@@ -1158,7 +1198,8 @@ begin
 			-- debug features (interface with ecc_axi)
 			dbgpgmstate => dbgpgmstate,
 			dbgnbbits => dbgnbbits,
-			dbgjoyebit => dbgjoyebit
+			dbgjoyebit => dbgjoyebit,
+			dbgnbstarvrndxyshuf => dbgnbstarvrndxyshuf
 			-- pragma translate_off
 			-- interface with ecc_fp (simu only)
 			, logr0r1 => logr0r1,
@@ -1190,8 +1231,6 @@ begin
 			iterate_shuffle_valid => iterate_shuffle_valid,
 			iterate_shuffle_rdy => iterate_shuffle_rdy,
 			iterate_shuffle_force => iterate_shuffle_force,
-			fr0z => fr0z,
-			fr1z => fr1z,
 			first2pz => first2pz,
 			first3pz => first3pz,
 			torsion2 => torsion2,
@@ -1397,6 +1436,7 @@ begin
 			dbgtrngrawdata => dbgtrngrawdata,
 			dbgtrngppdeact => dbgtrngppdeact,
 			dbgtrngcompletebypass => dbgtrngcompletebypass,
+			dbgtrngcompletebypassbit => dbgtrngcompletebypassbit,
 			dbgtrngrawduration => dbgtrngrawduration,
 			dbgtrngvonneuman => dbgtrngvonneuman,
 			dbgtrngidletime => dbgtrngidletime
@@ -1556,11 +1596,11 @@ begin
 			echol("");
 		end if;
 		-- 2nd console log line (ecc_curve_iram & ecc_fp settings)
-		echo("ECC: microcode mem size: ");
+		echo("ECC: microcode memory size: ");
 		echo(integer'image(ge_pow_of_2(nbopcodes)));
 		echo(" opcodes of ");
 		echo(integer'image(OPCODE_SZ));
-		echo("-bit, data mem: ");
+		echo("-bit, data memory: ");
 		echo(integer'image(ge_pow_of_2(nblargenb)));
 		echol(" large-numbers");
 		-- 3rd console log line (TRNG fifos)

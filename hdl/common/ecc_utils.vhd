@@ -213,7 +213,8 @@ package body ecc_utils is
 		variable tmp : positive := 32;
 	begin
 		if techno = spartan6 then tmp := 16;
-		elsif techno = series7 or techno = virtex6 then tmp := 16;
+		elsif techno = series7 or techno = virtex6 or
+			techno = ultrascale then tmp := 16;
 		elsif techno = ialtera then tmp := 27;
 		elsif techno = asic then tmp := multwidth;
 		end if;
@@ -382,7 +383,7 @@ package body ecc_utils is
 	end procedure hex_echol;
 
 	-- write hexadecimal value on a given input 'line'
-	procedure hex_write(l: inout line; value: in std_logic_vector) is
+	procedure hex_write(l: inout line; constant value: in std_logic_vector) is
 		variable tmp : std_logic_vector(
 			value'length + (4 * is_not_a_multiple_of_four(value'length)) - 1 downto 0)
 				:= (others => '0');
