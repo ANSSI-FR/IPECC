@@ -21,7 +21,7 @@ use work.ecc_utils.all; -- for ln2()
 use work.ecc_pkg.all;
 use work.mm_ndsp_pkg.all; -- for 'ndsp'
 
-entity maccx_asic is
+entity maccx is
 	port(
 		clk  : in std_logic;
 		rst  : in std_logic;
@@ -30,9 +30,9 @@ entity maccx_asic is
 		dspi : in maccx_array_in_type;
 		P    : out std_logic_vector(2*ww + ln2(ndsp) - 1 downto 0)
 	);
-end entity maccx_asic;
+end entity maccx;
 
-architecture struct of maccx_asic is
+architecture struct of maccx is
 
 	component macc_asic is
 		generic(

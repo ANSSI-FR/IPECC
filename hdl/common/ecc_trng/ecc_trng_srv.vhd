@@ -20,6 +20,7 @@ use ieee.numeric_std.all;
 use work.ecc_pkg.all; -- for std_logic2 & hex_write()
 use work.ecc_customize.all; -- for nbtrng
 use work.ecc_utils.all; -- for log2() & ge_pow_of_2()
+use work.ecc_trng_pkg.all;
 
 -- pragma translate_off
 use std.textio.all;
@@ -54,7 +55,7 @@ entity ecc_trng_srv is
 		-- interface with entropy client ecc_fp_dram_sh
 		rdy3 : in std_logic;
 		valid3 : out std_logic;
-		data3 : out std_logic_vector(FP_ADDR - 1 downto 0);
+		data3 : out std_logic_vector(irn_width_sh - 1 downto 0);
 		irncount3 : out std_logic_vector(log2(irn_fifo_size_sh) - 1 downto 0);
 		-- interface with ecc_axi (only usable in debug mode)
 		dbgtrngcompletebypassbit : in std_logic;
@@ -85,8 +86,8 @@ architecture struct of ecc_trng_srv is
 		ppdatain1_cnt : unsigned(log2(ww - 1) - 1 downto 0);
 		ppdatain2 : std_logic_vector(1 downto 0);
 		ppdatain2_cnt : unsigned(log2(2 - 1) - 1 downto 0); -- 0 downto 0 so what?
-		ppdatain3 : std_logic_vector(FP_ADDR - 1 downto 0);
-		ppdatain3_cnt : unsigned(log2(FP_ADDR - 1) - 1 downto 0);
+		ppdatain3 : std_logic_vector(irn_width_sh - 1 downto 0);
+		ppdatain3_cnt : unsigned(log2(irn_width_sh - 1) - 1 downto 0);
 		irn : set_reg_type_array;
 		rdy_s : std_logic;
 		priority : natural range 0 to 3;
@@ -94,7 +95,7 @@ architecture struct of ecc_trng_srv is
 		data0 : std_logic_vector(ww - 1 downto 0);
 		data1 : std_logic_vector(ww - 1 downto 0);
 		data2 : std_logic_vector(1 downto 0);
-		data3 : std_logic_vector(FP_ADDR - 1 downto 0);
+		data3 : std_logic_vector(irn_width_sh - 1 downto 0);
 		-- pragma translate_off
 		selected : natural range 0 to 3;
 		one_selected : boolean;
@@ -104,7 +105,7 @@ architecture struct of ecc_trng_srv is
 	signal ppdataout0 : std_logic_vector(ww - 1 downto 0);
 	signal ppdataout1 : std_logic_vector(ww - 1 downto 0);
 	signal ppdataout2 : std_logic_vector(1 downto 0);
-	signal ppdataout3 : std_logic_vector(FP_ADDR - 1 downto 0);
+	signal ppdataout3 : std_logic_vector(irn_width_sh - 1 downto 0);
 	signal empty, full : std_logic_vector(3 downto 0);
 	signal count0 : std_logic_vector(log2(irn_fifo_size_axi) - 1 downto 0);
 	signal count1 : std_logic_vector(log2(irn_fifo_size_fp) - 1 downto 0);
@@ -209,7 +210,7 @@ begin
 	-- IRN fifo for ecc_fp_dram_sh random data
 	f3: fifo
 		generic map(
-			datawidth => FP_ADDR,
+			datawidth => irn_width_sh,
 			datadepth => irn_fifo_size_sh)
 		port map(
 			clk => clk,
@@ -390,15 +391,15 @@ begin
 					v.priority := 0;
 				end if;
 			elsif v_selected = 3 then
-				v.ppdatain3(FP_ADDR - 1 downto 0) :=
-					r.ppdatain(0) & r.ppdatain3(FP_ADDR - 1 downto 1);
+				v.ppdatain3(irn_width_sh - 1 downto 0) :=
+					r.ppdatain(0) & r.ppdatain3(irn_width_sh - 1 downto 1);
 				-- decrement counter for target 3
 				v.ppdatain3_cnt := r.ppdatain3_cnt - 1;
 				-- detect and handle underflow of counter for target 3
 				if r.ppdatain3_cnt = (r.ppdatain3_cnt'range => '0') then
 					-- reset the counter for target 3
 					v.ppdatain3_cnt := to_unsigned(
-						FP_ADDR - 1, log2(FP_ADDR - 1));
+						irn_width_sh - 1, log2(irn_width_sh - 1));
 					-- set register r.ppdatain3 as valid to enter the FIFO #3
 					v.irn(3).valid := '1';
 					v.irn(3).can_be_filled := '0'; -- to inhibit target 3 in (s3)
@@ -587,7 +588,7 @@ begin
 			v.ppdatain1_cnt := to_unsigned(ww - 1, log2(ww - 1));
 			v.ppdatain2_cnt := to_unsigned(1, log2(1));
 			v.ppdatain3_cnt :=
-				to_unsigned(FP_ADDR - 1, log2(FP_ADDR - 1));
+				to_unsigned(irn_width_sh - 1, log2(irn_width_sh - 1));
 			for i in 0 to 3 loop
 				v.irn(i).can_be_filled := '1';
 				v.irn(i).valid := '0';

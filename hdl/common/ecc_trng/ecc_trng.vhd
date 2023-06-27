@@ -20,6 +20,7 @@ use ieee.numeric_std.all;
 use work.ecc_customize.all; -- for notrng
 use work.ecc_utils.all;
 use work.ecc_pkg.all;
+use work.ecc_trng_pkg.all;
 
 -- pragma translate_off
 use std.textio.all;
@@ -50,7 +51,7 @@ entity ecc_trng is
 		-- interface with entropy client ecc_fp_dram_sh
 		rdy3 : in std_logic;
 		valid3 : out std_logic;
-		data3 : out std_logic_vector(FP_ADDR - 1 downto 0);
+		data3 : out std_logic_vector(irn_width_sh - 1 downto 0);
 		irncount3 : out std_logic_vector(log2(irn_fifo_size_sh) - 1 downto 0);
 		-- interface with ecc_axi (only usable in debug mode)
 		dbgtrngta : in unsigned(19 downto 0);
@@ -163,7 +164,7 @@ architecture rtl of ecc_trng is
 			-- interface with entropy client ecc_fp_dram_sh
 			rdy3 : in std_logic;
 			valid3 : out std_logic;
-			data3 : out std_logic_vector(FP_ADDR - 1 downto 0);
+			data3 : out std_logic_vector(irn_width_sh - 1 downto 0);
 			irncount3 : out std_logic_vector(log2(irn_fifo_size_sh) - 1 downto 0);
 			-- interface with ecc_axi (only usable in debug mode)
 			dbgtrngcompletebypass : in std_logic;

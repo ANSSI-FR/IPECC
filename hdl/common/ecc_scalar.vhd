@@ -509,7 +509,9 @@ begin
 				nnmax_joye_loop_s <= to_integer(v.kp.joye.nbbits);
 				blbits_max_s <= to_integer(unsigned(blindbits));
 				-- pragma translate_on
-				v.int.permuteundo := '0';
+				if debug then -- statically resolved by synthesizer
+					v.int.permuteundo := '0';
+				end if;
 				v.int.ar0zi := ar0zo;
 				v.int.ar1zi := ar1zo;
 				-- pragma translate_off
@@ -1567,7 +1569,8 @@ begin
 							then
 								v.kp.joye.state := permutation;
 								v.int.permute := '1'; -- stays asserted 1 cycle thx to (s4)
-								if r.kp.joye.nbbits = to_unsigned(1, r.kp.joye.nbbits'length)
+								if debug and -- statically resolved by synthesizer
+									(r.kp.joye.nbbits = to_unsigned(1, r.kp.joye.nbbits'length))
 								then
 									v.int.permuteundo := '1';
 								end if;
@@ -1934,7 +1937,9 @@ begin
 			-- no need to reset r.mty.step nor r.mty.cntrshift
 			--v.kp.laststep := '0';
 			--v.kp.setup := '0';
-			v.int.permuteundo := '0';
+			if debug then -- statically resolved by synthesizer
+				v.int.permuteundo := '0';
+			end if;
 			v.pop.done := '0';
 			v.aop.done := '0';
 			-- no need to reset r.pop.equal, r.pop.opp, r.pop.equalx, r.pop.step
@@ -2005,7 +2010,9 @@ begin
 	aerr_outpt_not_on_curve <= r.int.aerr_outpt_not_on_curve;
 	--     (this signal is only used in the 'shuffle' case)
 	permute <= r.int.permute;
-	permuteundo <= r.int.permuteundo;
+	pu: if debug generate -- statically resolved by synthesizer
+		permuteundo <= r.int.permuteundo;
+	end generate;
 	-- pragma translate_off
 	--   interface with ecc_fp
 	simbit <= r.sim.simbit;
@@ -2184,22 +2191,9 @@ begin
 				echo("entering substate 'joyecoz' (");
 				echo(time'image(now));
 				echol(")");
-				if not (not shuffle or (shuffle and
-				  ( (debug and doshuffle = '0') or (not debug) ))) then
-						if (r.sim.simbit mod NB_BITS_LINE = NB_BITS_LINE - 1)
-							or (r.sim.simbit = nnmax_joye_loop_s + 2)
-						then
-							echo("ECC_SCALAR: ");
-							echo("scalar bits #");
-							echo(integer'image(r_sim_prevbit));
-							echo(" ... ");
-							echol(integer'image(r.sim.simbit));
-							r_sim_prevbit <= r.sim.simbit + 1;
-						end if;
-				end if;
-			elsif (r.kp.joye.state = itoh
-			  and rbak_joye_state /= itoh and (not shuffle or (shuffle and
-				  ( (debug and doshuffle = '0') or (not debug) )))) then
+			elsif (r.kp.joye.state /= zaddc
+			  and rbak_joye_state = zaddc) --and (not shuffle or (shuffle and
+				--( (debug and doshuffle = '0') or (not debug) )))) then
 				if (r.sim.simbit mod NB_BITS_LINE = NB_BITS_LINE - 1)
 					or (r.sim.simbit = nnmax_joye_loop_s + 2)
 				then

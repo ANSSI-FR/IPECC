@@ -41,12 +41,11 @@ entity syncram_sdp is
 		clk : in std_logic;
 		-- port A (write-only)
 		addra : in std_logic_vector(log2(datadepth - 1) - 1 downto 0);
-		ena : in std_logic;
 		wea : in std_logic;
 		dia : in std_logic_vector(datawidth - 1 downto 0);
 		-- port B (read-only)
 		addrb : in std_logic_vector(log2(datadepth - 1) - 1 downto 0);
-		enb : in std_logic;
+		reb : in std_logic;
 		dob : out std_logic_vector(datawidth - 1 downto 0)
 	);
 end entity syncram_sdp;
@@ -71,13 +70,11 @@ begin
 			-- write logic
 			-- (in simulation, only affects array content if no METAVALUE in addra)
 			-- otherwise issue a WARNING message
-			if (ena = '1') then
-				if (wea = '1') then
-					assert(not is_X(addra))
-						report "write to syncram_sdp with a METAVALUE address"
-							severity WARNING;
-					mem_content(to_integer(unsigned(addra))) := dia;
-				end if;
+			if (wea = '1') then
+				assert(not is_X(addra))
+					report "write to syncram_sdp with a METAVALUE address"
+						severity WARNING;
+				mem_content(to_integer(unsigned(addra))) := dia;
 			end if;
 		end if;
 	end process;
@@ -91,7 +88,7 @@ begin
 			if (clk'event and clk = '1') then
 				-- read logic
 				-- (in simulation returns 'force unknown' ('X') if METAVALUE in addrb)
-				if (enb = '1') then
+				if (reb = '1') then
 					-- pragma translate_off
 					if is_X(addrb) then
 						dob <= (others => 'X');
@@ -113,7 +110,7 @@ begin
 				dob <= predob;
 				-- read logic
 				-- (in simulation returns 'force unknown' ('X') if METAVALUE in addrb)
-				if (enb = '1') then
+				if (reb = '1') then
 					-- pragma translate_off
 					if is_X(addrb) then
 						predob <= (others => 'X');

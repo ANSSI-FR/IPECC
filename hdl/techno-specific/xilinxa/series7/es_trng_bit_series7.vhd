@@ -23,7 +23,7 @@ use std.textio.all;
 library unisim;
 use unisim.vcomponents.all;
 
-entity es_trng_bit_xilinx is
+entity es_trng_bit is
 	-- pragma translate_off
 	generic(jittervalfile : string);
 	-- pragma translate_on
@@ -33,9 +33,9 @@ entity es_trng_bit_xilinx is
 		raw : out std_logic;
 		valid : out std_logic
 	);
-end entity es_trng_bit_xilinx;
+end entity es_trng_bit;
 
-architecture struct of es_trng_bit_xilinx is
+architecture struct of es_trng_bit is
 
 	signal ro1out : std_logic;
 	signal ro1out_s : std_logic;

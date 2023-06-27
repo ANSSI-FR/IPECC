@@ -44,7 +44,6 @@ entity ecc_fp_dram is
 		clk : in std_logic;
 		-- port A: write-only interface from ecc_fp
 		-- (actually for write-access from AXI-lite interface)
-		ena : in std_logic;
 		wea : in std_logic;
 		addra : in std_logic_vector(FP_ADDR - 1 downto 0);
 		dia : in std_logic_vector(ww - 1 downto 0);
@@ -63,14 +62,7 @@ architecture syn of ecc_fp_dram is
 
 	function init_ecc_fp_dram return fp_dram_type is
 		variable vram : fp_dram_type;
-		variable v_constant_r : std_logic_ww;
 	begin
-		for i in 0 to n - 1 loop
-			vram((LARGE_NB_R_ADDR * n) + i) := (others => '0');
-		end loop;
-		v_constant_r := (others => '0');
-		v_constant_r((nn + 2) mod ww) := '1';
-		vram((LARGE_NB_R_ADDR * n) + ((nn + 2)/ww)) := v_constant_r;
 		-- big number 1 constant
 		for i in 1 to n - 1 loop
 			vram((LARGE_NB_ONE_ADDR * n) + i) := (others => '0');
@@ -102,13 +94,11 @@ begin
 			-- write logic
 			-- (in simulation, only affects array content if no METAVALUE in addra)
 			-- otherwise issue a WARNING message
-			if (ena = '1') then
-				if (wea = '1') then
-					assert(not is_X(addra))
-						report "write to ecc_fp_dram with a METAVALUE address"
-							severity WARNING;
-					mem_content(to_integer(unsigned(addra))) := dia;
-				end if;
+			if (wea = '1') then
+				assert(not is_X(addra))
+					report "write to ecc_fp_dram with a METAVALUE address"
+						severity WARNING;
+				mem_content(to_integer(unsigned(addra))) := dia;
 			end if;
 		end if;
 	end process;

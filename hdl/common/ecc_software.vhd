@@ -1,0 +1,235 @@
+--
+--  Copyright (C) 2023 - This file is part of IPECC project
+--
+--  Authors:
+--      Karim KHALFALLAH <karim.khalfallah@ssi.gouv.fr>
+--      Ryad BENADJILA <ryadbenadjila@gmail.com>
+--
+--  Contributors:
+--      Adrian THILLARD
+--      Emmanuel PROUFF
+--
+--  This software is licensed under GPL v2 license.
+--  See LICENSE file at the root folder of the project.
+--
+
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+
+use work.ecc_customize.all;
+use work.ecc_utils.all;
+use work.ecc_pkg.all;
+use work.ecc_trng_pkg.all;
+
+package ecc_soft is
+
+	-- Software can rely on the following definitions for proper interaction
+	-- with the IP, with addresses below to be considered as offset from
+	-- the base address allocated to the IP in the whole AXI address system.
+	-- -----------------------------------------------
+	-- addresses of all AXI-accessible write registers
+	-- -----------------------------------------------
+	constant W_CTRL : rat := std_nat(0, ADB);               -- 0x000
+	constant W_WRITE_DATA : rat := std_nat(1, ADB);         -- 0x008
+	constant W_R0_NULL : rat := std_nat(2, ADB);            -- 0x010
+	constant W_R1_NULL : rat := std_nat(3, ADB);            -- 0x018
+	constant W_PRIME_SIZE : rat := std_nat(4, ADB);         -- 0x020
+	constant W_BLINDING : rat := std_nat(5, ADB);           -- 0x028
+	constant W_IRQ : rat := std_nat(7, ADB);                -- 0x038
+	constant W_ERR_ACK : rat := std_nat(8, ADB);            -- 0x040
+	constant W_SMALL_SCALAR : rat := std_nat(9, ADB);       -- 0x048
+	constant W_SOFT_RESET : rat := std_nat(10, ADB);        -- 0x050
+	-- reserved                                             -- 0x058...0x0f8
+	-- (0x100: start of write DEBUG registers)
+	constant W_DBG_HALT : rat := std_nat(32, ADB);          -- 0x100
+	constant W_DBG_BKPT : rat := std_nat(33, ADB);          -- 0x108
+	constant W_DBG_STEPS : rat := std_nat(34, ADB);         -- 0x110
+	constant W_DBG_TRIG_ACT : rat := std_nat(35, ADB);      -- 0x118
+	constant W_DBG_TRIG_UP : rat := std_nat(36, ADB);       -- 0x120
+	constant W_DBG_TRIG_DOWN : rat := std_nat(37, ADB);     -- 0x128
+	constant W_DBG_OP_ADDR : rat := std_nat(38, ADB);       -- 0x130
+	constant W_DBG_WR_OPCODE : rat := std_nat(39, ADB);     -- 0x138
+	constant W_DBG_TRNGCTR : rat := std_nat(40, ADB);       -- 0x140
+	constant W_DBG_TRNGCFG : rat := std_nat(41, ADB);       -- 0x148
+	constant W_DBG_FP_WADDR : rat := std_nat(42, ADB);      -- 0x150
+	constant W_DBG_FP_WDATA : rat := std_nat(43, ADB);      -- 0x158
+	constant W_DBG_FP_RADDR : rat := std_nat(44, ADB);      -- 0x160
+	constant W_DBG_CFG_NOXYSHUF : rat := std_nat(45, ADB);  -- 0x168
+	constant W_DBG_CFG_NOAXIMSK : rat := std_nat(46, ADB);  -- 0x170
+	constant W_DBG_CFG_NOMEMSHUF : rat := std_nat(47, ADB); -- 0x178
+	-- ----------------------------------------------
+	-- addresses of all AXI-accessible read registers
+	-- ----------------------------------------------
+	constant R_STATUS : rat := std_nat(0, ADB);              -- 0x000
+	constant R_READ_DATA : rat := std_nat(1, ADB);           -- 0x008
+	constant R_CAPABILITIES : rat := std_nat(2, ADB);        -- 0x010
+	constant R_PRIME_SIZE : rat := std_nat(3, ADB);          -- 0x018
+	constant R_HW_VERSION : rat := std_nat(4, ADB);          -- 0x020
+	-- reserved                                              -- 0x030...0x0f8
+	-- (0x100: start of read DEBUG registers)
+	constant R_DBG_CAPABILITIES_0 : rat := std_nat(32, ADB); -- 0x100
+	constant R_DBG_CAPABILITIES_1 : rat := std_nat(33, ADB); -- 0x108
+	constant R_DBG_CAPABILITIES_2 : rat := std_nat(34, ADB); -- 0x110
+	constant R_DBG_STATUS : rat := std_nat(35, ADB);         -- 0x118
+	constant R_DBG_TIME : rat := std_nat(36, ADB);           -- 0x120
+	constant R_DBG_RAWDUR : rat := std_nat(37, ADB);         -- 0x128
+	constant R_DBG_FLAGS : rat := std_nat(38, ADB);          -- 0x130
+	-- reserved                                              -- 0x138
+	constant R_DBG_TRNG_STATUS : rat := std_nat(40, ADB);    -- 0x140
+	constant R_DBG_TRNG_DATA : rat := std_nat(41, ADB);      -- 0x148
+	constant R_DBG_FP_RDATA : rat := std_nat(42, ADB);       -- 0x150
+	constant R_DBG_IRN_CNT_AXI : rat := std_nat(43, ADB);    -- 0x158
+	constant R_DBG_IRN_CNT_EFP : rat := std_nat(44, ADB);    -- 0x160
+	constant R_DBG_IRN_CNT_CUR : rat := std_nat(45, ADB);    -- 0x168
+	constant R_DBG_IRN_CNT_SHF : rat := std_nat(46, ADB);    -- 0x170
+	constant R_DBG_FP_RDATA_RDY : rat := std_nat(47, ADB);   -- 0x178
+	constant R_DBG_EXP_FLAGS : rat := std_nat(48, ADB);      -- 0x180
+	constant R_DBG_DIAGNOSTICS : rat := std_nat(49, ADB);    -- 0x188
+
+	-- bit positions in W_CTRL register
+	constant CTRL_KP : natural := 0;
+	constant CTRL_PT_ADD : natural := 1;
+	constant CTRL_PT_DBL : natural := 2;
+	constant CTRL_PT_CHK : natural := 3;
+	constant CTRL_PT_NEG : natural := 4;
+	constant CTRL_PT_EQU : natural := 5;
+	constant CTRL_PT_OPP : natural := 6;
+	-- bits 7-8 reserved
+	constant CTRL_FP_MUL : natural := 9;
+	-- bits 10-15 reserved
+	constant CTRL_WRITE_NB : natural := 16;
+	constant CTRL_READ_NB : natural := 17;
+	constant CTRL_WRITE_K : natural := 18;
+	-- bit 19 reserved
+	constant CTRL_NBADDR_LSB : natural := 20;
+	constant CTRL_NBADDR_SZ : natural := 12;
+	constant CTRL_NBADDR_MSB : natural := CTRL_NBADDR_LSB + CTRL_NBADDR_SZ - 1;
+
+	-- bit positions in W_R0_NULL / W_R1_NULL registers
+	constant WR0_IS_NULL : natural := 0;
+	constant WR1_IS_NULL : natural := 0;
+
+	-- bit positions in W_DBG_CFG_NOXYSHUF register
+	constant XYSHF_DIS : natural := 0;
+
+	-- bit positions in W_DBG_CFG_NOAXIMSK register
+	constant AXIMSK_DIS : natural := 0;
+
+	-- bit positions in W_DBG_CFG_NOMEMSHUF register
+	constant MEMSHF_DIS : natural := 0;
+
+	-- bit positions in W_BLINDING register
+	constant BLD_EN : natural := 0;
+	constant BLD_BITS_LSB : natural := 4;
+	constant BLD_BITS_MSB : natural := BLD_BITS_LSB + log2(nn) - 1;
+
+	-- bit positions in W_IRQ register
+	constant IRQ_EN : natural := 0;
+
+	-- bit positions in W_PRIME_SIZE register
+	constant PMSZ_VALNN_LSB : natural := 0;
+	constant PMSZ_VALNN_SZ : natural := log2(nn);
+	constant PMSZ_VALNN_MSB : natural := PMSZ_VALNN_LSB + PMSZ_VALNN_SZ - 1;
+
+	-- bit positions in R_STATUS register (AXI interface w/ software)
+	constant STATUS_BUSY : natural := 0;
+	constant STATUS_KP : natural := 4;
+	constant STATUS_MTY : natural := 5;
+	constant STATUS_POP : natural := 6;
+	constant STATUS_AOP : natural := 7;
+	constant STATUS_R_OR_W : natural := 8;
+	constant STATUS_INIT : natural := 9;
+	constant STATUS_ENOUGH_RND : natural := 10;
+	constant STATUS_NNDYNACT : natural := 11;
+	constant STATUS_YES : natural := 13;
+	constant STATUS_R0_IS_NULL : natural := 14;
+	constant STATUS_R1_IS_NULL : natural := 15;
+	constant STATUS_ERR_LSB : natural := 16;
+	constant STATUS_ERR_COMP : natural := 16;
+	constant STATUS_ERR_WREG_FBD : natural := 17;
+	constant STATUS_ERR_KP_FBD : natural := 18;
+	constant STATUS_ERR_NNDYN : natural := 19;
+	constant STATUS_ERR_POP_FBD : natural := 20;
+	constant STATUS_ERR_RDNB_FBD : natural := 21;
+	constant STATUS_ERR_BLN : natural := 22;
+	constant STATUS_ERR_UNKNOWN_REG : natural := 23;
+	constant STATUS_ERR_IN_PT_NOT_ON_CURVE : natural := 24;
+	constant STATUS_ERR_OUT_PT_NOT_ON_CURVE : natural := 25;
+	constant STATUS_ERR_MSB : natural := 31;
+
+	-- bit positions in R_CAPABILITIES register
+	constant CAP_DBG_N_PROD : natural := 0;
+	constant CAP_SHF : natural := 4;
+	constant CAP_NNDYN : natural := 8;
+	constant CAP_W64 : natural := 9;
+	constant CAP_NNMAX_LSB : natural := 12;
+	constant CAP_NNMAX_MSB : natural := CAP_NNMAX_LSB + log2(nn) - 1;
+
+	-- bit positions in R_DBG_STATUS register
+	constant DBG_STATUS_HALTED : natural := 0;
+	constant DBG_STATUS_BKID_LSB : natural := 1;
+	constant DBG_STATUS_BKID_MSB : natural := 2;
+	constant DBG_STATUS_BK_HIT : natural := 3;
+	constant DBG_STATUS_PC_LSB : natural := 4;
+	constant DBG_STATUS_PC_MSB : natural := 15;
+	constant DBG_STATUS_NBIT_LSB : natural := 16;
+	constant DBG_STATUS_NBIT_MSB : natural := 27;
+	constant DBG_STATUS_STATE_LSB : natural := 28;
+	constant DBG_STATUS_STATE_MSB : natural := 31;
+
+	-- bit flags in R_DBG_FLAGS register
+	constant FLAGS_P_NOT_SET : natural := 0;
+	constant FLAGS_P_NOT_SET_MTY : natural := 1;
+	constant FLAGS_A_NOT_SET : natural := 2;
+	constant FLAGS_A_NOT_SET_MTY : natural := 3;
+	constant FLAGS_B_NOT_SET : natural := 4;
+	constant FLAGS_K_NOT_SET : natural := 5;
+	constant FLAGS_NNDYN_NOERR : natural := 6;
+	constant FLAGS_NOT_BLN_OR_Q_NOT_SET : natural := 7;
+
+	-- bit positions in W_DBG_TRNGCFG register
+	constant DBG_TRNG_VONM : natural := 0;
+	constant DBG_TRNG_COMPLETE_BYPASS : natural := 1;
+	constant DBG_TRNG_COMPLETE_BYPASS_BIT : natural := 2;
+	constant DBG_TRNG_TA_LSB : natural := 4;
+	constant DBG_TRNG_TA_MSB : natural := 23;
+	constant DBG_TRNG_IDLE_LSB : natural := 24;
+	constant DBG_TRNG_IDLE_MSB : natural := 27;
+
+	-- bit positions in W_DBG_TRNGCTR register
+	constant DBG_TRNG_RAW_RESET : natural := 0;
+	constant DBG_TRNG_IRN_RESET : natural := 1;
+	constant DBG_TRNG_RAW_READ : natural := 4;
+	constant DBG_TRNG_PP_DEACT : natural := 8;
+	constant DBG_TRNG_RAW_ADDR_LSB : natural := 12;
+	constant DBG_TRNG_RAW_ADDR_MSB : natural :=
+		DBG_TRNG_RAW_ADDR_LSB + log2(raw_ram_size - 1) - 1;
+
+	-- bit positions in W_DBG_HALT register
+	constant DBG_HALT : natural := 0;
+
+	-- bit positions in W_DBG_BKPT register
+	constant DBG_BKPT_EN : natural := 0;
+	constant DBG_BKPT_ID_LSB : natural := 1;
+	constant DBG_BKPT_ID_MSB : natural := 2;
+	constant DBG_BKPT_ADDR_LSB : natural := 4;
+	constant DBG_BKPT_ADDR_MSB : natural := 4 + IRAM_ADDR_SZ - 1;
+	constant DBG_BKPT_NBBIT_LSB : natural := 16;
+	constant DBG_BKPT_NBBIT_MSB : natural := 27;
+	constant DBG_BKPT_STATE_LSB : natural := 28;
+	constant DBG_BKPT_STATE_MSB : natural := 31;
+
+	-- bit positions in W_DBG_STEPS register
+	constant DBG_RESUME : natural := 28;
+	constant DBG_OPCODE_RUN : natural := 0;
+	constant DBG_OPCODE_NB_LSB : natural := 8;
+	constant DBG_OPCODE_NB_MSB : natural := 23;
+
+	-- bit positions in R_PRIME_SIZE
+	--   (same definitions as for W_PRIME_SIZE register, see above)
+
+	-- bit positions in R_DBG_FP_RDATA_RDY
+	constant DBG_FP_RDATA_IS_RDY : natural := 0;
+
+end package ecc_soft;

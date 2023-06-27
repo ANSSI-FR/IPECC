@@ -18,9 +18,9 @@
 # TRNG as "random" input source in the simulation testbench:
 od -t u1 -w1 -v /dev/urandom | awk '{print $2}' | head -$((128*1024*1024)) > /tmp/random.txt
 
-# Mind that generated file ("/tmp/random.txt" above is just an example)
-# should match the value set for HDL parameter 'simtrngfile' in file
-# hdl/ecc_customize.vhd.
+# Mind that the name of the generated file ("/tmp/random.txt" above
+# is just an example) should match the value set for HDL parameter
+# 'simtrngfile' in file hdl/ecc_customize.vhd.
 # Value 128 Meg above is also quite arbitratry and denotes the number
 # of values that will be generated. Be sure to generate enough of
 # these for your own simulation requirements to avoid starving of the

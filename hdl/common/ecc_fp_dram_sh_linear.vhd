@@ -26,7 +26,7 @@ use work.ecc_utils.all;
 use work.ecc_pkg.all;
 --use work.ecc_trng_pkg.all;
 
-entity ecc_fp_dram_sh is
+entity ecc_fp_dram_sh_linear is
 	generic(
 		rdlat : positive range 1 to 2);
 	port(
@@ -35,7 +35,6 @@ entity ecc_fp_dram_sh is
 		swrst : in std_logic;
 		-- port A: write-only interface from ecc_fp
 		-- (actually for write-access from AXI-lite interface)
-		ena : in std_logic;
 		wea : in std_logic;
 		addra : in std_logic_vector(FP_ADDR - 1 downto 0);
 		dia : in std_logic_vector(ww - 1 downto 0);
@@ -57,9 +56,9 @@ entity ecc_fp_dram_sh is
 		fprwmask : out std_logic_vector(FP_ADDR - 1 downto 0)
 		-- pragma translate_on
 	);
-end entity ecc_fp_dram_sh;
+end entity ecc_fp_dram_sh_linear;
 
-architecture syn of ecc_fp_dram_sh is
+architecture syn of ecc_fp_dram_sh_linear is
 
 	component ecc_fp_dram is
 		generic(
@@ -68,7 +67,6 @@ architecture syn of ecc_fp_dram_sh is
 			clk : in std_logic;
 			-- port A: write-only interface from ecc_fp
 			-- (actually for write-access from AXI-lite interface)
-			ena : in std_logic;
 			wea : in std_logic;
 			addra : in std_logic_vector(FP_ADDR - 1 downto 0);
 			dia : in std_logic_vector(ww - 1 downto 0);
@@ -150,7 +148,6 @@ begin
 		port map(
 			clk => clk,
 			-- port A (write-only)
-			ena => r.wea0,
 			wea => r.wea0,
 			addra => r.addra0,
 			dia => r.dia0,
@@ -169,7 +166,6 @@ begin
 		port map(
 			clk => clk,
 			-- port A (write-only)
-			ena => r.wea1,
 			wea => r.wea1,
 			addra => r.addra1,
 			dia => r.dia1,
@@ -182,7 +178,7 @@ begin
 			-- pragma translate_on
 		);
 
-	comb: process(r, rstn, ena, wea, addra, dia, reb, addrb, permute, permuteundo,
+	comb: process(r, rstn, wea, addra, dia, reb, addrb, permute, permuteundo,
 	              dob0, dob1, trngvalid, trngdata, swrst)
 		variable v : reg_type;
 	begin
@@ -269,7 +265,7 @@ begin
 			v.trngrdy := '1';
 			if permuteundo = '0' then
 				v.state := random0;
-			elsif permuteundo = '1' then
+			elsif (debug and permuteundo = '1') then
 				v.state := random1;
 				v.perm.wmask := r.fpmask;
 			end if;

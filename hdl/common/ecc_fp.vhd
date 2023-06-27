@@ -21,6 +21,7 @@ use work.ecc_customize.all;
 use work.ecc_utils.all;
 use work.ecc_pkg.all;
 use work.ecc_vars.all; -- for LARGE_NB_x constants (& only for simu, see s(142))
+use work.ecc_shuffle_pkg.all;
 
 -- pragma translate_off
 use std.textio.all;
@@ -106,18 +107,23 @@ entity ecc_fp is
 		patchid : in integer;
 		-- interface with ecc_fp_dram or ecc_fp_dram_sh (simu only)
 		fpdram : in fp_dram_type;
-		fprwmask : in std_logic_vector(FP_ADDR - 1 downto 0)
+		fprwmask : in std_logic_vector(FP_ADDR - 1 downto 0);
+		vtophys : in virt_to_phys_table_type
 		-- pragma translate_on
 	);
 end entity ecc_fp;
 
 architecture rtl of ecc_fp is
 
-	constant sramlatp2 : positive range 3 to 4 := sramlat + 2;
+	-- function set_readlat is defined in package ecc_utils
+	-- and depends on the presence of shuffle countermeasure (see
+	-- parameter 'shuffle' in ecc_customize.vhd). It also depends on
+	-- the type of shuffling algorithm used (see parameter 'shuffle_type'
+	-- in ecc_customize.vhd) and the read latency of SRAM blocks in
+	-- the design (see parameter 'sramlat' in ecc_customize.vhd)
+	constant readlat : positive := set_readlat;
 
 	type mm_opc_type is array(natural range 0 to nbmult - 1) of stdop;
-
-	type push_async_state_type is (waitread, waitenack, waitgoack, waitackack);
 
 	type mm_push_type is record
 		do : std_logic;
@@ -125,28 +131,23 @@ architecture rtl of ecc_fp is
 		oneavail : std_logic;
 		id0 : integer range 0 to nbmult - 1;
 		id1 : integer range 0 to nbmult - 1;
-		shstart : std_logic_vector(2*sramlatp2 downto 0);
-		shmid : std_logic_vector(sramlatp2 + 1 downto 0);
+		shstart : std_logic_vector(readlat + 1 downto 0);
+		shmid : std_logic_vector(readlat + 1 downto 0);
 		rd : std_logic;
 		rdcnt : unsigned(log2(w - 1) - 1 downto 0);
-		opacnt : unsigned(log2(2*n - 1) - 1 downto 0);
-		opbcnt : unsigned(log2(2*n - 1) - 1 downto 0);
 		opaorb : std_logic;
-		-- for 'gosh' only 4 bits kept by synthesizer if shuffle is FALSE
-		gosh : std_logic_vector(sramlatp2 + 1 downto 0);
+		-- for 'gosh' some bits will be trimmed by synthesizer depending on shuffle
+		gosh : std_logic_vector(readlat + 1 downto 0);
 		opic : std_logic_vector(FP_ADDR_MSB - 1 downto 0);
 		opc : mm_opc_type;
-		-- for 'xypushsh' if shuffle is FALSE synthesizer will prune upper bits
-		xypushsh : std_logic_vector(sramlatp2 - 1 downto 0);
-		async_state : push_async_state_type;
+		-- for 'xypushsh' some bits will be pruned by syn. depending on shuffle
+		xypushsh : std_logic_vector(readlat - 1 downto 0);
 		-- resync registers
 		rdy0, rdy1, rdy : std_logic;
 		go_ack0, go_ack1, go_ack : std_logic;
 		xen_ack0, xen_ack1, xen_ack : std_logic;
 		yen_ack0, yen_ack1, yen_ack : std_logic;
 	end record;
-
-	type pull_async_state_type is (idle, waitack, writeram, waitackack);
 
 	type mm_pull_type is record
 		done : std_logic_vector(0 to nbmult - 1);
@@ -163,7 +164,6 @@ architecture rtl of ecc_fp is
 		irq0, irq1, irq : std_logic;
 		zren_ack0, zren_ack1, zren_ack : std_logic;
 		z0, z1, z : std_logic;
-		async_state : pull_async_state_type;
 	end record;
 
 	type mm_type is record
@@ -183,9 +183,9 @@ architecture rtl of ecc_fp is
 		busy : std_logic;
 		rd : std_logic;
 		rdcnt : unsigned(log2(2*w - 1) - 1 downto 0);
-		-- for shstart & shend 2 bits pruned by synthesizer if shuffle is FALSE
-		shstart : std_logic_vector(sramlatp2 + 3 downto 0);
-		shend : std_logic_vector(sramlatp2 + 2 downto 0);
+		-- for shstart & shend some bits pruned by synthesizer depending on shuffle
+		shstart : std_logic_vector(readlat + 1 downto 0);
+		shend : std_logic_vector(readlat + 2 downto 0);
 		wr : std_logic;
 		wrcnt : unsigned(log2(w - 1) - 1 downto 0);
 		act : std_logic;
@@ -206,9 +206,9 @@ architecture rtl of ecc_fp is
 		busy : std_logic;
 		rd : std_logic;
 		rdcnt : unsigned(log2(2*w - 1) - 1 downto 0);
-		-- for shstart & shend 2 bits pruned by synthesizer if shuffle is FALSE
-		shstart : std_logic_vector(sramlatp2 + 1 downto 0);
-		shend : std_logic_vector(sramlatp2 + 2 downto 0);
+		-- for shstart & shend some bits pruned by synthesizer depending on shuffle
+		shstart : std_logic_vector(readlat + 1 downto 0);
+		shend : std_logic_vector(readlat + 2 downto 0);
 		wr : std_logic;
 		wrcnt : unsigned(log2(w - 1) - 1 downto 0);
 		op0 : std_logic_vector(ww - 1 downto 0);
@@ -222,9 +222,9 @@ architecture rtl of ecc_fp is
 		busy : std_logic;
 		rd : std_logic;
 		rdcnt : unsigned(log2(w - 1) - 1 downto 0);
-		-- for shstart & shend 2 bits pruned by synthesizer if shuffle is FALSE
-		shstart : std_logic_vector(sramlatp2 + 2 downto 0);
-		shend : std_logic_vector(sramlatp2 + 3 downto 0);
+		-- for shstart & shend some bits pruned by synthesizer depending on shuffle
+		shstart : std_logic_vector(readlat + 2 downto 0);
+		shend : std_logic_vector(readlat + 3 downto 0);
 		wr : std_logic;
 		wrcnt : unsigned(log2(w - 1) - 1 downto 0);
 		act : std_logic;
@@ -244,8 +244,8 @@ architecture rtl of ecc_fp is
 		par : std_logic;
 		kap : std_logic;
 		kapp : std_logic;
-		-- for 'sh' only 4 bits kept by synthesizer if shuffle is FALSE
-		sh : std_logic_vector(sramlatp2 + 1 downto 0);
+		-- for 'sh' some bits pruned by synthesizer depending on shuffle
+		sh : std_logic_vector(readlat + 1 downto 0);
 	end record;
 
 	-- for rnd operation (NNRND-like instructions)
@@ -295,9 +295,9 @@ architecture rtl of ecc_fp is
 		waddr : std_logic_vector(FP_ADDR - 1 downto 0);
 		wdata : std_logic_vector(ww - 1 downto 0);
 		waddrmuxsel : std_logic_vector(2 downto 0);
-		-- for 'wecnt' only 3 bits used (but 4 kept by synthesizer) if shuffle
+		-- for 'wecnt' some bits pruned by synthesizer depending on shuffle
 		-- is FALSE (not a big deal)
-		wecnt : unsigned(log2(sramlatp2 + 4) - 1 downto 0); -- independent of nn
+		wecnt : unsigned(log2(readlat + 4) - 1 downto 0); -- independent of nn
 		wecnten : std_logic;
 	end record;
 
@@ -340,7 +340,7 @@ architecture rtl of ecc_fp is
 		-- addition & subtraction
 		addsub : addsub_type;
 		-- bitwise xor
-		xxor : xor_type;
+		xxor : xor_type; -- xor is a VHDL reserved word, using xxor instead
 		-- bit-shift (left & right)
 		shift : shift_type;
 		-- parity test
@@ -402,120 +402,119 @@ architecture rtl of ecc_fp is
 		-- the reason for the string' attribute appearing several times below
 		-- (without it simulators won't know how to differentiate between
 		-- string or bit_vector for the 2nd parameter and will issue an error)
-		case v_pca is
-			when ECC_IRAM_CONSTMTY0_ADDR =>
-				write(lineo, string'(".constMTY0L [0x"));
-				hex_write(lineo, pca);
-				write(lineo, string'("]"));
-				newprg := TRUE;
-			when ECC_IRAM_CONSTMTY1_ADDR =>
-				write(lineo, string'(".constMTY1L [0x"));
-				hex_write(lineo, pca);
-				write(lineo, string'("]"));
-				newprg := TRUE;
-			when ECC_IRAM_CONSTMTY2_ADDR =>
-				write(lineo, string'(".constMTY2L [0x"));
-				hex_write(lineo, pca);
-				write(lineo, string'("]"));
-				newprg := TRUE;
-			when ECC_IRAM_AMONTY_ADDR =>
-				write(lineo, string'(".aMontyL [0x"));
-				hex_write(lineo, pca);
-				write(lineo, string'("]"));
-				newprg := TRUE;
-			when ECC_IRAM_CHKCURVE_ADDR =>
-				write(lineo, string'(".chkcurveL [0x"));
-				hex_write(lineo, pca);
-				write(lineo, string'("]"));
-				newprg := TRUE;
-			when ECC_IRAM_BLINDSTART_ADDR =>
-				write(lineo, string'(".blindstartL [0x"));
-				hex_write(lineo, pca);
-				write(lineo, string'("]"));
-				newprg := TRUE;
-			when ECC_IRAM_BLNBIT_ADDR =>
-				write(lineo, string'(".blnbitL [0x"));
-				hex_write(lineo, pca);
-				write(lineo, string'("]"));
-				newprg := TRUE;
-			when ECC_IRAM_BLINDSTOP_ADDR =>
-				write(lineo, string'(".blindstopL [0x"));
-				hex_write(lineo, pca);
-				write(lineo, string'("]"));
-				newprg := TRUE;
-			when ECC_IRAM_ADPA_ADDR =>
-				write(lineo, string'(".adpaL [0x"));
-				hex_write(lineo, pca);
-				write(lineo, string'("]"));
-				newprg := TRUE;
-			when ECC_IRAM_SETUP0_ADDR =>
-				write(lineo, string'(".setup0L [0x"));
-				hex_write(lineo, pca);
-				write(lineo, string'("]"));
-				newprg := TRUE;
-			when ECC_IRAM_SETUP1_ADDR =>
-				write(lineo, string'(".setup1L [0x"));
-				hex_write(lineo, pca);
-				write(lineo, string'("]"));
-				newprg := TRUE;
-			when ECC_IRAM_ITOH_ADDR =>
-				write(lineo, string'(".itohL [0x"));
-				hex_write(lineo, pca);
-				write(lineo, string'("]"));
-				newprg := TRUE;
-			when ECC_IRAM_PRE_ZADDU_ADDR =>
-				write(lineo, string'(".pre_zadduL [0x"));
-				hex_write(lineo, pca);
-				write(lineo, string'("]"));
-				newprg := TRUE;
-			when ECC_IRAM_ZADDU_ADDR =>
-				write(lineo, string'(".zadduL [0x"));
-				hex_write(lineo, pca);
-				write(lineo, string'("]"));
-				newprg := TRUE;
-			when ECC_IRAM_PRE_ZADDC_ADDR =>
-				write(lineo, string'(".pre_zaddcL [0x"));
-				hex_write(lineo, pca);
-				write(lineo, string'("]"));
-				newprg := TRUE;
-			when ECC_IRAM_ZADDC_ADDR =>
-				write(lineo, string'(".zaddcL [0x"));
-				hex_write(lineo, pca);
-				write(lineo, string'("]"));
-				newprg := TRUE;
-			when ECC_IRAM_SUBTRACTP_ADDR =>
-				write(lineo, string'(".subtractpL [0x"));
-				hex_write(lineo, pca);
-				write(lineo, string'("]"));
-				newprg := TRUE;
-			when ECC_IRAM_EXIT_ADDR =>
-				write(lineo, string'(".exitL [0x"));
-				hex_write(lineo, pca);
-				write(lineo, string'("]"));
-				newprg := TRUE;
-			when ECC_IRAM_ZDBL_ADDR =>
-				write(lineo, string'(".zdblL [0x"));
-				hex_write(lineo, pca);
-				write(lineo, string'("]"));
-				newprg := TRUE;
-			when ECC_IRAM_ZNEGC_ADDR =>
-				write(lineo, string'(".znegcL [0x"));
-				hex_write(lineo, pca);
-				write(lineo, string'("]"));
-				newprg := TRUE;
-			when ECC_IRAM_ADDITION_BEGIN_ADDR =>
-				write(lineo, string'(".addition_beginL [0x"));
-				hex_write(lineo, pca);
-				write(lineo, string'("]"));
-				newprg := TRUE;
-			when ECC_IRAM_ADDITION_END_ADDR =>
-				write(lineo, string'(".addition_endL [0x"));
-				hex_write(lineo, pca);
-				write(lineo, string'("]"));
-				newprg := TRUE;
-			when others =>
-				newprg := FALSE;
-		end case;
+		if v_pca = ECC_IRAM_CONSTMTY0_ADDR then
+			write(lineo, string'(".constMTY0L [0x"));
+			hex_write(lineo, pca);
+			write(lineo, string'("]"));
+			newprg := TRUE;
+		elsif v_pca = ECC_IRAM_CONSTMTY1_ADDR then
+			write(lineo, string'(".constMTY1L [0x"));
+			hex_write(lineo, pca);
+			write(lineo, string'("]"));
+			newprg := TRUE;
+		elsif v_pca = ECC_IRAM_CONSTMTY2_ADDR then
+			write(lineo, string'(".constMTY2L [0x"));
+			hex_write(lineo, pca);
+			write(lineo, string'("]"));
+			newprg := TRUE;
+		elsif v_pca = ECC_IRAM_AMONTY_ADDR then
+			write(lineo, string'(".aMontyL [0x"));
+			hex_write(lineo, pca);
+			write(lineo, string'("]"));
+			newprg := TRUE;
+		elsif v_pca = ECC_IRAM_CHKCURVE_ADDR then
+			write(lineo, string'(".chkcurveL [0x"));
+			hex_write(lineo, pca);
+			write(lineo, string'("]"));
+			newprg := TRUE;
+		elsif v_pca = ECC_IRAM_BLINDSTART_ADDR then
+			write(lineo, string'(".blindstartL [0x"));
+			hex_write(lineo, pca);
+			write(lineo, string'("]"));
+			newprg := TRUE;
+		elsif v_pca = ECC_IRAM_BLNBIT_ADDR then
+			write(lineo, string'(".blnbitL [0x"));
+			hex_write(lineo, pca);
+			write(lineo, string'("]"));
+			newprg := TRUE;
+		elsif v_pca = ECC_IRAM_BLINDSTOP_ADDR then
+			write(lineo, string'(".blindstopL [0x"));
+			hex_write(lineo, pca);
+			write(lineo, string'("]"));
+			newprg := TRUE;
+		elsif v_pca = ECC_IRAM_ADPA_ADDR then
+			write(lineo, string'(".adpaL [0x"));
+			hex_write(lineo, pca);
+			write(lineo, string'("]"));
+			newprg := TRUE;
+		elsif v_pca = ECC_IRAM_SETUP0_ADDR then
+			write(lineo, string'(".setup0L [0x"));
+			hex_write(lineo, pca);
+			write(lineo, string'("]"));
+			newprg := TRUE;
+		elsif v_pca = ECC_IRAM_SETUP1_ADDR then
+			write(lineo, string'(".setup1L [0x"));
+			hex_write(lineo, pca);
+			write(lineo, string'("]"));
+			newprg := TRUE;
+		elsif v_pca = ECC_IRAM_ITOH_ADDR then
+			write(lineo, string'(".itohL [0x"));
+			hex_write(lineo, pca);
+			write(lineo, string'("]"));
+			newprg := TRUE;
+		elsif v_pca = ECC_IRAM_PRE_ZADDU_ADDR then
+			write(lineo, string'(".pre_zadduL [0x"));
+			hex_write(lineo, pca);
+			write(lineo, string'("]"));
+			newprg := TRUE;
+		elsif v_pca = ECC_IRAM_ZADDU_ADDR then
+			write(lineo, string'(".zadduL [0x"));
+			hex_write(lineo, pca);
+			write(lineo, string'("]"));
+			newprg := TRUE;
+		elsif v_pca = ECC_IRAM_PRE_ZADDC_ADDR then
+			write(lineo, string'(".pre_zaddcL [0x"));
+			hex_write(lineo, pca);
+			write(lineo, string'("]"));
+			newprg := TRUE;
+		elsif v_pca = ECC_IRAM_ZADDC_ADDR then
+			write(lineo, string'(".zaddcL [0x"));
+			hex_write(lineo, pca);
+			write(lineo, string'("]"));
+			newprg := TRUE;
+		elsif v_pca = ECC_IRAM_SUBTRACTP_ADDR then
+			write(lineo, string'(".subtractpL [0x"));
+			hex_write(lineo, pca);
+			write(lineo, string'("]"));
+			newprg := TRUE;
+		elsif v_pca = ECC_IRAM_EXIT_ADDR then
+			write(lineo, string'(".exitL [0x"));
+			hex_write(lineo, pca);
+			write(lineo, string'("]"));
+			newprg := TRUE;
+		elsif v_pca = ECC_IRAM_ZDBL_ADDR then
+			write(lineo, string'(".zdblL [0x"));
+			hex_write(lineo, pca);
+			write(lineo, string'("]"));
+			newprg := TRUE;
+		elsif v_pca = ECC_IRAM_ZNEGC_ADDR then
+			write(lineo, string'(".znegcL [0x"));
+			hex_write(lineo, pca);
+			write(lineo, string'("]"));
+			newprg := TRUE;
+		elsif v_pca = ECC_IRAM_ADDITION_BEGIN_ADDR then
+			write(lineo, string'(".addition_beginL [0x"));
+			hex_write(lineo, pca);
+			write(lineo, string'("]"));
+			newprg := TRUE;
+		elsif v_pca = ECC_IRAM_ADDITION_END_ADDR then
+			write(lineo, string'(".addition_endL [0x"));
+			hex_write(lineo, pca);
+			write(lineo, string'("]"));
+			newprg := TRUE;
+		else
+			newprg := FALSE;
+		end if;
 	end procedure is_new_routine;
 
 	procedure log_coords(strcoord : string; coord : std_logic_vector;
@@ -535,16 +534,16 @@ architecture rtl of ecc_fp is
 		end if;
 	end procedure log_coords;
 
-	-- vtophys() is declared impure so that it can access signal fprwmask
-	impure function vtophys(vaddr : integer) return integer is
+	-- vtophys0() is declared impure so that it can access signal fprwmask
+	impure function vtophys0(vaddr : integer) return integer is
 		variable tmp : std_logic_vector(FP_ADDR - 1 downto 0);
 	begin
 		assert vaddr <= (2**(FP_ADDR)) - 1
-			report "call to function vtophys() w/ an out-of-RAM index"
+			report "call to function vtophys0() w/ an out-of-RAM index"
 				severity WARNING; -- only concerns simulation log
 		tmp := std_logic_vector(to_unsigned(vaddr, FP_ADDR));
 		return to_integer(unsigned(tmp xor fprwmask));
-	end function vtophys;
+	end function vtophys0;
 	-- pragma translate_on
 
 	signal redc_2nd_input_s : boolean := FALSE;
@@ -833,13 +832,8 @@ begin
 
 		-- shift-register for events involved at computation start
 		-- (s94) is bypassed by (s95)
-		if shuffle then -- statically resolved by synthesizer
-			v.mm.push.shstart(sramlatp2 + 1 downto 0) :=
-				'0' & r.mm.push.shstart(sramlatp2 + 1 downto 1); -- (s94)
-		else
-			v.mm.push.shstart(sramlat + 1 downto 0) :=
-				'0' & r.mm.push.shstart(sramlat + 1 downto 1); -- (s94)
-		end if;
+		v.mm.push.shstart(readlat + 1 downto 0) :=
+			'0' & r.mm.push.shstart(readlat + 1 downto 1); -- (s94)
 
 		-- read operand-words from ecc_fp_dram unit and feed them to the selected
 		-- multiplier - processing the result is handled asynchronously (see (s1)
@@ -892,11 +886,7 @@ begin
 				-- (i.e with no other operation being accepted coming from ecc_curve
 				-- before themselves are completely carried out)
 				v.mm.push.opc(r.mm.push.id0) := r.mm.push.opic; -- (s91)
-				if shuffle then -- statically resolved by synthesizer
-					v.mm.push.shstart(sramlatp2 + 1) := '1'; -- (s95) bypass of (s94)
-				else
-					v.mm.push.shstart(sramlat + 1) := '1'; -- (s95) bypass of (s94)
-				end if;
+				v.mm.push.shstart(readlat + 1) := '1'; -- (s95) bypass of (s94)
 				v.mm.push.rdcnt := nndyn_wm1;
 				v.mm.push.rd := '1';
 			else -- .oneavail etc
@@ -923,21 +913,11 @@ begin
 		end if; -- .do
 
 		-- (s96) is bypassed by (s97)
-		if shuffle then -- statically resolved by synthesizer
-			v.mm.push.shmid := -- (sramlatp2 + 1 downto 0) implied
-				'0' & r.mm.push.shmid(sramlatp2 + 1 downto 1); -- (s96)
-		else
-			v.mm.push.shmid(sramlat + 1 downto 0) :=
-				'0' & r.mm.push.shmid(sramlat + 1 downto 1); -- (s96)
-		end if;
+		v.mm.push.shmid := -- (readlat + 1 downto 0) implied
+			'0' & r.mm.push.shmid(readlat + 1 downto 1); -- (s96)
 
-		if shuffle then -- statically resolved by synthesizer
-			v.mm.push.gosh := -- (sramlatp2 + 1 downto 0) implied
-				'0' & r.mm.push.gosh(sramlatp2 + 1 downto 1);
-		else
-			v.mm.push.gosh(sramlat + 1 downto 0) :=
-				'0' & r.mm.push.gosh(sramlat + 1 downto 1);
-		end if;
+		v.mm.push.gosh := -- (readlat + 1 downto 0) implied
+			'0' & r.mm.push.gosh(readlat + 1 downto 1);
 
 		-- driving r.fpram.re
 		if r.mm.push.busy = '1' then
@@ -964,11 +944,7 @@ begin
 					v.mm.push.rdcnt := nndyn_wm1;
 					-- arm shmid shift-register so as to prepare the switch between
 					-- asserting xen and asserting yen to the Montgomery multiplier
-					if shuffle then -- statically resolved by synthesizer
-						v.mm.push.shmid(sramlatp2 + 1) := '1'; -- (s97) bypass of (s96)
-					else
-						v.mm.push.shmid(sramlat + 1) := '1'; -- (s97) bypass of (s96)
-					end if;
+					v.mm.push.shmid(readlat + 1) := '1'; -- (s97) bypass of (s96)
 					-- switch .raddrmuxsel so that now r.opb is used to drive ecc_fp_dram
 					-- read address (instead of r.opa)
 					-- (s35) has the effect that address will now be driven by r.opb,
@@ -976,11 +952,7 @@ begin
 					v.fpram.raddrmuxsel := "01"; -- (s35)
 				elsif r.mm.push.opaorb = '0' then
 					v.mm.push.rd := '0';
-					if shuffle then -- statically resolved by synthesizer
-						v.mm.push.gosh(sramlatp2 + 1) := '1';
-					else
-						v.mm.push.gosh(sramlat + 1) := '1';
-					end if;
+					v.mm.push.gosh(readlat + 1) := '1';
 				end if;
 			end if;
 		end if;
@@ -1010,17 +982,14 @@ begin
 		-- data-path feeding X & Y (input operands) to selected Montgomery
 		-- multiplier
 		-- (consists in driving signal r.mm.mmi(r.mm.push.id1).xy)
-		if shuffle then -- statically resolved by synthesizer
-			v.mm.push.xypushsh := -- (sramlatp2 - 1 downto 0) implied
-				r.fpram.re & r.mm.push.xypushsh(sramlatp2 - 1 downto 1);
-		else
-			if sramlat > 1 then -- statically resolved by synthesizer
-				v.mm.push.xypushsh(sramlat - 1 downto 0) :=
-					r.fpram.re & r.mm.push.xypushsh(sramlat - 1 downto 1);
-			elsif sramlat = 1 then
-				v.mm.push.xypushsh(0) := r.fpram.re;
-			end if;
+		if readlat > 1 then -- statically resolved by synthesizer
+			v.mm.push.xypushsh(readlat - 1 downto 0) :=
+				r.fpram.re & r.mm.push.xypushsh(readlat - 1 downto 1);
+		elsif readlat = 1 then
+			-- this is actually only possible if shuffle = FALSE and sramlat = 1
+			v.mm.push.xypushsh(0) := r.fpram.re;
 		end if;
+
 		if r.mm.push.xypushsh(0) = '1' and r.mm.push.busy = '1' then
 			v.mm.mmi(r.mm.push.id1).xy := fprdata; --r.fpram.fprdata;
 		end if;
@@ -1063,21 +1032,12 @@ begin
 
 		-- shift-register for events involved at computation start
 		-- (s70) is bypassed by (s71)
-		if shuffle then -- statically resolved by synthesizer
-			v.addsub.shstart(sramlatp2 + 1 downto 0) :=
-				'0' & r.addsub.shstart(sramlatp2 + 1 downto 1); -- (s70)
-		else
-			v.addsub.shstart(sramlat + 1 downto 0) :=
-				'0' & r.addsub.shstart(sramlat + 1 downto 1); -- (s70)
-		end if;
+		v.addsub.shstart(readlat + 1 downto 0) :=
+			'0' & r.addsub.shstart(readlat + 1 downto 1); -- (s70)
 
 		if r.addsub.do = '1' then -- an addition or subtraction op is pending
 			v.addsub.do := '0';
-			if shuffle then -- statically resolved by synthesizer
-				v.addsub.shstart(sramlatp2 + 1) := '1'; -- (s71) bypass of (s70)
-			else
-				v.addsub.shstart(sramlat + 1) := '1'; -- (s71) bypass of (s70)
-			end if;
+			v.addsub.shstart(readlat + 1) := '1'; -- (s71) bypass of (s70)
 			-- pragma translate_off
 			v.active := '1';
 			-- pragma translate_on
@@ -1085,20 +1045,13 @@ begin
 			v.fpram.raddrmuxsel := "00"; -- (s26) (see (s17))
 			v.fpram.waddrmuxsel := "000"; -- (s28) (see (s20))
 			v.addsub.zero := '1'; -- (s68) bypassed by (s69)
-			if shuffle then -- statically resolved by synthesizer
-				v.fpram.wecnt :=
-					to_unsigned(sramlatp2 + 4, log2(sramlatp2 + 4));
-			else
-				v.fpram.wecnt :=
-					to_unsigned(sramlat + 4, log2(sramlatp2 + 4));
-			end if;
+			v.fpram.wecnt :=
+				to_unsigned(readlat + 4, log2(readlat + 4));
 			v.fpram.wecnten := '1';
 		end if;
 
 		-- assertion of r.fpram.re (see (s41) for deassertion)
-		if (shuffle and r.addsub.shstart(sramlatp2 + 1) = '1')
-			or ((not shuffle) and r.addsub.shstart(sramlat + 1) = '1')
-		then
+		if r.addsub.shstart(readlat + 1) = '1' then
 			v.fpram.re := '1'; -- (s29) bypassed by (s41)
 			v.addsub.rdcnt := nndyn_2wm1;
 			v.addsub.rd := '1';
@@ -1106,13 +1059,8 @@ begin
 
 		-- shift-register for events involved at end of computation
 		-- (s72) is bypassed by (s73)
-		if shuffle then -- statically resolved by synthesizer
-			v.addsub.shend := -- (sramlatp2 + 2 downto 0) implied
-				 '0' & r.addsub.shend(sramlatp2 + 2 downto 1); -- (s72)
-		else
-			v.addsub.shend(sramlat + 2 downto 0) :=
-				'0' & r.addsub.shend(sramlat + 2 downto 1); -- (s72)
-		end if;
+		v.addsub.shend := -- (readlat + 2 downto 0) implied
+			 '0' & r.addsub.shend(readlat + 2 downto 1); -- (s72)
 
 		-- end of operands reading + arm shift-register controlling end of ops
 		if r.addsub.rd = '1' then
@@ -1120,11 +1068,7 @@ begin
 			if r.addsub.rdcnt = (r.addsub.rdcnt'range => '0') then
 				v.fpram.re := '0'; -- (s41) bypass of (s29)
 				v.addsub.rd := '0';
-				if shuffle then -- statically resolved by synthesizer
-					v.addsub.shend(sramlatp2 + 2) := '1'; -- (s73) bypass of (s72)
-				else
-					v.addsub.shend(sramlat + 2) := '1'; -- (s73) bypass of (s72)
-				end if;
+				v.addsub.shend(readlat + 2) := '1'; -- (s73) bypass of (s72)
 			end if;
 		end if;
 
@@ -1155,36 +1099,32 @@ begin
 		-- with boolean 'shuffle' (which encodes the presence of the ecc_fp_dram's
 		-- shuffling countermeasure)
 		if r.addsub.busy = '1' then
-			if shuffle then -- statically resolved by synthesizer
-				if sramlatp2 mod 2 = 0 then
+			if (not shuffle) or (shuffle and (shuffle_type = linear -- stat. resolved
+				or shuffle_type = permute_lgnb))
+			then
+				if readlat mod 2 = 0 then -- statically resolved by synthesizer
 					if r.fpram.raddrmuxsel = "01" then
 						v.addsub.op0 := fprdata;
 					else
 						v.addsub.op1 := fprdata;
 					end if;
-				else -- sramlatp2 mod 2 = 1
+				else -- readlat mod 2 = 1
 					if r.fpram.raddrmuxsel = "01" then
 						v.addsub.op1 := fprdata;
 					else
 						v.addsub.op0 := fprdata;
 					end if;
 				end if;
-			else
-				if sramlat mod 2 = 0 then
-					if r.fpram.raddrmuxsel = "01" then
-						v.addsub.op0 := fprdata;
-					else
-						v.addsub.op1 := fprdata;
-					end if;
-				else -- sramlat mod 2 = 1
-					if r.fpram.raddrmuxsel = "01" then
-						v.addsub.op1 := fprdata;
-					else
-						v.addsub.op0 := fprdata;
-					end if;
+			elsif (shuffle and shuffle_type = permute_limbs) then -- stat. resolved
+				-- in this case readlat = 2 x sramlat + 2 (see function set_readlat
+				-- in ecc_utils.vhd) therefore it is an even number
+				if r.fpram.raddrmuxsel = "01" then
+					v.addsub.op0 := fprdata;
+				else
+					v.addsub.op1 := fprdata;
 				end if;
 			end if;
-		end if;
+		end if; -- add/sub busy
 
 		-- assertion of r.addsub.act
 		if r.addsub.shstart(0) = '1' then
@@ -1200,44 +1140,10 @@ begin
 		--       r.addsub.busy -> r.addsub.res
 		--       r.addsub.busy -> r.addsub.carry
 		v.addsub.testz := '0';
-		if shuffle then -- statically resolved by synthesizer
-			if sramlatp2 mod 2 = 0 then
-				if r.addsub.act = '1'	and r.fpram.raddrmuxsel = "01" then
-					v_op0 := unsigned('0' & r.addsub.op0);
-					v_op1 := unsigned('0' & r.addsub.op1);
-					v_carry := to_unsigned(0, ww) & r.addsub.carry;
-					v_borrow := to_unsigned(0, ww) & r.addsub.borrow;
-					if r.ctrl.add = '1' then
-						v_addres := v_op0 + v_op1 + v_carry; -- (s87)
-						v.addsub.res := std_logic_vector(v_addres(ww - 1 downto 0));
-						v.addsub.carry := v_addres(ww); -- (s51) bypassed by (s52)
-					else --if r.ctrl.sub = '1' then
-						v_subres := v_op0 - v_op1 - v_borrow; -- (s88)
-						v.addsub.res := std_logic_vector(v_subres(ww - 1 downto 0));
-						v.addsub.borrow := v_subres(ww); -- (s89) bypassed by (s90)
-					end if;
-					v.addsub.testz := '1';
-				end if;
-			else -- sramlatp2 mod 2 = 1
-				if r.addsub.act = '1' and r.fpram.raddrmuxsel = "00" then
-					v_op0 := unsigned('0' & r.addsub.op0);
-					v_op1 := unsigned('0' & r.addsub.op1);
-					v_carry := to_unsigned(0, ww) & r.addsub.carry;
-					v_borrow := to_unsigned(0, ww) & r.addsub.borrow;
-					if r.ctrl.add = '1' then
-						v_addres := v_op0 + v_op1 + v_carry; -- (s87)
-						v.addsub.res := std_logic_vector(v_addres(ww - 1 downto 0));
-						v.addsub.carry := v_addres(ww); -- (s51) bypassed by (s52)
-					else --if r.ctrl.sub = '1' then
-						v_subres := v_op0 - v_op1 - v_borrow; -- (s88)
-						v.addsub.res := std_logic_vector(v_subres(ww - 1 downto 0));
-						v.addsub.borrow := v_subres(ww); -- (s89) bypassed by (s90)
-					end if;
-					v.addsub.testz := '1';
-				end if;
-			end if;
-		else -- not shuffle
-			if sramlat mod 2 = 0 then
+		if (not shuffle) or (shuffle and (shuffle_type = linear -- stat. resolved
+			or shuffle_type = permute_lgnb))
+		then
+			if readlat mod 2 = 0 then
 				if r.addsub.act = '1' and r.fpram.raddrmuxsel = "01" then
 					v_op0 := unsigned('0' & r.addsub.op0);
 					v_op1 := unsigned('0' & r.addsub.op1);
@@ -1254,7 +1160,7 @@ begin
 					end if;
 					v.addsub.testz := '1';
 				end if;
-			else -- sramlat mod 2 = 1
+			else -- readlat mod 2 = 1
 				if r.addsub.act = '1' and r.fpram.raddrmuxsel = "00" then
 					v_op0 := unsigned('0' & r.addsub.op0);
 					v_op1 := unsigned('0' & r.addsub.op1);
@@ -1272,7 +1178,26 @@ begin
 					v.addsub.testz := '1';
 				end if;
 			end if;
-		end if;
+		elsif (shuffle and shuffle_type = permute_limbs) then -- stat. resolved
+			-- in this case readlat = 2 x sramlat + 2 (see function set_readlat
+			-- in ecc_utils.vhd) therefore it is an even number
+			if r.addsub.act = '1' and r.fpram.raddrmuxsel = "01" then
+				v_op0 := unsigned('0' & r.addsub.op0);
+				v_op1 := unsigned('0' & r.addsub.op1);
+				v_carry := to_unsigned(0, ww) & r.addsub.carry;
+				v_borrow := to_unsigned(0, ww) & r.addsub.borrow;
+				if r.ctrl.add = '1' then
+					v_addres := v_op0 + v_op1 + v_carry; -- (s87)
+					v.addsub.res := std_logic_vector(v_addres(ww - 1 downto 0));
+					v.addsub.carry := v_addres(ww); -- (s51) bypassed by (s52)
+				else --if r.ctrl.sub = '1' then
+					v_subres := v_op0 - v_op1 - v_borrow; -- (s88)
+					v.addsub.res := std_logic_vector(v_subres(ww - 1 downto 0));
+					v.addsub.borrow := v_subres(ww); -- (s89) bypassed by (s90)
+				end if;
+				v.addsub.testz := '1';
+			end if;
+		end if; -- shuffle
 
 		-- deassertion of r.addsub.act
 		if r.addsub.shend(2) = '1' then
@@ -1303,7 +1228,7 @@ begin
 
 		-- pushing result back into ecc_fp_dram
 		if (r.ctrl.add = '1' or r.ctrl.sub = '1')
-		  and r.fpram.wecnten = '1' and r.fpram.wecnt = "0000"
+		  and r.fpram.wecnten = '1' and r.fpram.wecnt = (r.fpram.wecnt'range => '0')
 		then
 			v.fpram.we := '1';
 			v.addsub.weact := '1';
@@ -1427,54 +1352,33 @@ begin
 		-- are read from it)
 
 		-- shift-register for events involved at computation start
-		if shuffle then -- statically resolved by synthesizer
-			v.xxor.shstart := -- (sramlatp2 + 1 downto 0) implied
-				'0' & r.xxor.shstart(sramlatp2 + 1 downto 1);
-		else
-			v.xxor.shstart(sramlat + 1 downto 0) :=
-				'0' & r.xxor.shstart(sramlat + 1 downto 1);
-		end if;
+		v.xxor.shstart := -- (readlat + 1 downto 0) implied
+			'0' & r.xxor.shstart(readlat + 1 downto 1);
 
 		if r.xxor.do = '1' then -- a bitwise xor operation is pending
 			v.xxor.do := '0';
-			if shuffle then -- statically resolved by synthesizer
-				v.xxor.shstart(sramlatp2 + 1) := '1';
-			else
-				v.xxor.shstart(sramlat + 1) := '1';
-			end if;
+			v.xxor.shstart(readlat + 1) := '1';
 			-- pragma translate_off
 			v.active := '1';
 			-- pragma translate_on
 			v.xxor.busy := '1';
 			v.fpram.raddrmuxsel := "00"; -- (s44)
 			v.fpram.waddrmuxsel := "010"; -- (s45) (see (s20))
-			if shuffle then -- statically resolved by synthesizer
-				v.fpram.wecnt :=
-					to_unsigned(sramlatp2 + 4, log2(sramlatp2 + 4));
-			else
-				v.fpram.wecnt :=
-					to_unsigned(sramlat + 4, log2(sramlatp2 + 4));
-			end if;
+			v.fpram.wecnt :=
+				to_unsigned(readlat + 4, log2(readlat + 4));
 			v.fpram.wecnten := '1';
 		end if;
 
 		-- assertion of r.fpram.re
-		if (shuffle and r.xxor.shstart(sramlatp2 + 1) = '1')
-			or ((not shuffle) and r.xxor.shstart(sramlat + 1) = '1')
-		then
+		if r.xxor.shstart(readlat + 1) = '1' then
 			v.fpram.re := '1';
 			v.xxor.rdcnt := nndyn_2wm1;
 			v.xxor.rd := '1';
 		end if;
 
 		-- shift-register for events involved at computation end
-		if shuffle then -- statically resolved by synthesizer
-			v.xxor.shend := -- (sramlatp2 + 2 downto 0) implied
-				'0' & r.xxor.shend(sramlatp2 + 2 downto 1);
-		else
-			v.xxor.shend(sramlat + 2 downto 0) :=
-				'0' & r.xxor.shend(sramlat + 2 downto 1);
-		end if;
+		v.xxor.shend := -- (readlat + 2 downto 0) implied
+			'0' & r.xxor.shend(readlat + 2 downto 1);
 
 		-- end of operands reading + arm shift-register controlling end of ops
 		if r.xxor.rd = '1' then
@@ -1482,11 +1386,7 @@ begin
 			if r.xxor.rdcnt = (r.xxor.rdcnt'range => '0') then
 				v.fpram.re := '0';
 				v.xxor.rd := '0';
-				if shuffle then -- statically resolved by synthesizer
-					v.xxor.shend(sramlatp2 + 2) := '1';
-				else
-					v.xxor.shend(sramlat + 2) := '1';
-				end if;
+				v.xxor.shend(readlat + 2) := '1';
 			end if;
 		end if;
 
@@ -1518,68 +1418,65 @@ begin
 		-- with boolean 'shuffle' (which encodes the presence of the ecc_fp_dram's
 		-- shuffling countermeasure)
 		if r.xxor.busy = '1' then
-			if shuffle then -- statically resolved by synthesizer
-				if sramlatp2 mod 2 = 0 then
+			if (not shuffle) or (shuffle and (shuffle_type = linear -- stat. resolved
+				or shuffle_type = permute_lgnb))
+			then
+				if readlat mod 2 = 0 then
 					if r.fpram.raddrmuxsel = "01" then
 						v.xxor.op0 := fprdata;
 					else
 						v.xxor.op1 := fprdata;
 					end if;
-				else -- sramlatp2 mod 2 = 1
+				else -- readlat mod 2 = 1
 					if r.fpram.raddrmuxsel = "01" then
 						v.xxor.op1 := fprdata;
 					else
 						v.xxor.op0 := fprdata;
 					end if;
 				end if;
-			else -- not shuffle
-				if sramlat mod 2 = 0 then
-					if r.fpram.raddrmuxsel = "01" then
-						v.xxor.op0 := fprdata;
-					else
-						v.xxor.op1 := fprdata;
-					end if;
-				else -- sramlat mod 2 = 1
-					if r.fpram.raddrmuxsel = "01" then
-						v.xxor.op1 := fprdata;
-					else
-						v.xxor.op0 := fprdata;
-					end if;
+			elsif (shuffle and shuffle_type = permute_limbs) then -- stat. resolved
+				-- in this case readlat = 2 x sramlat + 2 (see function set_readlat
+				-- in ecc_utils.vhd) therefore it is an even number
+				if r.fpram.raddrmuxsel = "01" then
+					v.xxor.op0 := fprdata;
+				else
+					v.xxor.op1 := fprdata;
 				end if;
 			end if;
-		end if;
+		end if; -- xxor busy
 
 		-- actual bitwise xor
 		-- TODO: set multicycle (2 periods) on path r.xxor.op0/1 -> r.xxor.res
 		--                  and (6 periods) on path r.xxor.busy -> r.xxor.res
-		if shuffle then -- statically resolved by synthesizer
-			if sramlatp2 mod 2 = 0 then
+
+		if (not shuffle) or (shuffle and (shuffle_type = linear -- stat. resolved
+			or shuffle_type = permute_lgnb))
+		then
+			if readlat mod 2 = 0 then
 				if r.xxor.busy = '1' and r.fpram.raddrmuxsel = "01" then
 					v.xxor.res := r.xxor.op0 xor r.xxor.op1;
 				end if;
-			else -- sramlatp2 mod 2 = 1
+			else -- readlat mod 2 = 1
 				if r.xxor.busy = '1' and r.fpram.raddrmuxsel = "00" then
 					v.xxor.res := r.xxor.op0 xor r.xxor.op1;
 				end if;
 			end if;
-		else
-			if sramlat mod 2 = 0 then
-				if r.xxor.busy = '1' and r.fpram.raddrmuxsel = "01" then
-					v.xxor.res := r.xxor.op0 xor r.xxor.op1;
-				end if;
-			else -- sramlat mod 2 = 1
-				if r.xxor.busy = '1' and r.fpram.raddrmuxsel = "00" then
-					v.xxor.res := r.xxor.op0 xor r.xxor.op1;
-				end if;
+		elsif (shuffle and shuffle_type = permute_limbs) then -- stat. resolved
+			-- in this case readlat = 2 x sramlat + 2 (see function set_readlat
+			-- in ecc_utils.vhd) therefore it is an even number
+			if r.xxor.busy = '1' and r.fpram.raddrmuxsel = "01" then
+				v.xxor.res := r.xxor.op0 xor r.xxor.op1;
 			end if;
-		end if;
+		--elsif (shuffle and shuffle_type = permute_lgnb) then -- stat. resolved
+		--	-- TODO
+		end if; -- shuffle
 
 		-- Note that the latch of 'ww'-bit bitwise xor result into r.fpram.wdata
 		-- is described with MUX (s20) below
 
 		-- pushing result back into ecc_fp_dram
 		if r.ctrl.xxor = '1'
-			and r.fpram.wecnten = '1' and r.fpram.wecnt = "0000"
+			and r.fpram.wecnten = '1' and r.fpram.wecnt = (r.fpram.wecnt'range => '0')
 		then
 			v.fpram.we := '1';
 			v.xxor.weact := '1';
@@ -1636,13 +1533,8 @@ begin
 		-- are read from it)
 
 		-- shift-register for events involved at computation start
-		if shuffle then -- statically resolved by synthesizer
-			v.shift.shstart(sramlatp2 + 2 downto 0) :=
-				'0' & r.shift.shstart(sramlatp2 + 2 downto 1);
-		else
-			v.shift.shstart(sramlat + 2 downto 0) :=
-				'0' & r.shift.shstart(sramlat + 2 downto 1);
-		end if;
+		v.shift.shstart(readlat + 2 downto 0) :=
+			'0' & r.shift.shstart(readlat + 2 downto 1);
 
 		if r.shift.do = '1' then -- a bitshift operation is pending
 			v.shift.do := '0';
@@ -1650,21 +1542,12 @@ begin
 			v.active := '1';
 			-- pragma translate_on
 			v.shift.busy := '1';
-			if shuffle then -- statically resolved by synthesizer
-				v.shift.shstart(sramlatp2 + 2) := '1';
-			else
-				v.shift.shstart(sramlat + 2) := '1';
-			end if;
+			v.shift.shstart(readlat + 2) := '1';
 			v.fpram.raddrmuxsel := "00"; -- (s16) (see (s17))
 			v.fpram.waddrmuxsel := "011"; -- (s56) (see (s20))
 			v.shift.zero := '1';
-			if shuffle then -- statically resolved by synthesizer
-				v.fpram.wecnt :=
-					to_unsigned(sramlatp2 + 3, log2(sramlatp2 + 4));
-			else
-				v.fpram.wecnt :=
-					to_unsigned(sramlat + 3, log2(sramlatp2 + 4));
-			end if;
+			v.fpram.wecnt :=
+				to_unsigned(readlat + 3, log2(readlat + 4));
 			v.fpram.wecnten := '1';
 			-- support of NNSRLs & NNSRLf instructions: we assert the shift-enable
 			-- of the appropriate shift-register for just one cycle, see (s111).
@@ -1688,9 +1571,7 @@ begin
 		end if;
 
 		-- assertion of r.fpram.re
-		if (shuffle and r.shift.shstart(sramlatp2 + 2) = '1')
-			or ((not shuffle) and r.shift.shstart(sramlat + 2) = '1')
-		then
+		if r.shift.shstart(readlat + 2) = '1' then
 			v.fpram.re := '1';
 			-- we need to read exactly w ww-bit terms from ecc_fp_dram
 			v.shift.rdcnt := nndyn_wm1;
@@ -1698,13 +1579,8 @@ begin
 		end if;
 
 		-- shift-register for events involved at computation end
-		if shuffle then -- statically resolved by synthesizer
-			v.shift.shend :=
-				'0' & r.shift.shend(sramlatp2 + 3 downto 1);
-		else
-			v.shift.shend(sramlat + 3 downto 0) :=
-				'0' & r.shift.shend(sramlat + 3 downto 1);
-		end if;
+		v.shift.shend :=
+			'0' & r.shift.shend(readlat + 3 downto 1);
 
 		-- end of operands reading + arm shift-register controlling end of ops
 		if r.shift.rd = '1' then
@@ -1712,11 +1588,7 @@ begin
 			if r.shift.rdcnt = (r.shift.rdcnt'range => '0') then
 				v.fpram.re := '0';
 				v.shift.rd := '0';
-				if shuffle then -- statically resolved by synthesizer
-					v.shift.shend(sramlatp2 + 3) := '1';
-				else
-					v.shift.shend(sramlat + 3) := '1';
-				end if;
+				v.shift.shend(readlat + 3) := '1';
 			end if;
 		end if;
 
@@ -1787,7 +1659,7 @@ begin
 
 		-- pushing result back into ecc_fp_dram
 		if r.shift.busy = '1'
-		  and r.fpram.wecnten = '1' and r.fpram.wecnt = "0000"
+		  and r.fpram.wecnten = '1' and r.fpram.wecnt = (r.fpram.wecnt'range => '0')
 		then
 			v.fpram.we := '1';
 			v.shift.wr := '1';
@@ -2079,11 +1951,7 @@ begin
 		-- (i.e the result is given back to ecc_curve before a new
 		-- operation is accepted from it)
 
-		if shuffle then -- statically resolved by synthesizer
-			v.par.sh(sramlatp2 + 1 downto 0) := '0' & r.par.sh(sramlatp2 + 1 downto 1);
-		else
-			v.par.sh(sramlat + 1 downto 0) := '0' & r.par.sh(sramlat + 1 downto 1);
-		end if;
+		v.par.sh(readlat + 1 downto 0) := '0' & r.par.sh(readlat + 1 downto 1);
 
 		if r.par.do = '1' then -- a parity-test operation is pending
 			v.par.do := '0';
@@ -2092,19 +1960,12 @@ begin
 			-- pragma translate_on
 			v.par.busy := '1';
 			v.fpram.raddrmuxsel := "00"; -- (s74) see (s17)
-			if shuffle then -- statically resolved by synthesizer
-				v.par.sh(sramlatp2 + 1) := '1';
-			else
-				v.par.sh(sramlat + 1) := '1';
-			end if;
+			v.par.sh(readlat + 1) := '1';
 		end if;
 
-		if (shuffle and r.par.sh(sramlatp2 + 1) = '1')
-			or (not shuffle and r.par.sh(sramlat + 1) = '1')
-		then
+		if r.par.sh(readlat + 1) = '1' then
 			v.fpram.re := '1';
-		elsif (shuffle and r.par.sh(sramlatp2) = '1')
-		        or (not shuffle and r.par.sh(sramlat) = '1') then
+		elsif r.par.sh(readlat) = '1' then
 			v.fpram.re := '0';
 		elsif r.par.sh(0) = '1' then
 			v.par.par := fprdata(0); -- (s75) drives output 'opresultpar' (see (s76))
@@ -2285,7 +2146,7 @@ begin
 		-- decount cycles before asserting WE to ecc_fp_dram
 		if r.fpram.wecnten = '1' then
 			v.fpram.wecnt := r.fpram.wecnt - 1;
-			if r.fpram.wecnt = "0000" then
+			if r.fpram.wecnt = (r.fpram.wecnt'range => '0') then
 				v.fpram.wecnten := '0';
 			end if;
 		end if;
@@ -3164,18 +3025,46 @@ begin
 						v_addr_yr1 := LARGE_NB_YR1_ADDR;
 					end if;
 					if shuffle then
-						for i in 0 to vw-1 loop
-							x0(ww*(i+1) - 1 downto ww*i) := fpdram(
-								vtophys((v_addr_xr0*n) + i));
-							y0(ww*(i+1) - 1 downto ww*i) := fpdram(
-								vtophys((v_addr_yr0*n) + i));
-							x1(ww*(i+1) - 1 downto ww*i) := fpdram(
-								vtophys((v_addr_xr1*n) + i));
-							y1(ww*(i+1) - 1 downto ww*i) := fpdram(
-								vtophys((v_addr_yr1*n) + i));
-							z(ww*(i+1) - 1 downto ww*i) := fpdram(
-								vtophys((LARGE_NB_ZR01_ADDR*n) + i));
-						end loop;
+						if shuffle_type = linear then
+							for i in 0 to vw-1 loop
+								x0(ww*(i+1) - 1 downto ww*i) := fpdram(
+									vtophys0((v_addr_xr0*n) + i));
+								y0(ww*(i+1) - 1 downto ww*i) := fpdram(
+									vtophys0((v_addr_yr0*n) + i));
+								x1(ww*(i+1) - 1 downto ww*i) := fpdram(
+									vtophys0((v_addr_xr1*n) + i));
+								y1(ww*(i+1) - 1 downto ww*i) := fpdram(
+									vtophys0((v_addr_yr1*n) + i));
+								z(ww*(i+1) - 1 downto ww*i) := fpdram(
+									vtophys0((LARGE_NB_ZR01_ADDR*n) + i));
+							end loop;
+						elsif shuffle_type = permute_limbs then
+							for i in 0 to vw-1 loop
+								x0(ww*(i+1) - 1 downto ww*i) := fpdram(to_integer(unsigned(
+									vtophys((v_addr_xr0*n) + i))));
+								y0(ww*(i+1) - 1 downto ww*i) := fpdram(to_integer(unsigned(
+									vtophys((v_addr_yr0*n) + i))));
+								x1(ww*(i+1) - 1 downto ww*i) := fpdram(to_integer(unsigned(
+									vtophys((v_addr_xr1*n) + i))));
+								y1(ww*(i+1) - 1 downto ww*i) := fpdram(to_integer(unsigned(
+									vtophys((v_addr_yr1*n) + i))));
+								z(ww*(i+1) - 1 downto ww*i) := fpdram(to_integer(unsigned(
+									vtophys((LARGE_NB_ZR01_ADDR*n) + i))));
+							end loop;
+						elsif shuffle_type = permute_lgnb then
+							for i in 0 to vw-1 loop
+								x0(ww*(i+1) - 1 downto ww*i) := fpdram((to_integer(unsigned(
+									vtophys(v_addr_xr0))) * n) + i);
+								y0(ww*(i+1) - 1 downto ww*i) := fpdram((to_integer(unsigned(
+									vtophys(v_addr_yr0))) * n) + i);
+								x1(ww*(i+1) - 1 downto ww*i) := fpdram((to_integer(unsigned(
+									vtophys(v_addr_xr1))) * n) + i);
+								y1(ww*(i+1) - 1 downto ww*i) := fpdram((to_integer(unsigned(
+									vtophys(v_addr_yr1))) * n) + i);
+								z(ww*(i+1) - 1 downto ww*i) := fpdram((to_integer(unsigned(
+									vtophys(LARGE_NB_ZR01_ADDR))) * n) + i);
+							end loop;
+						end if;
 					else
 						for i in 0 to vw-1 loop
 							x0(ww*(i+1) - 1 downto ww*i) := fpdram((v_addr_xr0*n) + i);
@@ -3302,12 +3191,28 @@ begin
 				xkp := (others => '0');
 				ykp := (others => '0');
 				if shuffle then
-					for i in 0 to to_integer(nndyn_w) - 1 loop
-						xkp(ww*(i+1) - 1 downto ww*i) := fpdram(
-							vtophys((LARGE_NB_XR1_ADDR*n)+i));
-						ykp(ww*(i+1) - 1 downto ww*i) := fpdram(
-							vtophys((LARGE_NB_YR1_ADDR*n)+i));
-					end loop;
+					if shuffle_type = linear then
+						for i in 0 to to_integer(nndyn_w) - 1 loop
+							xkp(ww*(i+1) - 1 downto ww*i) := fpdram(
+								vtophys0((LARGE_NB_XR1_ADDR * n) + i));
+							ykp(ww*(i+1) - 1 downto ww*i) := fpdram(
+								vtophys0((LARGE_NB_YR1_ADDR * n) + i));
+						end loop;
+					elsif shuffle_type = permute_limbs then
+						for i in 0 to to_integer(nndyn_w) - 1 loop
+							xkp(ww*(i+1) - 1 downto ww*i) := fpdram(to_integer(unsigned(
+								vtophys((LARGE_NB_XR1_ADDR*n)+i))));
+							ykp(ww*(i+1) - 1 downto ww*i) := fpdram(to_integer(unsigned(
+								vtophys((LARGE_NB_YR1_ADDR*n)+i))));
+						end loop;
+					elsif shuffle_type = permute_lgnb then
+						for i in 0 to to_integer(nndyn_w) - 1 loop
+							xkp(ww*(i+1) - 1 downto ww*i) := fpdram((to_integer(unsigned(
+								vtophys(LARGE_NB_XR1_ADDR))) * n) + i);
+							ykp(ww*(i+1) - 1 downto ww*i) := fpdram((to_integer(unsigned(
+								vtophys(LARGE_NB_YR1_ADDR))) * n) + i);
+						end loop;
+					end if;
 				else
 					for i in 0 to to_integer(nndyn_w) - 1 loop
 						xkp(ww*(i+1) - 1 downto ww*i) := fpdram(

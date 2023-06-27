@@ -82,10 +82,12 @@ package ecc_pkg is
 	-- FP_ADDR_MSB
 	--
 	-- this is the number of bits required to encode the address of one of the
-	-- large numbers in ecc_fp_dram (in qty nblargenb). This parameter obviously
-	-- has an effect on the size of opcode words in ecc_curve_iram, that's why
-	-- modifying parameter nblargenb in ecc_customize.vhd should be made with
-	-- caution
+	-- large numbers in ecc_fp_dram (which are in qty nblargenb). Parameter
+	-- FP_ADDR_MSB obviously has an effect on the size of opcode words in
+	-- ecc_curve_iram, that's why modifying parameter nblargenb in
+	-- ecc_customize.vhd should be made with caution (increasing nblargenb
+	-- would increase FP_ADDR_MSB which in turn may have the opcode size
+	-- exceed the current nominal size of 32 bit)
 	constant FP_ADDR_MSB : positive := log2(nblargenb - 1);
 
 	-- FP_ADDR_LSB
@@ -285,12 +287,11 @@ package ecc_pkg is
 			clk : in std_logic;
 			-- port A (W only)
 			addra : in std_logic_vector(log2(datadepth - 1) - 1 downto 0);
-			ena : in std_logic;
 			wea : in std_logic;
 			dia : in std_logic_vector(datawidth - 1 downto 0);
 			-- port B (R only)
 			addrb : in std_logic_vector(log2(datadepth - 1) - 1 downto 0);
-			enb : in std_logic;
+			reb : in std_logic;
 			dob : out std_logic_vector(datawidth - 1 downto 0)
 		);
 	end component;
@@ -306,13 +307,12 @@ package ecc_pkg is
 			-- port A (W only)
 			clka : in std_logic;
 			addra : in std_logic_vector(log2(datadepth - 1) - 1 downto 0);
-			ena : in std_logic;
 			wea : in std_logic;
 			dia : in std_logic_vector(datawidth - 1 downto 0);
 			-- port B (R only)
 			clkb : in std_logic;
 			addrb : in std_logic_vector(log2(datadepth - 1) - 1 downto 0);
-			enb : in std_logic;
+			reb : in std_logic;
 			dob : out std_logic_vector(datawidth - 1 downto 0)
 		);
 	end component;
@@ -370,6 +370,8 @@ package ecc_pkg is
 
 	function set_ndsp return positive;
 
+	function set_irn_width_sh return positive;
+
 	-- the following is used between ecc_axi & ecc_scalar to encode operations
 	-- and does not need to be known by software
 	--   point based operations encoding (used between ecc_axi & ecc_scalar)
@@ -396,43 +398,6 @@ package ecc_pkg is
 	-- TRNG specifics
 	-- ---------------------------------------------------------------------------
 
-	-- raw_ram_size
-	--
-	-- this is the size of TRNG memory in which all raw random bits are buffered
-	-- (this memory is only instanciated, and accessible for read, in debug mode,
-	-- to allow for statistical analysis of the physical TRNG).
-	constant raw_ram_size : natural := 32768; -- TODO: set something smarter
-
-	-- pp_irn_width
-	-- 
-	-- this is the bus size of data driven out by the TRNG post-processing
-	-- component, if any
-	constant pp_irn_width : positive := 32;
-
-	-- irn_fifo_size_axi
-	--
-	-- this is the size of TRNG internal random numbers served to AXI interface
-	-- (for on-the-fly masking of the scalar)
-	constant irn_fifo_size_axi : positive := 4 * 2 * n; -- ~256 bytes (nn=256)
-
-	-- irn_fifo_size_fp
-	--
-	-- this is the size of TRNG internal random numbers served to ecc_fp (Fp ALU)
-	-- (for implementation of the NNRND instruction)
-	constant irn_fifo_size_fp : positive := ge_pow_of_2(4 * 6 * n); -- ~768 bytes (nn=256)
-
-	-- irn_fifo_size_curve
-	--
-	-- this is the size of TRNG internal random numbers served to ecc_curve
-	-- (for implementation of the shuffling of [XY]R[01] coordinates)
-	constant irn_fifo_size_curve : positive := ge_pow_of_2(2 * nn * 32); -- 4 Kbytes (nn=256)
-
-	-- irn_fifo_size_sh
-	--
-	-- this is the size of TRNG internal random numbers served to ecc_fp_dram_sh
-	-- (for implementation of the large numbers memory shuffling)
-	constant irn_fifo_size_sh : positive := ge_pow_of_2(32768 / (2 * (5 + log2(n) - 1)));
-
 	-- ---------------------------------------------------------------------------
 	-- AXI interface
 	-- ---------------------------------------------------------------------------
@@ -457,11 +422,11 @@ package ecc_pkg is
 	--       or as a 64-bit AXI interface (this is the case when axi32or64
 	--       = 64 in ecc_customize.vhd)
 
-	-- a little ASCII art to illustrate how the IP decodes the AXI address
-	-- bus (either read or write) to determine which register is accessed
-	-- during an AXI transaction made by any AXI initiator (typically the
-	-- CPU if the transaction was initiated as the result of an instruction
-	-- of the software driver):
+	-- Below is a little ASCII art to illustrate how the IP decodes the AXI
+	-- address bus (either read or write) to determine which register is
+	-- accessed during an AXI transaction made by any AXI initiator (typical-
+	-- ly the CPU if the transaction was initiated as the result of an ins-
+	-- truction of the software driver):
 	--
 	--                                         AXIAW = 9 bits
 	--                                               ^
@@ -511,213 +476,12 @@ package ecc_pkg is
 
 	subtype rat is std_logic_vector(ADB - 1 downto 0);
 
-	-- Software can rely on the following definitions for proper interaction
-	-- with the IP, with addresses below to be considered as offset from
-	-- the base address allocated to the IP in the whole AXI address system.
-	-- -----------------------------------------------
-	-- addresses of all AXI-accessible write registers
-	-- -----------------------------------------------
-	constant W_CTRL : rat := std_nat(0, ADB);               -- 0x000
-	constant W_WRITE_DATA : rat := std_nat(1, ADB);         -- 0x008
-	constant W_R0_NULL : rat := std_nat(2, ADB);            -- 0x010
-	constant W_R1_NULL : rat := std_nat(3, ADB);            -- 0x018
-	constant W_PRIME_SIZE : rat := std_nat(4, ADB);         -- 0x020
-	constant W_BLINDING : rat := std_nat(5, ADB);           -- 0x028
-	constant W_IRQ : rat := std_nat(7, ADB);                -- 0x038
-	constant W_ERR_ACK : rat := std_nat(8, ADB);            -- 0x040
-	constant W_SMALL_SCALAR : rat := std_nat(9, ADB);       -- 0x048
-	constant W_SOFT_RESET : rat := std_nat(10, ADB);        -- 0x050
-	-- reserved                                             -- 0x058...0x0f8
-	-- (0x100: start of write DEBUG registers)
-	constant W_DBG_HALT : rat := std_nat(32, ADB);          -- 0x100
-	constant W_DBG_BKPT : rat := std_nat(33, ADB);          -- 0x108
-	constant W_DBG_STEPS : rat := std_nat(34, ADB);         -- 0x110
-	constant W_DBG_TRIG_ACT : rat := std_nat(35, ADB);      -- 0x118
-	constant W_DBG_TRIG_UP : rat := std_nat(36, ADB);       -- 0x120
-	constant W_DBG_TRIG_DOWN : rat := std_nat(37, ADB);     -- 0x128
-	constant W_DBG_OP_ADDR : rat := std_nat(38, ADB);       -- 0x130
-	constant W_DBG_WR_OPCODE : rat := std_nat(39, ADB);     -- 0x138
-	constant W_DBG_TRNGCTR : rat := std_nat(40, ADB);       -- 0x140
-	constant W_DBG_TRNGCFG : rat := std_nat(41, ADB);       -- 0x148
-	constant W_DBG_FP_WADDR : rat := std_nat(42, ADB);      -- 0x150
-	constant W_DBG_FP_WDATA : rat := std_nat(43, ADB);      -- 0x158
-	constant W_DBG_FP_RADDR : rat := std_nat(44, ADB);      -- 0x160
-	constant W_DBG_CFG_NOXYSHUF : rat := std_nat(45, ADB);  -- 0x168
-	constant W_DBG_CFG_NOAXIMSK : rat := std_nat(46, ADB);  -- 0x170
-	constant W_DBG_CFG_NOMEMSHUF : rat := std_nat(47, ADB); -- 0x178
-	-- ----------------------------------------------
-	-- addresses of all AXI-accessible read registers
-	-- ----------------------------------------------
-	constant R_STATUS : rat := std_nat(0, ADB);              -- 0x000
-	constant R_READ_DATA : rat := std_nat(1, ADB);           -- 0x008
-	constant R_CAPABILITIES : rat := std_nat(2, ADB);        -- 0x010
-	constant R_PRIME_SIZE : rat := std_nat(3, ADB);          -- 0x018
-	constant R_HW_VERSION : rat := std_nat(4, ADB);          -- 0x020
-	-- reserved                                              -- 0x030...0x0f8
-	-- (0x100: start of read DEBUG registers)
-	constant R_DBG_CAPABILITIES_0 : rat := std_nat(32, ADB); -- 0x100
-	constant R_DBG_CAPABILITIES_1 : rat := std_nat(33, ADB); -- 0x108
-	constant R_DBG_CAPABILITIES_2 : rat := std_nat(34, ADB); -- 0x110
-	constant R_DBG_STATUS : rat := std_nat(35, ADB);         -- 0x118
-	constant R_DBG_TIME : rat := std_nat(36, ADB);           -- 0x120
-	constant R_DBG_RAWDUR : rat := std_nat(37, ADB);         -- 0x128
-	constant R_DBG_FLAGS : rat := std_nat(38, ADB);          -- 0x130
-	constant R_DBG_RD_OPCODE : rat := std_nat(39, ADB);      -- 0x138
-	constant R_DBG_TRNG_STATUS : rat := std_nat(40, ADB);    -- 0x140
-	constant R_DBG_TRNG_DATA : rat := std_nat(41, ADB);      -- 0x148
-	constant R_DBG_FP_RDATA : rat := std_nat(42, ADB);       -- 0x150
-	constant R_DBG_IRN_CNT_AXI : rat := std_nat(43, ADB);    -- 0x158
-	constant R_DBG_IRN_CNT_EFP : rat := std_nat(44, ADB);    -- 0x160
-	constant R_DBG_IRN_CNT_CUR : rat := std_nat(45, ADB);    -- 0x168
-	constant R_DBG_IRN_CNT_SHF : rat := std_nat(46, ADB);    -- 0x170
-	constant R_DBG_FP_RDATA_RDY : rat := std_nat(47, ADB);   -- 0x178
-	constant R_DBG_EXP_FLAGS : rat := std_nat(48, ADB);      -- 0x180
-	constant R_DBG_DIAGNOSTICS : rat := std_nat(49, ADB);    -- 0x188
+	--subtype phys_addr is std_logic_vector(FP_ADDR - 1 downto 0);
 
-	-- bit positions in W_CTRL register
-	constant CTRL_KP : natural := 0;
-	constant CTRL_PT_ADD : natural := 1;
-	constant CTRL_PT_DBL : natural := 2;
-	constant CTRL_PT_CHK : natural := 3;
-	constant CTRL_PT_NEG : natural := 4;
-	constant CTRL_PT_EQU : natural := 5;
-	constant CTRL_PT_OPP : natural := 6;
-	-- bits 7-8 reserved
-	constant CTRL_FP_MUL : natural := 9;
-	-- bits 10-15 reserved
-	constant CTRL_WRITE_NB : natural := 16;
-	constant CTRL_READ_NB : natural := 17;
-	constant CTRL_WRITE_K : natural := 18;
-	-- bit 19 reserved
-	constant CTRL_NBADDR_LSB : natural := 20;
-	constant CTRL_NBADDR_SZ : natural := 12;
-	constant CTRL_NBADDR_MSB : natural := CTRL_NBADDR_LSB + CTRL_NBADDR_SZ - 1;
+	--type virt_to_phys_table_type is
+	--	array(integer range 0 to (2**FP_ADDR) - 1) of phys_addr;
 
-	-- bit positions in W_R0_NULL / W_R1_NULL registers
-	constant WR0_IS_NULL : natural := 0;
-	constant WR1_IS_NULL : natural := 0;
-
-	-- bit positions in W_DBG_CFG_NOXYSHUF register
-	constant XYSHF_DIS : natural := 0;
-
-	-- bit positions in W_DBG_CFG_NOAXIMSK register
-	constant AXIMSK_DIS : natural := 0;
-
-	-- bit positions in W_DBG_CFG_NOMEMSHUF register
-	constant MEMSHF_DIS : natural := 0;
-
-	-- bit positions in W_BLINDING register
-	constant BLD_EN : natural := 0;
-	constant BLD_BITS_LSB : natural := 4;
-	constant BLD_BITS_MSB : natural := BLD_BITS_LSB + log2(nn) - 1;
-
-	-- bit positions in W_IRQ register
-	constant IRQ_EN : natural := 0;
-
-	-- bit positions in W_PRIME_SIZE register
-	constant PMSZ_VALNN_LSB : natural := 0;
-	constant PMSZ_VALNN_SZ : natural := log2(nn);
-	constant PMSZ_VALNN_MSB : natural := PMSZ_VALNN_LSB + PMSZ_VALNN_SZ - 1;
-
-	-- bit positions in R_STATUS register (AXI interface w/ software)
-	constant STATUS_BUSY : natural := 0;
-	constant STATUS_KP : natural := 4;
-	constant STATUS_MTY : natural := 5;
-	constant STATUS_POP : natural := 6;
-	constant STATUS_AOP : natural := 7;
-	constant STATUS_R_OR_W : natural := 8;
-	constant STATUS_INIT : natural := 9;
-	constant STATUS_ENOUGH_RND : natural := 10;
-	constant STATUS_NNDYNACT : natural := 11;
-	constant STATUS_YES : natural := 13;
-	constant STATUS_R0_IS_NULL : natural := 14;
-	constant STATUS_R1_IS_NULL : natural := 15;
-	constant STATUS_ERR_LSB : natural := 16;
-	constant STATUS_ERR_COMP : natural := 16;
-	constant STATUS_ERR_WREG_FBD : natural := 17;
-	constant STATUS_ERR_KP_FBD : natural := 18;
-	constant STATUS_ERR_NNDYN : natural := 19;
-	constant STATUS_ERR_POP_FBD : natural := 20;
-	constant STATUS_ERR_RDNB_FBD : natural := 21;
-	constant STATUS_ERR_BLN : natural := 22;
-	constant STATUS_ERR_UNKNOWN_REG : natural := 23;
-	constant STATUS_ERR_IN_PT_NOT_ON_CURVE : natural := 24;
-	constant STATUS_ERR_OUT_PT_NOT_ON_CURVE : natural := 25;
-	constant STATUS_ERR_MSB : natural := 31;
-
-	-- bit positions in R_CAPABILITIES register
-	constant CAP_DBG_N_PROD : natural := 0;
-	constant CAP_SHF : natural := 4;
-	constant CAP_NNDYN : natural := 8;
-	constant CAP_W64 : natural := 9;
-	constant CAP_NNMAX_LSB : natural := 12;
-	constant CAP_NNMAX_MSB : natural := CAP_NNMAX_LSB + log2(nn) - 1;
-
-	-- bit positions in R_DBG_STATUS register
-	constant DBG_STATUS_HALTED : natural := 0;
-	constant DBG_STATUS_BKID_LSB : natural := 1;
-	constant DBG_STATUS_BKID_MSB : natural := 2;
-	constant DBG_STATUS_BK_HIT : natural := 3;
-	constant DBG_STATUS_PC_LSB : natural := 4;
-	constant DBG_STATUS_PC_MSB : natural := 15;
-	constant DBG_STATUS_NBIT_LSB : natural := 16;
-	constant DBG_STATUS_NBIT_MSB : natural := 27;
-	constant DBG_STATUS_STATE_LSB : natural := 28;
-	constant DBG_STATUS_STATE_MSB : natural := 31;
-
-	-- bit flags in R_DBG_FLAGS register
-	constant FLAGS_P_NOT_SET : natural := 0;
-	constant FLAGS_P_NOT_SET_MTY : natural := 1;
-	constant FLAGS_A_NOT_SET : natural := 2;
-	constant FLAGS_A_NOT_SET_MTY : natural := 3;
-	constant FLAGS_B_NOT_SET : natural := 4;
-	constant FLAGS_K_NOT_SET : natural := 5;
-	constant FLAGS_NNDYN_NOERR : natural := 6;
-	constant FLAGS_NOT_BLN_OR_Q_NOT_SET : natural := 7;
-
-	-- bit positions in W_DBG_TRNGCFG register
-	constant DBG_TRNG_VONM : natural := 0;
-	constant DBG_TRNG_COMPLETE_BYPASS : natural := 1;
-	constant DBG_TRNG_COMPLETE_BYPASS_BIT : natural := 2;
-	constant DBG_TRNG_TA_LSB : natural := 4;
-	constant DBG_TRNG_TA_MSB : natural := 23;
-	constant DBG_TRNG_IDLE_LSB : natural := 24;
-	constant DBG_TRNG_IDLE_MSB : natural := 27;
-
-	-- bit positions in W_DBG_TRNGCTR register
-	constant DBG_TRNG_RAW_RESET : natural := 0;
-	constant DBG_TRNG_IRN_RESET : natural := 1;
-	constant DBG_TRNG_RAW_READ : natural := 4;
-	constant DBG_TRNG_PP_DEACT : natural := 8;
-	constant DBG_TRNG_RAW_ADDR_LSB : natural := 12;
-	constant DBG_TRNG_RAW_ADDR_MSB : natural :=
-		DBG_TRNG_RAW_ADDR_LSB + log2(raw_ram_size - 1) - 1;
-
-	-- bit positions in W_DBG_HALT register
-	constant DBG_HALT : natural := 0;
-
-	-- bit positions in W_DBG_BKPT register
-	constant DBG_BKPT_EN : natural := 0;
-	constant DBG_BKPT_ID_LSB : natural := 1;
-	constant DBG_BKPT_ID_MSB : natural := 2;
-	constant DBG_BKPT_ADDR_LSB : natural := 4;
-	constant DBG_BKPT_ADDR_MSB : natural := 4 + IRAM_ADDR_SZ - 1;
-	constant DBG_BKPT_NBBIT_LSB : natural := 16;
-	constant DBG_BKPT_NBBIT_MSB : natural := 27;
-	constant DBG_BKPT_STATE_LSB : natural := 28;
-	constant DBG_BKPT_STATE_MSB : natural := 31;
-
-	-- bit positions in W_DBG_STEPS register
-	constant DBG_RESUME : natural := 28;
-	constant DBG_OPCODE_RUN : natural := 0;
-	constant DBG_OPCODE_NB_LSB : natural := 8;
-	constant DBG_OPCODE_NB_MSB : natural := 23;
-
-	-- bit positions in R_PRIME_SIZE
-	--   (same definitions as for W_PRIME_SIZE register, see above)
-
-	-- bit positions in R_DBG_FP_RDATA_RDY
-	constant DBG_FP_RDATA_IS_RDY : natural := 0;
+	function set_phys_addr_width return positive;
 
 end package ecc_pkg;
 
@@ -738,5 +502,36 @@ package body ecc_pkg is
 		end if;
 		return tmp;
 	end function set_ndsp;
+
+	function set_irn_width_sh return positive is
+		variable tmp : positive;
+	begin
+		-- shuffle_type is defined in package ecc_customize
+		if shuffle_type = linear or shuffle_type = permute_limbs then
+			tmp := FP_ADDR; -- defined in current package, see above
+		elsif shuffle_type = permute_lgnb then
+			tmp := log2(nblargenb - 1);
+		end if;
+		return tmp;
+	end function set_irn_width_sh;
+
+	function set_phys_addr_width return positive is
+		variable tmp : positive;
+	begin
+		if shuffle then
+			if shuffle_type = permute_limbs then
+				tmp := FP_ADDR;
+			elsif shuffle_type = permute_lgnb then
+				tmp := FP_ADDR_MSB;
+			else
+				-- not important in this case (we set an arbitrary value)
+				tmp := FP_ADDR;
+			end if;
+		else
+			-- not important in this case (we set an arbitrary value)
+			tmp := FP_ADDR;
+		end if;
+		return tmp;
+	end function set_phys_addr_width;
 
 end package body ecc_pkg;

@@ -21,7 +21,7 @@ use ieee.numeric_std.all;
 use work.ecc_pkg.all; -- for 'std_logic2'
 use work.ecc_customize.all; -- for 'nbtrng'
 use work.ecc_utils.all; -- for log2() & ge_pow_of_2()
---use work.ecc_trng_pkg.all;
+use work.ecc_trng_pkg.all;
 
 -- pragma translate_off
 use std.textio.all;

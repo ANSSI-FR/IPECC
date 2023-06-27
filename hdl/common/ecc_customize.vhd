@@ -18,29 +18,38 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
 package ecc_customize is
-
 	-- ----------------------------------
 	-- start of: user-editable parameters
 	-- ----------------------------------
-	--
-	-- A small doc on the following parameters is provided
-	-- at the end of the package description, in the same
-	-- order as they appear below
-	constant nn : positive := 528;
+	-- A small documentation on the following parameters is provided
+	-- at the end of the package description, in the same order as
+	-- they appear hereafter - please see below.
+	constant nn : positive := 256;
 	constant nn_dynamic : boolean := TRUE;
-	type techno_type is (spartan6, virtex6, series7, ialtera, asic);
-	constant techno : techno_type := series7; -- a 'techno_type' value
+	type techno_type is (spartan6, virtex6, series7, ultrascale, ialtera, asic);
+	constant techno : techno_type := ultrascale; -- choose one of 'techno_type' value
 	-- multwidth is only used if 'techno' = 'asic'
 	-- (otherwise its value has no meaning and can be ignored)
 	constant multwidth : positive := 32; -- 32 seems fair for an ASIC default
 	constant nbmult : positive range 1 to 2 := 2;
-	constant nbdsp : positive range 2 to positive'high := 4; -- must be >= 2
+	-- parameter nbdsp below is range-constrained because it must be >=2
+	constant nbdsp : positive range 2 to positive'high := 4;
 	constant sramlat : positive range 1 to 2 := 1;
 	constant async : boolean := TRUE;
-	constant shuffle : boolean := FALSE;
+	constant shuffle : boolean := TRUE;
+	type shuftype is (linear, permute_lgnb, permute_limbs);
+	-- shuffle_type below is used only when shuffle = TRUE
+	constant shuffle_type : shuftype := permute_lgnb; -- choose one of 'shuftype' value
 	constant notrng : boolean := TRUE; -- set to TRUE for simu, to FALSE for syn
 	constant nbtrng : positive := 4;
 	constant trngta : natural range 1 to 4095 := 32;
+	-- the five constants below are expressed in kB (kilo bytes)
+	-- (mind that in FPGAs blockRAMs are typically 4 kB in size)
+	constant trng_ramsz_raw : positive := 4;
+	constant trng_ramsz_axi : positive := 4;
+	constant trng_ramsz_fpr : positive := 4;
+	constant trng_ramsz_crv : positive := 4;
+	constant trng_ramsz_shf : positive := 16;
 	constant axi32or64 : natural := 32; -- 32 or 64 only allowed values
 	constant debug : boolean := FALSE;
 	constant nblargenb : positive := 32;  -- change these two parameters only if
@@ -52,13 +61,15 @@ package ecc_customize is
 	-- --------------------------------
 	-- end of: user-editable parameters
 	-- --------------------------------
-	
 end package ecc_customize;
 
---                         ******************************
---                         *      DOCUMENTATION OF      *
---                         *      ABOVE PARAMETERS      *
---                         ******************************
+
+
+
+--                         *******************************
+--                         *      DOCUMENTATION FOR      *
+--                         *      PARAMETERS ABOVE       *
+--                         *******************************
 
 -- ============================================================================
 -- NAME
@@ -306,19 +317,20 @@ end package ecc_customize;
 --       Obviously the more there are MACC/DSP blocks in each Montgomery
 --       multiplier, the less it will take for them to carry out a complete
 --       REDC operation.
---       Note however that the "speed vs nbdsp" relation is of linear only
+--       Note however that the "speed vs nbdsp" relation is linear only
 --       in a specific range of the 'nbdsp' parameter, a range which can
 --       sometimes turn to be quite small - meaning that past a specific
 --       threeshold (that is dependent mainly on the values of 'nn' and 'ww')
---       the computation speed will plateau however hard you try and increase
---       parameter 'nbdsp' (actually it may even decrease due to the fact that
---       the excess of MACC/DSP blocks will increase the time for data to
---       go through the chain without increasing the number of useful multi-
---       plications per clock cycle).
---       The table below gives the duration of one REDC operation for 'nn' = 256
---       in 'techno' = asic, for different values of the parameter 'ww' (which
---       in the case of asic matches 'multwidth') and different values of the
---       'nbdsp' parameter. The mm_ndsp block is assumed to run at 300 MHz.
+--       the computation speed obviously will plateau however hard you try
+--       and increase parameter 'nbdsp' (actually it may even decrease due to
+--       the fact that the excess of MACC/DSP blocks will increase the time
+--       for data to go through the chain without increasing the number of
+--       usefull multiplications per clock cycle).
+--       The table below gives the duration in microseconds of one REDC
+--       operation for 'nn' = 256 in 'techno' = 'asic', for different values
+--       of the parameter 'ww' (which in the case of asic matches 'multwidth')
+--       and different values of the 'nbdsp' parameter.
+--       The mm_ndsp block is assumed to run at 300 MHz.
 --
 --            \ nbdsp |   2    3    4    5    6     8     10   12   13
 --          ww \      |
@@ -332,7 +344,7 @@ end package ecc_customize;
 --       value allowed for 'nbdsp', which matches the number of 'ww'-bit limbs
 --       large numbers are made of. Function set_ndsp in package ecc_pkg.vhd
 --       enforces that this limit is not exceeded, it is used to compute the
---       value of a parameter called 'ndsp' based on 'nbdsp' which is the
+--       value of a parameter called 'ndsp' (based on 'nbdsp') which is the
 --       constant actually used in the RTL code: if value of nbdsp set by
 --       user in present file is below the limit, then ndsp = nbdsp, and if
 --       it is greater, then ndsp is set to the limit.

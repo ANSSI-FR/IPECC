@@ -94,6 +94,8 @@ package ecc_utils is
 	function set_op_arith_fill(opsz: positive; pcsz: positive) return integer;
 	function set_op_branch_fill(opsz: positive; pcsz: positive) return integer;
 
+	function set_readlat return positive;
+
 	-- log10(i)
 	--
 	-- returns the mathematical composition of log funtion (in basis 10)
@@ -111,7 +113,7 @@ package ecc_utils is
 	-- write hexadecimal value to the console & flush the line
 	procedure hex_echol(value: in std_logic_vector);
 	-- write hexadecimal value on a given input 'line'
-	procedure hex_write(l: inout line; value: in std_logic_vector);
+	procedure hex_write(l: inout line; constant value: in std_logic_vector);
 	-- pragma translate_on
 
 	subtype std_logic2 is std_logic_vector(1 downto 0);
@@ -135,6 +137,8 @@ package ecc_utils is
 	subtype std_logic512 is std_logic_vector(511 downto 0);
 
 	function std_nat(arg, size: natural) return std_logic_vector;
+
+	function ge_even(arg: natural) return natural;
 
 end package ecc_utils;
 
@@ -264,10 +268,38 @@ package body ecc_utils is
 		end if;
 	end function set_op_branch_fill;
 
+	function set_readlat return positive is
+		variable tmp : positive;
+	begin
+		if shuffle then -- defined in package ecc_customize
+			case shuffle_type is
+				when linear => tmp := sramlat + 2;
+				when permute_lgnb => tmp := sramlat + 2;
+				when permute_limbs => tmp := (2 * sramlat) + 2;
+				when others =>
+					assert FALSE report "unknown value for 'shuffle_type' parameter " &
+						"in ecc_customize.vhd"
+							severity FAILURE;
+			end case;
+		else -- no shuffle
+			tmp := sramlat; -- defined in package ecc_customize
+		end if;
+		return tmp;
+	end function set_readlat;
+
 	function std_nat(arg, size: natural) return std_logic_vector is
 	begin
 		return std_logic_vector(to_unsigned(arg, size));
 	end function std_nat;
+
+	function ge_even(arg: natural) return natural is
+	begin
+		if (arg mod 2) = 0 then
+			return arg;
+		else
+			return arg + 1;
+		end if;
+	end function ge_even;
 
 	-- pragma translate_off
 	-- write something to the console (without flushing the line)

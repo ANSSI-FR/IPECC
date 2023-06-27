@@ -610,11 +610,9 @@ entity ecc_curve_iram is
 	port(
 		-- port A: write-only interface to AXI-lite interface
 		clka : in std_logic;
-		rea : in std_logic;
 		wea : in std_logic;
 		addra : in std_logic_vector(IRAM_ADDR_SZ - 1 downto 0);
 		dia : in std_logic_vector (OPCODE_SZ - 1 downto 0);
-		doa : out std_logic_vector (OPCODE_SZ - 1 downto 0);
 		-- port B: read-only interface to ecc_curve
 		clkb : in std_logic;
 		reb : in std_logic;
@@ -639,31 +637,28 @@ ecc_curve_iram_end = r"""
 		others => (others => '0')
 	);
 	signal predoutb : std_logic_opcode;
-	signal predouta : std_logic_opcode;
 
 begin
 
 	-- ---------------------------------------------
-	-- Port A (R/W) is only present if in debug mode
+	-- Port A (W only) is only present in debug mode
 	-- ---------------------------------------------
 	d0: if debug generate -- statically resolved by synthesizer
 		process(clka)
 		begin
 			if (clka'event and clka = '1') then
+				-- write logic
+				-- (in simulation, only affects array content if no METAVALUE in addra)
+				-- otherwise issue a WARNING message
 				if (wea = '1') then
+					assert(not is_X(addra))
+						report "write to ecc_curve_iram with a METAVALUE address"
+							severity WARNING;
 					mem_content(to_integer(unsigned(addra))) := dia;
 				end if;
-				if (rea = '1') then
-					predouta <= mem_content(to_integer(unsigned(addra)));
-				end if;
-				doa <= predouta;
 			end if;
 		end process;
 	end generate;
-
-	d1: if not debug generate -- statically resolved by synthesizer
-		doa <= (others => '1');
-	end generate;	
 
 	-- --------------------------------------------------------------
 	-- Port B (R only) is the nominal port used by ecc_curve to fetch
@@ -674,8 +669,18 @@ begin
 		process(clkb)
 		begin
 			if (clkb'event and clkb = '1') then
+				-- read logic
+				-- (in simulation returns 'force unknown' ('X') if METAVALUE in addrb)
 				if (reb = '1') then
-					dob <= mem_content(to_integer(unsigned(addrb)));
+					-- pragma translate_off
+					if is_X(addrb) then
+						dob <= (others => 'X');
+					else
+					-- pragma translate_on
+						dob <= mem_content(to_integer(unsigned(addrb)));
+					-- pragma translate_off
+					end if;
+					-- pragma translate_on
 				end if;
 			end if;
 		end process;
@@ -686,7 +691,15 @@ begin
 		begin
 			if (clkb'event and clkb = '1') then
 				if (reb = '1') then
-					predoutb <= mem_content(to_integer(unsigned(addrb)));
+					-- pragma translate_off
+					if is_X(addrb) then
+						dob <= (others => 'X');
+					else
+					-- pragma translate_on
+						predoutb <= mem_content(to_integer(unsigned(addrb)));
+					-- pragma translate_off
+					end if;
+					-- pragma translate_on
 				end if;
 				dob <= predoutb;
 			end if;

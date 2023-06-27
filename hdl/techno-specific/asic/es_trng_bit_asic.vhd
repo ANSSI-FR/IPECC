@@ -20,7 +20,7 @@ use ieee.numeric_std.all;
 use std.textio.all;
 -- pragma translate_on
 
-entity es_trng_bit_asic is
+entity es_trng_bit is
 	generic(
 		jittervalfile : string
 	);
@@ -30,9 +30,9 @@ entity es_trng_bit_asic is
 		raw : out std_logic;
 		valid : out std_logic
 	);
-end entity es_trng_bit_asic;
+end entity es_trng_bit;
 
-architecture behav of es_trng_bit_asic is
+architecture behav of es_trng_bit is
 
 	signal ro1out : std_logic;
 	signal ro2out : std_logic;
@@ -60,9 +60,9 @@ begin
 	-- RO1 oscillator
 	-- --------------
 	-- combinational loop:
-	--   - synthesizer probably won't like it
-	--   - simulator will hang on it (so don't simulate it, use instead
-	--     file es_trng_bit-sim_asic.vhd)
+	--   - synthesizer probably won't like it (unless you
+	--     create constraint or set a specific attribute on it)
+	--   - simulator will hang on it (so don't simulate it)
 	ro1out <= ro1en and not ro1out;
 
 	-- --------------

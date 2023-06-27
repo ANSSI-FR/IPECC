@@ -709,12 +709,11 @@ begin
 				clka => clk,
 				addra => r_iram_waddr,
 				wea => riram.we,
-				ena => vcc,
 				dia => riram.wdata,
 				-- port B (R only)
 				clkb => clk0,
 				addrb => r_iram_raddr,
-				enb => r.iram.re,
+				reb => r.iram.re,
 				dob => r_iram_rdata -- directly latched into r.prod.rdata, see (s1)
 			);
 		-- -------------
@@ -728,11 +727,10 @@ begin
 				-- port A (W only)
 				addra => r_tram_waddr,
 				wea => r.tram.we,
-				ena => vcc,
 				dia => r.tram.wdata,
 				-- port B (R only)
 				addrb => r_tram_raddr,
-				enb => r.tram.re,
+				reb => r.tram.re,
 				dob => r_tram_rdata -- directly latched into r.prod.rdata, see (s1)
 			);
 		-- -------------
@@ -746,12 +744,11 @@ begin
 				clka => clk0,
 				addra => r_zram_waddr,
 				wea => r.zram.we,
-				ena => vcc,
 				dia => r.zram.wdata,
 				-- port B (R only)
 				clkb => clk,
 				addrb => r_zram_raddr,
-				enb => rzram.re,
+				reb => rzram.re,
 				dob => r_zram_rdata
 			);
 	end generate;
@@ -770,11 +767,10 @@ begin
 				-- port A (W only)
 				addra => r_oram_waddr,
 				wea => r.oram.we,
-				ena => vcc,
 				dia => r.oram.wdata,
 				-- port B (R only)
 				addrb => r_oram_raddr,
-				enb => r.oram.re,
+				reb => r.oram.re,
 				dob => r_oram_rdata -- directly latched into r.prod.rdata, see (s1)
 			);
 	end generate;
@@ -791,11 +787,10 @@ begin
 			-- port A (W only)
 			addra => r_pram_waddr,
 			wea => r.pram.we,
-			ena => vcc, -- r.pram.we, TODO: replace with true enable STABLE signal!
 			dia => r.pram.wdata,
 			-- port B (R only)
 			addrb => r_pram_raddr,
-			enb => r.pram.re, --TODO: replace with true enable STABLE signal!
+			reb => r.pram.re,
 			dob => r_pram_rdata
 		);
 

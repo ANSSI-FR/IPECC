@@ -21,7 +21,9 @@ use work.ecc_customize.all;
 use work.ecc_utils.all;
 use work.ecc_pkg.all;
 use work.ecc_vars.all; -- for LARGE_NB_R_ADDR - see (s79), (s80) & (s81)
+use work.ecc_soft.all;
 use work.mm_ndsp_pkg.all;
+use work.ecc_trng_pkg.all;
 -- pragma translate_off
 use std.textio.all;
 -- pragma translate_on
@@ -177,9 +179,7 @@ entity ecc_axi is
 		-- debug features (interface with ecc_curve_iram)
 		dbgiaddr : out std_logic_vector(IRAM_ADDR_SZ - 1 downto 0);
 		dbgiwdata : out std_logic_vector(OPCODE_SZ - 1 downto 0);
-		dbgirdata : in std_logic_vector(OPCODE_SZ - 1 downto 0);
 		dbgiwe : out std_logic;
-		dbgire : out std_logic;
 		-- debug features (interface with ecc_fp)
 		dbgtrnguse : out std_logic;
 		-- debug features (interface with ecc_trng)
@@ -207,6 +207,8 @@ architecture rtl of ecc_axi is
 	constant CST_AXI_RESP_OKAY : std_logic_vector(1 downto 0) := "00";
 
 	constant btw : natural := max(log2(nn) + 2, log2(ww));
+
+	constant readlat : positive := set_readlat;
 
 	type state_type is
 		(idle, writeln, readln, -- ln stands for large number
@@ -277,8 +279,8 @@ architecture rtl of ecc_axi is
 		shdataww : std_logic_vector(ww - 1 downto 0); -- 'ww'-bit shift-register
 		shdatawwcanbeemptied : std_logic;
 		fpre, fpre0 : std_logic;
-		-- resh's 2 MSbits only used if shuffle=TRUE (pruned in syn. otherwise)
-		resh : std_logic_vector(sramlat + 2 downto 0);
+		-- some of resh's upper bits may be pruned depending on shuffle
+		resh : std_logic_vector(readlat downto 0);
 		arpending : std_logic;
 		rdatax : std_logic_vector(C_S_AXI_DATA_WIDTH - 1 downto 0);
 		rdataxcanbefilled : std_logic;
@@ -408,17 +410,15 @@ architecture rtl of ecc_axi is
 		masktmp3b : std_logic_vector(ww - 1 downto 0);
 		valw3, valwtmp3 : unsigned(log2(w) - 1 downto 0);
 		nnrnd_mask : std_logic_vector(ww - 1 downto 0);
-		dodec4 : std_logic;
-		valw4m1, valwtmp4, valwtmp4prev : unsigned(log2(w) - 1 downto 0);
-		mask4, masktmp4 : std_logic_vector(ww - 1 downto 0);
-		tmp4 : unsigned(log2(nn + 3) downto 0);
-		tmpprev4 : unsigned(log2(nn + 3) downto 0);
-		dodec4done : std_logic;
-		doshcnt4 : std_logic;
-		shcnt4 : unsigned(log2(ww - 1) - 1 downto 0);
+		doburst01 : std_logic;
+		burst01cnt : unsigned(log2(n - 1) - 1 downto 0);
+		burst0or1 : std_logic;
+		burst01done : std_logic;
+		dosingle1 : std_logic;
+		valw4m1 : unsigned(log2(w) - 1 downto 0);
 		r_burstwr, r_singlewr : std_logic;
 		r_burstwrcnt : unsigned(log2(n - 1) - 1 downto 0);
-		rwritedone : std_logic; 
+		--rwritedone : std_logic; 
 		exception : std_logic;
 	end record;
 
@@ -444,9 +444,8 @@ architecture rtl of ecc_axi is
 		iaddr : std_logic_vector(IRAM_ADDR_SZ - 1 downto 0);
 		iwdata : std_logic_vector(OPCODE_SZ - 1 downto 0);
 		iwe : std_logic;
-		iresh : std_logic_vector(sramlat downto 0);
-		idatabeat : std_logic;
 		counter : unsigned(31 downto 0);
+		idatabeat : std_logic;
 		trigger : std_logic;
 		trigup : std_logic_vector(31 downto 0);
 		trigdown : std_logic_vector(31 downto 0);
@@ -460,7 +459,7 @@ architecture rtl of ecc_axi is
 		halt : std_logic;
 		shwon : std_logic_vector(1 downto 0);
 		readrdy : std_logic;
-		readsh: std_logic_vector(sramlat + 1 downto 0);
+		readsh : std_logic_vector(readlat downto 0);
 		noxyshuf : std_logic;
 		noaxirnd : std_logic;
 	end record;
@@ -597,7 +596,7 @@ begin
 	              ar01zien, ar0zi, ar1zi, amtydone,
 	              -- debug features
 	              dbghalted, dbgdecodepc, dbgbreakpointid,
-	              dbgpgmstate, dbgnbbits, dbgirdata, dbgbreakpointhit,
+	              dbgpgmstate, dbgnbbits, dbgbreakpointhit,
 	              dbgtrngrawfull, dbgtrngrawwaddr,
 	              dbgtrngrawdata, dbgtrngrawduration,
 	              dbgnbstarvrndxyshuf
@@ -638,6 +637,8 @@ begin
 		variable vtmp15 : signed(log2(nn) downto 0);
 		variable vtmp16, vtmp17 : unsigned(log2(ww) downto 0);
 		variable vtmp18 : signed(log2(ww) downto 0);
+		variable v_axi_wdatax_msb : std_logic_vector(FP_ADDR_MSB - 1 downto 0);
+		variable v_fpaddr0_msb : std_logic_vector(FP_ADDR_MSB - 1 downto 0);
 	begin
 		v := r;
 
@@ -690,11 +691,11 @@ begin
 		-- Simply put, if:
 		--      - we are computing a [k]P product
 		--   or - we are computing Montgomery constants
-		--   or - we are processing a point or Fp operation
+		--   or - we are processing a point operation or an Fp operation
 		--   or - we are writing or reading portion of a large number
 		--   or - we are in the process of computing signals associated
 		--        to a new value of nn (prime size, nn_dynamic = TRUE)
-		--   or - we are reading TRNG data (debug = TRUE)
+		--   or - we are reading TRNG data (debug = TRUE only)
 		--   or - AXI interface is briefly "locked" to avoid race condition
 		-- then the BUSY bit in R_STATUS register is set and software is not
 		-- supposed to perform any action other than polling the BUSY bit
@@ -1005,12 +1006,11 @@ begin
 		-- -----------------------------------------------------------
 		-- debug feature
 		v.debug.iwe := '0'; -- (s82)
-		v.debug.iresh := '0' & r.debug.iresh(sramlat downto 1); -- (s86)
 		v.debug.resume := '0'; -- (s173)
 		v.debug.dosomeopcodes := '0'; -- (s33)
 		v.ctrl.penupsh := '0' & r.ctrl.penupsh(1);
 		v.debug.shwon := '0' & r.debug.shwon(1);
-		v.debug.readsh := '0' & r.debug.readsh(sramlat + 1 downto 1);
+		v.debug.readsh := '0' & r.debug.readsh(readlat downto 1);
 		if r.debug.readsh(0) = '1' then
 			v.debug.readrdy := '1';
 		end if;
@@ -1084,31 +1084,34 @@ begin
 						-- TODO: multicycle constraints are possible here on a few paths:
 						--         r.axi.wdatax(addr) -> r.ctrl.[pabqxy]_set
 						--         r.axi.wdatax(addr) -> r.ctrl.a_set_and_mty
-						case r.axi.wdatax(
-								CTRL_NBADDR_LSB + FP_ADDR_MSB - 1 downto CTRL_NBADDR_LSB) is
-							when CST_ADDR_P =>
-								v.ctrl.p_set := '0'; -- see (s112)
-								v.ctrl.p_set_and_mty := '0'; -- (s179), see (s110)
-								-- writing a new value of 'p' immediately invalidates
-								-- the current value of curve parameter 'a'
-								v.ctrl.a_set := '0';
-								v.ctrl.a_set_and_mty := '0';
-							when CST_ADDR_A =>
-								v.ctrl.a_set := '0'; -- (s181), see (s113)
-								v.ctrl.a_set_and_mty := '0'; -- (s182), see (s111)
-								v.ctrl.newa := '1'; -- (s121), bypass of (s120)
-							when CST_ADDR_B => v.ctrl.b_set := '0';
-							when CST_ADDR_Q => v.ctrl.q_set := '0';
-							when CST_ADDR_XR1 =>
-								v.ctrl.x_set := '0';
-								v.ctrl.r1_is_null := '0';
-							when CST_ADDR_YR1 =>
-								v.ctrl.y_set := '0';
-								v.ctrl.r1_is_null := '0';
-							when CST_ADDR_XR0 => v.ctrl.r0_is_null := '0';
-							when CST_ADDR_YR0 => v.ctrl.r0_is_null := '0';
-							when others => null;
-						end case;
+						v_axi_wdatax_msb := r.axi.wdatax(
+								CTRL_NBADDR_LSB + FP_ADDR_MSB - 1 downto CTRL_NBADDR_LSB);
+						if v_axi_wdatax_msb = CST_ADDR_P then
+							v.ctrl.p_set := '0'; -- see (s112)
+							v.ctrl.p_set_and_mty := '0'; -- (s179), see (s110)
+							-- writing a new value of 'p' immediately invalidates
+							-- the current value of curve parameter 'a'
+							v.ctrl.a_set := '0';
+							v.ctrl.a_set_and_mty := '0';
+						elsif v_axi_wdatax_msb = CST_ADDR_A then
+							v.ctrl.a_set := '0'; -- (s181), see (s113)
+							v.ctrl.a_set_and_mty := '0'; -- (s182), see (s111)
+							v.ctrl.newa := '1'; -- (s121), bypass of (s120)
+						elsif v_axi_wdatax_msb = CST_ADDR_B then
+							v.ctrl.b_set := '0';
+						elsif v_axi_wdatax_msb = CST_ADDR_Q then
+							v.ctrl.q_set := '0';
+						elsif v_axi_wdatax_msb = CST_ADDR_XR1 then
+							v.ctrl.x_set := '0';
+							v.ctrl.r1_is_null := '0';
+						elsif v_axi_wdatax_msb = CST_ADDR_YR1 then
+							v.ctrl.y_set := '0';
+							v.ctrl.r1_is_null := '0';
+						elsif (v_axi_wdatax_msb = CST_ADDR_XR0) or
+							(v_axi_wdatax_msb = CST_ADDR_YR0)
+						then
+							v.ctrl.r0_is_null := '0';
+						end if;
 						if not debug then -- statically resolved by synthesizer
 							v.ctrl.read_forbidden := '1';
 						end if;
@@ -1700,17 +1703,10 @@ begin
 			-- --------------------------------------------------------------
 			elsif debug and r.axi.waddr = W_DBG_OP_ADDR then
 				v.debug.iaddr := r.axi.wdatax(IRAM_ADDR_SZ - 1 downto 0);
-				v.debug.idatabeat := '0';
-				-- (s201)
-				-- to allow the read into ecc_curve_iram to happen before the
-				-- software reads data back using a read to register R_DBG_RD_OPCODE
-				-- (see (s199)) we temporize the assertion of the 4 AXI handshake
-				-- signals with the small shift register .iresh - see (s200) below
-				v.debug.iresh(sramlat) := '1'; -- asserted only 1 cycle thx to (s86)
-					--v.axi.wready := '1';
-					--v.axi.awready := '1';
-					--v.axi.arready := '1';
-					--v.axi.bvalid := '1';
+				v.axi.wready := '1';
+				v.axi.awready := '1';
+				v.axi.arready := '1';
+				v.axi.bvalid := '1';
 			-- ---------------------------------------------------------------
 			-- decoding write of W_DBG_WR_OPCODE register
 			-- ---------------------------------------------------------------
@@ -1838,7 +1834,7 @@ begin
 				-- deassert ready bit in R_DBG_FP_RDATA_RDY register
 				v.debug.readrdy := '0';
 				-- arm latency counter (shift-reg)
-				v.debug.readsh(sramlat + 1) := '1';
+				v.debug.readsh(readlat) := '1';
 				-- drive write-response to initiator
 				v.axi.bvalid := '1';
 			-- -------------------------------------------------------------
@@ -1902,14 +1898,6 @@ begin
 		-- otherwise)
 		if r.write.new32 = '1' then
 			v.write.doshift := '1';
-		end if;
-
-		-- (s200), see (s201) register R_DBG_RD_OPCODE
-		if r.debug.iresh(0) = '1' then
-			v.axi.wready := '1';
-			v.axi.awready := '1';
-			v.axi.arready := '1';
-			v.axi.bvalid := '1';
 		end if;
 
 		-- --------------------------------
@@ -2100,29 +2088,36 @@ begin
 						v.write.busy := '0';
 					end if;
 					-- (s178), see (s177)
-					case r.fpaddr0(log2(n - 1) + FP_ADDR_MSB - 1 downto log2(n - 1)) is
-						when CST_ADDR_P => v.ctrl.p_set := '1'; -- (s112)
-						when CST_ADDR_A => v.ctrl.a_set := '1'; -- (s113), see (s181)
-							-- since Montgomery constants have been computed & are available,
-							-- transmission of parameter 'a' triggers the execution of the
-							-- (tiny) routine that will switch it into its Montgomery repre-
-							-- sentation
-							if r.ctrl.p_set_and_mty = '1' -- and r.ctrl.p_set = '1' -- useless
-							then
-								-- r.ctrl.agomtya will be reset by (s105) after ecc_scalar's ACK
-								v.ctrl.agomtya := '1'; -- (s103)
-								v.ctrl.newa := '0';
-								v.write.busy := '0';
-							-- else
-							-- 	-- r.ctrl.a_set_and_mty still 0
-							end if;
-						when CST_ADDR_B => v.ctrl.b_set := '1';
-						when CST_ADDR_Q => v.ctrl.q_set := '1';
-						--when CST_ADDR_K => v.ctrl.k_set := '1'; -- error, see (s123) below
-						when CST_ADDR_XR1 => v.ctrl.x_set := '1';
-						when CST_ADDR_YR1 => v.ctrl.y_set := '1';
-						when others => null;
-					end case;
+					v_fpaddr0_msb :=
+						r.fpaddr0(log2(n - 1) + FP_ADDR_MSB - 1 downto log2(n - 1));
+					if v_fpaddr0_msb = CST_ADDR_P then
+						v.ctrl.p_set := '1'; -- (s112)
+					elsif v_fpaddr0_msb = CST_ADDR_A then
+						v.ctrl.a_set := '1'; -- (s113), see (s181)
+						-- since Montgomery constants have been computed & are available,
+						-- transmission of parameter 'a' triggers the execution of the
+						-- (tiny) routine that will switch it into its Montgomery repre-
+						-- sentation
+						if r.ctrl.p_set_and_mty = '1' -- and r.ctrl.p_set = '1' -- useless
+						then
+							-- r.ctrl.agomtya will be reset by (s105) after ecc_scalar's ACK
+							v.ctrl.agomtya := '1'; -- (s103)
+							v.ctrl.newa := '0';
+							v.write.busy := '0';
+						-- else
+						-- 	-- r.ctrl.a_set_and_mty still 0
+						end if;
+					elsif v_fpaddr0_msb = CST_ADDR_B then
+						v.ctrl.b_set := '1';
+					elsif v_fpaddr0_msb = CST_ADDR_Q then
+						v.ctrl.q_set := '1';
+					--elsif v_fpaddr0_msb = CST_ADDR_K then
+					--	v.ctrl.k_set := '1'; -- error, see (s123) below
+					elsif v_fpaddr0_msb = CST_ADDR_XR1 then
+						v.ctrl.x_set := '1';
+					elsif v_fpaddr0_msb = CST_ADDR_YR1 then
+						v.ctrl.y_set := '1';
+					end if;
 					-- (s123) we can't use r.fpaddr0 to detect that scalar k is the large
 					-- nb currently written (because in that case r.fpaddr0 might as well
 					-- contain the address of the mask for k), so we use a special flag
@@ -2653,7 +2648,7 @@ begin
 			then
 				-- version number, we use the first 32 bits of git commit checksum
 				dw := (others => '0');
-				dw(31 downto 0) := x"0001" & x"0000"; -- version 1.0
+				dw(31 downto 0) := x"0001" & x"0001"; -- version 1.1
 				v.axi.rdatax := dw;
 				v.axi.rvalid := '1'; -- (s5)
 			-- ------------------------------
@@ -2762,27 +2757,6 @@ begin
 					dw(FLAGS_NOT_BLN_OR_Q_NOT_SET) := '0';
 				end if;
 				v.axi.rdatax := dw;
-				v.axi.rvalid := '1'; -- (s5)
-			-- -----------------------------------------
-			-- decoding read of R_DBG_RD_OPCODE register
-			-- -----------------------------------------
-			elsif debug -- statically resolved by synthesizer
-			  and s_axi_araddr(ADB + 2 downto 3) = R_DBG_RD_OPCODE
-			then
-				-- (s199), see also (s200) & (s201)
-				if OPCODE_SZ > C_S_AXI_DATA_WIDTH then -- statically resolved by synth.
-					if r.debug.idatabeat = '0' then
-						v.debug.idatabeat := '1';
-						v.axi.rdatax := dbgirdata(C_S_AXI_DATA_WIDTH - 1 downto 0);
-					elsif r.debug.idatabeat = '1' then
-						v.debug.idatabeat := '0';
-						v.axi.rdatax((OPCODE_SZ mod C_S_AXI_DATA_WIDTH) - 1 downto 0) :=
-							dbgirdata(C_S_AXI_DATA_WIDTH+(OPCODE_SZ mod C_S_AXI_DATA_WIDTH)-1
-							          downto C_S_AXI_DATA_WIDTH); -- (s85), see (s83)
-					end if;
-				else
-					v.axi.rdatax(OPCODE_SZ - 1 downto 0) := dbgirdata;
-				end if;
 				v.axi.rvalid := '1'; -- (s5)
 			-- -------------------------------------------
 			-- decoding read of R_DBG_TRNG_STATUS register
@@ -2946,12 +2920,7 @@ begin
 
 		-- sample of data read back from ecc_fp_dram into r.read.shdataww
 		-- & assertion of r.read.shdatawwcanbeemptied
-		if shuffle then
-			v.read.resh := r.read.fpre & r.read.resh(sramlat + 2 downto 1);
-		else
-			v.read.resh(sramlat downto 0) :=
-				r.read.fpre & r.read.resh(sramlat downto 1);
-		end if;
+		v.read.resh := r.read.fpre & r.read.resh(readlat downto 1);
 		if r.read.resh(0) = '1' then
 			v.read.shdataww := xrdata;
 			v.read.shdatawwcanbeemptied := '1';
@@ -3147,9 +3116,8 @@ begin
 				v.nndyn.savnnp2p3p4 := '1'; -- asserted only 1 cycle
 				v.nndyn.dodec0done := '0';
 				v.nndyn.dodec3done := '0';
-				v.nndyn.dodec4done := '0';
+				v.nndyn.burst01done := '0';
 				v.nndyn.docnt32done := '0';
-				v.nndyn.rwritedone := '0';
 				v.nndyn.valnnp2dww_rdy := '0';
 				v.nndyn.brlwmin_rdy:= '0';
 			end if;
@@ -3165,12 +3133,9 @@ begin
 				v.nndyn.dodec2 := '1';
 				-- init the 5th batch of operations
 				v.nndyn.valwtmp := (others => '0');
-				v.nndyn.dodec4 := '1';
-				v.nndyn.tmp4 := '0' & r.nndyn.valnnp3;
-				v.nndyn.valwtmp4 := (others => '0');
-				v.nndyn.valwtmp4prev := (others => '0');
-				--v.nndyn.valwm1 := (others => '1'); -- "-1"
-				--v.nndyn.val2wm1 := (others => '0');
+				v.nndyn.doburst01 := '1';
+				v.nndyn.burst0or1 := '0'; -- we first erase large number "zero"
+				v.nndyn.burst01cnt := to_unsigned(n - 1, log2(n - 1));
 			end if;
 
 			-- --------------------------------------------------------------------
@@ -3386,89 +3351,47 @@ begin
 			end if;
 
 			if r.nndyn.dodec0done = '1' and r.nndyn.dodec3done = '1'
-				and r.nndyn.dodec4done = '1' then
+				and r.nndyn.burst01done = '1'
+			then
 				v.nndyn.docnt32 := '1';
 				v.nndyn.cnt32 := (others => '1'); -- decimal 31
 				v.nndyn.dodec0done := '0';
 				v.nndyn.dodec3done := '0';
-				v.nndyn.dodec4done := '0';
+				v.nndyn.burst01done := '0';
 			end if;
 
 			-- --------------------------------------------------------------------
 			-- 5th batch of operations (based on value nn + 3)
 			-- --------------------------------------------------------------------
 
-			if r.nndyn.dodec4 = '1' then
-				-- subtract ww to value of .tmp4
-				v.nndyn.tmp4 := r.nndyn.tmp4 - to_unsigned(ww, log2(nn + 3) + 1);
-				-- increment .valwtmp4
-				v.nndyn.valwtmp4 := r.nndyn.valwtmp4 + 1;
-				if r.nndyn.tmp4(log2(nn + 3)) = '1' -- < 0
-					or r.nndyn.tmp4 = (r.nndyn.tmp4'range => '0') -- or = 0
-					-- (here we must test for either negative OR ZERO)
-				then
-					v.nndyn.dodec4 := '0';
-					v.nndyn.doshcnt4:= '1';
-					-- size of .tmpprev4 is log2(nn + 3) + 1, size of .shcnt4
-					-- is log2(ww - 1) so resize function below will discard the upper
-					-- bits of .tmpprev4. However at the time hardware latches .tmpprev4
-					-- into .shcnt, it's sure that .tmpprev4 holds a residue value
-					-- mod ww, so these bits are necessarily 0 anyway
-					v.nndyn.shcnt4 := resize(r.nndyn.tmpprev4, log2(ww - 1));
-					v.nndyn.masktmp4 := (0 => '1', others => '0');
-					v.nndyn.valw4m1 := r.nndyn.valwtmp4prev;
-				end if;
-			end if;
-
-			v.nndyn.tmpprev4 := r.nndyn.tmp4;
-			v.nndyn.valwtmp4prev := r.nndyn.valwtmp4;
-
-			if r.nndyn.doshcnt4 = '1' then
-				v.nndyn.masktmp4 := r.nndyn.masktmp4(ww - 2 downto 0) & '0';
-				v.nndyn.shcnt4 := r.nndyn.shcnt4 - 1;
-				if r.nndyn.shcnt4 = to_unsigned(1, log2(ww - 1)) then
-					v.nndyn.doshcnt4 := '0';
-					v.nndyn.mask4 := r.nndyn.masktmp4;
-					v.nndyn.dodec4done := '1';
-					v.nndyn.r_burstwr := '1';
-					v.nndyn.r_burstwrcnt := to_unsigned(n - 2, log2(n - 1));
-					v.write.fpwe0 := '1';
-					-- (s80), see (s79)
+			if r.nndyn.doburst01 = '1' then
+				v.write.fpwe0 := '1'; -- (s222), will be deasserted by (s223)
+				-- we "recycle" the .shdataww register
+				v.write.shdataww := (others => '0');
+				if r.nndyn.burst0or1 = '0' then
 					v.fpaddr0 := std_logic_vector(
-						to_unsigned(LARGE_NB_R_ADDR, FP_ADDR_MSB) &
-						to_unsigned(0, log2(n - 1)));
-					-- we recycle the .shdataww register
-					v.write.shdataww := (others => '0');
-				end if;
-			end if;
-
-			-- once .mask4 and .valw4m1 are known, perform a write into ecc_fp_dram
-			-- so as to form the large number 2**(nn + 2) ( = constant R for the
-			-- Montgomery representation)
-			-- This is done by bursting a serie of ww-bit null words into the
-			-- address corresponding to R, followed by the write of the ww-bit
-			-- word .mask4 at offset .valw4m1
-			if r.nndyn.r_burstwr = '1' then
-				v.write.fpwe0 := '1';
-				v.nndyn.r_burstwrcnt := r.nndyn.r_burstwrcnt - 1;
-				v.fpaddr0 := std_logic_vector(unsigned(r.fpaddr0) + 1);
-				if r.nndyn.r_burstwrcnt(log2(n - 1) - 1) = '0' and
-					v.nndyn.r_burstwrcnt(log2(n - 1) - 1) = '1'
-				then
-					v.nndyn.r_burstwr := '0';
-					v.nndyn.r_singlewr := '1';
-					-- (s81), see (s79)
+						to_unsigned(LARGE_NB_ZERO_ADDR, FP_ADDR_MSB)
+					) & std_logic_vector(r.nndyn.burst01cnt);
+				elsif r.nndyn.burst0or1 = '1' then
 					v.fpaddr0 := std_logic_vector(
-						to_unsigned(LARGE_NB_R_ADDR, FP_ADDR_MSB) &
-						resize(r.nndyn.valw4m1, log2(n - 1)));
-					v.write.shdataww := r.nndyn.mask4;
+						to_unsigned(LARGE_NB_ONE_ADDR, FP_ADDR_MSB)
+					) & std_logic_vector(r.nndyn.burst01cnt);
+				end if;
+				v.nndyn.burst01cnt := r.nndyn.burst01cnt - 1;
+				if r.nndyn.burst01cnt = (r.nndyn.burst01cnt'range => '0') then
+					v.nndyn.burst0or1 := not r.nndyn.burst0or1;
+					if r.nndyn.burst0or1 = '1' then
+						v.nndyn.doburst01 := '0';
+						v.nndyn.dosingle1 := '1';
+						v.write.shdataww := (0 => '1', others => '0');
+					end if;
 				end if;
 			end if;
 
-			if r.nndyn.r_singlewr = '1' then
-				v.nndyn.r_singlewr := '0';
-				v.write.fpwe0 := '0';
-				v.nndyn.rwritedone := '1';
+			if r.nndyn.dosingle1 = '1' then
+				v.nndyn.dosingle1 := '0';
+				v.write.fpwe0 := '0'; -- (s223), deassertion of (s222)
+				v.nndyn.burst01done := '1';
 			end if;
 
 			-- --------------------------------------------------------------------
@@ -3488,8 +3411,7 @@ begin
 			end if;
 
 			-- end of "nndyn" operations
-			if r.nndyn.rwritedone = '1' and r.nndyn.docnt32done = '1' then
-				v.nndyn.rwritedone := '0';
+			if r.nndyn.docnt32done = '1' then
 				v.nndyn.docnt32done := '0';
 				v.ctrl.state := idle;
 				v.nndyn.active := '0'; -- release BUSY bit in R_STATUS, see (s30)
@@ -3638,14 +3560,12 @@ begin
 				v.nndyn.doshcnt := '0';
 				v.nndyn.dodec3b := '0';
 				v.nndyn.doshcnt3b := '0';
-				v.nndyn.doshcnt4 := '0';
 				v.nndyn.dodec3 := '0';
-				v.nndyn.dodec4 := '0';
-				v.nndyn.dodec4done := '0';
 				v.nndyn.docnt32 := '0';
 				v.nndyn.dodec2 := '0';
 				v.nndyn.dodec22 := '0';
 				v.nndyn.docnt32done := '0';
+				v.nndyn.doburst01 := '0';
 			else -- nn_dynamic = FALSE
 				v.nndyn.valnn := to_unsigned(nn, log2(nn));
 				v.nndyn.valnnm1 := to_unsigned(nn - 1, log2(nn));
@@ -3867,7 +3787,6 @@ begin
 	dbgiaddr <= r.debug.iaddr;
 	dbgiwdata <= r.debug.iwdata;
 	dbgiwe <= r.debug.iwe;
-	dbgire <= r.debug.iresh(sramlat);
 	dbgtrigger <= r.debug.trigger;
 
 	-- debug features (to ecc_curve)

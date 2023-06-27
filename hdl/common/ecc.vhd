@@ -21,6 +21,8 @@ use work.ecc_customize.all;
 use work.ecc_utils.all;
 use work.ecc_pkg.all;
 use work.mm_ndsp_pkg.all;
+use work.ecc_trng_pkg.all;
+use work.ecc_shuffle_pkg.all;
 
 -- pragma translate_off
 use std.textio.all;
@@ -237,9 +239,7 @@ architecture struct of ecc is
 			-- debug features (interface with ecc_curve_iram)
 			dbgiaddr : out std_logic_vector(IRAM_ADDR_SZ - 1 downto 0);
 			dbgiwdata : out std_logic_vector(OPCODE_SZ - 1 downto 0);
-			dbgirdata : in std_logic_vector(OPCODE_SZ - 1 downto 0);
 			dbgiwe : out std_logic;
-			dbgire : out std_logic;
 			-- debug features (interface with ecc_fp)
 			dbgtrnguse : out std_logic;
 			-- debug features (interface with ecc_trng)
@@ -344,7 +344,7 @@ architecture struct of ecc is
 			compcstmty : out std_logic;
 			comppop : out std_logic;
 			compaop : out std_logic;
-			-- interface with ecc_fp_dram_sh (used only in the 'shuffle' case)
+			-- interface with ecc_fp_dram_sh_* (used only in the 'shuffle' case)
 			permute : out std_logic;
 			permuterdy : in std_logic;
 			permuteundo : out std_logic;
@@ -460,11 +460,9 @@ architecture struct of ecc is
 		port(
 			-- port A: write-only interface to AXI-lite interface
 			clka : in std_logic;
-			rea : in std_logic;
 			wea : in std_logic;
 			addra : in std_logic_vector(IRAM_ADDR_SZ - 1 downto 0);
 			dia : in std_logic_vector (OPCODE_SZ - 1 downto 0);
-			doa : out std_logic_vector (OPCODE_SZ - 1 downto 0);
 			-- port B: read-only interface to ecc_curve
 			clkb : in std_logic;
 			reb : in std_logic;
@@ -557,7 +555,8 @@ architecture struct of ecc is
 			patchid : in integer;
 			-- interface with ecc_fp_dram (simu only)
 			fpdram : in fp_dram_type;
-			fprwmask : in std_logic_vector(FP_ADDR - 1 downto 0)
+			fprwmask : in std_logic_vector(FP_ADDR - 1 downto 0);
+			vtophys : in virt_to_phys_table_type
 			-- pragma translate_on
 		);
 	end component ecc_fp;
@@ -585,10 +584,10 @@ architecture struct of ecc is
 			valid2 : out std_logic;
 			data2 : out std_logic_vector(1 downto 0);
 			irncount2 : out std_logic_vector(log2(irn_fifo_size_curve) - 1 downto 0);
-			-- interface with entropy client ecc_fp_dram_sh
+			-- interface with entropy client ecc_fp_dram_sh_*
 			rdy3 : in std_logic;
 			valid3 : out std_logic;
-			data3 : out std_logic_vector(FP_ADDR - 1 downto 0);
+			data3 : out std_logic_vector(irn_width_sh - 1 downto 0);
 			irncount3 : out std_logic_vector(log2(irn_fifo_size_sh) - 1 downto 0);
 			-- interface with ecc_axi (only usable in debug mode)
 			dbgtrngta : in unsigned(19 downto 0);
@@ -617,7 +616,6 @@ architecture struct of ecc is
 			clk : in std_logic;
 			-- port A: write-only interface to ecc_fp
 			-- (actually for write-access from AXI-lite interface)
-			ena : in std_logic;
 			wea : in std_logic;
 			addra : in std_logic_vector (FP_ADDR - 1 downto 0);
 			dia : in std_logic_vector (ww - 1 downto 0);
@@ -632,8 +630,8 @@ architecture struct of ecc is
 		);
 	end component ecc_fp_dram;
 
-	-- shuffled version of ecc_fp_dram
-	component ecc_fp_dram_sh is
+	-- shuffled version of ecc_fp_dram (linear masking version)
+	component ecc_fp_dram_sh_linear is
 		generic(
 			rdlat : positive range 1 to 2);
 		port(
@@ -642,7 +640,6 @@ architecture struct of ecc is
 			swrst : in std_logic;
 			-- port A: write-only interface from ecc_fp
 			-- (actually for write-access from AXI-lite interface)
-			ena : in std_logic;
 			wea : in std_logic;
 			addra : in std_logic_vector(FP_ADDR - 1 downto 0);
 			dia : in std_logic_vector(ww - 1 downto 0);
@@ -657,14 +654,83 @@ architecture struct of ecc is
 			-- interface with ecc_trng
 			trngvalid : in std_logic;
 			trngrdy : out std_logic;
-			trngdata : in std_logic_vector(FP_ADDR - 1 downto 0)
+			trngdata : in std_logic_vector(irn_width_sh - 1 downto 0)
 			-- pragma translate_off
 			-- interface with ecc_fp (simu only)
 			; fpdram : out fp_dram_type;
 			fprwmask : out std_logic_vector(FP_ADDR - 1 downto 0)
 			-- pragma translate_on
 		);
-	end component ecc_fp_dram_sh;
+	end component ecc_fp_dram_sh_linear;
+
+	-- shuffled version of ecc_fp_dram (version: Fisher-Yates permutation applied
+	-- on a coarse scale, that is on large numbers only)
+	component ecc_fp_dram_sh_fishy_nb is
+		generic(
+			rdlat : positive range 1 to 2);
+		port(
+			clk : in std_logic;
+			rstn : in std_logic;
+			swrst : in std_logic;
+			-- port A: write-only interface from ecc_fp
+			-- (actually for write-access from AXI-lite interface)
+			wea : in std_logic;
+			addra : in std_logic_vector(FP_ADDR - 1 downto 0);
+			dia : in std_logic_vector(ww - 1 downto 0);
+			-- port B: read-only interface to ecc_fp
+			reb : in std_logic;
+			addrb : in std_logic_vector(FP_ADDR - 1 downto 0);
+			dob : out std_logic_vector(ww - 1 downto 0);
+			-- interface with ecc_axi
+			nndyn_wm1 : in unsigned(log2(w - 1) - 1 downto 0);
+			-- interface with ecc_scalar
+			permute : in std_logic;
+			permuterdy : out std_logic;
+			-- interface with ecc_trng
+			trngvalid : in std_logic;
+			trngrdy : out std_logic;
+			trngdata : in std_logic_vector(irn_width_sh - 1 downto 0)
+			-- pragma translate_off
+			-- interface with ecc_fp (simu only)
+			; fpdram : out fp_dram_type;
+			vtophys : out virt_to_phys_table_type
+			-- pragma translate_on
+		);
+	end component ecc_fp_dram_sh_fishy_nb;
+
+	-- shuffled version of ecc_fp_dram (version: Fisher-Yates permutation applied
+	-- on a fine scale, that is not only on large numbers but on their inside
+	-- ww-bit limbs)
+	component ecc_fp_dram_sh_fishy is
+		generic(
+			rdlat : positive range 1 to 2);
+		port(
+			clk : in std_logic;
+			rstn : in std_logic;
+			swrst : in std_logic;
+			-- port A: write-only interface from ecc_fp
+			-- (actually for write-access from AXI-lite interface)
+			wea : in std_logic;
+			addra : in std_logic_vector(FP_ADDR - 1 downto 0);
+			dia : in std_logic_vector(ww - 1 downto 0);
+			-- port B: read-only interface to ecc_fp
+			reb : in std_logic;
+			addrb : in std_logic_vector(FP_ADDR - 1 downto 0);
+			dob : out std_logic_vector(ww - 1 downto 0);
+			-- interface with ecc_scalar
+			permute : in std_logic;
+			permuterdy : out std_logic;
+			-- interface with ecc_trng
+			trngvalid : in std_logic;
+			trngrdy : out std_logic;
+			trngdata : in std_logic_vector(irn_width_sh - 1 downto 0)
+			-- pragma translate_off
+			-- interface with ecc_fp (simu only)
+			; fpdram : out fp_dram_type;
+			vtophys : out virt_to_phys_table_type
+			-- pragma translate_on
+		);
+	end component ecc_fp_dram_sh_fishy;
 
 	-- Montgomery multiplier
 	component mm_ndsp is
@@ -855,7 +921,7 @@ architecture struct of ecc is
 	-- signals between ecc_trng & entropy user ecc_fp_dram_sh
 	signal trng_rdy_sh : std_logic;
 	signal trng_valid_sh : std_logic;
-	signal trng_data_sh : std_logic_vector(FP_ADDR - 1 downto 0);
+	signal trng_data_sh : std_logic_vector(irn_width_sh - 1 downto 0);
 	-- debug features (signals between ecc_axi & ecc_scalar)
 	signal dbgpgmstate : std_logic_vector(3 downto 0);
 	signal dbgnbbits : std_logic_vector(15 downto 0);
@@ -865,8 +931,7 @@ architecture struct of ecc is
 	-- debug features (signals between ecc_axi & ecc_curve_iram)
 	signal dbgiaddr : std_logic_vector(IRAM_ADDR_SZ - 1 downto 0);
 	signal dbgiwdata : std_logic_vector(OPCODE_SZ - 1 downto 0);
-	signal dbgirdata : std_logic_vector(OPCODE_SZ - 1 downto 0);
-	signal dbgiwe, dbgire : std_logic;
+	signal dbgiwe : std_logic;
 	-- debug features (signals between ecc_axi & ecc_curve)
 	signal dbgbreakpoints : breakpoints_type;
 	signal dbgnbopcodes : std_logic_vector(15 downto 0);
@@ -902,6 +967,7 @@ architecture struct of ecc is
 	-- signals between ecc_fp & ecc_fp_dram[_sh] (simu only)
 	signal fpdram : fp_dram_type;
 	signal fprwmask : std_logic_vector(FP_ADDR - 1 downto 0);
+	signal vtophys : virt_to_phys_table_type;
 	-- pragma translate_on
 
 	signal rstn_resync0 : std_logic;
@@ -1081,9 +1147,7 @@ begin
 			-- debug features (interface with ecc_curve_iram)
 			dbgiaddr => dbgiaddr,
 			dbgiwdata => dbgiwdata,
-			dbgirdata => dbgirdata,
 			dbgiwe => dbgiwe,
-			dbgire => dbgire,
 			-- debug features (interface with ecc_fp)
 			dbgtrnguse => dbgtrnguse,
 			-- debug features (interface with ecc_trng)
@@ -1304,11 +1368,9 @@ begin
 		port map(
 			-- port A: write-only interface to AXI-lite interface
 			clka => s_axi_aclk,
-			rea => dbgire,
 			wea => dbgiwe,
 			addra => dbgiaddr,
 			dia => dbgiwdata,
-			doa => dbgirdata,
 			-- port B: read-only interface to ecc_curve
 			clkb => s_axi_aclk,
 			reb => ire,
@@ -1395,7 +1457,8 @@ begin
 			patchid => patchid,
 			-- interface with ecc_fp_dram or ecc_fp_dram_sh (simu only)
 			fpdram => fpdram,
-			fprwmask => fprwmask
+			fprwmask => fprwmask,
+			vtophys => vtophys
 			-- pragma translate_on
 		); -- ecc_fp
 
@@ -1452,7 +1515,6 @@ begin
 				clk => s_axi_aclk,
 				-- port A: write-only interface to ecc_fp
 				-- (actually for write-access from AXI-lite interface)
-				ena => fpwe,
 				wea => fpwe,
 				addra => fpwaddr,
 				dia => fpwdata,
@@ -1470,37 +1532,106 @@ begin
 	-- same feature as ecc_fp_dram for the address
 	-- shuffling countermeasure
 	ds0: if shuffle generate
-		ds0: ecc_fp_dram_sh
-			generic map(
-				rdlat => sramlat)
-			port map(
-				clk => s_axi_aclk,
-				rstn => s_axi_aresetn_resync,
-				swrst => swrst,
-				-- port A: write-only interface to ecc_fp
-				-- (actually for write-access from AXI-lite interface)
-				ena => fpwe,
-				wea => fpwe,
-				addra => fpwaddr,
-				dia => fpwdata,
-				-- port B: read-only interface to ecc_fp
-				reb => fpre,
-				addrb => fpraddr,
-				dob => fprdata,
-				-- interface with ecc_scalar
-				permute => permute,
-				permuterdy => permuterdy,
-				permuteundo => permuteundo,
-				-- interface with ecc_trng
-				trngvalid => trng_valid_sh,
-				trngrdy => trng_rdy_sh,
-				trngdata => trng_data_sh
-				-- pragma translate_off
-				-- interface with ecc_fp (simu only)
-				, fpdram => fpdram,
-				fprwmask => fprwmask
-				-- pragma translate_on
-			); -- ecc_fp_dram_sh
+
+		ds0: if shuffle_type = linear generate
+			ds0: ecc_fp_dram_sh_linear
+				generic map(
+					rdlat => sramlat)
+				port map(
+					clk => s_axi_aclk,
+					rstn => s_axi_aresetn_resync,
+					swrst => swrst,
+					-- port A: write-only interface to ecc_fp
+					-- (actually for write-access from AXI-lite interface)
+					wea => fpwe,
+					addra => fpwaddr,
+					dia => fpwdata,
+					-- port B: read-only interface to ecc_fp
+					reb => fpre,
+					addrb => fpraddr,
+					dob => fprdata,
+					-- interface with ecc_scalar
+					permute => permute,
+					permuterdy => permuterdy,
+					permuteundo => permuteundo,
+					-- interface with ecc_trng
+					trngvalid => trng_valid_sh,
+					trngrdy => trng_rdy_sh,
+					trngdata => trng_data_sh
+					-- pragma translate_off
+					-- interface with ecc_fp (simu only)
+					, fpdram => fpdram,
+					fprwmask => fprwmask
+					-- pragma translate_on
+				); -- ecc_fp_dram_sh_linear
+		end generate;
+
+		ds1: if shuffle_type = permute_lgnb generate
+			ds1: ecc_fp_dram_sh_fishy_nb
+				generic map(
+					rdlat => sramlat)
+				port map(
+					clk => s_axi_aclk,
+					rstn => s_axi_aresetn_resync,
+					swrst => swrst,
+					-- port A: write-only interface to ecc_fp
+					-- (actually for write-access from AXI-lite interface)
+					wea => fpwe,
+					addra => fpwaddr,
+					dia => fpwdata,
+					-- port B: read-only interface to ecc_fp
+					reb => fpre,
+					addrb => fpraddr,
+					dob => fprdata,
+					-- interface with ecc_axi
+					nndyn_wm1 => nndyn_wm1,
+					-- interface with ecc_scalar
+					permute => permute,
+					permuterdy => permuterdy,
+					-- interface with ecc_trng
+					trngvalid => trng_valid_sh,
+					trngrdy => trng_rdy_sh,
+					trngdata => trng_data_sh
+					-- pragma translate_off
+					-- interface with ecc_fp (simu only)
+					, fpdram => fpdram,
+					vtophys => vtophys
+					-- pragma translate_on
+				); -- ecc_fp_dram_sh_fishy_nb
+		end generate;
+
+		ds2: if shuffle_type = permute_limbs generate
+			ds2: ecc_fp_dram_sh_fishy
+				generic map(
+					rdlat => sramlat)
+				port map(
+					clk => s_axi_aclk,
+					rstn => s_axi_aresetn_resync,
+					swrst => swrst,
+					-- port A: write-only interface to ecc_fp
+					-- (actually for write-access from AXI-lite interface)
+					wea => fpwe,
+					addra => fpwaddr,
+					dia => fpwdata,
+					-- port B: read-only interface to ecc_fp
+					reb => fpre,
+					addrb => fpraddr,
+					dob => fprdata,
+					-- interface with ecc_scalar
+					permute => permute,
+					permuterdy => permuterdy,
+					-- interface with ecc_trng
+					trngvalid => trng_valid_sh,
+					trngrdy => trng_rdy_sh,
+					trngdata => trng_data_sh
+					-- pragma translate_off
+					-- interface with ecc_fp (simu only)
+					, fpdram => fpdram,
+					vtophys => vtophys
+					-- pragma translate_on
+				); -- ecc_fp_dram_sh_fishy
+		end generate;
+
 	end generate;
 
 	ds0_n: if not shuffle generate
@@ -1578,7 +1709,14 @@ begin
 		end if;
 		echo(", shuffle ");
 		if shuffle then
-			echo("ON");
+			echo("ON (");
+			if shuffle_type = linear then
+				echo("linear address masking)");
+			elsif shuffle_type = permute_lgnb then
+				echo("permutation of large numbers)");
+			elsif shuffle_type = permute_limbs then
+				echo("permutation of large numbers internal limbs)");
+			end if;
 		else
 			echo("OFF");
 		end if;
@@ -1621,7 +1759,7 @@ begin
 		echo("-bit, irn sh=");
 		echo(integer'image(irn_fifo_size_sh));
 		echo(" words of ");
-		echo(integer'image((FP_ADDR)));
+		echo(integer'image((irn_width_sh)));
 		echol("-bit");
 		wait;
 	end process;

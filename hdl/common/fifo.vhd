@@ -93,12 +93,11 @@ begin
 			clk => clk,
 			-- port A (write/push/fill)
 			addra => r.waddr,
-			ena => vcc,
 			wea => r.we,
 			dia => r.datain,
 			-- port B (read/pull/empty)
 			addrb => r.raddr,
-			enb => re,
+			reb => re,
 			dob => dataout
 		);
 
