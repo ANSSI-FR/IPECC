@@ -21,3 +21,4 @@ sim/sage/ecc_tb.sage.py
 *.log
 *.html
 *.pdf
+*.swp
