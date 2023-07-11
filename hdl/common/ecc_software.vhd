@@ -112,8 +112,7 @@ package ecc_software is
 	constant CTRL_PT_NEG : natural := 4;
 	constant CTRL_PT_EQU : natural := 5;
 	constant CTRL_PT_OPP : natural := 6;
-	-- bits 7-8 reserved
-	constant CTRL_FP_MUL : natural := 9;
+	-- bits 7-9 reserved
 	-- bits 10-11 reserved
 	constant CTRL_RD_TOKEN : natural := 12;
 	constant CTRL_WRITE_NB : natural := 16;
@@ -154,7 +153,6 @@ package ecc_software is
 	constant STATUS_KP : natural := 4;
 	constant STATUS_MTY : natural := 5;
 	constant STATUS_POP : natural := 6;
-	constant STATUS_AOP : natural := 7;
 	constant STATUS_R_OR_W : natural := 8;
 	constant STATUS_INIT : natural := 9;
 	constant STATUS_ENOUGH_RND : natural := 10;

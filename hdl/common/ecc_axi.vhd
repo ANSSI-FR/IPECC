@@ -104,10 +104,6 @@ entity ecc_axi is
 		popdone : in std_logic;
 		yes : in std_logic;
 		yesen : in std_logic;
-		--   arihtmetic computations
-		doaop : out std_logic;
-		aopid : out std_logic_vector(2 downto 0); -- id defined in ecc_pkg
-		aopdone : in std_logic;
 		--   token
 		gentoken : out std_logic;
 		tokendone : in std_logic;
@@ -330,12 +326,8 @@ architecture rtl of ecc_axi is
 		doshuffle : std_logic;
 		dopop : std_logic;
 		popid : std_logic_vector(2 downto 0); -- id defined in ecc_pkg
-		doaop : std_logic;
-		aopid : std_logic_vector(2 downto 0); -- id defined in ecc_pkg
 		poppending : std_logic;
-		aoppending : std_logic;
 		popdone_d : std_logic;
-		aopdone_d : std_logic;
 		yes : std_logic;
 		r0_is_null : std_logic;
 		r1_is_null : std_logic;
@@ -625,7 +617,7 @@ begin
 	              s_axi_araddr, s_axi_arprot, s_axi_arvalid,
 	              s_axi_rready, ardy, aerr_inpt_not_on_curve,
 	              aerr_outpt_not_on_curve,
-	              kpdone, mtydone, popdone, aopdone, yes, yesen, xrdata,
+	              kpdone, mtydone, popdone, yes, yesen, xrdata,
 	              trngvalid, trngdata, initdone,
 	              trngaxiirncount, trngefpirncount, trngcurirncount,
 	              trngshfirncount,
@@ -882,7 +874,7 @@ begin
 		v_busy := (initdone = '0') or r.ctrl.kppending = '1'
 		         or r.ctrl.mtypending = '1' or r.ctrl.agocstmty = '1'
 		         or r.ctrl.amtypending = '1' or r.ctrl.agomtya = '1'
-		         or r.ctrl.poppending = '1' or r.ctrl.aoppending = '1'
+		         or r.ctrl.poppending = '1'
 		         or r.write.busy = '1' or r.read.busy = '1'
 		         or (nn_dynamic and r.nndyn.active = '1')
 		         or r.read.trngreading = '1'
@@ -1300,7 +1292,6 @@ begin
 					--   3. software wants to start a [k]P computation, see (s188)
 					--   4. software asks for a point-based operation (other than [k]P),
 					--      see (s189)
-					--   5. software asks for a field-arithmetic operation, see (s190)
 					-- In any other case, error flag STATUS_ERR_WREG_FBD is raised in
 					-- R_STATUS register. Note that no error flag is raised in case
 					-- several actions are asked for in the same W_CTRL write, instead
@@ -1662,16 +1653,6 @@ begin
 							-- SW settings are not enough to perform a point-computation
 							v.ctrl.ierrid(STATUS_ERR_POP_FBD) := '1';
 						end if;
-					-- ----------------------------------------------------------
-					--                 field arithmetic operations
-					--            (finally we only left REDC operation)
-					-- ----------------------------------------------------------
-					-- (s190)
-					elsif r.axi.wdatax(CTRL_FP_MUL) = '1' then
-						-- SW is asking for an Fp MUL
-						v.ctrl.doaop := '1';
-						v.ctrl.aopid := ECC_AXI_FP_MUL;
-						v.ctrl.lockaxi := '1'; -- (s91), will be deasserted by (s92)
 					end if; -- decoding content of W_CTRL register
 					v.ctrl.ierrid(STATUS_ERR_WREG_FBD) := '0'; -- clr possible past error
 				else
@@ -2860,8 +2841,8 @@ begin
 		end if;
 
 		if debug then -- statically resolved by synthesizer
-			if (r.ctrl.kppending = '1' or r.ctrl.poppending = '1' or
-				r.ctrl.aoppending = '1') and dbghalted = '0'
+			if (r.ctrl.kppending = '1' or r.ctrl.poppending = '1')
+				and dbghalted = '0'
 			then
 				v.debug.counter := r.debug.counter + 1;
 			end if;
@@ -2930,33 +2911,6 @@ begin
 			end if;
 		end if;
 
-		-- irq generation upon rising edge of aopdone
-		v.ctrl.aopdone_d := aopdone;
-		if aopdone = '1' and r.ctrl.aopdone_d = '0' then
-			v.ctrl.aoppending := '0';
-			v.ctrl.irqsh(3) := '1';
-			if r.ctrl.irqen = '1' then
-				v.ctrl.irq := '1';
-			end if;
-			-- authorize SW to read the result
-			v.ctrl.read_forbidden := '0';
-		end if;
-
-		-- ---------------------------------
-		-- start of one Fp-based computation (handshake with ecc_scalar)
-		-- ---------------------------------
-		-- {deassertion of r.ctrl.doaop}/{assertion of r.ctrl.aoppending}
-		-- once ecc_scalar has acknowledged 'doaop' request
-		if r.ctrl.doaop = '1' and ardy = '1' then
-			v.ctrl.doaop := '0';
-			v.ctrl.aoppending := '1';
-			v.ctrl.lockaxi := '0'; -- (s92) deassertion of (s91)
-			if debug then -- statically resolved by synthesizer
-				v.debug.trigger := '0';
-				v.debug.counter := (others => '0');
-			end if;
-		end if;
-
 		-- ----------------------------------------------------------
 		--                     A X I   R e a d s
 		-- ----------------------------------------------------------
@@ -2997,7 +2951,6 @@ begin
 				     r.ctrl.mtypending or r.ctrl.agocstmty -- or r.ctrl.newp;
 				  or r.ctrl.amtypending or r.ctrl.agomtya;
 				dw(STATUS_POP) := r.ctrl.poppending;
-				dw(STATUS_AOP) := r.ctrl.aoppending;
 				dw(STATUS_R_OR_W) := r.write.busy or r.read.busy;
 				dw(STATUS_INIT) := not initdone;
 				dw(STATUS_ENOUGH_RND) := not r.write.rnd.enough_random;
@@ -4058,9 +4011,7 @@ begin
 			v.ctrl.mtydone_d := '0';
 			v.ctrl.amtydone_d := '0';
 			v.ctrl.dopop := '0';
-			v.ctrl.doaop := '0';
 			v.ctrl.poppending := '0';
-			v.ctrl.aoppending := '0';
 			v.ctrl.ierrid := (others => '0');
 			-- (s240) - blinding config upon reset
 			--   Same treatment whether debug = TRUE or not: in both cases,
@@ -4303,8 +4254,6 @@ begin
 	k_is_null <= r.ctrl.k_is_null;
 	dopop <= r.ctrl.dopop;
 	popid <= r.ctrl.popid;
-	doaop <= r.ctrl.doaop;
-	aopid <= r.ctrl.aopid;
 	ar0zo <= r.ctrl.r0_is_null;
 	ar1zo <= r.ctrl.r1_is_null;
 	aerr_inpt_ack <= r.ctrl.aerr_inpt_ack;

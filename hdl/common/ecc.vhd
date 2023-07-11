@@ -164,10 +164,6 @@ architecture struct of ecc is
 			popdone : in std_logic;
 			yes : in std_logic;
 			yesen : in std_logic;
-			--   arihtmetic computations
-			doaop : out std_logic;
-			aopid : out std_logic_vector(2 downto 0); -- id defined in ecc_pkg
-			aopdone : in std_logic;
 			--   token
 			gentoken : out std_logic;
 			tokendone : in std_logic;
@@ -306,10 +302,6 @@ architecture struct of ecc is
 			popdone : out std_logic;
 			yes : out std_logic;
 			yesen : out std_logic;
-			--   arithmetic computations
-			doaop : in std_logic;
-			aopid : in std_logic_vector(2 downto 0); -- id defined in ecc_pkg
-			aopdone : out std_logic;
 			--   token
 			gentoken : in std_logic;
 			tokendone : out std_logic;
@@ -346,7 +338,6 @@ architecture struct of ecc is
 			compkp : out std_logic;
 			compcstmty : out std_logic;
 			comppop : out std_logic;
-			compaop : out std_logic;
 			token_generating : out std_logic;
 			-- interface with ecc_fp_dram_sh_* (used only in the 'shuffle' case)
 			permute : out std_logic;
@@ -521,7 +512,6 @@ architecture struct of ecc is
 			compkp : in std_logic;
 			compcstmty : in std_logic;
 			comppop : in std_logic;
-			compaop : in std_logic;
 			token_generating : in std_logic;
 			-- debug features (interface with ecc_axi)
 			dbgtrnguse : in std_logic;
@@ -803,9 +793,6 @@ architecture struct of ecc is
 	signal popid : std_logic_vector(2 downto 0);
 	signal popdone : std_logic;
 	signal yes, yesen : std_logic;
-	signal doaop : std_logic;
-	signal aopid : std_logic_vector(2 downto 0);
-	signal aopdone : std_logic;
 	signal gentoken : std_logic;
 	signal tokendone : std_logic;
 	signal ar01zien : std_logic;
@@ -904,7 +891,6 @@ architecture struct of ecc is
 	signal compkp : std_logic;
 	signal compcstmty : std_logic;
 	signal comppop : std_logic;
-	signal compaop : std_logic;
 	signal token_generating : std_logic;
 	-- signals between ecc_fp_scalar & ecc_fp_dram_sh
 	-- (used only when shuffle_type /= none)
@@ -1090,10 +1076,6 @@ begin
 			popdone => popdone,
 			yes => yes,
 			yesen => yesen,
-			--   arihtmetic computations
-			doaop => doaop,
-			aopid => aopid,
-			aopdone => aopdone,
 			--   token
 			gentoken => gentoken,
 			tokendone => tokendone,
@@ -1235,10 +1217,6 @@ begin
 			popdone => popdone,
 			yes => yes,
 			yesen => yesen,
-			--   arihtmetic computations
-			doaop => doaop,
-			aopid => aopid,
-			aopdone => aopdone,
 			--   token
 			gentoken => gentoken,
 			tokendone => tokendone,
@@ -1275,7 +1253,6 @@ begin
 			compkp => compkp, -- also driven to ecc_curve
 			compcstmty => compcstmty,
 			comppop => comppop, -- also driven to ecc_curve
-			compaop => compaop, -- also driven to ecc_curve
 			token_generating => token_generating,
 			-- interface with ecc_fp_dram_sh (used only when shuffle_type /= none)
 			permute => permute,
@@ -1441,7 +1418,6 @@ begin
 			compkp => compkp,
 			compcstmty => compcstmty,
 			comppop => comppop,
-			compaop => compaop,
 			token_generating => token_generating,
 			-- debug feature (interface with ecc_axi)
 			dbgtrnguse => dbgtrnguse,

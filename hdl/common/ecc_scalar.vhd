@@ -75,10 +75,6 @@ entity ecc_scalar is
 		popdone : out std_logic;
 		yes : out std_logic;
 		yesen : out std_logic;
-		--   arihtmetic computations
-		doaop : in std_logic;
-		aopid : in std_logic_vector(2 downto 0); -- id defined in ecc_pkg
-		aopdone : out std_logic;
 		--   token
 		gentoken : in std_logic;
 		tokendone : out std_logic;
@@ -115,7 +111,6 @@ entity ecc_scalar is
 		compkp : out std_logic;
 		compcstmty : out std_logic;
 		comppop : out std_logic;
-		compaop : out std_logic;
 		token_generating : out std_logic;
 		-- interface with ecc_fp_dram_sh (used only if shuffle_type /= none)
 		permute : out std_logic;
@@ -137,7 +132,7 @@ end entity ecc_scalar;
 
 architecture rtl of ecc_scalar is
 
-	type state_type is (idle, cst, set, kp, pop, aop, tok);
+	type state_type is (idle, cst, set, kp, pop, tok);
 
 	type program_type is (idle, checkoncurve, blindinit, blindbit, blindexit,
 	                      adpa, ssetup, joyecoz, subtractp, exits,
@@ -220,13 +215,6 @@ architecture rtl of ecc_scalar is
 		yesen : std_logic;
 	end record;
 
-	-- registers involved in Fp arithmetic operations
-	type aop_reg_type is record
-		computing : std_logic;
-		arithop : std_logic_vector(2 downto 0);
-		done : std_logic;
-	end record;
-
 	-- pragma translate_off
 	-- simulation only
 	type sim_reg_type is record
@@ -273,7 +261,6 @@ architecture rtl of ecc_scalar is
 		kp : kp_reg_type;
 		mty : mty_reg_type;
 		pop : pop_reg_type;
-		aop : aop_reg_type;
 		int : int_reg_type;
 		dbg : debug_reg_type;
 		-- pragma translate_off
@@ -321,6 +308,8 @@ architecture rtl of ecc_scalar is
 	constant SETUP_ROUTINE : natural := 29;
 	constant GET_TOKEN_ROUTINE : natural := 30;
 	constant MASK_TOKEN_ROUTINE : natural := 31;
+	--constant NOP_ROUTINE : natural := 32;
+
 	-- Address of the routines below (all constants whose name starts with
 	-- "ECC_IRAM_" (see below definition of array constant EXEC_ADDR) are
 	-- defined in package ecc_addr (see file <ecc_addr.vhd>) which is
@@ -393,6 +382,7 @@ architecture rtl of ecc_scalar is
 		ZDBLSW_ROUTINE => ECC_IRAM_ZDBL_SW_ADDR,          -- .zdbl_swL[_export]
 		GET_TOKEN_ROUTINE => ECC_IRAM_GET_TOKEN_ADDR,     -- .get_tokenL[_export]
 		MASK_TOKEN_ROUTINE => ECC_IRAM_TOKEN_KP_MASK_ADDR --.token_kP_maskL[_export]
+		-- NOP_ROUTINE =>         (not used here, clumsy exceeds 31, and for nothing)
 	);
 
 	-- pragma translate_off
@@ -422,7 +412,7 @@ begin
 	comb : process(r, rstn, agokp, agocstmty, doblinding, blindbits, agomtya,
 	               frdy, ferr, zero, iterate_shuffle_rdy, permuterdy, doshuffle,
 	               k_is_null, aerr_inpt_ack, aerr_outpt_ack, nndyn_nnm3,
-	               nndyn_nnp1, dopop, popid, doaop, aopid, ar0zo, ar1zo,
+	               nndyn_nnp1, dopop, popid, ar0zo, ar1zo,
 	               swrst, first2pz, xmxz, ymyz, torsion2, kap, kapp,
 	               phimsb, kb0end, small_k_sz_en, small_k_sz_en_en, small_k_sz,
 	               gentoken, tokenact, zremaskact, zremaskbits)
@@ -619,20 +609,6 @@ begin
 				v.pop.computing := '1';
 				v.int.ar0zi := ar0zo;
 				v.int.ar1zi := ar1zo;
-			elsif (r.int.ardy = '1' and doaop = '1') then
-				-- trigger start of a field arithmetic operation
-				v.int.ardy := '0';
-				v.aop.done := '0';
-				v.ctrl.active := '1';
-				v.ctrl.state := aop;
-				--case aopid is
-				--	-- Fp REDC
-				--	when "010" => v.int.faddr := EXEC_ADDR(FPMULT_ROUTINE);
-				--	-- no error here, ids should be filtered by ecc_axi
-				--	when others => null;
-				--end case;
-				v.int.fgo := '1'; -- (s72), see (s67)
-				v.aop.computing := '1';
 			elsif (r.int.ardy = '1' and gentoken = '1') then
 				-- ----------------------------------
 				-- trigger generation of random token
@@ -961,12 +937,6 @@ begin
 							-- be done by either (s61), (s62) or (s63)
 						end if;
 					end if;
-				when aop =>
-					v.ctrl.active := '0';
-					v.ctrl.state := idle;
-					v.int.ardy := '1';
-					v.aop.done := '1';
-					v.aop.computing := '0';
 				when others => null; -- TODO: treat this as an error
 			end case; -- r.ctrl.state
 		end if; -- fgo = 0 + frdy = 1
@@ -2074,7 +2044,6 @@ begin
 			v.mty.computing := '0';
 			v.mty.computing_a := '0';
 			v.pop.computing := '0';
-			v.aop.computing := '0';
 			v.kp.joye.state := idle;
 			if shuffle_type /= none then -- statically resolved by synthesizer
 				v.int.permute := '0';
@@ -2096,7 +2065,6 @@ begin
 				v.int.permuteundo := '0';
 			end if;
 			v.pop.done := '0';
-			v.aop.done := '0';
 			-- no need to reset r.pop.equal, r.pop.opp, r.pop.equalx, r.pop.step
 			v.pop.yes := '0';
 			v.pop.yesen := '0';
@@ -2133,7 +2101,6 @@ begin
 	mtydone <= r.mty.done;
 	amtydone <= r.mty.donea;
 	popdone <= r.pop.done;
-	aopdone <= r.aop.done;
 	yes <= r.pop.yes;
 	yesen <= r.pop.yesen;
 	ar01zien <= r.int.ar01zien;
@@ -2164,7 +2131,6 @@ begin
 	compkp <= r.kp.computing; -- also driven to ecc_curve
 	compcstmty <= r.mty.computing_del;
 	comppop <= r.pop.computing; -- also driven to ecc_curve
-	compaop <= r.aop.computing; -- also driven to ecc_curve
 	aerr_inpt_not_on_curve <= r.int.aerr_inpt_not_on_curve;
 	aerr_outpt_not_on_curve <= r.int.aerr_outpt_not_on_curve;
 	--     (this signal is only used in the 'shuffle_type' /= none case)
@@ -2244,11 +2210,6 @@ begin
 			elsif (r.ctrl.state = pop and rbak_state /= pop) then
 				echo("ECC_SCALAR: ");
 				echo("entering state 'pop' (");
-				echo(time'image(now));
-				echol(")");
-			elsif (r.ctrl.state = aop and rbak_state /= aop) then
-				echo("ECC_SCALAR: ");
-				echo("entering state 'aop' (");
 				echo(time'image(now));
 				echol(")");
 			end if;

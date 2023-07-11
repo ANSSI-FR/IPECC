@@ -70,7 +70,6 @@ entity ecc_fp is
 		compkp : in std_logic;
 		compcstmty : in std_logic;
 		comppop : in std_logic;
-		compaop : in std_logic;
 		token_generating : in std_logic;
 		-- debug features (interface with ecc_axi)
 		dbgtrnguse : in std_logic;
@@ -352,7 +351,6 @@ architecture rtl of ecc_fp is
 		compkpdel : std_logic;
 		compcstmtydel : std_logic;
 		comppopdel : std_logic;
-		compaopdel : std_logic;
 		tokgendel : std_logic;
 	end record;
 
@@ -588,7 +586,7 @@ begin
 	-- combinational process
 	comb : process(r, rstn,
 	               opi, mmo, fprdata, xwe, xaddr, xwdata, xre, initkp,
-	               compkp, compcstmty, comppop, compaop, trngdata, trngvalid,
+	               compkp, compcstmty, comppop, trngdata, trngvalid,
 	               dbgtrnguse, dbghalted,
 	               nndyn_nnrnd_mask, nndyn_nnrnd_zerowm1, nndyn_wm1,
 								 nndyn_2wm1, swrst, token_generating)
@@ -2083,9 +2081,8 @@ begin
 		v.compkpdel := compkp;
 		v.compcstmtydel := compcstmty;
 		v.comppopdel := comppop;
-		v.compaopdel := compaop;
 		v.tokgendel := token_generating;
-		if (compkp = '0' and compcstmty = '0' and comppop = '0' and compaop = '0'
+		if (compkp = '0' and compcstmty = '0' and comppop = '0'
 				and token_generating = '0')
 			or (debug and dbghalted = '1')
 		then -- (s98), see (s100) in ecc_curve.vhd
@@ -2102,7 +2099,6 @@ begin
 			if   (r.compkpdel = '0' and compkp = '1')
 			  or (r.compcstmtydel = '0' and compcstmty = '1')
 			  or (r.comppopdel = '0' and comppop = '1')
-			  or (r.compaopdel = '0' and compaop = '1')
 				or (r.tokgendel = '0' and token_generating = '1')
 			then
 				v.fpram.we := '0';
