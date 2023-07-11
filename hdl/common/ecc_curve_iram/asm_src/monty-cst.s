@@ -77,7 +77,7 @@
 # if the result of last NNSUB is negative, patch p5 on line below will
 # replace virtual operand patchme with address of variable twop, hence
 # restoring a positive value. It the result is positive, effect of patch
-# is to replace patchme with the address of of variable zero
+# is to replace patchme with the address of variable zero
 	NNADD,p5	red	patchme	Rmodp
 	STOP
 

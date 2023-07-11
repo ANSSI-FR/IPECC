@@ -303,7 +303,7 @@ begin
 				v_one_selected := TRUE;
 				v_selected := 3;
 			end if;
-		elsif shuffle and r.priority = 3 then
+		elsif shuffle_type /= none and r.priority = 3 then
 			if r.irn(3).can_be_filled = '1' then
 				v_one_selected := TRUE;
 				v_selected := 3;
@@ -385,7 +385,7 @@ begin
 					v.irn(2).valid := '1';
 					v.irn(2).can_be_filled := '0'; -- to inhibit target 2 in (s3)
 				end if;
-				if shuffle then
+				if shuffle_type /= none then
 					v.priority := 3;
 				else
 					v.priority := 0;

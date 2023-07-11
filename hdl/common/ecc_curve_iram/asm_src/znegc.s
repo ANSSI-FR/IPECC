@@ -29,5 +29,4 @@
 	NNMOV,p55	Ykeep		patchme
 	NNMOV,p20	Xkeep		XR0
 	NNMOV,p21	Xkeep		XR1
-	NOP
 	STOP

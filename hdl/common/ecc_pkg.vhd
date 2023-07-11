@@ -169,6 +169,7 @@ package ecc_pkg is
 	constant CST_ADDR_ZERO : stdop := std_nat(LARGE_NB_ZERO_ADDR, FP_ADDR_MSB);
 	constant CST_ADDR_XR0BK : stdop := std_nat(LARGE_NB_XR0BK_ADDR, FP_ADDR_MSB);
 	constant CST_ADDR_YR0BK : stdop := std_nat(LARGE_NB_YR0BK_ADDR, FP_ADDR_MSB);
+	constant CST_ADDR_TOKEN : stdop := std_nat(LARGE_NB_TOKEN_ADDR, FP_ADDR_MSB);
 
 	constant CST_ARITH_MASK_0 : integer := 10;
 	constant CST_ARITH_MASK_1 : integer := 11;
@@ -417,10 +418,10 @@ package ecc_pkg is
 	constant ADB : natural := AXIAW - 3;
 
 	-- Note: the alignment of registers on 8-byte boundaries is effective
-	--       whatever the IP being is configured as a 32-bit AXI interface
-	--       (thiz is the case when axi32or64 = 32 in ecc_customize.vhd)
-	--       or as a 64-bit AXI interface (this is the case when axi32or64
-	--       = 64 in ecc_customize.vhd)
+	--       whatever the IP being being configured as a 32-bit AXI interface
+	--       (this is the case when axi32or64 = 32 in ecc_customize.vhd)
+	--       or as a 64-bit AXI interface (this is the case when axi32or64 = 64
+	--       in ecc_customize.vhd)
 
 	-- Below is a little ASCII art to illustrate how the IP decodes the AXI
 	-- address bus (either read or write) to determine which register is
@@ -452,9 +453,10 @@ package ecc_pkg is
 	--                               (offset +0x158 from base address
 	--                               of the IP in the system) matches
 	--                               register W_DBG_FP_WDATA (search
-	--                               below for this character string)
-	--                                 in write-mode and register
-	--                               R_DBG_IRN_CNT_AXI in read mode.
+	--                                this character string in file
+	--                               ecc_software.vhd) in write-mode
+	--                               and register R_DBG_IRN_CNT_AXI
+	--                                        in read mode.
 	--
 	-- Note that address decoding is not the same depending on the value of
 	-- parameter 'debug' in ecc_customize.vhd:
@@ -476,26 +478,21 @@ package ecc_pkg is
 
 	subtype rat is std_logic_vector(ADB - 1 downto 0);
 
-	--subtype phys_addr is std_logic_vector(FP_ADDR - 1 downto 0);
-
-	--type virt_to_phys_table_type is
-	--	array(integer range 0 to (2**FP_ADDR) - 1) of phys_addr;
-
 	function set_phys_addr_width return positive;
 
 end package ecc_pkg;
 
 package body ecc_pkg is
 
-	-- it doesn't make sense that the nb of DSP primitives in design is
-	-- greater than 'w'
+	-- It doesn't make sense that the nb of DSP primitives in design is
+	-- greater than 'w'.
 	function set_ndsp return positive is
 		variable tmp : positive;
 	begin
 		assert (nbdsp > 1)
 			report "minimal allowed value of nbdsp user parameter is 2"
 				severity failure;
-		if nbdsp > w then -- nbdsp is defined by user
+		if nbdsp > w then -- 'nbdsp' is defined by user
 			tmp := w;
 		else
 			tmp := nbdsp;
@@ -506,7 +503,7 @@ package body ecc_pkg is
 	function set_irn_width_sh return positive is
 		variable tmp : positive;
 	begin
-		-- shuffle_type is defined in package ecc_customize
+		-- 'shuffle_type' is defined in package ecc_customize
 		if shuffle_type = linear or shuffle_type = permute_limbs then
 			tmp := FP_ADDR; -- defined in current package, see above
 		elsif shuffle_type = permute_lgnb then
@@ -518,16 +515,15 @@ package body ecc_pkg is
 	function set_phys_addr_width return positive is
 		variable tmp : positive;
 	begin
-		if shuffle then
+		if shuffle_type /= none then
 			if shuffle_type = permute_limbs then
 				tmp := FP_ADDR;
 			elsif shuffle_type = permute_lgnb then
 				tmp := FP_ADDR_MSB;
-			else
-				-- not important in this case (we set an arbitrary value)
+			else -- means 'shuffle_type' = 'linear'
 				tmp := FP_ADDR;
 			end if;
-		else
+		else -- 'shuffle_type' = 'none'
 			-- not important in this case (we set an arbitrary value)
 			tmp := FP_ADDR;
 		end if;

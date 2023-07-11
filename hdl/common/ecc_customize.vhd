@@ -18,69 +18,82 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
 package ecc_customize is
-	-- ----------------------------------
+	-- **********************************
 	-- start of: user-editable parameters
-	-- ----------------------------------
-	-- A small documentation on the following parameters is provided
-	-- at the end of the package description, in the same order as
-	-- they appear hereafter - please see below.
-	constant nn : positive := 256;
+	-- **********************************
+	-- Please refer to the in-file documentation of parameters below (after the
+	-- package specification), where parameters are described in the same order
+	-- as they appear in the code hereafter.
+	constant nn : positive := 528;
 	constant nn_dynamic : boolean := TRUE;
 	type techno_type is (spartan6, virtex6, series7, ultrascale, ialtera, asic);
-	constant techno : techno_type := ultrascale; -- choose one of 'techno_type' value
+	constant techno : techno_type := ultrascale; -- set a 'techno_type' value
+	-- ------------------------------
+	-- performance related parameters
+	-- ------------------------------
 	-- multwidth is only used if 'techno' = 'asic'
 	-- (otherwise its value has no meaning and can be ignored)
 	constant multwidth : positive := 32; -- 32 seems fair for an ASIC default
 	constant nbmult : positive range 1 to 2 := 2;
 	-- parameter nbdsp below is range-constrained because it must be >=2
-	constant nbdsp : positive range 2 to positive'high := 4;
+	constant nbdsp : positive range 2 to positive'high := 6;
 	constant sramlat : positive range 1 to 2 := 1;
 	constant async : boolean := TRUE;
-	constant shuffle : boolean := TRUE;
-	type shuftype is (linear, permute_lgnb, permute_limbs);
-	-- shuffle_type below is used only when shuffle = TRUE
-	constant shuffle_type : shuftype := permute_lgnb; -- choose one of 'shuftype' value
-	constant notrng : boolean := TRUE; -- set to TRUE for simu, to FALSE for syn
+	-- -----------------------------------------------
+	-- side-channel countermeasures related parameters
+	-- -----------------------------------------------
+	constant debug : boolean := FALSE; -- FALSE = highly secure, TRUE = highly not
+	constant blinding : integer := 96; -- 96 seems fair for size of blinding rnd
+	constant shuffle : boolean := TRUE; -- memory shuffling
+	type shuftype is (none, linear, permute_lgnb, permute_limbs);
+	constant shuffle_type : shuftype := permute_lgnb; -- set a 'shuftype' value
+	constant zremask : integer := 16; -- quite arbitrary
+	-- -----------------------
+	-- TRNG related parameters
+	-- -----------------------
+	constant notrng : boolean := FALSE; -- set to TRUE for simu, to FALSE for syn
 	constant nbtrng : positive := 4;
 	constant trngta : natural range 1 to 4095 := 32;
-	-- the five constants below are expressed in kB (kilo bytes)
-	-- (mind that in FPGAs blockRAMs are typically 4 kB in size)
-	constant trng_ramsz_raw : positive := 4;
-	constant trng_ramsz_axi : positive := 4;
-	constant trng_ramsz_fpr : positive := 4;
-	constant trng_ramsz_crv : positive := 4;
-	constant trng_ramsz_shf : positive := 16;
+	constant trng_ramsz_raw : positive := 4; -- in kB
+	constant trng_ramsz_axi : positive := 4; -- in kB
+	constant trng_ramsz_fpr : positive := 4; -- in kB
+	constant trng_ramsz_crv : positive := 4; -- in kB
+	constant trng_ramsz_shf : positive := 16; -- in kB
+	-- -------------
+	-- miscellaneous
+	-- -------------
 	constant axi32or64 : natural := 32; -- 32 or 64 only allowed values
-	constant debug : boolean := FALSE;
 	constant nblargenb : positive := 32;  -- change these two parameters only if
 	constant nbopcodes : positive := 512; -- you really know what you're doing
-	-- parameters below only concern simulation
+	-- --------------------------
+	-- simulation-only parameters
+	-- --------------------------
 	constant simkb : natural range 0 to natural'high := 0; -- if 0 then ignored
 	constant simlog : string := "/tmp/ecc.log";
 	constant simtrngfile: string := "/tmp/random.txt";
-	-- --------------------------------
+	-- ********************************
 	-- end of: user-editable parameters
-	-- --------------------------------
+	-- ********************************
 end package ecc_customize;
 
 
 
 
---                         *******************************
---                         *      DOCUMENTATION FOR      *
---                         *      PARAMETERS ABOVE       *
---                         *******************************
+--                         ******************************
+--                         *      DOCUMENTATION OF      *
+--                         *      ABOVE PARAMETERS      *
+--                         ******************************
 
 -- ============================================================================
 -- NAME
---       nn
+--       'nn'
 --
 -- DEFINITION
 --       Main security parameter.
 --
 -- TYPE/VALUE
 --       Integer. No limit except that of the hardware ressources available
---       from your target/die-area.
+--       in your target/die-area.
 --
 -- DESCRIPTION
 --       Defines the size in bit of large numbers implied in cryptographic
@@ -89,16 +102,19 @@ end package ecc_customize;
 --       q of the curve, the point coordiantes XP & YP of the base point, and
 --       all intermediate variables used during computations.
 --       Note: the order q of the curve can be greater than p (by a quantity
---       that, according to Hasse theorem, may be up to twhice the square root
+--       that, according to Hasse theorem, may be up to twice the square root
 --       of p) therefore the value of 'nn' should be chosen as max(size of p,
 --       size of q). Refer for instance to [Hankerson, Menezes, Vanstone,
 --       "Elliptic Curve Cryptography", Springer 2004, p. 82, thereom 3.7],
 --       or the Wikipedia article "Hasse's theorem on elliptic curves"
 --       https://en.wikipedia.org/wiki/Hasse%27s_theorem_on_elliptic_curves.
 --
+-- SEE ALSO
+--       'nn_dynamic'
+--
 -- ============================================================================
 -- NAME
---       nn_dynamic
+--       'nn_dynamic'
 --
 -- DEFINITION
 --       Option to set the "dynamic prime size" feature.
@@ -111,23 +127,28 @@ end package ecc_customize;
 --       driver to dynamically set the security parameter, meaning the value
 --       of 'nn' can be modified at runtime. This is done by writing register
 --       W_PRIME_SIZE. The value statically set to 'nn' in the present file
---       then becomes the maximum value allowed at runtime (hardware enforces
+--       then becomes the maximum value allowed at runtime. Hardware enforces
 --       verification of this and, in case the condition that the value set
 --       by software is greater than 'nn', raises an error flag in main status
 --       register (R_STATUS) and freezes operations until a correct value
 --       is set again by software.
+--
 --       When the option it set to FALSE, software cannot modify value of 'nn'
 --       at runtime, and only cares the value set of 'nn' in the present file.
 --       The advantage of setting this option to FALSE when the feature is
 --       not considered useful for your own design is to save logic.
---       The advatange of setting this option to TRUE when you need for your
---       application to modify the security parameter at runtime is to increase
---       performances (latency and throughput) whenever a smaller value of 'nn'
---       can be chosen.
+--
+--       The advantage of setting this option to TRUE, when you need for your
+--       own application to be able modify the security parameter at runtime,
+--       is to increase performances (latency and throughput) whenever a
+--       smaller value of 'nn' can be chosen.
+--
+-- SEE ALSO
+--       'nn'
 --
 -- ============================================================================
 -- NAME
---       techno
+--       'techno'
 --
 -- DEFINITION
 --       Defines the technology (ASIC vs FPGA) you wish to target and, in the
@@ -146,9 +167,12 @@ end package ecc_customize;
 --       hardware feature that needs to be "black-box" instanciated in the
 --       design (as opposed to inferred by synthesizer from behavorial VHDL).
 --
+-- SEE ALSO
+--       'multwidth'
+--
 -- ============================================================================
 -- NAME
---       multwidth
+--       'multwidth'
 --
 -- DEFINITION
 --       Only used if 'techno' = asic, and in this case designates the size
@@ -201,7 +225,7 @@ end package ecc_customize;
 --       The size of the limbs of large numbers manipulated in the IP (hence
 --       also the size of the inputs to the multipliers) is denoted 'ww' (for
 --       word's width) and is set statically (meaning at compilation/synthesis
---       time) by function set_ww of package ecc_utils (file ecc_utils.vhd):
+--       time) by function 'set_ww' of package ecc_utils (file ecc_utils.vhd):
 --
 --         - if you have set 'techno' = asic, value of 'ww' is set to the same
 --           value as 'multwidth'
@@ -220,7 +244,7 @@ end package ecc_customize;
 --               a significant difference in the final area nor the performance
 --               of the design.
 --               However if you really want to scrimp and save to the maximum,
---               you can tweak set_ww function to return 17 instead of 16.
+--               you can tweak 'set_ww' function to return 17 instead of 16.
 --             - for Intel-Altera FPGAs, 'ww' is set to 27. This is a peremptory
 --               choice that you can also modify to a default 9 or 18 by editing
 --               the code.
@@ -248,11 +272,11 @@ end package ecc_customize;
 --       cases you won't have to worry about 'ww' and 'multwidth' parameters.
 --
 -- SEE ALSO
---       nbdsp
+--       'nbdsp'
 --
 -- ============================================================================
 -- NAME
---       nbmult
+--       'nbmult'
 --
 -- DEFINITION
 --       Number of Montgomery multipliers instanciated in the IP.
@@ -300,9 +324,10 @@ end package ecc_customize;
 --       modified. Visit the page "Explicit-Formulas Database" of website
 --       hyperelliptic.org for a comprehensive description of elliptic curve
 --       formulae, with a comparison of their performances.
+--
 -- ============================================================================
 -- NAME
---       nbdsp
+--       'nbdsp'
 --
 -- DEFINITION
 --       Number of MACC/DSP blocks per Montgomery multipliers
@@ -345,18 +370,18 @@ end package ecc_customize;
 --       large numbers are made of. Function set_ndsp in package ecc_pkg.vhd
 --       enforces that this limit is not exceeded, it is used to compute the
 --       value of a parameter called 'ndsp' (based on 'nbdsp') which is the
---       constant actually used in the RTL code: if value of nbdsp set by
---       user in present file is below the limit, then ndsp = nbdsp, and if
---       it is greater, then ndsp is set to the limit.
+--       constant actually used in the RTL code: if value of 'nbdsp' set by
+--       user in present file is below the limit, then 'ndsp' = 'nbdsp', and
+--       if it is greater, then ndsp is set to the limit.
 --       For instance in the example above and with 'ww' = 16, the limit to
---       'nbdsp' is 17, therefore any value for 'nbdsp' above 17 will be ignored
---       and replaced by 17. Now the table above also tells us that 17 is
---       already a suboptimal value for 'nbdsp', and that you'd probably better
---       set 'nbdsp' = 10 instead.
+--       'nbdsp' is 17, therefore any value for 'nbdsp' above 17 will be
+--       ignored and replaced by 17. Now the table above also tells us that
+--       17 is already a suboptimal value for 'nbdsp', and that you'd probably
+--       better set 'nbdsp' = 10 instead.
 --
 -- ============================================================================
 -- NAME
---       sramlat
+--       'sramlat'
 --
 -- DEFINITION
 --       Read latency for all the blocks of SRAM memory used in the IP
@@ -379,7 +404,7 @@ end package ecc_customize;
 --
 -- ============================================================================
 -- NAME
---       async
+--       'async'
 --
 -- DEFINITION
 --       If TRUE, the Montgomery multipliers in the design will reside in
@@ -445,72 +470,445 @@ end package ecc_customize;
 --
 -- ============================================================================
 -- NAME
---       shuffle
+--       'debug'
 --
 -- DEFINITION
---       This parameter is used to statically activate ot statically deactivate
---       the shuffling anti side-channel countermeasure.
+--       To choose between 'debug mode' versus 'production mode' of the IP.
+--       In a nutshell, debug mode means any tampering with the IP is made
+--       easy to the software driver. On the contrary production mode means
+--       hardware security is at its max.
+--
+--       Setting 'debug' to TRUE is very dangerous and should not apply to
+--       production purposes, as this mode allows software driver to tamper
+--       in any possible way with the IP, making it possible for each secu-
+--       rity feature and countermeasure to be disengaged at runtime at the
+--       software initiative.
+--
+--       Setting 'debug' to FALSE is what you wish if you're targeting pro-
+--       duction mode and you aim at disposing of a true hardware secure
+--       element for your application.
 --
 -- TYPE/VALUE
 --       Boolean, true or false.
 --
 -- DESCRIPTION
---       When set to TRUE, this parameter activates the random shuffling of
---       the complete memory storing large cryptographic numbers between the
---       processing of each bit of the scalar. This countermeasure thwarts the
---       attacks aimed at guessing which intermediate variables are manipulated
---       inside point addition formulae, by using their address. As memory
---       shuffling removes the relation between addresses and values of the
---       aforementioned variables, these attacks become infeasible - or, more
---       precisely, much difficult to be carried out.
+--       The IP can be used in two different modes which are exclusive of one
+--       another: either the IP is configured in production mode or it is confi-
+--       gured in debug mode. This configuration is static and can’t be modified
+--       at runtime. Setting 'debug' to TRUE naturally means setting the IP in
+--       the debug mode, and in production mode otherwise.
 --
---       The permutation applied to the content of the memory consists in
---       drawing a random mask and applying it linearly (xor) to the read
---       address of each data word to determine the target (shuffled) write
---       address. Therefore when the countermeasure is activated the memory
---       is physically duplicated inside the IP and a flip/flop mechanism is
---       used to ensure consistency of the transfer of one version of the
---       memory into its newly shuffled version.
+--       Debug mode means that interacting with the IP through software driver
+--       is made very permissive, so as to allow pre-production analysis of the
+--       IP and of its side-channel leakages. Software driver can then tamper
+--       freely with almost any security feature implemented in the IP.
 --
---       A linear masking of the address as we do may appear a too little
---       fragile countermeasure at first sight. However it appeared to us that
---       it was the only way to avoid using a more complex permutation (such as
---       one generated using the Knuth/Fisher-Yates algorithm) that would
---       require using a RAM array to buffer it - thus defeating the purpose
---       of masking the read address of the sensible memory to begin with.
---       In other words, since the purpose of the shuffling countermeasure
---       is to break the relation between large numbers and the address in the
---       physical memory they are read from during sensitive computations,
---       what point would it be to randomize this read address if to get the
---       randomized address, the logic must first read it from another physical
---       memory? In FPGAs all physical memories have the same size (typically
---       32 kbit) therefore the physical leakage occuring while reading a
---       large number from its RAM block is expected to be the same as the
---       one that would occur when reading the randomized address from another
---       RAM block.
+--       In debug mode, software-driver can:
+--         - read or write the value of any large number in memory, at any time
+--         - insert breakpoints into microcode to interrupt scalar multiplica-
+--           tion and perform step by step execution (e.g to allow time iso-
+--           lation of a specific part of [k]P computation for clean, reduced-
+--           noise side-channel measurement)
+--         - specify a precise time in the course of [k]P computation where to
+--           activate or deactivate the trigger signal driven out of the IP
+--           (this is 'dbgtrigger' output port of top-level entity 'ecc').
+--           Use cases for the external out trigger feature include oscilloscope
+--           input-trigger activation and EM injection probe setting-off.
+--           This feature is clock-cycle accurate
+--         - bypass the TRNG and force use of deterministic numbers instead of
+--           random ones
+--         - access internal memory array of the TRNG raw random bit FIFO, in
+--           order to perform entropy quality assessment
+--         - modify the content of the microcode memory to implement and
+--           evaluate different curve formulae or different countermeasures.
+--         - enable or disable almost any of the countermeasures.
 --
---       Our strategy is different in the sense that using a simple boolean
---       masking of the address, both application of one permutation (inbetween
---       the bits of the scalar) and inversion of the permutation (when acces-
---       sing the memory for arithmetical computations) now can be done inside
---       FPGA logic fabric only (as opposed to RAM block access).
+--       In production mode:
+--         - the only large numbers software driver is allowed to WRITE in
+--           memory are the first eight ones (large number address 0 to 7).
+--           These are: prime number p, curve parameters a, b and q, scalar k
+--           and base point coordinates XP & YP
+--         - the only large numbers software driver is allowed to READ from
+--           memory are:
+--             - the two coordinates of the result point (these are
+--               x_{[k]P} and y_{[k]P} in affine representation) which are avai-
+--               lable for read at the same address as XP and YP are respecti-
+--               vely available for write)
+--             - the one-shot random masking token that the IP uses to whiten
+--               the [k]P result coordinates. Software driver is required to
+--               read that number before ordering any [k]P computation, other-
+--               wise it won't be able to obtain the plain (unmasked) value of
+--               the [k]P result coordinates.
+--         - breakpoints do not exist (control logic & data paths are pruned
+--           at synthesis time)
+--         - outside trigger does not exit (control logic & data paths are
+--           pruned at synthesis time).
+--         - TRNG cannot be bypassed, nor random values be forced, nor random
+--           values be read by software (control logic and read data paths are
+--           pruned at synthesis time)
+--         - microcode memory cannot be modified (content is fixed at syn-
+--           thesis time and write data path to memory is pruned).
+--         - Interactions between software driver and IP are strongly res-
+--           tricted. Whenever software issues a command that requires
+--           computation from the IP, it can no longer issues any command
+--           before that computation is totally carried out and completed.
+--         - The choice made by the hardware designer at synthesis time on
+--           the following 3 options : 'blinding', 'shuffle', and 'zremask'
+--           can only be modified by the software driver if it increases
+--           the level of security. For instance, if 'blinding' is 0 in
+--           ecc_customize.vhd, it means software driver will still be able
+--           to program [k]P computations with blinding. On the other hand,
+--           if 'blinding' > 0, then software driver won't be able to suppress
+--           blinding at runtime. Same applies to 'shuffle', and same applies
+--           to 'zremask' (the 'shuffle' parameter however behaves a bit dif-
+--           ferently in the sense that if 'shuffle' = FALSE statically in
+--           ecc_customize.vhd, then it can't be activated at runtime, see
+--           below description of parameter 'shuffle').
+--           The idea behind the three parameters named 'blinding', 'zremask'
+--           and 'shuffle' (along with 'shuffle_type') is to allow the hardware
+--           designer, to lock the corresponding countermeasure as always
+--           applicable to each [k]P computation, and it is important to keep
+--           in mind that these locks are effective only if you also set at
+--           the same time parameter 'debug' to FALSE.
+--           Setting 'debug' parameter to TRUE instead would actually maintain
+--           the possibility to engage each of these countermeasures, but at the
+--           discretion of the software driver and on a [k]P-computation per
+--           [k]P-computation basis.
+--           Note that 'blinding', 'shuffle' & 'zremask' features are not the
+--           only side-channel countermeasures provided with the IP, but only
+--           those that you can choose to statically hardlock. This is because
+--           they are the most performance costly.
 --
---       Note: a previous version of the IP was released internally using the
---       Knuth/Fisher-Yates permutation algorithm buffered into a physical RAM
---       block. In this situation, the entropy of the permutation is maximum
---       since each new random permutation can happen to be one among all the
---       n! possible permutations (with 'n' here denoting the size of the
---       large number memory to be shuffled). Whereas with the current code
---       release, based on linear masking, the number of permutations is only
---       a small fraction (n) of the total number of possible permutations.
---       It is possible that this feature be released again in the future.
---       If it is, choice will then be given to the designer to choose wich
---       kind of permutation algorithm ha wants to implement (linear masking
---       with logic gates, versus Knuth RAM buffered permutation).
+--       To sum-up:
+--
+--         - If you intend to use the IP in a security application such as a
+--       Secure Element, a Hardware Security Module or if you entend to
+--       integrate it as hardware accelerator inside a general purpose SoC,
+--       choose FALSE.
+--
+--         - If you intend to use the IP for an academic/research purpose,
+--       to evaluate the side-channel resistance of the IP on a specific
+--       target, or during the preproduction phase of your product, choose
+--       TRUE (in the latter case, you may consider to "logic-lock" all
+--       the portion of the design that will remain when you eventually
+--       turn the parameter to FALSE and send it to foundry).
+--
+-- SEE ALSO
+--       'blinding', 'shuffle', 'zremask'
 --
 -- ============================================================================
 -- NAME
---       notrng
+--       'blinding'
+--
+-- DEFINITION
+--       This parameter is used to statically activate (and configure), or
+--       statically deactivate the blinding side-channel countermeasure.
+--
+-- TYPE/VALUE
+--       Integer.
+--       0 means disable, otherwise any strictly positive number will set
+--       the bit size of the blinding number.
+--       Default is 96.
+--
+-- DESCRIPTION
+--       When non null, 'blinding' gives the bit size of the random number
+--       "alpha" used to randomize the original scalar "k" set by software,
+--        according to equation:
+--
+--                             k' = k + (alpha x q)
+--
+--       where "q" designates the order of the elliptic curve.
+--
+--       The rule of thumb is to set a bitwidth of approx. 96 for 'nn' = 256.
+--       Hardware enforces that the size be smaller than 'nn' (either the
+--       static value when 'nn_dynamic' = FALSE, or the runtime dynamic one
+--       when 'nn_dynamic' = TRUE).
+--
+--       Setting 0 instead will keep the blinding countermeasure available but
+--       solely as an option that software can decide to set or not to set at
+--       each [k]P computation.
+--
+-- IMPORTANT NOTE:
+--       Setting a non-0 value to 'blinding' only makes sense if you also set
+--       'debug' to FALSE.
+--       If you set 'debug' to TRUE, the value set for 'blinding' won't make
+--       a difference as software driver will then be considered legitimate
+--       in modifying the blinding settings at runtime, including the possi-
+--       bility to completely disable blinding.
+--
+-- SEE ALSO
+--       'debug', 'shuffle', 'zremask'
+--
+-- ============================================================================
+-- NAME
+--       'shuffle'
+--
+-- DEFINITION
+--       This parameter is used to statically activate or statically deactivate
+--       the shuffling side-channel countermeasure.
+--
+-- TYPE/VALUE
+--       Boolean (true or false)
+--       Default is true.
+--
+-- DESCRIPTION
+--       The purpose of the shuffling countermeasure is to break the relation
+--       between large numbers and the address in the physical memory they are
+--       read from during sensitive computations.
+--
+--       When set to TRUE, 'shuffle' parameter activates the random shuffling of
+--       the complete memory storing large cryptographic numbers between the
+--       processing of each bit of the scalar. This countermeasure thwarts the
+--       attacks aimed at guessing which intermediate variables are manipulated
+--       inside point addition formulae by use of their address's physical
+--       leakage. As memory shuffling removes the relation between addresses
+--       and values of the aforementioned variables, these attacks become
+--       infeasible - or at least much difficult to be carried out.
+--
+--       Set to TRUE if you want the shuffling of large numbers' memory to be
+--       activated at each [k]P computation (memory is shuffled inbetween the
+--       processing of two consecutive bits of the scalar). The method used to
+--       to shuffle the memory is defined as per parameter 'shuffle_type'.
+--
+--       Setting FALSE instead to 'shuffle' parameter will keep the counter-
+--       measure available but solely as an option that software can decide
+--       to use or not to use at each [k]P computation.
+--
+--       In any case, the choice of the shuffling method is static as only one
+--       will be implemented at synthesis time, among 'linear', 'permute_lgnb'
+--       and 'permute_limbs'.
+--
+--       Setting 'shuffle' to TRUE only makes sense if you also set 'debug' to
+--       FALSE. If you set 'debug' to TRUE, the value set for 'shuffle' won't
+--       make a difference, as software driver will then be considered legiti-
+--       mate in modifying the shuffle settings at runtime, including the pos-
+--       sibility to completely disable it.
+--
+-- SEE ALSO
+--       'shuffle_type', 'debug', 'blinding', 'zremask'
+--
+-- ============================================================================
+-- NAME
+--       'shuffle_type'
+--
+-- DEFINITION
+--       Only relevant if 'shuffle' = TRUE.
+--       Defines the way large numbers' memory is shuffled.
+--
+-- TYPE/VALUE
+--       One of 'linear', 'permute_lgnb', 'permute_limbs'
+--       Default is 'permute_lgnb'.
+--
+-- DESCRIPTION
+--
+--       The three available methods of shuffling correspond to a compromise
+--       between implementation complexity & perf. cost on one side, and
+--       efficiency as a side-channel countermeasure on the other.
+--
+--       The 'linear' method is simple to implement and should incur almost
+--       no performance penalty at all (neither in surface nor on speed).
+--       The 'permute_limbs' method should quite damage the speed performance,
+--       and is probably "overkill". Besides, as discussed below, as it requires
+--       an SRAM block memory to store the address indirection, it is possible
+--       that its gain might not be real in terms of side-channel resistance.
+--       It is also expected to consume large quantities of randomness.
+--       The 'permute_lgnb' method offers an intermediate solution, both in
+--       terms of surface and speed, which makes it probably the best solution
+--       (which is why it was set as the default choice).
+--
+--       The description below first covers the two "extreme" methods ('linear'
+--       and 'permute_limbs'), 'permute_lgnb' being explained last.
+--
+--       'linear':
+--
+--          Shuffling will consist in drawing a random mask and applying it
+--          linearly (xor) to the read address of each data word to determine
+--          the target (shuffled) write address. Therefore when the counter-
+--          measure is activated the memory is physically duplicated inside
+--          the IP and a flip/flop mechanism is used to ensure consistency
+--          of the transfer of one version of the memory into its newly shuf-
+--          fled version.
+--          The address here designates the address of *limbs* inside the
+--          large numbers' memory. Hence limbs of the large numbers are what
+--          is shuffled here, meaning that each one of the 'nblargenb' large
+--          numbers stored in memory will have its 'ww'-bit limbs scattered
+--          all accross the memory array, however their addresses will keep
+--          a linear relation between them.
+--          The number of possible permutations in this case is not very
+--          important. For instace for 'nn' = 256 and 'ww' = 16 (and assuming
+--          the default value of 32 for 'nblargenb', the address of a 'ww'-bit
+--          limb in memory will be of 10 bits, which makes it a total of 2**10
+--          (1024) different possible permutations (this should be compared to
+--          the 1024! ways of permutating a memory array of 1024-words, which
+--          is what is offered by the 'permute_limbs' method).
+--
+--       'permute_limbs':
+--
+--          This method consists in permutating the large numbers' memory using
+--          the Fisher-Yates algorithm.
+--          Generally speaking, the Fisher-Yates algorithm is used to randomly
+--          generate any permutation of an n-element set 'a' among the total n!
+--          possibilities of doing so. The algorithm is very simple and consists
+--          in scanning the n items (for instance in the range 'i' from 'n - 1'
+--          downto 0), generating for each step 'i' a random number j in [0..i],
+--          and swapping the items of the set 'a' in positions 'i' & 'j' (noted
+--          a[i] <-> a[j]).
+--          The difference between the 'permute_limbs' & 'permute_lgnb' methods
+--          of shuffling is that in the former the Fisher-Yates algorithm is ap-
+--          plied on limbs, while in the latter it is applied on whole large
+--          numbers.
+--          Hence in the 'permute_limbs' method, many performance aspects of
+--          the implementation are expected to decrease: [k]P computation time
+--          mmight probably increase a lot, and an important throughout will
+--          probably required for randomness. Furthermore, and this is probably
+--          the worst, it is obvious that a second SRAM block memory is made
+--          necessary in the implementation in order to store the definition of
+--          the permutation at any time. Well, the presence of an SRAM memory
+--          in order to store the large numbers was already a drawback in itself
+--          (from the perspective of side-channels (*)) that the shuffling
+--          countermeasure was intended at mitigating in the first place.
+--          Using another SRAM block to store the permutation (i.e the address
+--          translation table) might therefore not be the more judicious to
+--          do so. That's the reason for the option 'permute_lgnb' described
+--          hereafter. The advantage of the 'linear' option is also that it won't
+--          be synthesized but in logic gates, not memory.
+--          (Finally the option 'permute_limbs' was kept in the source code to
+--          allow experiments).
+--
+--              (*) For instance in FPGAs all physical memories have the same
+--                  size (typically 32 kbit) therefore the physical leakage
+--                  occuring while reading a large number from its RAM block
+--                  is expected to be the same as the one that would occur when
+--                  reading the randomized address from another RAM block.
+--                  Power consumption as well as EM emission in digital cir-
+--                  cuits is proportional to the capacitive load of nets,
+--                  which are quite important in memory physical layouts.
+--          
+--       'permute_lgnb':
+--
+--          Here "lgnb" stands for large numbers, meaning the Fisher-Yates algo-
+--          rithm is used to permutate whole large numbers (not only their
+--          limbs). Considering the default value of 32 for the number of large
+--          numbers stored in memory, it is then possible to synthesize the
+--          translation table as a tiny memory of 160 bits (32 words of 5 bits)
+--          whose side-channel signature should be a lot weaker than the large
+--          large numbers' memory, while still allowing the complete 32! permu-
+--          tations (~10^35) to be equally feasible (the component named
+--          'virt_to_phys_ram_async' which implements this memory describes an
+--          asynchronous read memory in order to enforce this synthesis result
+--          in FPGAs (in Xilinx FPGA, the translation memory could thus be
+--          synthesized using only 4 LUT located in the same slice).
+--
+-- NOTE:
+--       As opposed to 'blinding' & 'zremask', it is not possible for the
+--       software driver to enable shuffling if option 'shuffle' was not
+--       statically set to TRUE, nor it is possible to modify the shuffling
+--       method dynamically (meaning at runtime).
+--
+--       If 'shuffle' = TRUE, then only one shuffling method will be synthe-
+--       sized and present in the hardware, according to the value of parame-
+--       ter 'shuffle_type'. If moreover 'debug' = TRUE, then software driver
+--       will be able to enable or disable the shuffling.
+--
+--       Now if 'shuffle' = FALSE, software driver won't be able to activate
+--       it. This is because the hardware implementing the shuffling of memory
+--       won't be present in the circuit to begin with.
+-- 
+-- SEE ALSO
+--       'shuffle', 'nblargenb', 'debug', 'blinding', 'zremask'
+--
+-- ============================================================================
+-- NAME
+--       'zremask'
+--
+-- DEFINITION
+--       Used to enable or disable statically the periodic repetition, all
+--       along the course of [k]P computation, of random re-generation of the
+--       coordinates of sensitive points, using each time a new fresh random
+--       value. This countermeasure is based on the so-called Jacobian projec-
+--       tive representation which by definition uses 3 coordinates (X : Y : Z)
+--       to characterize points on an elliptic curve, instead of two in the
+--       affine (x, y) system.
+--
+-- TYPE/VALUE
+--       Integer.
+--       A value of 0 disables the countermeasure, yet software driver will
+--       still be able to activate it at rutime.
+--       Default value is 16 but this is quite arbitrary. You should consider
+--       the performance penalty induced by the countermeasure when selecting
+--       the value for this parameter (and when doing so, keep in mind that
+--       the smaller the value, the bigger the performance loss) - see last
+--       paragraph of section DESCRIPTION below for performance considera-
+--       tions.
+--
+-- DESCRIPTION
+--       For 'zremask' parameter, setting a non-0 integer will define a periodi-
+--       city, expressed in number of bits of the scalar, at which the coordina-
+--       tes of points R0 and R1 (used throughout the scalar loop to compute
+--       [k]P) will be re-randomized using a fresh multiplicative random (aka
+--       "Z-masking" countermeasure). Note that such a masking is always applied
+--       at the beginning of the scalar loop, regardless of value set for
+--       'zremask'. What you can set with 'zremask' is to force that masking to
+--       happen again and periodically throughout the entire scalar loop.
+--       If you set for instance 'zremask' = 4, then coordinates will be rando-
+--       mized with a new fresh random every one in four bits of the scalar.
+--       There is a 1-1 correspondence between the set of affine points
+--
+--                               {(x, y) : x,y \in F_p}
+--
+--       and the set of projective points
+--
+--                        {(X : Y : Z) : X,Y,Z \in F_p, Z != 0}
+--
+--       verifying x = X / (Z**2),  y = Y / (Z**3).
+--       Hence the Z coordinate can be used as some kind of "free" variable
+--       allowing us to choose between virtually an infinite number (actually
+--       p - 1) of ways to represent any point on the elliptic curve. For any
+--       valid representation (X : Y : Z) that belongs to the equivalence class
+--       of an affine point (x, y) then for any number L in F_p \ {0}, the tri-
+--       plet { (L^2).X : (L^3).Y : L.Z } belongs to the same equivalence class,
+--       hence represents the same point.
+--       This countermeasure has been called "Randomized projective coordina-
+--       tes" in the paper that originally introduced the idea (c.f [J.-B.
+--       Coron, "Resistance against Differential Power Analysis for Elliptic
+--       Curve Cryptosystems", CHES'1999]). In the context of the IP we call
+--       that countermeasure "Z-remasking" as the idea is to allow the user of
+--       of the IP/designer of the hardware system to repeat the randomization
+--       of the point representation several times inside each [k]P represen-
+--       tation.
+--
+--       Setting 'zremask' = 0 will keep the Z-masking countermeasure available
+--       but solely as an option that software can decide to set or not to set
+--       at each [k]P computation.
+--
+--       Setting a non-0 value to 'zremask' only makes sense if you also set
+--       'debug' to FALSE (if you set 'debug' to TRUE, the value set for
+--       'zremask' won't make a difference as software driver will then be
+--       considered legitimate in modifying the 'zremask' settings at runtime
+--       or simply disabling it).
+--
+--       Note that when option 'nn_dynamic' is set to TRUE, the value set for
+--       'zremask' is independent of the runtime value 'nn' can take. If for
+--       instance 'zremask' = 4, re-randomization will happen every 4 bits of
+--       the scalar whether 'nn' = 256 or 'nn' = 384, simply in the former
+--       case it will happen 64 times, and in the latter 96 times.
+--
+--       The cost of the countermeasure is 8 REDC (8 Montgomery multiplications)
+--       at each remasking, so you'd better consider the performance cost of
+--       setting the countermeasure 'zremask', given that each bit of the scalar
+--       already costs 16 REDC per itself in Co-Z representation (which is the
+--       one used in the IP). Obviously the performance cost decreases as the
+--       value of 'zremask' increases (choosing for instance 'zremask' = 1 would
+--       mean randomly refreshing the point coordinates after each bit of the
+--       scalar, which would dramatically increase the computation cost of the
+--       [k]P operation).
+--
+-- SEE ALSO
+--       'debug'
+--
+-- ============================================================================
+-- NAME
+--       'notrng'
 --
 -- DEFINITION
 --       Used to amputate the testbench from the TRNG HDL despcription
@@ -551,12 +949,13 @@ end package ecc_customize;
 --       Vivado tool from ARM-Xilinx seems not comfortable with this parameter
 --       being set to either one of "/dev/random" or "/dev/urandom" (it will
 --       halt simulation from the begining).
-
+--
 -- SEE ALSO
---       simtrngfile
+--       'simtrngfile'
+--
 -- ============================================================================
 -- NAME
---       nbtrng
+--       'nbtrng'
 --
 -- DEFINITION
 --       Number of TRNG primitives instanciated in parallel in the IP.
@@ -616,7 +1015,9 @@ end package ecc_customize;
 --       | IT GUARANTEES THAT THE OUPUT OF THE RANDOM GENERATOR REMAINS  |
 --       | UNPREDICTABLE TO AN ATTACKER EVEN IF SHE TAKES CONTROL OF THE |
 --       | PHYSICAL ENTROPY SOURCE AND THAT THE OUTPUT OF THE PHYSICAL   |
---       | ENTROPY SOURCE BECOMES DETERMINISTIC TO HER.                  |
+--       | ENTROPY SOURCE BECOMES DETERMINISTIC TO HER (e.g THROUGH A    |
+--       | "STUCK-AT-0" OR A "STUCK-AT-1" INVASIVE OR SEMI-INVASIVE KIND |
+--       | OF ATTACK).                                                   |
 --       +===============================================================+
 --
 --       In present release of the IP, as no postprocessing unit is provided,
@@ -692,10 +1093,11 @@ end package ecc_customize;
 --       FIFO.
 --
 -- SEE ALSO
---       trngta, notrng
+--       'trngta', 'notrng'
+--
 -- ============================================================================
 -- NAME
---       trngta
+--       'trngta'
 --
 -- DEFINITION
 --       Main sizing parameter of the entropy quality generated by the ES-TRNG
@@ -733,15 +1135,82 @@ end package ecc_customize;
 --       number properly.
 --
 -- SEE ALSO
---       nbtrng, notrng
+--       'nbtrng', 'notrng'
+--
 -- ============================================================================
 -- NAME
---       axi32or64
+--       'trng_ramsz_[raw|axi|fpr|crv|shf]'
+--
+-- DEFINITION
+--       These 5 parameters each set the size of one of the FIFO used to
+--       buffer random numbers inside the IP before they are serviced to
+--       their respective entropy clients.
+--
+-- TYPE/VALUE
+--       All 5 parameters are integer, expressed in kilo-bytes.
+--
+-- DESCRIPTION
+--       In terminology of AIS31 standard, parameter 'trng_ramsz_raw' is
+--       related to "raw random numbers", which are random numbers directly
+--       taken at the output of the physical source, before any logical
+--       "post-processing". Other 4 parameters 'trng_ramsz_[axi|fpr|crv|shf]
+--       are related to "internal random numbers" (AIS31 terminology again),
+--       which are random numbers taken at the output of the post-processing
+--       operations.
+--       Each of the 5 parameters is translated (this is done in package
+--       ecc_trng_pkg) into an associated parameter expressing the size of
+--       the same FIFO, but this time in number of elements (or "words") of
+--       the corresponding FIFO's memory array. Moreover, and ROUNDED UP
+--       TO THE NEXT (OR EQUAL) POWER OF 2.
+--
+--         - 'trng_ramsz_raw' is translated into parameter 'raw_ram_size'.
+--           Now as the raw random FIFO stores bits, we obviously have:
+--
+--             'raw_ram_size' = greater or equal power of 2 of qty
+--                                (  8 * 1024 * 'trng_ramsz_raw' )
+--
+--         - 'trng_ramsz_axi' is translated into parameter 'irn_fifo_size_axi'.
+--           The FIFO of internal random nb served to ecc_axi storing ww-bit
+--           words, we have:
+--
+--             'irn_fifo_size_axi' = greater or equal power of 2 of qty
+--                                 ( 'trng_ramsz_axi' * 1024 * 8) / ww )
+--
+--         - 'trng_ramsz_fpr' is translated into parameter 'irn_fifo_size_fp'.
+--           The FIFO of internal random nb served to ecc_fp storing ww-bit
+--           words, we have:
+--
+--             'irn_fifo_size_fp' = greater or equal power of 2 of qty
+--                                 ( 'trng_ramsz_fpr' * 1024 * 8) / ww )
+-- 
+--         - 'trng_ramsz_crv' is translated in parameter 'irn_fifo_size_curve'.
+--           The FIFO of internal random nb served to ecc_curve storing 2-bit
+--           words, we have:
+--
+--             'irn_fifo_size_curve' = greater or equal power of 2 of qty
+--                                    ( 'trng_ramsz_crv' * 1024 * 8) / 2 )
+--
+--         - 'trng_ramsz_shf' is translated into parameter 'irn_fifo_size_sh'.
+--           The FIFO of internal random nb served to ecc_fp_dram_sh_* storing
+--           words whose bitwidth depends on the type of shuffling algorithm
+--           selected by parameter 'shuffle_type' (see that parameter and its
+--           desccription), parameter 'irn_fifo_size_sh' is deduced from
+--           'trng_ramsz_shf' through a relation similar as those above but
+--           depending on the parameter 'shuffle_type' (see VHDL function
+--           'set_irn_width_sh' defined in package file ecc_pkg.vhd and used
+--           in ./ecc_trng/ecc_trng_pkg.vhd).
+--
+-- SEE ALSO
+--       'nbtrng', 'notrng', 'shuffle_type'
+--
+-- ============================================================================
+-- NAME
+--       'axi32or64'
 --
 -- DEFINITION
 --       Defines the width of the data buses of the AXI interfaces of the IP.
 --       These are: the WDATA signal bus of the AXI write-data channel, and
---       RDATA signal bus of the AXI read-data channel.
+--       the RDATA signal bus of the AXI read-data channel.
 --
 -- TYPE/VALUE
 --       Integer, with only values 32 or 64 allowed.
@@ -754,6 +1223,7 @@ end package ecc_customize;
 --         - are all 32-bit long (as if data buses were that of a 32-bit
 --           system), WITH THE EXCEPTION OF THE TWO REGISTERS W_WRITE_DATA
 --           and R_READ_DATA
+--
 --         - have address aligned on 8 bytes (as if address buses were that
 --           of a 64-bit system).
 --
@@ -768,6 +1238,7 @@ end package ecc_customize;
 --             - when reading register R_READ_DATA, the 32 upper bits of the
 --               signal bus RDATA (AXI read data channel) will be cleared
 --               (zeroed) by the IP
+--
 --             - when writing register W_WRITE_DATA, the 32 upper bits of the
 --               signal bus WDATA (AXI write data channel) will be ignored
 --               by the IP.
@@ -791,91 +1262,30 @@ end package ecc_customize;
 --             the AXI interconnect, so that to enforce that transactions
 --             should always be issued by pair (otherwise deadlock might occur).
 --
+-- IMPORTANT NOTE:
+--       Experiments made on real hardware, namely Xilinx(R) Zynq(R) SoC/FPGA
+--       platforms, show that is is probably better to always set parameter
+--       'axi32or64' to 32. These real-hardware tests indeed showed that even
+--       when the IP was connected to an AXI 64-bit interface (and despite
+--       the fact that Cortex-A53 used for these tests were 64-bit cores)
+--       bus transactions issued from the CPU were still 32-bit ones, thus
+--       incurring errors with an IP configured in mode 'axi32or64' = 64.
+--
+--       In any case, set 'axi32or64' = 64  *ONLY IF*  you are absolutely
+--       sure and have characterized, in your own hardware application, the
+--       property that AXI transactions emitted by the CPU when writing
+--       (resp. reading) to register W_WRITE_DATA (resp. from register
+--       R_READ_DATA) are 64-bit transactions, which will never be split
+--       in 32-bit transactions during their complete path through the
+--       interconnect from the CPU to the IP (resp. from the IP to the CPU).
+--
+--       The restriction descrived above probably narrows down the utility
+--       of parameter 'axi32or64', which hence might be suppressed in future
+--       releases of the IP.
+--
 -- ============================================================================
 -- NAME
---       debug
---
--- DEFINITION
---       To choose between 'debug mode' versus 'production mode' of the IP.
---       In a nutshell, debug mode means any tampering with the IP is made
---       easy to the software driver. On the contrary production mode means
---       hardware security is at its max.
---
--- TYPE/VALUE
---       Boolean, true or false.
---
--- DESCRIPTION
---       The IP can be used in two different modes which are exclusive of one
---       another: either the IP is configured in production mode or it is confi-
---       gured in debug mode. This configuration is static and can’t be modified
---       at runtime. Setting 'debug' to TRUE naturally means setting the IP in
---       the debug mode, and in production mode otherwise.
---
---       Debug mode means that interacting with the IP through software driver
---       is made very permissive, so as to alloow pre-production analysis of the
---       IP and of its side-channel leakages. Software driver can then tamper
---       freely with almost any security feature implemented in the IP.
---
---       In debug mode, software-driver can:
---         - read or write the value of any large number in memory, at any time
---         - insert breakpoints into microcode to interrupt scalar multiplica-
---           tion and perform step by step execution (e.g to allow time iso-
---           lation of a specific part of [k]P computation for clean, reduced-
---           noise side-channel measurement)
---         - specify a precise time in the course of [k]P computation where to
---           activate or deactivate the trigger signal driven out of the IP
---           (this is 'dbgtrigger' output port of top-level entity 'ecc').
---           Use cases for the external out trigger feature include oscilloscope
---           input-trigger activation and EM injection probe setting-off.
---           This feature is clock-cycle accurate
---         - bypass the TRNG and force use of deterministic numbers instead of
---           random ones
---         - access internal memory array of the TRNG raw random bit FIFO, in
---           order to perform entropy quality assessment
---         - modify the content of the microcode memory to implement and
---           evaluate different curve formulae or different countermeasures.
---
---       In production mode:
---         - the only large numbers software driver is allowed to write in
---           memory are the first eight ones (large number address 0 to 7).
---           These are: prime number p, curve parameters a, b and q, scalar k
---           and base point coordinates XP & YP
---         - the only large numbers software driver is allowed to read from
---           memory are the two coordinates of the result point (these are
---           x_{[k]P} and y_{[k]P} in affine representation) which are avai-
---           lable for read at the same address as XP and YP are respectively
---           available for write)
---         - breakpoints do not exist (control logic & data paths were pruned
---           at synthesis time)
---         - outside trigger does not exit (control logic & data paths wrer
---           pruned at synthesis time).
---         - TRNG cannot be bypassed, nor random values be forced, nor random
---           values be read by software (control logic and read data paths were
---           pruned at synthesis time)
---         - microcode memory cannot be modified (content was fixed at syn-
---           thesis time and write-data path to memory was pruned).
---         - Interactions between software driver and IP are strongly res-
---           tricted. Whenever software issues a command that requires
---           computation from the IP, it can no longer issues any command
---           before that computation is totally carried out and completed.
---
---       To sum-up:
---
---         - If you intend to use the IP in a security application such as a
---       Secure Element, a Hardware Security Module or if you entend to
---       integrate it as hardware accelerator inside a general purpose SoC,
---       choose FALSE.
---
---         - If you intend to use the IP for an academic/research purpose,
---       to evaluate the side-channel resistance of the IP on a specific
---       target, or during the preproduction phase of your product, choose
---       TRUE (in the latter case, you may consider to "logic-lock" all
---       the portion of the design that will remain when you eventually
---       turn the parameter to FALSE and send it to foundry).
-
--- ============================================================================
--- NAME
---       nblargenb
+--       'nblargenb'
 --
 -- DEFINITION
 --       Number of cryptographic large numbers that inner memory of the IP
@@ -924,7 +1334,7 @@ end package ecc_customize;
 --
 -- ============================================================================
 -- NAME
---       nbopcodes
+--       'nbopcodes'
 --
 -- DEFINITION
 --       Size of the microcode memory of the IP, in number of instruction
@@ -946,7 +1356,7 @@ end package ecc_customize;
 --
 -- ============================================================================
 -- NAME
---       simkb
+--       'simkb'
 --
 -- DEFINITION
 --       Only used in simulation, to artificially restrict the size of a large
@@ -967,24 +1377,24 @@ end package ecc_customize;
 --
 -- WARNING
 --       It doesn't make sense to restrict the size of the scalar (using
---       'simkb') in a simulation where blinding countermeasure is also active,
---       or at least simply keep in mind that the quantity of bits that will be
---       taken into account by the IP are the ones of the *blinded* scalar,
---       hence the result can bear no more logic relation with the initial
---       scalar as provided by the software driver.
+--       'simkb') in a simulation where blinding countermeasure is also
+--       enabled, or at least simply keep in mind that the quantity of bits
+--       that will be taken into account by the IP are the ones of the
+--       *blinded* scalar, hence the result can bear no more logic relation
+--       to the scalar as it was set initially by the software driver.
 --
 -- ============================================================================
 -- NAME
---       simlog
+--       'simlog'
 --
 -- DEFINITION
---       Only used in simulation. Path file for the simulation log.
+--       Only used in simulation. Path file for the simulation trace log.
 --
 -- TYPE/VALUE
 --       Character string indicating a file path which should be accessible
 --       in write mode.
---       Default is "/tmp/ecc.log", which should be convenient at least for
---       Unix-like systems.
+--       Default is "/tmp/ecc.log", which should be convenient (at least for
+--       Unix-like systems).
 --
 -- DESCRIPTION
 --       This is the path of the file where simulation will dump the information
@@ -997,12 +1407,12 @@ end package ecc_customize;
 --
 -- ============================================================================
 -- NAME
---       simtrngfile
+--       'simtrngfile'
 --
 -- DEFINITION
 --       Only used in simulation.
---       Testbench input file providing "random" data to the TRNG simulation
---       model.
+--       Name of the input file providing "random" data to the TRNG simulation
+--       testbench.
 --
 -- TYPE/VALUE
 --       Character string indicating a file path which should be accessible
@@ -1015,8 +1425,8 @@ end package ecc_customize;
 --       per line.
 --       Simulation will stop when it hits the end of the file.
 --
---       File sim/jittervals-HOWTO.txt gives an example of a one-liner
+--       File sim/HOWTO-random.txt gives an example of a one-liner
 --       command you can use to quickly generate this file.
 --
 -- SEE ALSO
---       notrng
+--       'notrng'

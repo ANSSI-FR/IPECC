@@ -20,9 +20,7 @@
 	BARRIER
 	NNCLR			alf
 	NNRND			phi0
-.tagphi0L_export:
 	NNRND			phi1
-.tagphi1L_export:
 .savekb0L:
 # *******************************************************************
 # save kb0 (LSB of kb) as it will be required in the end to condition-

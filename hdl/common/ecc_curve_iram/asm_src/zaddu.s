@@ -38,7 +38,6 @@
 # we need to test if YR0 == YR1 (i.e YmY == 0) so reduce YmY in [0, p-1[
 	NNSUB	YmY	p	red
 	NNADD,p49	red	patchme	YmY
-	NOP
 	STOP
 
 .zadduL:
@@ -72,5 +71,4 @@
 	NNSUB,p28	YR0	YR1	YR0
 	BARRIER
 	NNADD,p39	YR0	patchme	YR0
-	NOP
 	RET

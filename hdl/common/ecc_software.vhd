@@ -22,11 +22,16 @@ use work.ecc_utils.all;
 use work.ecc_pkg.all;
 use work.ecc_trng_pkg.all;
 
-package ecc_soft is
+package ecc_software is
 
 	-- Software can rely on the following definitions for proper interaction
 	-- with the IP, with addresses below to be considered as offset from
 	-- the base address allocated to the IP in the whole AXI address system.
+	--
+	-- Please also refer to the comments that come with parameters 'AXIAW'
+	-- and 'ADB' in ecc_pkg.vhd, including the small ASCII figure which
+	-- captures in a simple way the definition of these two parameters.
+	--
 	-- -----------------------------------------------
 	-- addresses of all AXI-accessible write registers
 	-- -----------------------------------------------
@@ -36,11 +41,14 @@ package ecc_soft is
 	constant W_R1_NULL : rat := std_nat(3, ADB);            -- 0x018
 	constant W_PRIME_SIZE : rat := std_nat(4, ADB);         -- 0x020
 	constant W_BLINDING : rat := std_nat(5, ADB);           -- 0x028
-	constant W_IRQ : rat := std_nat(7, ADB);                -- 0x038
-	constant W_ERR_ACK : rat := std_nat(8, ADB);            -- 0x040
-	constant W_SMALL_SCALAR : rat := std_nat(9, ADB);       -- 0x048
-	constant W_SOFT_RESET : rat := std_nat(10, ADB);        -- 0x050
-	-- reserved                                             -- 0x058...0x0f8
+	constant W_SHUFFLE : rat := std_nat(6, ADB);            -- 0x030
+	constant W_ZREMASK : rat := std_nat(7, ADB);            -- 0x038
+	constant W_TOKEN : rat := std_nat(8, ADB);              -- 0x040
+	constant W_IRQ : rat := std_nat(9, ADB);                -- 0x048
+	constant W_ERR_ACK : rat := std_nat(10, ADB);           -- 0x050
+	constant W_SMALL_SCALAR : rat := std_nat(11, ADB);      -- 0x058
+	constant W_SOFT_RESET : rat := std_nat(12, ADB);        -- 0x060
+	-- reserved                                             -- 0x060...0x0f8
 	-- (0x100: start of write DEBUG registers)
 	constant W_DBG_HALT : rat := std_nat(32, ADB);          -- 0x100
 	constant W_DBG_BKPT : rat := std_nat(33, ADB);          -- 0x108
@@ -57,7 +65,9 @@ package ecc_soft is
 	constant W_DBG_FP_RADDR : rat := std_nat(44, ADB);      -- 0x160
 	constant W_DBG_CFG_NOXYSHUF : rat := std_nat(45, ADB);  -- 0x168
 	constant W_DBG_CFG_NOAXIMSK : rat := std_nat(46, ADB);  -- 0x170
-	constant W_DBG_CFG_NOMEMSHUF : rat := std_nat(47, ADB); -- 0x178
+	constant W_DBG_CFG_NOTOKEN : rat := std_nat(47, ADB);   -- 0x178
+	constant W_DBG_RSTTRNGCNT : rat := std_nat(48, ADB);    -- 0x180
+	-- reserved                                             -- 0x188...0x1f8
 	-- ----------------------------------------------
 	-- addresses of all AXI-accessible read registers
 	-- ----------------------------------------------
@@ -75,17 +85,24 @@ package ecc_soft is
 	constant R_DBG_TIME : rat := std_nat(36, ADB);           -- 0x120
 	constant R_DBG_RAWDUR : rat := std_nat(37, ADB);         -- 0x128
 	constant R_DBG_FLAGS : rat := std_nat(38, ADB);          -- 0x130
-	-- reserved                                              -- 0x138
-	constant R_DBG_TRNG_STATUS : rat := std_nat(40, ADB);    -- 0x140
-	constant R_DBG_TRNG_DATA : rat := std_nat(41, ADB);      -- 0x148
-	constant R_DBG_FP_RDATA : rat := std_nat(42, ADB);       -- 0x150
-	constant R_DBG_IRN_CNT_AXI : rat := std_nat(43, ADB);    -- 0x158
-	constant R_DBG_IRN_CNT_EFP : rat := std_nat(44, ADB);    -- 0x160
-	constant R_DBG_IRN_CNT_CUR : rat := std_nat(45, ADB);    -- 0x168
-	constant R_DBG_IRN_CNT_SHF : rat := std_nat(46, ADB);    -- 0x170
-	constant R_DBG_FP_RDATA_RDY : rat := std_nat(47, ADB);   -- 0x178
-	constant R_DBG_EXP_FLAGS : rat := std_nat(48, ADB);      -- 0x180
-	constant R_DBG_DIAGNOSTICS : rat := std_nat(49, ADB);    -- 0x188
+	constant R_DBG_TRNG_STATUS : rat := std_nat(39, ADB);    -- 0x138
+	constant R_DBG_TRNG_DATA : rat := std_nat(40, ADB);      -- 0x140
+	constant R_DBG_FP_RDATA : rat := std_nat(41, ADB);       -- 0x148
+	constant R_DBG_IRN_CNT_AXI : rat := std_nat(42, ADB);    -- 0x150
+	constant R_DBG_IRN_CNT_EFP : rat := std_nat(43, ADB);    -- 0x158
+	constant R_DBG_IRN_CNT_CUR : rat := std_nat(44, ADB);    -- 0x160
+	constant R_DBG_IRN_CNT_SHF : rat := std_nat(45, ADB);    -- 0x168
+	constant R_DBG_FP_RDATA_RDY : rat := std_nat(46, ADB);   -- 0x170
+	constant R_DBG_DIAGNOSTICS_0 : rat := std_nat(47, ADB);  -- 0x178
+	constant R_DBG_DIAGNOSTICS_1 : rat := std_nat(48, ADB);  -- 0x180
+	constant R_DBG_DIAGNOSTICS_2 : rat := std_nat(49, ADB);  -- 0x188
+	constant R_DBG_DIAGNOSTICS_3 : rat := std_nat(50, ADB);  -- 0x190
+	constant R_DBG_DIAGNOSTICS_4 : rat := std_nat(51, ADB);  -- 0x198
+	constant R_DBG_DIAGNOSTICS_5 : rat := std_nat(52, ADB);  -- 0x1a0
+	constant R_DBG_DIAGNOSTICS_6 : rat := std_nat(53, ADB);  -- 0x1a8
+	constant R_DBG_DIAGNOSTICS_7 : rat := std_nat(54, ADB);  -- 0x1b0
+	constant R_DBG_DIAGNOSTICS_8 : rat := std_nat(55, ADB);  -- 0x1b8
+	-- reserved                                              -- 0x1c0...0x1f8
 
 	-- bit positions in W_CTRL register
 	constant CTRL_KP : natural := 0;
@@ -97,7 +114,8 @@ package ecc_soft is
 	constant CTRL_PT_OPP : natural := 6;
 	-- bits 7-8 reserved
 	constant CTRL_FP_MUL : natural := 9;
-	-- bits 10-15 reserved
+	-- bits 10-11 reserved
+	constant CTRL_RD_TOKEN : natural := 12;
 	constant CTRL_WRITE_NB : natural := 16;
 	constant CTRL_READ_NB : natural := 17;
 	constant CTRL_WRITE_K : natural := 18;
@@ -110,19 +128,18 @@ package ecc_soft is
 	constant WR0_IS_NULL : natural := 0;
 	constant WR1_IS_NULL : natural := 0;
 
-	-- bit positions in W_DBG_CFG_NOXYSHUF register
-	constant XYSHF_DIS : natural := 0;
-
-	-- bit positions in W_DBG_CFG_NOAXIMSK register
-	constant AXIMSK_DIS : natural := 0;
-
-	-- bit positions in W_DBG_CFG_NOMEMSHUF register
-	constant MEMSHF_DIS : natural := 0;
-
 	-- bit positions in W_BLINDING register
 	constant BLD_EN : natural := 0;
 	constant BLD_BITS_LSB : natural := 4;
 	constant BLD_BITS_MSB : natural := BLD_BITS_LSB + log2(nn) - 1;
+
+	-- bit positions in W_SHUFFLE register
+	constant SHUF_EN : natural := 0;
+
+	-- bit positions in W_ZREMASK register
+	constant ZMSK_EN : natural := 0;
+	constant ZMSK_LSB : natural := 16;
+	constant ZMSK_MSB : natural := ZMSK_LSB + log2(nn - 1) - 1;
 
 	-- bit positions in W_IRQ register
 	constant IRQ_EN : natural := 0;
@@ -145,18 +162,21 @@ package ecc_soft is
 	constant STATUS_YES : natural := 13;
 	constant STATUS_R0_IS_NULL : natural := 14;
 	constant STATUS_R1_IS_NULL : natural := 15;
-	constant STATUS_ERR_LSB : natural := 16;
-	constant STATUS_ERR_COMP : natural := 16;
-	constant STATUS_ERR_WREG_FBD : natural := 17;
-	constant STATUS_ERR_KP_FBD : natural := 18;
-	constant STATUS_ERR_NNDYN : natural := 19;
-	constant STATUS_ERR_POP_FBD : natural := 20;
-	constant STATUS_ERR_RDNB_FBD : natural := 21;
-	constant STATUS_ERR_BLN : natural := 22;
-	constant STATUS_ERR_UNKNOWN_REG : natural := 23;
-	constant STATUS_ERR_IN_PT_NOT_ON_CURVE : natural := 24;
-	constant STATUS_ERR_OUT_PT_NOT_ON_CURVE : natural := 25;
-	constant STATUS_ERR_MSB : natural := 31;
+	constant STATUS_ERR_IN_PT_NOT_ON_CURVE : natural := 16;
+	constant STATUS_ERR_OUT_PT_NOT_ON_CURVE : natural := 17;
+	constant STATUS_ERR_LSB : natural := 20;
+	constant STATUS_ERR_COMP : natural := 20;
+	constant STATUS_ERR_WREG_FBD : natural := 21;
+	constant STATUS_ERR_KP_FBD : natural := 22;
+	constant STATUS_ERR_NNDYN : natural := 23;
+	constant STATUS_ERR_POP_FBD : natural := 24;
+	constant STATUS_ERR_RDNB_FBD : natural := 25;
+	constant STATUS_ERR_BLN : natural := 26;
+	constant STATUS_ERR_UNKNOWN_REG : natural := 27;
+	constant STATUS_ERR_TOKEN : natural := 28;
+	constant STATUS_ERR_SHUFFLE : natural := 29;
+	constant STATUS_ERR_ZREMASK : natural := 30;
+	constant STATUS_ERR_MSB : natural := 30;
 
 	-- bit positions in R_CAPABILITIES register
 	constant CAP_DBG_N_PROD : natural := 0;
@@ -226,10 +246,19 @@ package ecc_soft is
 	constant DBG_OPCODE_NB_LSB : natural := 8;
 	constant DBG_OPCODE_NB_MSB : natural := 23;
 
+	-- bit positions in W_DBG_CFG_NOXYSHUF register
+	constant XYSHF_DIS : natural := 0;
+
+	-- bit positions in W_DBG_CFG_NOAXIMSK register
+	constant AXIMSK_DIS : natural := 0;
+
+	-- bit positions in W_DBG_CFG_NOTOKEN register
+	constant TOK_DIS : natural := 0;
+
 	-- bit positions in R_PRIME_SIZE
 	--   (same definitions as for W_PRIME_SIZE register, see above)
 
 	-- bit positions in R_DBG_FP_RDATA_RDY
 	constant DBG_FP_RDATA_IS_RDY : natural := 0;
 
-end package ecc_soft;
+end package ecc_software;

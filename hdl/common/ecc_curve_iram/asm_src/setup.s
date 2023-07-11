@@ -12,20 +12,19 @@
 #####################################################################
 #                            S E T U P
 #####################################################################
-.setup0L:
-.setup0L_export:
+.drawZL:
+.drawZL_export:
 # ****************************************************************
 # generate lambda random value (Z-mask)
 # ****************************************************************
-.drawZL:
 	BARRIER
 	NNRNDm			lambda
 	NNSUB	lambda	p	red
 	NNADD,p4	red	patchme	lambda
 	STOP
 
-.setup1L:
-.setup1L_export:
+.setupL:
+.setupL_export:
 # ****************************************************************
 # switch to Montgomery representation
 # ****************************************************************
@@ -46,16 +45,7 @@
 # ****************************************************************
 # randomize coordinates (Z-masking aka point blinding) w/ lambda
 # ****************************************************************
-.taglambdaL_export:
-	FPREDC	lambda	R2modp	lambda
-	BARRIER
-	FPREDC	ZR01	lambda	ZR01
-	FPREDC	lambda	lambda	lambdasq
-	BARRIER
-	FPREDC	XR1	lambdasq	XR1
-	FPREDC	lambdasq	lambda	lambdacu
-	BARRIER
-	FPREDC	YR1	lambdacu	YR1
+	JL	.r1zmultL
 	NNMOV	XR1		XR0
 	BARRIER
 	NNMOV	YR1		YR0
@@ -69,4 +59,16 @@
 # This call won't return
 # ****************************************************************
 	J	.pre_zadduL
+
+.r1zmultL:
+	FPREDC	lambda	R2modp	lambda
+	BARRIER
+	FPREDC	ZR01	lambda	ZR01
+	FPREDC	lambda	lambda	lambdasq
+	BARRIER
+	FPREDC,p44	XR1	lambdasq	XR1
+	FPREDC	lambdasq	lambda	lambdacu
+	BARRIER
+	FPREDC,p45	YR1	lambdacu	YR1
+	RET
 

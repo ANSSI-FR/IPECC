@@ -149,6 +149,9 @@ architecture struct of ecc is
 			small_k_sz : out unsigned(log2(nn) - 1 downto 0);
 			small_k_sz_en_ack : in std_logic;
 			small_k_sz_kpdone : in std_logic;
+			tokenact : out std_logic;
+			zremaskact : out std_logic;
+			zremaskbits : out unsigned(log2(nn - 1) - 1 downto 0);
 			--   Montgomery constants computation
 			agocstmty : out std_logic;
 			mtydone : in std_logic;
@@ -165,24 +168,9 @@ architecture struct of ecc is
 			doaop : out std_logic;
 			aopid : out std_logic_vector(2 downto 0); -- id defined in ecc_pkg
 			aopdone : in std_logic;
-			--   /debug only
-			laststep : in std_logic;
-			firstzdbl : in std_logic;
-			firstzaddu : in std_logic;
-			first2pz : in std_logic;
-			first3pz : in std_logic;
-			torsion2 : in std_logic;
-			kap : in std_logic;
-			kapp : in std_logic;
-			zu : in std_logic;
-			zc : in std_logic;
-			r0z : in std_logic;
-			r1z : in std_logic;
-			pts_are_equal : in std_logic;
-			pts_are_oppos : in std_logic;
-			phimsb : in std_logic;
-			kb0end : in std_logic;
-			--   end of debug only/
+			--   token
+			gentoken : out std_logic;
+			tokendone : in std_logic;
 			-- interface with ecc_curve
 			masklsb : out std_logic;
 			-- interface with ecc_fp (access to ecc_fp_dram)
@@ -223,7 +211,6 @@ architecture struct of ecc is
 			-- debug features (interface with ecc_scalar shared w/ ecc_curve)
 			dbgpgmstate : in std_logic_vector(3 downto 0);
 			dbgnbbits : in std_logic_vector(15 downto 0);
-			dbgjoyebit : in std_logic_vector(log2(2*nn - 1) - 1 downto 0);
 			dbgnbstarvrndxyshuf : in std_logic_vector(15 downto 0);
 			-- debug features (interface with ecc_curve)
 			dbgbreakpoints : out breakpoints_type;
@@ -256,6 +243,16 @@ architecture struct of ecc is
 			dbgtrngrawduration : in unsigned(31 downto 0);
 			dbgtrngvonneuman : out std_logic;
 			dbgtrngidletime : out unsigned(3 downto 0);
+			-- handshake signals between entropy server ecc_trng
+			-- and the different clients (for debug diagnostics)
+			dbgtrngaxirdy : in std_logic;
+			dbgtrngaxivalid : in std_logic;
+			dbgtrngfprdy : in std_logic;
+			dbgtrngfpvalid : in std_logic;
+			dbgtrngcrvrdy : in std_logic;
+			dbgtrngcrvvalid : in std_logic;
+			dbgtrngshrdy : in std_logic;
+			dbgtrngshvalid : in std_logic;
 			-- debug feature (off-chip trigger)
 			dbgtrigger : out std_logic
 		);
@@ -294,6 +291,9 @@ architecture struct of ecc is
 			small_k_sz : in unsigned(log2(nn) - 1 downto 0);
 			small_k_sz_en_ack : out std_logic;
 			small_k_sz_kpdone : out std_logic;
+			tokenact : in std_logic;
+			zremaskact : in std_logic;
+			zremaskbits : in unsigned(log2(nn - 1) - 1 downto 0);
 			--   Montgomery constants computation
 			agocstmty : in std_logic;
 			mtydone : out std_logic;
@@ -310,6 +310,9 @@ architecture struct of ecc is
 			doaop : in std_logic;
 			aopid : in std_logic_vector(2 downto 0); -- id defined in ecc_pkg
 			aopdone : out std_logic;
+			--   token
+			gentoken : in std_logic;
+			tokendone : out std_logic;
 			-- interface with ecc_curve
 			initkp : out std_logic; -- also driven to ecc_fp
 			frdy : in std_logic;
@@ -344,6 +347,7 @@ architecture struct of ecc is
 			compcstmty : out std_logic;
 			comppop : out std_logic;
 			compaop : out std_logic;
+			token_generating : out std_logic;
 			-- interface with ecc_fp_dram_sh_* (used only in the 'shuffle' case)
 			permute : out std_logic;
 			permuterdy : in std_logic;
@@ -351,7 +355,6 @@ architecture struct of ecc is
 			-- debug features
 			dbgpgmstate : out std_logic_vector(3 downto 0);
 			dbgnbbits : out std_logic_vector(15 downto 0);
-			dbgjoyebit : out std_logic_vector(log2(2*nn - 1) - 1 downto 0);
 			dbgnbstarvrndxyshuf : out std_logic_vector(15 downto 0)
 			-- pragma translate_off
 			-- interface with ecc_fp (simu only)
@@ -505,7 +508,6 @@ architecture struct of ecc is
 			nndyn_nnrnd_mask : in std_logic_vector(ww - 1 downto 0);
 			nndyn_nnrnd_zerowm1 : in std_logic;
 			nndyn_wm1 : in unsigned(log2(w - 1) - 1 downto 0);
-			nndyn_wm2 : in unsigned(log2(w - 1) - 1 downto 0);
 			nndyn_2wm1 : in unsigned(log2((2*w) - 1) - 1 downto 0);
 			-- pragma translate_off
 			nndyn_w : in unsigned(log2(w) - 1 downto 0);
@@ -520,6 +522,7 @@ architecture struct of ecc is
 			compcstmty : in std_logic;
 			comppop : in std_logic;
 			compaop : in std_logic;
+			token_generating : in std_logic;
 			-- debug features (interface with ecc_axi)
 			dbgtrnguse : in std_logic;
 			-- debug feature (ecc_scalar)
@@ -781,6 +784,9 @@ architecture struct of ecc is
 	signal small_k_sz : unsigned(log2(nn) - 1 downto 0);
 	signal small_k_sz_en_ack : std_logic;
 	signal small_k_sz_kpdone : std_logic;
+	signal tokenact : std_logic;
+	signal zremaskact : std_logic;
+	signal zremaskbits : unsigned(log2(nn - 1) - 1 downto 0);
 	signal ardy : std_logic;
 	signal aerr_inpt_not_on_curve : std_logic;
 	signal aerr_outpt_not_on_curve : std_logic;
@@ -800,6 +806,8 @@ architecture struct of ecc is
 	signal doaop : std_logic;
 	signal aopid : std_logic_vector(2 downto 0);
 	signal aopdone : std_logic;
+	signal gentoken : std_logic;
+	signal tokendone : std_logic;
 	signal ar01zien : std_logic;
 	signal ar0zi : std_logic;
 	signal ar1zi : std_logic;
@@ -897,8 +905,9 @@ architecture struct of ecc is
 	signal compcstmty : std_logic;
 	signal comppop : std_logic;
 	signal compaop : std_logic;
+	signal token_generating : std_logic;
 	-- signals between ecc_fp_scalar & ecc_fp_dram_sh
-	-- (used only when shuffle = TRUE)
+	-- (used only when shuffle_type /= none)
 	signal permute : std_logic;
 	signal permuterdy : std_logic;
 	signal permuteundo : std_logic;
@@ -925,7 +934,6 @@ architecture struct of ecc is
 	-- debug features (signals between ecc_axi & ecc_scalar)
 	signal dbgpgmstate : std_logic_vector(3 downto 0);
 	signal dbgnbbits : std_logic_vector(15 downto 0);
-	signal dbgjoyebit : std_logic_vector(log2(2*nn - 1) - 1 downto 0);
 	signal dbgnbstarvrndxyshuf : std_logic_vector(15 downto 0);
 	signal dbghalted_s : std_logic;
 	-- debug features (signals between ecc_axi & ecc_curve_iram)
@@ -981,8 +989,18 @@ architecture struct of ecc is
 begin
 
 	assert (axi32or64 = 32 or axi32or64 = 64)
-		report "wrong value of paramter axi32or64 in ecc_customize.vhd "
-		     & "(must be 32 or 64)"
+		report "Wrong value of parameter axi32or64 in ecc_customize.vhd "
+		     & "(must be 32 or 64)."
+			severity FAILURE;
+
+	-- This is to ensure that 'shuffle_type' = 'none' only if at the
+	-- same time 'shuffle' = FALSE.
+	assert ((shuffle and shuffle_type /= none) or (not shuffle))
+		report "Static configuration of the shuffle countermeasure is inconsistent "
+		     & "in ecc_customize.vhd: either 'shuffle'=FALSE and then it makes "
+				 & "sense (though not mandatory) to set 'shuffle_type' to 'none'; or "
+				 & "'shuffle'=TRUE but then you must set a value for 'shuffle_type' "
+				 & "that is different from 'none'."
 			severity FAILURE;
 
 	-- force resynchronization of input reset s_axi_aresetn in the
@@ -1057,6 +1075,9 @@ begin
 			small_k_sz => small_k_sz,
 			small_k_sz_en_ack => small_k_sz_en_ack,
 			small_k_sz_kpdone => small_k_sz_kpdone,
+			tokenact => tokenact,
+			zremaskact => zremaskact,
+			zremaskbits => zremaskbits,
 			--   Montgomery constants computation
 			agocstmty => agocstmty,
 			mtydone => mtydone,
@@ -1073,24 +1094,9 @@ begin
 			doaop => doaop,
 			aopid => aopid,
 			aopdone => aopdone,
-			--   /debug only
-			laststep => laststep,
-			firstzdbl => firstzdbl,
-			firstzaddu => firstzaddu,
-			first2pz => first2pz,
-			first3pz => first3pz,
-			torsion2 => torsion2,
-			kap => kap,
-			kapp => kapp,
-			zu => zu,
-			zc => zc,
-			r0z => r0z,
-			r1z => r1z,
-			pts_are_equal => pts_are_equal,
-			pts_are_oppos => pts_are_oppos,
-			phimsb => phimsb,
-			kb0end => kb0end,
-			--   end of debug only/
+			--   token
+			gentoken => gentoken,
+			tokendone => tokendone,
 			-- interface with ecc_curve
 			masklsb => masklsb,
 			-- interface with ecc_fp (access to ecc_fp_dram)
@@ -1131,7 +1137,6 @@ begin
 			-- debug features (interface with ecc_scalar)
 			dbgpgmstate => dbgpgmstate,
 			dbgnbbits => dbgnbbits,
-			dbgjoyebit => dbgjoyebit,
 			dbgnbstarvrndxyshuf => dbgnbstarvrndxyshuf,
 			-- debug features (interface with ecc_curve)
 			dbgbreakpoints => dbgbreakpoints,
@@ -1164,6 +1169,16 @@ begin
 			dbgtrngrawduration => dbgtrngrawduration,
 			dbgtrngvonneuman => dbgtrngvonneuman,
 			dbgtrngidletime => dbgtrngidletime,
+			-- handshake signals between entropy server ecc_trng
+			-- and the different clients (for debug diagnostics)
+			dbgtrngaxirdy => trng_rdy_axi,
+			dbgtrngaxivalid => trng_valid_axi,
+			dbgtrngfprdy => trng_rdy_fp,
+			dbgtrngfpvalid => trng_valid_fp,
+			dbgtrngcrvrdy => trng_rdy_curve,
+			dbgtrngcrvvalid => trng_valid_curve,
+			dbgtrngshrdy => trng_rdy_sh,
+			dbgtrngshvalid => trng_valid_sh,
 			-- debug feature (off-chip trigger)
 			dbgtrigger => dbgtrigger
 		); -- ecc_axi
@@ -1205,6 +1220,9 @@ begin
 			small_k_sz => small_k_sz,
 			small_k_sz_en_ack => small_k_sz_en_ack,
 			small_k_sz_kpdone => small_k_sz_kpdone,
+			tokenact => tokenact,
+			zremaskact => zremaskact,
+			zremaskbits => zremaskbits,
 			--   Montgomery constants computation
 			agocstmty => agocstmty,
 			mtydone => mtydone,
@@ -1221,6 +1239,9 @@ begin
 			doaop => doaop,
 			aopid => aopid,
 			aopdone => aopdone,
+			--   token
+			gentoken => gentoken,
+			tokendone => tokendone,
 			-- interface with ecc_curve
 			initkp => initkp,
 			frdy => frdy,
@@ -1255,14 +1276,14 @@ begin
 			compcstmty => compcstmty,
 			comppop => comppop, -- also driven to ecc_curve
 			compaop => compaop, -- also driven to ecc_curve
-			-- interface with ecc_fp_dram_sh (used only when shuffle = TRUE)
+			token_generating => token_generating,
+			-- interface with ecc_fp_dram_sh (used only when shuffle_type /= none)
 			permute => permute,
 			permuterdy => permuterdy,
 			permuteundo => permuteundo,
 			-- debug features (interface with ecc_axi)
 			dbgpgmstate => dbgpgmstate,
 			dbgnbbits => dbgnbbits,
-			dbgjoyebit => dbgjoyebit,
 			dbgnbstarvrndxyshuf => dbgnbstarvrndxyshuf
 			-- pragma translate_off
 			-- interface with ecc_fp (simu only)
@@ -1407,7 +1428,6 @@ begin
 			nndyn_nnrnd_mask => nndyn_nnrnd_mask,
 			nndyn_nnrnd_zerowm1 => nndyn_nnrnd_zerowm1,
 			nndyn_wm1 => nndyn_wm1,
-			nndyn_wm2 => nndyn_wm2,
 			nndyn_2wm1 => nndyn_2wm1,
 			-- pragma translate_off
 			nndyn_w => nndyn_w,
@@ -1422,6 +1442,7 @@ begin
 			compcstmty => compcstmty,
 			comppop => comppop,
 			compaop => compaop,
+			token_generating => token_generating,
 			-- debug feature (interface with ecc_axi)
 			dbgtrnguse => dbgtrnguse,
 			-- debug feature (ecc_scalar)
@@ -1507,7 +1528,7 @@ begin
 
 	-- static-memory storing temporary variables read-&-written
 	-- by instructions of programs executed by ecc_curve
-	d0 : if not shuffle generate
+	d0 : if shuffle_type = none generate
 		d0: ecc_fp_dram
 			generic map(
 				rdlat => sramlat)
@@ -1531,7 +1552,7 @@ begin
 
 	-- same feature as ecc_fp_dram for the address
 	-- shuffling countermeasure
-	ds0: if shuffle generate
+	ds0: if shuffle_type /= none generate
 
 		ds0: if shuffle_type = linear generate
 			ds0: ecc_fp_dram_sh_linear
@@ -1634,7 +1655,7 @@ begin
 
 	end generate;
 
-	ds0_n: if not shuffle generate
+	ds0_n: if shuffle_type = none generate
 		trng_rdy_sh <= '0';
 	end generate;
 
@@ -1707,18 +1728,22 @@ begin
 		else
 			echo("FALSE");
 		end if;
-		echo(", shuffle ");
-		if shuffle then
-			echo("ON (");
+		if shuffle_type /= none then
+			echo(", shuffle AVAIL (");
 			if shuffle_type = linear then
 				echo("linear address masking)");
 			elsif shuffle_type = permute_lgnb then
 				echo("permutation of large numbers)");
 			elsif shuffle_type = permute_limbs then
-				echo("permutation of large numbers internal limbs)");
+				echo("permutation of large numbers' internal limbs)");
+			end if;
+			if shuffle then
+				echo(" and ON");
+			else
+				echo(" but OFF at reset");
 			end if;
 		else
-			echo("OFF");
+			echo(", no shuffle avail");
 		end if;
 		echo(", debug ");
 		if debug then

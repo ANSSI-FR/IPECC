@@ -271,7 +271,7 @@ package body ecc_utils is
 	function set_readlat return positive is
 		variable tmp : positive;
 	begin
-		if shuffle then -- defined in package ecc_customize
+		if shuffle_type /= none then -- defined in package ecc_customize
 			case shuffle_type is
 				when linear => tmp := sramlat + 2;
 				when permute_lgnb => tmp := sramlat + 2;
@@ -281,7 +281,7 @@ package body ecc_utils is
 						"in ecc_customize.vhd"
 							severity FAILURE;
 			end case;
-		else -- no shuffle
+		else -- no shuffle hardware present at all in the design
 			tmp := sramlat; -- defined in package ecc_customize
 		end if;
 		return tmp;

@@ -99,8 +99,7 @@ SmT,17
 lambdasq,22
 MM,22
 lambda,21
-lambdacu,21
-Y1Z1,21
+lambdacu,23
 # variables used by both <zadd[uc].s>
 AZ,8
 BmX,8
@@ -173,3 +172,5 @@ XR0bk,14
 YR0bk,15
 XR1bk,28
 YR1bk,12
+# variable used specifically by <token.s>
+token,18

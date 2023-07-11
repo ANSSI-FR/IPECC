@@ -10,6 +10,7 @@ use std.textio.all;
 use work.ecc_pkg.all;
 use work.ecc_utils.all;
 use work.ecc_customize.all; -- for nblargenb
+use work.ecc_trng_pkg.irn_width_sh;
 use work.ecc_shuffle_pkg.all;
 
 entity ecc_fp_dram_sh_fishy is
@@ -33,7 +34,7 @@ entity ecc_fp_dram_sh_fishy is
 		-- interface with ecc_trng
 		trngvalid : in std_logic;
 		trngrdy : out std_logic;
-		trngdata : in std_logic_vector(FP_ADDR - 1 downto 0)
+		trngdata : in std_logic_vector(irn_width_sh - 1 downto 0)
 		-- pragma translate_off
 		-- interface with ecc_fp (simu only)
 		; fpdram : out fp_dram_type;

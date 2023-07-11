@@ -165,6 +165,7 @@ begin
 	-- emulation of stimuli signals
 	process
 		variable v_debug_reg : std_logic_vector(31 downto 0);
+		variable vtoken : std_logic512;
 	begin
 
 		-- *********************************************************************
@@ -239,7 +240,14 @@ begin
 			-- ------------------------------------------------------
 			-- scalar multiplication
 			-- ------------------------------------------------------
-			--
+			
+			-- ask for a token to mask [k]P coordinates with
+			vtoken := (others => '0');
+			get_token(s_axi_aclk, axi, axo, 160, vtoken);
+			echo("ECC_TB: got masking token: 0x");
+			hex_echol(vtoken(159 downto 0));
+
+			-- send point coordinates & give computation a go
 			scalar_mult(s_axi_aclk, axi, axo, 160,
 			            SCALAR_K160, BIG_XP_BPOOL160R1, BIG_YP_BPOOL160R1);
 			--
@@ -247,7 +255,7 @@ begin
 			poll_until_ready(s_axi_aclk, axi, axo);
 
 			-- get and display coordinates of [k]P point result
-			read_and_display_kp_result(s_axi_aclk, axi, axo, 160);
+			read_and_display_kp_result(s_axi_aclk, axi, axo, 160, vtoken);
 
 			wait for 100 us; -- for sake of waveform readability
 
@@ -393,7 +401,14 @@ begin
 			-- ------------------------------------------------------
 			-- scalar multiplication
 			-- ------------------------------------------------------
-			--
+
+			-- ask for a token to mask [k]P coordinates with
+			vtoken := (others => '0');
+			get_token(s_axi_aclk, axi, axo, 192, vtoken);
+			echo("ECC_TB: got masking token: 0x");
+			hex_echol(vtoken(191 downto 0));
+
+			-- send point coordinates & give computation a go
 			scalar_mult(s_axi_aclk, axi, axo, 192,
 			            SCALAR_K192, BIG_XP_BPOOL192r1, BIG_YP_BPOOL192r1);
 			--
@@ -401,7 +416,7 @@ begin
 			poll_until_ready(s_axi_aclk, axi, axo);
 
 			-- get and display coordinates of [k]P point result
-			read_and_display_kp_result(s_axi_aclk, axi, axo, 192);
+			read_and_display_kp_result(s_axi_aclk, axi, axo, 192, vtoken);
 
 			wait for 100 us; -- for sake of waveform readability
 		end if; -- nn >= 192
@@ -443,7 +458,14 @@ begin
 			-- ------------------------------------------------------
 			-- scalar multiplication
 			-- ------------------------------------------------------
-			--
+
+			-- ask for a token to mask [k]P coordinates with
+			vtoken := (others => '0');
+			get_token(s_axi_aclk, axi, axo, 224, vtoken);
+			echo("ECC_TB: got masking token: 0x");
+			hex_echol(vtoken(223 downto 0));
+
+			-- send point coordinates & give computation a go
 			scalar_mult(s_axi_aclk, axi, axo, 224,
 			            SCALAR_K224, BIG_XP_BPOOL224r1, BIG_YP_BPOOL224r1);
 			--
@@ -451,7 +473,7 @@ begin
 			poll_until_ready(s_axi_aclk, axi, axo);
 
 			-- get and display coordinates of [k]P point result
-			read_and_display_kp_result(s_axi_aclk, axi, axo, 224);
+			read_and_display_kp_result(s_axi_aclk, axi, axo, 224, vtoken);
 
 			wait for 100 us; -- for sake of waveform readability
 		end if; -- nn >= 224
@@ -493,14 +515,21 @@ begin
 			-- ------------------------------------------------------
 			-- scalar multiplication
 			-- ------------------------------------------------------
-			--
+
+			-- ask for a token to mask [k]P coordinates with
+			vtoken := (others => '0');
+			get_token(s_axi_aclk, axi, axo, 256, vtoken);
+			echo("ECC_TB: got masking token: 0x");
+			hex_echol(vtoken(255 downto 0));
+
+			-- send point coordinates & give computation a go
 			scalar_mult(s_axi_aclk, axi, axo, 256,
 			            SCALAR_K256, BIG_XP_FRP256v1, BIG_YP_FRP256v1);
 			--
 			poll_until_ready(s_axi_aclk, axi, axo);
 
 			-- get and display coordinates of [k]P point result
-			read_and_display_kp_result(s_axi_aclk, axi, axo, 256);
+			read_and_display_kp_result(s_axi_aclk, axi, axo, 256, vtoken);
 
 			wait for 100 us; -- for sake of waveform readability
 		end if; -- nn >= 256
@@ -542,7 +571,14 @@ begin
 			-- ------------------------------------------------------
 			-- scalar multiplication
 			-- ------------------------------------------------------
-			--
+
+			-- ask for a token to mask [k]P coordinates with
+			vtoken := (others => '0');
+			get_token(s_axi_aclk, axi, axo, 320, vtoken);
+			echo("ECC_TB: got masking token: 0x");
+			hex_echol(vtoken(319 downto 0));
+
+			-- send point coordinates & give computation a go
 			scalar_mult(s_axi_aclk, axi, axo, 320,
 			            SCALAR_K320, BIG_XP_BPOOL320r1, BIG_YP_BPOOL320r1);
 			--
@@ -550,7 +586,7 @@ begin
 			poll_until_ready(s_axi_aclk, axi, axo);
 
 			-- get and display coordinates of [k]P point result
-			read_and_display_kp_result(s_axi_aclk, axi, axo, 320);
+			read_and_display_kp_result(s_axi_aclk, axi, axo, 320, vtoken);
 
 			wait for 100 us; -- for sake of waveform readability
 		end if; -- nn >= 320
@@ -592,7 +628,14 @@ begin
 			-- ------------------------------------------------------
 			-- scalar multiplication
 			-- ------------------------------------------------------
-			--
+
+			-- ask for a token to mask [k]P coordinates with
+			vtoken := (others => '0');
+			get_token(s_axi_aclk, axi, axo, 384, vtoken);
+			echo("ECC_TB: got masking token: 0x");
+			hex_echol(vtoken(383 downto 0));
+
+			-- send point coordinates & give computation a go
 			scalar_mult(s_axi_aclk, axi, axo, 384,
 			            SCALAR_K384, BIG_XP_BPOOL384r1, BIG_YP_BPOOL384r1);
 			--
@@ -600,7 +643,7 @@ begin
 			poll_until_ready(s_axi_aclk, axi, axo);
 
 			-- get and display coordinates of [k]P point result
-			read_and_display_kp_result(s_axi_aclk, axi, axo, 384);
+			read_and_display_kp_result(s_axi_aclk, axi, axo, 384, vtoken);
 
 			wait for 100 us; -- for sake of waveform readability
 		end if; -- nn >= 384
@@ -642,7 +685,14 @@ begin
 			-- ------------------------------------------------------
 			-- scalar multiplication
 			-- ------------------------------------------------------
-			--
+
+			-- ask for a token to mask [k]P coordinates with
+			vtoken := (others => '0');
+			get_token(s_axi_aclk, axi, axo, 512, vtoken);
+			echo("ECC_TB: got masking token: 0x");
+			hex_echol(vtoken(511 downto 0));
+
+			-- send point coordinates & give computation a go
 			scalar_mult(s_axi_aclk, axi, axo, 512,
 			            SCALAR_K512, BIG_XP_BPOOL512R1, BIG_YP_BPOOL512R1);
 			--
@@ -650,7 +700,7 @@ begin
 			poll_until_ready(s_axi_aclk, axi, axo);
 
 			-- get and display coordinates of [k]P point result
-			read_and_display_kp_result(s_axi_aclk, axi, axo, 512);
+			read_and_display_kp_result(s_axi_aclk, axi, axo, 512, vtoken);
 
 			wait for 100 us; -- for sake of waveform readability
 		end if; -- nn >= 512

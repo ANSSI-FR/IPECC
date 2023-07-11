@@ -48,7 +48,7 @@ entity ecc_fp is
 		fpwaddr : out std_logic_vector(FP_ADDR - 1 downto 0);
 		fpwdata : out std_logic_vector(ww - 1 downto 0);
 		-- interface with AXI-lite
-		--   (to actually have the AXI-lite interface access ecc_fp_dram)
+		--   (to have the AXI-lite interface access ecc_fp_dram)
 		xwe : in std_logic;
 		xaddr : in std_logic_vector(FP_ADDR - 1 downto 0);
 		xwdata : in std_logic_vector(ww - 1 downto 0);
@@ -57,7 +57,6 @@ entity ecc_fp is
 		nndyn_nnrnd_mask : in std_logic_vector(ww - 1 downto 0);
 		nndyn_nnrnd_zerowm1 : in std_logic;
 		nndyn_wm1 : in unsigned(log2(w - 1) - 1 downto 0);
-		nndyn_wm2 : in unsigned(log2(w - 1) - 1 downto 0);
 		nndyn_2wm1 : in unsigned(log2((2*w) - 1) - 1 downto 0);
 		-- pragma translate_off
 		nndyn_w : in unsigned(log2(w) - 1 downto 0);
@@ -72,6 +71,7 @@ entity ecc_fp is
 		compcstmty : in std_logic;
 		comppop : in std_logic;
 		compaop : in std_logic;
+		token_generating : in std_logic;
 		-- debug features (interface with ecc_axi)
 		dbgtrnguse : in std_logic;
 		-- debug feature (ecc_scalar)
@@ -115,7 +115,7 @@ end entity ecc_fp;
 
 architecture rtl of ecc_fp is
 
-	-- function set_readlat is defined in package ecc_utils
+	-- Function set_readlat is defined in package ecc_utils
 	-- and depends on the presence of shuffle countermeasure (see
 	-- parameter 'shuffle' in ecc_customize.vhd). It also depends on
 	-- the type of shuffling algorithm used (see parameter 'shuffle_type'
@@ -353,6 +353,7 @@ architecture rtl of ecc_fp is
 		compcstmtydel : std_logic;
 		comppopdel : std_logic;
 		compaopdel : std_logic;
+		tokgendel : std_logic;
 	end record;
 
 	signal vcc, gnd : std_logic;
@@ -447,13 +448,13 @@ architecture rtl of ecc_fp is
 			hex_write(lineo, pca);
 			write(lineo, string'("]"));
 			newprg := TRUE;
-		elsif v_pca = ECC_IRAM_SETUP0_ADDR then
-			write(lineo, string'(".setup0L [0x"));
+		elsif v_pca = ECC_IRAM_DRAWZ_ADDR then
+			write(lineo, string'(".drawZL [0x"));
 			hex_write(lineo, pca);
 			write(lineo, string'("]"));
 			newprg := TRUE;
-		elsif v_pca = ECC_IRAM_SETUP1_ADDR then
-			write(lineo, string'(".setup1L [0x"));
+		elsif v_pca = ECC_IRAM_SETUP_ADDR then
+			write(lineo, string'(".setupL [0x"));
 			hex_write(lineo, pca);
 			write(lineo, string'("]"));
 			newprg := TRUE;
@@ -509,6 +510,21 @@ architecture rtl of ecc_fp is
 			newprg := TRUE;
 		elsif v_pca = ECC_IRAM_ADDITION_END_ADDR then
 			write(lineo, string'(".addition_endL [0x"));
+			hex_write(lineo, pca);
+			write(lineo, string'("]"));
+			newprg := TRUE;
+		elsif v_pca = ECC_IRAM_GET_TOKEN_ADDR then
+			write(lineo, string'(".get_tokenL [0x"));
+			hex_write(lineo, pca);
+			write(lineo, string'("]"));
+			newprg := TRUE;
+		elsif v_pca = ECC_IRAM_TOKEN_KP_MASK_ADDR then
+			write(lineo, string'(".token_kp_maskL [0x"));
+			hex_write(lineo, pca);
+			write(lineo, string'("]"));
+			newprg := TRUE;
+		elsif v_pca = ECC_IRAM_ZREMASK_ADDR then
+			write(lineo, string'(".ZremaskL [0x"));
 			hex_write(lineo, pca);
 			write(lineo, string'("]"));
 			newprg := TRUE;
@@ -574,8 +590,8 @@ begin
 	               opi, mmo, fprdata, xwe, xaddr, xwdata, xre, initkp,
 	               compkp, compcstmty, comppop, compaop, trngdata, trngvalid,
 	               dbgtrnguse, dbghalted,
-	               nndyn_nnrnd_mask, nndyn_nnrnd_zerowm1, nndyn_wm1, nndyn_wm2,
-								 nndyn_2wm1, swrst)
+	               nndyn_nnrnd_mask, nndyn_nnrnd_zerowm1, nndyn_wm1,
+								 nndyn_2wm1, swrst, token_generating)
 		variable v : reg_type;
 		variable v_op0 : unsigned(ww downto 0);
 		variable v_op1 : unsigned(ww downto 0);
@@ -979,14 +995,14 @@ begin
 			v.mm.mmi(r.mm.push.id1).go := '1'; -- asserted 1 cycle thx to (s6)
 		end if;
 
-		-- data-path feeding X & Y (input operands) to selected Montgomery
-		-- multiplier
-		-- (consists in driving signal r.mm.mmi(r.mm.push.id1).xy)
+		-- Data-path feeding X & Y (input operands) to selected Montgomery
+		-- multiplier (consists in driving signal r.mm.mmi(r.mm.push.id1).xy).
 		if readlat > 1 then -- statically resolved by synthesizer
 			v.mm.push.xypushsh(readlat - 1 downto 0) :=
 				r.fpram.re & r.mm.push.xypushsh(readlat - 1 downto 1);
 		elsif readlat = 1 then
-			-- this is actually only possible if shuffle = FALSE and sramlat = 1
+			-- This is actually only possible if 'shuffle_type' = 'none' and
+			-- 'sramlat' = 1 (see function 'set_readlat' in ecc_utils.vhd).
 			v.mm.push.xypushsh(0) := r.fpram.re;
 		end if;
 
@@ -1099,8 +1115,8 @@ begin
 		-- with boolean 'shuffle' (which encodes the presence of the ecc_fp_dram's
 		-- shuffling countermeasure)
 		if r.addsub.busy = '1' then
-			if (not shuffle) or (shuffle and (shuffle_type = linear -- stat. resolved
-				or shuffle_type = permute_lgnb))
+			if shuffle_type = none or shuffle_type = linear -- stat. resolved
+				or shuffle_type = permute_lgnb
 			then
 				if readlat mod 2 = 0 then -- statically resolved by synthesizer
 					if r.fpram.raddrmuxsel = "01" then
@@ -1115,7 +1131,7 @@ begin
 						v.addsub.op0 := fprdata;
 					end if;
 				end if;
-			elsif (shuffle and shuffle_type = permute_limbs) then -- stat. resolved
+			elsif shuffle_type = permute_limbs then -- stat. resolved
 				-- in this case readlat = 2 x sramlat + 2 (see function set_readlat
 				-- in ecc_utils.vhd) therefore it is an even number
 				if r.fpram.raddrmuxsel = "01" then
@@ -1140,8 +1156,8 @@ begin
 		--       r.addsub.busy -> r.addsub.res
 		--       r.addsub.busy -> r.addsub.carry
 		v.addsub.testz := '0';
-		if (not shuffle) or (shuffle and (shuffle_type = linear -- stat. resolved
-			or shuffle_type = permute_lgnb))
+		if shuffle_type = none or shuffle_type = linear -- stat. resolved
+			or shuffle_type = permute_lgnb
 		then
 			if readlat mod 2 = 0 then
 				if r.addsub.act = '1' and r.fpram.raddrmuxsel = "01" then
@@ -1178,7 +1194,7 @@ begin
 					v.addsub.testz := '1';
 				end if;
 			end if;
-		elsif (shuffle and shuffle_type = permute_limbs) then -- stat. resolved
+		elsif shuffle_type = permute_limbs then -- stat. resolved
 			-- in this case readlat = 2 x sramlat + 2 (see function set_readlat
 			-- in ecc_utils.vhd) therefore it is an even number
 			if r.addsub.act = '1' and r.fpram.raddrmuxsel = "01" then
@@ -1418,8 +1434,8 @@ begin
 		-- with boolean 'shuffle' (which encodes the presence of the ecc_fp_dram's
 		-- shuffling countermeasure)
 		if r.xxor.busy = '1' then
-			if (not shuffle) or (shuffle and (shuffle_type = linear -- stat. resolved
-				or shuffle_type = permute_lgnb))
+			if shuffle_type = none or shuffle_type = linear -- stat. resolved
+				or shuffle_type = permute_lgnb
 			then
 				if readlat mod 2 = 0 then
 					if r.fpram.raddrmuxsel = "01" then
@@ -1434,7 +1450,7 @@ begin
 						v.xxor.op0 := fprdata;
 					end if;
 				end if;
-			elsif (shuffle and shuffle_type = permute_limbs) then -- stat. resolved
+			elsif shuffle_type = permute_limbs then -- stat. resolved
 				-- in this case readlat = 2 x sramlat + 2 (see function set_readlat
 				-- in ecc_utils.vhd) therefore it is an even number
 				if r.fpram.raddrmuxsel = "01" then
@@ -1449,8 +1465,8 @@ begin
 		-- TODO: set multicycle (2 periods) on path r.xxor.op0/1 -> r.xxor.res
 		--                  and (6 periods) on path r.xxor.busy -> r.xxor.res
 
-		if (not shuffle) or (shuffle and (shuffle_type = linear -- stat. resolved
-			or shuffle_type = permute_lgnb))
+		if shuffle_type = none or shuffle_type = linear -- stat. resolved
+			or shuffle_type = permute_lgnb
 		then
 			if readlat mod 2 = 0 then
 				if r.xxor.busy = '1' and r.fpram.raddrmuxsel = "01" then
@@ -1461,15 +1477,13 @@ begin
 					v.xxor.res := r.xxor.op0 xor r.xxor.op1;
 				end if;
 			end if;
-		elsif (shuffle and shuffle_type = permute_limbs) then -- stat. resolved
+		elsif shuffle_type = permute_limbs then -- stat. resolved
 			-- in this case readlat = 2 x sramlat + 2 (see function set_readlat
 			-- in ecc_utils.vhd) therefore it is an even number
 			if r.xxor.busy = '1' and r.fpram.raddrmuxsel = "01" then
 				v.xxor.res := r.xxor.op0 xor r.xxor.op1;
 			end if;
-		--elsif (shuffle and shuffle_type = permute_lgnb) then -- stat. resolved
-		--	-- TODO
-		end if; -- shuffle
+		end if; -- shuffle_type
 
 		-- Note that the latch of 'ww'-bit bitwise xor result into r.fpram.wdata
 		-- is described with MUX (s20) below
@@ -2070,7 +2084,9 @@ begin
 		v.compcstmtydel := compcstmty;
 		v.comppopdel := comppop;
 		v.compaopdel := compaop;
-		if (compkp = '0' and compcstmty = '0' and comppop = '0' and compaop = '0')
+		v.tokgendel := token_generating;
+		if (compkp = '0' and compcstmty = '0' and comppop = '0' and compaop = '0'
+				and token_generating = '0')
 			or (debug and dbghalted = '1')
 		then -- (s98), see (s100) in ecc_curve.vhd
 			v.fpram.waddrmuxsel := "111"; -- (s37), see (s20)
@@ -2080,12 +2096,14 @@ begin
 		else
 			-- the test below is here so that when entering computation
 			-- of Montgomery constants or when entering computation of [k]P
-			-- or entering any of point-based operations or F_p arithmetic
-			-- operations, we don't leave r.fpram.we inadvertently asserted
+			-- or when entering any of point-based operations or F_p arithmetic
+			-- operations, or when enetering generation of the random token,
+			-- we don't leave r.fpram.we inadvertently asserted
 			if   (r.compkpdel = '0' and compkp = '1')
 			  or (r.compcstmtydel = '0' and compcstmty = '1')
 			  or (r.comppopdel = '0' and comppop = '1')
 			  or (r.compaopdel = '0' and compaop = '1')
+				or (r.tokgendel = '0' and token_generating = '1')
 			then
 				v.fpram.we := '0';
 				v.fpram.re := '0';
@@ -3024,7 +3042,7 @@ begin
 						v_addr_xr1 := LARGE_NB_XR1_ADDR;
 						v_addr_yr1 := LARGE_NB_YR1_ADDR;
 					end if;
-					if shuffle then
+					if shuffle_type /= none then
 						if shuffle_type = linear then
 							for i in 0 to vw-1 loop
 								x0(ww*(i+1) - 1 downto ww*i) := fpdram(
@@ -3065,7 +3083,7 @@ begin
 									vtophys(LARGE_NB_ZR01_ADDR))) * n) + i);
 							end loop;
 						end if;
-					else
+					else -- shuffle_type = none
 						for i in 0 to vw-1 loop
 							x0(ww*(i+1) - 1 downto ww*i) := fpdram((v_addr_xr0*n) + i);
 							y0(ww*(i+1) - 1 downto ww*i) := fpdram((v_addr_yr0*n) + i);
@@ -3190,7 +3208,7 @@ begin
 			if logfinalresult = '1' then
 				xkp := (others => '0');
 				ykp := (others => '0');
-				if shuffle then
+				if shuffle_type /= none then
 					if shuffle_type = linear then
 						for i in 0 to to_integer(nndyn_w) - 1 loop
 							xkp(ww*(i+1) - 1 downto ww*i) := fpdram(
@@ -3213,7 +3231,7 @@ begin
 								vtophys(LARGE_NB_YR1_ADDR))) * n) + i);
 						end loop;
 					end if;
-				else
+				else -- shuffle_type = none
 					for i in 0 to to_integer(nndyn_w) - 1 loop
 						xkp(ww*(i+1) - 1 downto ww*i) := fpdram(
 							(LARGE_NB_XR1_ADDR*ge_pow_of_2(n))+i);

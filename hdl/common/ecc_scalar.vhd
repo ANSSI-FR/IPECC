@@ -49,7 +49,7 @@ entity ecc_scalar is
 		nndyn_nnp1 : in unsigned(log2(nn + 1) - 1 downto 0);
 		nndyn_nnm3 : in unsigned(log2(nn) - 1 downto 0);
 		--   [k]P computation
-		agokp : in  std_logic;
+		agokp : in std_logic;
 		kpdone : out std_logic;
 		doblinding : in std_logic;
 		blindbits : in std_logic_vector(log2(nn) - 1 downto 0);
@@ -60,6 +60,9 @@ entity ecc_scalar is
 		small_k_sz : in unsigned(log2(nn) - 1 downto 0);
 		small_k_sz_en_ack : out std_logic;
 		small_k_sz_kpdone : out std_logic;
+		tokenact : in std_logic;
+		zremaskact : in std_logic;
+		zremaskbits : in unsigned(log2(nn - 1) - 1 downto 0);
 		--   Montgomery constants computation
 		agocstmty : in std_logic;
 		mtydone : out std_logic;
@@ -76,6 +79,9 @@ entity ecc_scalar is
 		doaop : in std_logic;
 		aopid : in std_logic_vector(2 downto 0); -- id defined in ecc_pkg
 		aopdone : out std_logic;
+		--   token
+		gentoken : in std_logic;
+		tokendone : out std_logic;
 		-- interface with ecc_curve
 		initkp : out std_logic; -- also driven to ecc_fp
 		frdy : in std_logic;
@@ -110,14 +116,14 @@ entity ecc_scalar is
 		compcstmty : out std_logic;
 		comppop : out std_logic;
 		compaop : out std_logic;
-		-- interface with ecc_fp_dram_sh (used only if shuffle = TRUE)
+		token_generating : out std_logic;
+		-- interface with ecc_fp_dram_sh (used only if shuffle_type /= none)
 		permute : out std_logic;
 		permuterdy : in std_logic;
 		permuteundo : out std_logic;
 		-- debug features
 		dbgpgmstate : out std_logic_vector(3 downto 0);
 		dbgnbbits : out std_logic_vector(15 downto 0);
-		dbgjoyebit : out std_logic_vector(log2(2*nn - 1) - 1 downto 0);
 		dbgnbstarvrndxyshuf : out std_logic_vector(15 downto 0)
 		-- pragma translate_off
 		-- interface with ecc_fp (simu only)
@@ -131,11 +137,11 @@ end entity ecc_scalar;
 
 architecture rtl of ecc_scalar is
 
-	type state_type is (idle, cst, set, kp, pop, aop);
+	type state_type is (idle, cst, set, kp, pop, aop, tok);
 
 	type program_type is (idle, checkoncurve, blindinit, blindbit, blindexit,
 	                      adpa, ssetup, joyecoz, subtractp, exits,
-	                      wait_xyr01_permute);
+	                      wait_xyr01_permute, token);
 
 	-- main control signals
 	type ctrl_reg_type is record
@@ -151,7 +157,7 @@ architecture rtl of ecc_scalar is
 	end record;
 
 	type joye_state_type is (idle, itoh, prezaddu, zaddu, prezaddc, zaddc,
-		permutation, zdblu, zdblc, znegc);
+		permutation, zdblu, zdblc, znegc, zrmsk);
 
 	-- registers used to encode Joye state machine
 	type joye_reg_type is record
@@ -184,6 +190,8 @@ architecture rtl of ecc_scalar is
 		ssetup_step : std_logic_vector(1 downto 0);
 		first3pz : std_logic;
 		--firstitoh : std_logic;
+		zrmcnt : unsigned(log2(nn - 1) - 1 downto 0);
+		zrmstep : std_logic;
 	end record;
 
 	-- registers involved in computation of Montgomery constants
@@ -250,6 +258,8 @@ architecture rtl of ecc_scalar is
 		small_k_sz_en_ack : std_logic;
 		small_k_sz_kpdone : std_logic;
 		ptadd : std_logic;
+		tokendone : std_logic;
+		token_generating : std_logic;
 	end record;
 
 	-- debug features
@@ -287,7 +297,7 @@ architecture rtl of ecc_scalar is
 	constant BLNBIT_ROUTINE : natural := 5;
 	constant BLINDSTOP_ROUTINE : natural := 6;
 	constant ADPA_ROUTINE : natural := 7;
-	constant SETUP0_ROUTINE : natural := 8;
+	constant DRAWZ_ROUTINE : natural := 8;
 	constant ITOH_ROUTINE : natural := 9;
 	constant ZADDU_ROUTINE : natural := 10;
 	constant ZADDC_ROUTINE : natural := 11;
@@ -300,7 +310,7 @@ architecture rtl of ecc_scalar is
 	constant EQUALY_ROUTINE : natural := 18;
 	constant OPPOSITEY_ROUTINE : natural := 19;
 	constant IS_ON_CURVE_ROUTINE : natural := 20;
-	constant FPMULT_ROUTINE : natural := 21;
+	constant ZREMASK_ROUTINE : natural := 21;
 	constant AMONTY_ROUTINE : natural := 22;
 	constant PRE_ZADDU_ROUTINE : natural := 23;
 	constant PRE_ZADDC_ROUTINE : natural := 24;
@@ -308,15 +318,20 @@ architecture rtl of ecc_scalar is
 	constant ZNEGC_ROUTINE : natural := 26;
 	constant ADDITION_END_ROUTINE : natural := 27;
 	constant ZDBLSW_ROUTINE : natural := 28;
-	constant SETUP1_ROUTINE : natural := 29;
+	constant SETUP_ROUTINE : natural := 29;
+	constant GET_TOKEN_ROUTINE : natural := 30;
+	constant MASK_TOKEN_ROUTINE : natural := 31;
 	-- Address of the routines below (all constants whose name starts with
-	-- "ECC_IRAM_" (see below definition of array constant EXEC_ADDR) are defined
-	-- in package ecc_addr (see file <ecc_addr.vhd>) which is automatically
-	-- generated when running 'make' in folder hdl/ecc_curve_iram/.
-	-- Numerical values in <ecc_addr.vhd> are obtained when assembling all *.s
-	-- source files present in folder hdl/ecc_curve_iram/asm_src and extracting
-	-- addresses from the final binary image. The addresses to be extracted
-	-- are all the addresses whose label is suffixed with the string "_export":
+	-- "ECC_IRAM_" (see below definition of array constant EXEC_ADDR) are
+	-- defined in package ecc_addr (see file <ecc_addr.vhd>) which is
+	-- automatically generated when running 'make' in folder hdl/ecc_curve_iram/.
+	-- Numerical values in <ecc_addr.vhd> are obtained when assembling all
+	-- *.s source files present in folder hdl/ecc_curve_iram/asm_src and
+	-- extracting addresses from the final binary image. (This is done
+	-- through Makefile and scripting in folder hdl/ecc_curve_iram - see
+	-- in particular script <ipecc_assembler.py>). The addresses to be
+	-- extracted are all the addresses whose label is suffixed with the
+	-- string "_export":
 	--
 	--   1. this suffixe is removed, as long as the uppercase letter 'L'
 	--      preceeding it, as long as the initial dot prefixing the label name
@@ -324,8 +339,11 @@ architecture rtl of ecc_scalar is
 	--   3. it is prefixed with the string "ECC_IRAM_"
 	--
 	-- Example: constant ECC_IRAM_CONSTMTY0_ADDR is the address of routine
-	--  ".constMTYL_export".
-	--  (.constMTYL_export -> constMTY -> CONSTMTYL -> ECC_IRAM_CONSTMTY_ADDR)
+	--  ".constMTY0L_export".
+	--  (.constMTY0L_export -> constMTY0L -> CONSTMTY0 -> ECC_IRAM_CONSTMTY0_ADDR)
+	--
+	-- Hence label names should not be considered case sensitive (.foobarL and
+	-- .FoObARL will lead to the same routine address entry)
 	--
 	-- A note on synthesis of constant EXEC_ADDR: it will almost certainly
 	-- lead to inference of LUT-based logic only, because of the way EXEC_ADDR
@@ -336,41 +354,45 @@ architecture rtl of ecc_scalar is
 	-- to be synthesized as an SRAM memory (either for FPGA or ASIC target)
 	-- should not take a big effort in modifying the RTL below
 	subtype std_logic_pc is std_logic_vector(IRAM_ADDR_SZ - 1 downto 0);
-	type exec_addr_type is array(0 to 29) of std_logic_pc;
-	constant EXEC_ADDR : exec_addr_type := (
-		CONSTMTY0_ROUTINE => ECC_IRAM_CONSTMTY0_ADDR,
-		CONSTMTY1_ROUTINE => ECC_IRAM_CONSTMTY1_ADDR,
-		CONSTMTY2_ROUTINE => ECC_IRAM_CONSTMTY2_ADDR,
+	type exec_addr_type is array(0 to 31) of std_logic_pc;
+	constant EXEC_ADDR : exec_addr_type := ( -- (s115)  --  matching routine:
+		CONSTMTY0_ROUTINE => ECC_IRAM_CONSTMTY0_ADDR,     -- .constMTY0L[_export]
+		CONSTMTY1_ROUTINE => ECC_IRAM_CONSTMTY1_ADDR,     -- .constMTY1L[_export]
+		CONSTMTY2_ROUTINE => ECC_IRAM_CONSTMTY2_ADDR,     -- .constMTY2L[_export]
 		-- all routines used by [k]P computation
-		CHKCURVE_ROUTINE => ECC_IRAM_CHKCURVE_ADDR,
-		BLINDSTART_ROUTINE => ECC_IRAM_BLINDSTART_ADDR,
-		BLNBIT_ROUTINE => ECC_IRAM_BLNBIT_ADDR,
-		BLINDSTOP_ROUTINE => ECC_IRAM_BLINDSTOP_ADDR,
-		ADPA_ROUTINE => ECC_IRAM_ADPA_ADDR,
-		SETUP0_ROUTINE => ECC_IRAM_SETUP0_ADDR,
-		SETUP1_ROUTINE => ECC_IRAM_SETUP1_ADDR,
-		ITOH_ROUTINE => ECC_IRAM_ITOH_ADDR,
-		ZADDU_ROUTINE => ECC_IRAM_ZADDU_ADDR,
-		ZADDC_ROUTINE => ECC_IRAM_ZADDC_ADDR,
-		SUBTRACTP_ROUTINE => ECC_IRAM_SUBTRACTP_ADDR,
-		EXIT_ROUTINE => ECC_IRAM_EXIT_ADDR,
+		CHKCURVE_ROUTINE => ECC_IRAM_CHKCURVE_ADDR,       -- .chkcurveL[_export]
+		BLINDSTART_ROUTINE => ECC_IRAM_BLINDSTART_ADDR,   -- .blindstartL_[export]
+		BLNBIT_ROUTINE => ECC_IRAM_BLNBIT_ADDR,           -- .blnbitL[_export]
+		BLINDSTOP_ROUTINE => ECC_IRAM_BLINDSTOP_ADDR,     -- .blindstopL[_export]
+		ADPA_ROUTINE => ECC_IRAM_ADPA_ADDR,               -- .adpaL[_export]
+		DRAWZ_ROUTINE => ECC_IRAM_DRAWZ_ADDR,             -- .drawZL[_export]
+		SETUP_ROUTINE => ECC_IRAM_SETUP_ADDR,             -- .setupL[_export]
+		ITOH_ROUTINE => ECC_IRAM_ITOH_ADDR,               -- .itohL[_export]
+		ZADDU_ROUTINE => ECC_IRAM_ZADDU_ADDR,             -- .zadduL[_export]
+		ZADDC_ROUTINE => ECC_IRAM_ZADDC_ADDR,             -- .zaddcL[_export]
+		SUBTRACTP_ROUTINE => ECC_IRAM_SUBTRACTP_ADDR,     -- .subtractPL[_export]
+		EXIT_ROUTINE => ECC_IRAM_EXIT_ADDR,               -- .exitL[_export]
 		-- extra point-level routines
 		ADDITION_BEGIN_ROUTINE => ECC_IRAM_ADDITION_BEGIN_ADDR,
-		DOUBLE_ROUTINE => ECC_IRAM_DOUBLE_ADDR,
-		NEGATIVE_ROUTINE => ECC_IRAM_NEGATIVE_ADDR,
-		EQUALX_ROUTINE => ECC_IRAM_EQUALX_ADDR,
-		EQUALY_ROUTINE => ECC_IRAM_EQUALY_ADDR,
-		OPPOSITEY_ROUTINE => ECC_IRAM_OPPOSITEY_ADDR,
-		IS_ON_CURVE_ROUTINE => ECC_IRAM_IS_ON_CURVE_ADDR,
+		                                                -- .addition_beginL[_export]
+		DOUBLE_ROUTINE => ECC_IRAM_DOUBLE_ADDR,           -- .doubleL[_export]
+		NEGATIVE_ROUTINE => ECC_IRAM_NEGATIVE_ADDR,       -- .negativeL[_export]
+		EQUALX_ROUTINE => ECC_IRAM_EQUALX_ADDR,           -- .equalXL[_export]
+		EQUALY_ROUTINE => ECC_IRAM_EQUALY_ADDR,           -- .equalYL[_export]
+		OPPOSITEY_ROUTINE => ECC_IRAM_OPPOSITEY_ADDR,     -- .oppositeYL[_export]
+		IS_ON_CURVE_ROUTINE => ECC_IRAM_IS_ON_CURVE_ADDR, -- .is_on_curveL[_export]
 		-- extra arithmetic-level routines
-		FPMULT_ROUTINE => ECC_IRAM_FPMULT_ADDR,
-		AMONTY_ROUTINE => ECC_IRAM_AMONTY_ADDR,
-		PRE_ZADDU_ROUTINE => ECC_IRAM_PRE_ZADDU_ADDR,
-		PRE_ZADDC_ROUTINE => ECC_IRAM_PRE_ZADDC_ADDR,
-		ZDBL_ROUTINE => ECC_IRAM_ZDBL_ADDR,
-		ZNEGC_ROUTINE => ECC_IRAM_ZNEGC_ADDR,
+		ZREMASK_ROUTINE => ECC_IRAM_ZREMASK_ADDR,         -- .zremaskL[_export]
+		AMONTY_ROUTINE => ECC_IRAM_AMONTY_ADDR,           -- .aMontyL[_export]
+		PRE_ZADDU_ROUTINE => ECC_IRAM_PRE_ZADDU_ADDR,     -- .pre_zadduL[_export]
+		PRE_ZADDC_ROUTINE => ECC_IRAM_PRE_ZADDC_ADDR,     -- .pre_zaddcL[_export]
+		ZDBL_ROUTINE => ECC_IRAM_ZDBL_ADDR,               -- .zdblL[_export]
+		ZNEGC_ROUTINE => ECC_IRAM_ZNEGC_ADDR,             -- .znegcL[_export]
 		ADDITION_END_ROUTINE => ECC_IRAM_ADDITION_END_ADDR,
-		ZDBLSW_ROUTINE => ECC_IRAM_ZDBL_SW_ADDR
+		                                                  -- .addition_endL[_export]
+		ZDBLSW_ROUTINE => ECC_IRAM_ZDBL_SW_ADDR,          -- .zdbl_swL[_export]
+		GET_TOKEN_ROUTINE => ECC_IRAM_GET_TOKEN_ADDR,     -- .get_tokenL[_export]
+		MASK_TOKEN_ROUTINE => ECC_IRAM_TOKEN_KP_MASK_ADDR --.token_kP_maskL[_export]
 	);
 
 	-- pragma translate_off
@@ -378,11 +400,16 @@ architecture rtl of ecc_scalar is
 	signal r_sim_prevbit : natural;
 	signal blbits_max_s : integer;
 	signal r_sim_prevblbit : natural;
+	signal z_rmsk_on : std_logic;
 	-- pragma translate_on
 
 	constant NB_BITS_LINE : natural := 16;
 
 begin
+
+	-- pragma translate_off
+	z_rmsk_on <= '1' when r.kp.joye.state = zrmsk else '0';
+	-- pragma translate_on
 
 	-- (s29), see (s30)
 	-- pragma translate_off
@@ -396,8 +423,9 @@ begin
 	               frdy, ferr, zero, iterate_shuffle_rdy, permuterdy, doshuffle,
 	               k_is_null, aerr_inpt_ack, aerr_outpt_ack, nndyn_nnm3,
 	               nndyn_nnp1, dopop, popid, doaop, aopid, ar0zo, ar1zo,
-								 swrst, first2pz, xmxz, ymyz, torsion2, kap, kapp,
-								 phimsb, kb0end, small_k_sz_en, small_k_sz_en_en, small_k_sz)
+	               swrst, first2pz, xmxz, ymyz, torsion2, kap, kapp,
+	               phimsb, kb0end, small_k_sz_en, small_k_sz_en_en, small_k_sz,
+	               gentoken, tokenact, zremaskact, zremaskbits)
 		variable v : reg_type;
 		variable v_simkb : integer;
 		variable v01z : std_logic_vector(1 downto 0);
@@ -447,7 +475,7 @@ begin
 				v.int.ardy := '0';
 				v.int.faddr := EXEC_ADDR(CONSTMTY0_ROUTINE);
 				v.mty.step := "00";
-				v.int.fgo := '1'; -- (s69), see (s67)-(s68)
+				v.int.fgo := '1'; -- (s69), see (s67)
 				v.mty.computing := '1';
 				v.mty.computing_a := '0';
 				v.mty.done := '0';
@@ -460,11 +488,15 @@ begin
 				v.ctrl.active := '1';
 				v.int.ardy := '0';
 				v.int.faddr := EXEC_ADDR(AMONTY_ROUTINE); -- to start .aMontyL routine
-				v.int.fgo := '1'; -- (s70), see (s67)-(s68)
+				v.int.fgo := '1'; -- (s70), see (s67)
 				v.mty.computing := '1';
 				v.mty.computing_a := '1';
 				v.mty.donea := '0';
 			elsif (r.int.ardy = '1' and agokp = '1') then
+				-- TODO: may be reduce the fan-out of ardy & agokp signals by
+				-- creating a delayed version of their logic-and and have those
+				-- of the registers below which do not have priority be set 1 cycle
+				-- later with that register copy
 				-- --------------------------------------------
 				-- trigger start of an overall [k]P computation
 				-- --------------------------------------------
@@ -583,7 +615,7 @@ begin
 				-- and ecc_curve and we'll have consistant computation
 				v.ctrl.r0z := ar0zo;
 				v.ctrl.r1z := ar1zo;
-				v.int.fgo := '1'; -- (s71), see (s67)-(s68)
+				v.int.fgo := '1'; -- (s71), see (s67)
 				v.pop.computing := '1';
 				v.int.ar0zi := ar0zo;
 				v.int.ar1zi := ar1zo;
@@ -593,14 +625,27 @@ begin
 				v.aop.done := '0';
 				v.ctrl.active := '1';
 				v.ctrl.state := aop;
-				case aopid is
-					-- Fp REDC
-					when "010" => v.int.faddr := EXEC_ADDR(FPMULT_ROUTINE);
-					-- no error here, ids should be filtered by ecc_axi
-					when others => null;
-				end case;
-				v.int.fgo := '1'; -- (s72), see (s67)-(s68)
+				--case aopid is
+				--	-- Fp REDC
+				--	when "010" => v.int.faddr := EXEC_ADDR(FPMULT_ROUTINE);
+				--	-- no error here, ids should be filtered by ecc_axi
+				--	when others => null;
+				--end case;
+				v.int.fgo := '1'; -- (s72), see (s67)
 				v.aop.computing := '1';
+			elsif (r.int.ardy = '1' and gentoken = '1') then
+				-- ----------------------------------
+				-- trigger generation of random token
+				-- ----------------------------------
+				v.int.ardy := '0';
+				v.int.tokendone := '0';
+				v.ctrl.active := '1';
+				v.ctrl.state := tok;
+				v.int.faddr := EXEC_ADDR(GET_TOKEN_ROUTINE);
+				v.int.fgo := '1'; -- (s73), see (s67)
+				-- Aim of (s110) below is to allow ecc_fp to access ecc_fp_dram
+				-- memory when generating the random token
+				v.int.token_generating := '1'; -- (s110)
 			end if;
 		end if;
 
@@ -620,22 +665,23 @@ begin
 		-- ------------------------
 		-- interface with ecc_curve
 		-- ------------------------
-		-- main state machine (based on r.ctrl.state)
+		-- (s113) main state machine (based on r.ctrl.state).
+		--        For the 'kp' state, sub state-machine (s1) also applies.
 		v.int.permute := '0'; -- (s4)
 		if r.int.fgo = '0' and frdy = '1' then -- (s67)
 			-- means ecc_curve was triggered for a software routine execution
-			-- by one of the r.int.fgo assertions (s68)-(s101), then ecc_curve
-			-- acknowledged that by asserting frdy while fgo was still high
-			-- (see (s66)) and now the job by ecc_curve is completed, which
-			-- is indicated by frdy asserted again with fgo having been
-			-- deasserted in the meantime by (s102)
+			-- by one of the r.int.fgo assertions (s69)-(s101) + (s111), then
+			-- ecc_curve acknowledged that by asserting frdy while fgo was still
+			-- high (see (s66)) and now the job by ecc_curve is completed, which
+			-- is indicated by frdy asserted again with fgo having been deasserted
+			-- in the meantime by (s102) 
 			case r.ctrl.state is
 				when cst =>
 					if r.mty.computing_a = '0' then
 						if r.mty.step = "00" then
 							v.int.faddr := EXEC_ADDR(CONSTMTY1_ROUTINE);
 							v.mty.step := "01";
-							v.int.fgo := '1'; -- (s74), see (s67)-(s68)
+							v.int.fgo := '1'; -- (s74), see (s67)
 							v.mty.cntrshift := nndyn_nnp1;
 						elsif r.mty.step = "01" then
 							v.mty.cntrshift := r.mty.cntrshift - 1;
@@ -649,7 +695,7 @@ begin
 								-- (no need to set it again), same for r.mty.step, it stays "01"
 								null;
 							end if;
-							v.int.fgo := '1'; -- (s75), see (s67)-(s68)
+							v.int.fgo := '1'; -- (s75), see (s67)
 						elsif r.mty.step = "10" then
 							v.ctrl.state := idle;
 							v.mty.computing := '0';
@@ -665,21 +711,18 @@ begin
 						v.mty.donea := '1';
 						v.ctrl.active := '0';
 					end if;
-				when set =>
-					v.kp.initkp := '0'; -- (s20), see (s19)
-					v.ctrl.state := kp;
-					v.kp.substate := checkoncurve;
-					v.int.faddr := EXEC_ADDR(CHKCURVE_ROUTINE); -- (s0)
-					v.int.fgo := '1'; -- (s76), see (s67)-(s68)
 				when kp =>
-					if r.kp.substate = exits then -- (s2)
-						-- end of overall computation, return to idle state and notify
-						-- ecc_axi that the result (computed [k]P point) is available
-						v.ctrl.active := '0';
-						v.ctrl.state := idle;
-						v.kp.substate := idle;
-						v.int.ardy := '1';
-						v.kp.computing := '0';
+					if r.kp.substate = exits then
+						if tokenact = '0' then -- (s2)
+							-- end of overall computation, return to idle state and notify
+							-- ecc_axi that the result (computed [k]P point) is available
+							-- for user/software to read
+							v.ctrl.active := '0';
+							v.ctrl.state := idle;
+							v.kp.substate := idle;
+							v.int.ardy := '1';
+							v.kp.computing := '0';
+						end if;
 						-- pragma translate_off
 						v.sim.logfinalresult := '1';
 						v.sim.perfcnten := '0';
@@ -700,11 +743,27 @@ begin
 						if r.ctrl.small_k_sz_en = '1' then
 							v.int.small_k_sz_kpdone := '1'; -- asserted 1 cycle thx to (s54)
 						end if;
+					elsif r.kp.substate = token -- (s112)
+						-- and tokenact = '1' -- useless (obviously true if .substate=token)
+					then
+						-- end of overall computation, return to idle state and notify
+						-- ecc_axi that the result (computed [k]P point) is available
+						v.ctrl.active := '0';
+						v.ctrl.state := idle;
+						v.kp.substate := idle;
+						v.int.ardy := '1';
+						v.kp.computing := '0';
 					else
 						-- nothing to do, ecc_curve acknowledgement is handled in the
-						-- state machine (s1) below
+						-- programs sub-state machine, see (s1) below
 						null;
 					end if;
+				when tok =>
+					v.ctrl.active := '0';
+					v.ctrl.state := idle;
+					v.int.ardy := '1';
+					v.int.tokendone := '1';
+					v.int.token_generating := '0';
 				when pop =>
 					-- (s24) - following assignments on .active./.state/.ardy/.pop.done/
 					-- .computing have possible bypasses in (s25), (s26) & (s60) below
@@ -754,7 +813,7 @@ begin
 								-- see (s65) below
 								v.int.faddr := EXEC_ADDR(ZADDU_ROUTINE);
 							end if;
-							v.int.fgo := '1'; -- (s77), see (s67)-(s68)
+							v.int.fgo := '1'; -- (s77), see (s67)
 							-- (s26), following statements are bypasses of the ones
 							-- in (s24) above
 							v.ctrl.active := '1';
@@ -764,7 +823,7 @@ begin
 							v.pop.computing := '1';
 						elsif r.pop.step = "01" then
 							v.int.faddr := EXEC_ADDR(ADDITION_END_ROUTINE);
-							v.int.fgo := '1'; -- (s78), see (s67)-(s68)
+							v.int.fgo := '1'; -- (s78), see (s67)
 							-- (s60), following statements are bypasses of the ones
 							-- in (s24) above
 							v.ctrl.active := '1';
@@ -862,7 +921,7 @@ begin
 								-- now test if YR0 == -YR1
 								v.int.faddr := EXEC_ADDR(OPPOSITEY_ROUTINE); -- .oppYL routine
 							end if;
-							v.int.fgo := '1'; -- (s79), see (s67)-(s68)
+							v.int.fgo := '1'; -- (s79), see (s67)
 							-- (s25), following statements are bypasses of the ones
 							-- in (s24) above
 							v.int.ardy := '0';
@@ -909,10 +968,24 @@ begin
 					v.aop.done := '1';
 					v.aop.computing := '0';
 				when others => null; -- TODO: treat this as an error
-			end case;
+			end case; -- r.ctrl.state
+		end if; -- fgo = 0 + frdy = 1
+
+		-- the 'set' state is special, as it always only lasts 1 clock cycle,
+		-- which is why it is handled outside of the fgo/frdy handshake with
+		-- ecc_curve (handled 
+		if r.ctrl.state = set then
+			v.kp.initkp := '0'; -- (s20), see (s19)
+			v.ctrl.state := kp;
+			v.kp.substate := checkoncurve;
+			v.int.faddr := EXEC_ADDR(CHKCURVE_ROUTINE); -- (s0)
+			v.int.fgo := '1'; -- (s76), see (s67)
 		end if;
 
-		-- handle sequential execution of the different programs involved in
+		-- (s1) program sequence state machine (based on r.kp.substate)
+		--      This can be seen as a substate machine of the main one (see (s113))
+		--      which applies to the (r.ctrl.)state value 'kp'.
+		-- Handle sequential execution of the different programs involved in
 		-- one complete [k]P computation.
 		-- A program is assumed to have been executed completely by ecc_curve
 		-- when ecc_curve asserts 'frdy' high again after we have deasserted
@@ -936,7 +1009,7 @@ begin
 						v.int.faddr := EXEC_ADDR(ADPA_ROUTINE);
 						v.kp.substate := adpa;
 					end if;
-					v.int.fgo := '1'; -- (s80), see (s67)-(s68)
+					v.int.fgo := '1'; -- (s80), see (s67)
 					if r.ctrl.r1z = '1' then
 						-- R1 being null from start of computation, the check-on-curve
 						-- test is assumed to be TRUE with no regards as to the result of
@@ -960,7 +1033,7 @@ begin
 					-- or blind, the private scalar
 					v.int.faddr := EXEC_ADDR(BLNBIT_ROUTINE);
 					v.kp.substate := blindbit;
-					v.int.fgo := '1'; -- (s81), see (s67)-(s68)
+					v.int.fgo := '1'; -- (s81), see (s67)
 					-- pragma translate_off
 					v.sim.simblbit := 0;
 					-- pragma translate_on
@@ -976,12 +1049,12 @@ begin
 						-- next program .blindstopL ('blindexit' substate)
 						v.int.faddr := EXEC_ADDR(BLINDSTOP_ROUTINE);
 						v.kp.substate := blindexit;
-						v.int.fgo := '1'; -- (s82), see (s67)-(s68)
+						v.int.fgo := '1'; -- (s82), see (s67)
 					else
 						-- run the program again
 						-- (r.int.faddr is still set to ECC_IRAM_BLNBIT_ADDR)
 						-- (r.kp.substate is still set to 'blindbit')
-						v.int.fgo := '1'; -- (s83), see (s67)-(s68)
+						v.int.fgo := '1'; -- (s83), see (s67)
 						-- pragma translate_off
 						v.sim.simblbit := r.sim.simblbit + 1;
 						-- pragma translate_on
@@ -991,20 +1064,20 @@ begin
 					-- next program: "ADPA init" ('adpa' substate)
 					v.int.faddr := EXEC_ADDR(ADPA_ROUTINE);
 					v.kp.substate := adpa;
-					v.int.fgo := '1'; -- (s84), see (s67)-(s68)
+					v.int.fgo := '1'; -- (s84), see (s67)
 				-- -------------------------------------------------
 				-- adpa: prepare Anti Address-Bit DPA countermeasure
 				-- -------------------------------------------------
 				when adpa =>
 					-- switch from 'adpa' state to 'ssetup' state
-					v.int.faddr := EXEC_ADDR(SETUP0_ROUTINE);
+					v.int.faddr := EXEC_ADDR(DRAWZ_ROUTINE);
 					v.kp.substate := ssetup;
 					-- r.kp.ssetup_step is used to differentiate between 1st, 2nd
 					-- & 3rd pass of 'ssetup' state: here we set it low to "00" as
 					-- we're starting the 1st pass
 					v.kp.ssetup_step := "00";
 					v.kp.firstzdbl := '1';
-					v.int.fgo := '1'; -- (s85), see (s67)-(s68)
+					v.int.fgo := '1'; -- (s85), see (s67)
 				-- -----------------------------------------------------
 				-- ssetup: enter  Montgomery domain,  switch to Jacobian
 				--         coordinates, compute [2]P & [3]P, set R0 & R1
@@ -1018,13 +1091,13 @@ begin
 							-- hardware, it will cause arithmetical error when passing point
 							-- coords into Jacobian form)
 							-- retry drawing lots
-							--v.int.faddr := EXEC_ADDR(SETUP0_ROUTINE); useless (still set)
+							--v.int.faddr := EXEC_ADDR(DRAWZ_ROUTINE); useless (still set)
 							--v.kp.ssetup_step := "00"; useless (still set)
-							v.int.fgo := '1'; -- (s86), see (s67)-(s68)
+							v.int.fgo := '1'; -- (s86), see (s67)
 						elsif zero = '0' then
 							-- lambda random is not null
-							v.int.faddr := EXEC_ADDR(SETUP1_ROUTINE);
-							v.int.fgo := '1'; -- (s87), see (s67)-(s68)
+							v.int.faddr := EXEC_ADDR(SETUP_ROUTINE);
+							v.int.fgo := '1'; -- (s87), see (s67)
 							-- we stay in the same 'ssetup' state, but the 2nd pass (switch to
 							-- Mont. & Jacobian domains, including a call to .pre_zaddU routine
 							-- in order to prepare the 3rd & last step) is enforced by asserting
@@ -1065,7 +1138,7 @@ begin
 						end if;
 						-- R1 still holds point P after .zdblL (& .pre_zadduL) execution
 						v.int.faddr := EXEC_ADDR(ZADDU_ROUTINE);
-						v.int.fgo := '1'; -- (s88), see (s67)-(s68)
+						v.int.fgo := '1'; -- (s88), see (s67)
 						v.kp.firstzdbl := '0';
 						v.kp.firstzaddu := '1';
 						-- we stay in the same 'ssetup' state, but the 3rd pass (executing
@@ -1090,7 +1163,7 @@ begin
 						--v.kp.firstitoh := '1';
 						v.kp.substate := joyecoz;
 						v.kp.joye.state := itoh;
-						v.int.fgo := '1'; -- (s89), see (s67)-(s68)
+						v.int.fgo := '1'; -- (s89), see (s67)
 						-- pragma translate_off
 						v.sim.logr0r1 := '1';
 						v.sim.logr0r1step := 1;
@@ -1098,7 +1171,7 @@ begin
 						--if iterate_shuffle_rdy = '1' then
 						--	-- switch from 'ssetup' state to 'switch3p' state
 						--	v.kp.substate := switch3p;
-						--	v.int.fgo := '1'; -- (s90), see (s67)-(s68)
+						--	v.int.fgo := '1'; -- (s90), see (s67)
 						--	-- pragma translate_off
 						--	v.sim.logr0r1 := '1';
 						--	v.sim.logr0r1step := 1;
@@ -1134,6 +1207,10 @@ begin
 							-- R1 contains initial point P, so it is non null if P isn't
 							v.ctrl.r1z := r.ctrl.r1z_init;
 						end if;
+						-- If needed, initialize the Z-remasking counter.
+						if zremaskact = '1' then
+							v.kp.zrmcnt := zremaskbits;
+						end if;
 					end if;
 				-- ------------------------
 				-- Joye Double-&-Add always (s5), see also (s6)
@@ -1152,7 +1229,7 @@ begin
 						if iterate_shuffle_rdy = '1' then
 							-- enter Joye FSM state 'prezaddu'
 							v.kp.joye.state := prezaddu; -- (s12)
-							v.int.fgo := '1'; -- (s91), see (s67)-(s68)
+							v.int.fgo := '1'; -- (s91), see (s67)
 							--if r.kp.firstitoh = '1' then
 							--	v.kp.firstitoh := '0';
 							--elsif r.kp.firstitoh = '0' then
@@ -1189,7 +1266,7 @@ begin
 						v.int.faddr := EXEC_ADDR(ZADDU_ROUTINE); -- (s31), bypassed by (s33)
 						v.kp.joye.state := zaddu; -- (s32), bypassed by (s34)
 						v.kp.zu := '1';
-						v.int.fgo := '1'; -- (s92), see (s67)-(s68)
+						v.int.fgo := '1'; -- (s92), see (s67)
 						-- if the two points R0 & R1 are equal (and non null), we must
 						-- call .zdblL instead of .zadduL (and switch to zdblu state
 						-- instead of zaddu)
@@ -1214,7 +1291,7 @@ begin
 						v.int.faddr := EXEC_ADDR(PRE_ZADDC_ROUTINE); -- (s11)
 						if iterate_shuffle_rdy = '1' then
 							v.kp.joye.state := prezaddc; -- (s17)
-							v.int.fgo := '1'; -- (s93), see (s67)-(s68)
+							v.int.fgo := '1'; -- (s93), see (s67)
 							v.kp.iterate_shuffle_valid := '1';
 							-- pragma translate_off
 							v.sim.logr0r1 := '1';
@@ -1295,7 +1372,7 @@ begin
 						v.int.faddr := EXEC_ADDR(PRE_ZADDC_ROUTINE); -- (s37)
 						if iterate_shuffle_rdy = '1' then
 							v.kp.joye.state := prezaddc; -- (s35)
-							v.int.fgo := '1'; -- (s94), see (s67)-(s68)
+							v.int.fgo := '1'; -- (s94), see (s67)
 							v.kp.iterate_shuffle_valid := '1';
 							-- pragma translate_off
 							v.sim.logr0r1 := '1';
@@ -1398,7 +1475,7 @@ begin
 						v.kp.joye.state := zaddc; -- (s40), bypassed by (s42) & (s44)
 						v.kp.zu := '0';
 						v.kp.zc := '1';
-						v.int.fgo := '1'; -- (s95), see (s67)-(s68)
+						v.int.fgo := '1'; -- (s95), see (s67)
 						-- if the two points R0 & R1 are either equal or opposite
 						-- (and non null), we must call .zdblL instead of .zaddcL
 						-- (and switch to zdblc state instead of zaddc)
@@ -1523,6 +1600,31 @@ begin
 							-- pragma translate_on
 							null;
 						end if;
+					elsif r.kp.joye.state = zrmsk then
+						if r.kp.zrmstep = '0' then
+							if zero = '1' then
+								-- this means that lambda random is null - this is not acceptable
+								-- (despite the fact that it probably indicates a tampering of the
+								-- hardware, it will cause arithmetical error when multiplicating
+								-- point coordinates)
+								-- retry drawing lots
+								--v.int.faddr := EXEC_ADDR(DRAWZ_ROUTINE); useless (still set)
+								v.int.fgo := '1'; -- (s86), see (s67)
+							elsif zero = '0' then
+								-- lambda random is not null
+								v.int.faddr := EXEC_ADDR(ZREMASK_ROUTINE);
+								v.int.fgo := '1'; -- (s87), see (s67)
+								-- we stay in the same 'ssetup' state, but the 2nd pass (switch to
+								-- Mont. & Jacobian domains, including a call to .pre_zaddU routine
+								-- in order to prepare the 3rd & last step) is enforced by asserting
+								-- .kp.ssetup_step to "01"
+								v.kp.zrmstep := '1';
+							end if;
+						elsif r.kp.zrmstep = '1' then
+							v.kp.joye.state := itoh;
+							v.int.faddr := EXEC_ADDR(ITOH_ROUTINE); 
+							v.int.fgo := '1';
+						end if;
 					end if; -- if r.kp.joye.state
 
 					-- (s49)
@@ -1560,13 +1662,11 @@ begin
 							v.kp.subpstep := '0';
 							v.kp.laststep := '1';
 							v.kp.joye.state := idle;
-							v.int.fgo := '1'; -- (s96), see (s67)-(s68)
+							v.int.fgo := '1'; -- (s96), see (s67)
 						else
 							-- Double-&-Add loop is not over, loop back to 'itoh'
-							-- (or to 'permutation' if shuffle = TRUE)
-							if (not debug and shuffle) or
-					  		(debug and shuffle and doshuffle = '1') -- (s21)
-							then
+							-- (or to 'permutation' if shuffle is active)
+							if doshuffle = '1' then -- (s21)
 								v.kp.joye.state := permutation;
 								v.int.permute := '1'; -- stays asserted 1 cycle thx to (s4)
 								if debug and -- statically resolved by synthesizer
@@ -1575,9 +1675,21 @@ begin
 									v.int.permuteundo := '1';
 								end if;
 							else
-								v.kp.joye.state := itoh;
-								v.int.faddr := EXEC_ADDR(ITOH_ROUTINE);
-								v.int.fgo := '1'; -- (s97), see (s67)-(s68)
+								v.kp.joye.state := itoh; -- (s116), bypassed by (s117)
+								v.int.faddr := EXEC_ADDR(ITOH_ROUTINE); -- (s118) byp. by (s119)
+								-- If needed, decrement the Z-remasking counter, and possibly
+								-- switch to program state 'zrmsk' if underflow is detected
+								if zremaskact = '1' then -- statically resolved by synthesizer
+									v.kp.zrmcnt := r.kp.zrmcnt - 1;
+									if r.kp.zrmcnt = (r.kp.zrmcnt'range => '0') then
+										v.kp.zrmcnt := zremaskbits;
+										v.kp.joye.state := zrmsk; -- (s117), bypass of (s116)
+										v.int.faddr :=
+											EXEC_ADDR(DRAWZ_ROUTINE); -- (s119), bypass of (s118)
+										v.kp.zrmstep := '0';
+									end if;
+								end if;
+								v.int.fgo := '1'; -- (s97), see (s67)
 							end if;
 						end if;
 						v.kp.zc := '0';
@@ -1695,7 +1807,7 @@ begin
 							-- but the null point too)
 							null; -- there's no point in signaling an error
 						end if;
-						v.int.fgo := '1'; -- (s98), see (s67)-(s68)
+						v.int.fgo := '1'; -- (s98), see (s67)
 						-- we stay in state 'subtractp' to execute the last ZADDC/ZNEGC/
 						-- ZDBLC routine, simply we assert r.kp.subpstep for next STOP
 						-- to be recognized as the end of the 2nd pass of subtractp
@@ -1760,7 +1872,7 @@ begin
 						v.int.faddr := EXEC_ADDR(EXIT_ROUTINE);
 						v.kp.substate := exits;
 						v.kp.laststep := '0';
-						v.int.fgo := '1'; -- (s99), see (s67)-(s68)
+						v.int.fgo := '1'; -- (s99), see (s67)
 						-- pragma translate_off
 						v.sim.logr0r1 := '1';
 						v.sim.logr0r1step := 5;
@@ -1778,7 +1890,7 @@ begin
 					if r.ctrl.r1z = '1' or r.ctrl.r1z_init = '1' then
 						v.int.aerr_outpt_not_on_curve := '0'; -- no error (0 is on curve)
 					elsif r.ctrl.r1z = '0' and r.ctrl.r1z_init = '0' then
-						if zero = '0' then
+						if zero = '0' then -- (s114)
 							-- error (output point NOT on curve)
 							v.int.aerr_outpt_not_on_curve := '1';
 						elsif zero = '1' then
@@ -1786,11 +1898,6 @@ begin
 							v.int.aerr_outpt_not_on_curve := '0';
 						end if;
 					end if;
-					-- this is the only substate where we don't reassert
-					-- r.int.fgo to '1' again
-					-- nothing to do, return to idle state is handled
-					-- by the main state machine (see (s2) above)
-					v.kp.done := '1';
 					-- the final state of R1 (nut or not null) must be forced high if
 					-- initial point P was null to begin with. This is because value
 					-- of signal r.ctrl.r1z is based on arithmetic operations all along
@@ -1801,32 +1908,80 @@ begin
 					if r.ctrl.r1z_init = '1' then
 						v.ctrl.r1z := '1'; -- (s64)
 					end if;
+					if tokenact = '1' then
+						-- it is the responsability of ecc_axi to enforce that if 'tokenact'
+						-- is high then token was generated and read back by the software
+						-- before [k]P computation was started (ecc_axi refuses to launch
+						-- computation as long as software has not done so, issuing error
+						-- STATUS_ERR_KP_FBD whenever it happens). This ensures coherency
+						-- in the fact that we're now going to mask the coordinates of [k]P
+						-- result with the very same token (which is done by executing
+						-- routine .token_kP_maskL, the address of which is pointed to by
+						-- MASK_TOKEN_ROUTINE in EXEC_ADDR memory)
+						v.kp.substate := token;
+						v.int.faddr := EXEC_ADDR(MASK_TOKEN_ROUTINE);
+						v.int.fgo := '1'; -- (s111), see (s67)
+					elsif tokenact = '0' then
+						-- We must no execute token masking routine.
+						-- We don't reassert r.int.fgo to '1' again.
+						-- Nothing to do, return to idle state is handled
+						-- by the main state machine (see (s2) above)
+						v.kp.done := '1';
+					end if;
 					-- pragma translate_off
 					v.sim.logr0r1 := '1';
 					v.sim.logr0r1step := 6;
 					-- pragma translate_on
+				-- -----------------------------------------------------
+				-- token: unmask the scalar set by software
+				-- -----------------------------------------------------
+				when token =>
+					-- Note: the final masking of the [k]P coordinates cannot be
+					-- merged into 'exits' state (hence the 'token' state) because
+					-- the 'exits' state must be terminated by a call to .checkoncurveL
+					-- the last instruction of which sets the 'zero' input flag to us
+					-- so that we can determine if [k]P result point actually is on
+					-- the curve, see (s114) above.
+					-- This is the only substate where we surely do not reassert
+					-- r.int.fgo to '1' again
+					-- nothing to do, return to idle state is handled by the main
+					-- state machine (see (s112) above)
+					v.kp.done := '1';
 				when others =>
 					null;
 			end case;
 		end if;
 
-		-- (s6) this part of "joye" state-machine (see (s5)) needs to be separated
+		-- (s6) This part of "joye" state-machine (see (s5)) needs to be separated
 		-- from the test (s7), as it does not rely on the "fgo/frdy" handshake with
 		-- ecc_curve (it doesn't involve execution of any program in ecc_curve_iram
 		-- & depends instead on the handshake "permute/permuterdy" with
-		-- ecc_fp_dram_sh (the latter only exists in the 'shuffle' case)
-		-- no test is required here on shuffle and/or doshuffle: if r.kp.joye.state
-		-- FSM is in permutation state, it means that conditions (s8) (or (s21))
-		-- were met
+		-- ecc_fp_dram_sh (the latter only exists in the 'shuffle_type' /= none
+		-- case).
+		-- No test is required here on shuffle_type and/or doshuffle: if register
+		-- r.kp.joye.state FSM is in permutation state, it means that conditions
+		-- (s21) were met.
 		if r.kp.joye.state = permutation then
 			-- (s23) the test r.int.permute = 0 in (s22) below is mandatory because
 			-- in the first clock cycle of permutation state r.int.permute = 1 but
 			-- ecc_fp_dram_sh logic can't have yet deasserted permuterdy
 			if r.int.permute = '0' then -- (s22)
 				if permuterdy = '1' then
-					v.kp.joye.state := itoh;
-					v.int.faddr := EXEC_ADDR(ITOH_ROUTINE);
-					v.int.fgo := '1'; -- (s100), see (s67)-(s68)
+					v.kp.joye.state := itoh; -- (s120), bypassed by (s121)
+					v.int.faddr := EXEC_ADDR(ITOH_ROUTINE); -- (s122), bypassed by (s123)
+					-- If needed, decrement the Z-remasking counter, and possibly
+					-- switch to program state 'zrmsk' if underflow is detected
+					if (zremaskact = '1') then -- statically resolved by synthesizer
+						v.kp.zrmcnt := r.kp.zrmcnt - 1;
+						if r.kp.zrmcnt = (r.kp.zrmcnt'range => '0') then
+							v.kp.zrmcnt := zremaskbits;
+							v.kp.joye.state := zrmsk; -- (s121), bypass of (s120)
+							v.int.faddr :=
+								EXEC_ADDR(DRAWZ_ROUTINE); -- (s123), bypass of (s122)
+							v.kp.zrmstep := '0';
+						end if;
+					end if;
+					v.int.fgo := '1'; -- (s100), see (s67)
 				end if;
 			end if;
 		end if;
@@ -1837,12 +1992,12 @@ begin
 		end if;
 
 		if r.kp.substate = wait_xyr01_permute then
-			-- no deadlock here: ecc_curve never waits for our signal
-			-- r.kp.iterate_shuffle_valid to be asserted for asserting
-			-- iterate_shuffle_rdy
+			-- no deadlock possible here: ecc_curve never waits for our signal
+			-- 'r.kp.iterate_shuffle_valid' to be asserted for asserting on its side
+			-- the signal 'iterate_shuffle_rdy'
 			if iterate_shuffle_rdy = '1' then
 				v.kp.substate := r.kp.nextsubstate; -- (s15)
-				v.int.fgo := '1'; -- (s101), see (s67)-(s68)
+				v.int.fgo := '1'; -- (s101), see (s67)
 				-- no need to set r.int.faddr, it was done:
 				--   - by (s9) at the end of substate 'ssetup'
 				--       (r.int.faddr was then set to EXEC_ADDR(ITOH_ROUTINE))
@@ -1921,7 +2076,7 @@ begin
 			v.pop.computing := '0';
 			v.aop.computing := '0';
 			v.kp.joye.state := idle;
-			if shuffle then -- statically resolved by synthesizer
+			if shuffle_type /= none then -- statically resolved by synthesizer
 				v.int.permute := '0';
 			end if;
 			-- pragma translate_off
@@ -1955,6 +2110,8 @@ begin
 			-- no need to reset r.int.small_k_sz_kpdone
 			v.ctrl.small_k_sz_en := '0';
 			v.int.ptadd := '0';
+			v.int.tokendone := '0';
+			v.int.token_generating := '0';
 		end if;
 
 	rin <= v;
@@ -1984,6 +2141,8 @@ begin
 	ar1zi <= r.int.ar1zi;
 	small_k_sz_en_ack <= r.int.small_k_sz_en_ack;
 	small_k_sz_kpdone <= r.int.small_k_sz_kpdone;
+	tokendone <= r.int.tokendone;
+	token_generating <= r.int.token_generating;
 	--   interface with ecc_curve
 	fgo <= r.int.fgo;
 	faddr <= r.int.faddr;
@@ -2008,7 +2167,7 @@ begin
 	compaop <= r.aop.computing; -- also driven to ecc_curve
 	aerr_inpt_not_on_curve <= r.int.aerr_inpt_not_on_curve;
 	aerr_outpt_not_on_curve <= r.int.aerr_outpt_not_on_curve;
-	--     (this signal is only used in the 'shuffle' case)
+	--     (this signal is only used in the 'shuffle_type' /= none case)
 	permute <= r.int.permute;
 	pu: if debug generate -- statically resolved by synthesizer
 		permuteundo <= r.int.permuteundo;
@@ -2018,7 +2177,6 @@ begin
 	simbit <= r.sim.simbit;
 	-- pragma translate_on
 	-- debug features
-	dbgjoyebit <= r.dbg.joyebit;
 	dbgnbstarvrndxyshuf <= r.dbg.nbstarvrndxyshuf;
 	-- TODO: many multicycles can be set on paths r.ctrl.state -> dbg*
 	-- TODO: many multicycles can be set on paths r.kp.substate -> dbg*
@@ -2101,20 +2259,33 @@ begin
 				echo("returning to substate 'idle' (");
 				echo(time'image(now));
 				echol(")");
-			elsif (r.kp.substate = idle and rbak_substate /= idle) then
+			elsif (rbak_substate = exits and r.kp.substate /= exits) then
 				echo("ECC_SCALAR: ");
-				if (rbak_substate = exits) then
+				--if (rbak_substate = exits) then
 					if zero = '1' or r.ctrl.r1z = '1' then
 						echo("output point IS on curve");
 						if r.ctrl.r1z = '1' then
-							echo(" (it is null) ");
+							echol(" (it is null)");
 						else
-							echo(", ");
+							echol("");
 						end if;
 					else
-						echo("output point IS NOT on curve, ");
+						echol("output point IS NOT on curve");
 					end if;
+				--end if;
+				if r.kp.substate = idle then
+					echo("ECC_SCALAR: ");
+					echo("returning to substate 'idle' (");
+					echo(time'image(now));
+					echol(")");
+					echo("ECC_SCALAR: PERF: ");
+					echo(integer'image(r.sim.perfcnt));
+					echo(" clock cycles (");
+					echo(time'image(now));
+					echol(")");
 				end if;
+			elsif (rbak_substate = token and r.kp.substate = idle) then
+				echo("ECC_SCALAR: ");
 				echo("returning to substate 'idle' (");
 				echo(time'image(now));
 				echol(")");
@@ -2192,7 +2363,7 @@ begin
 				echo(time'image(now));
 				echol(")");
 			elsif (r.kp.joye.state /= zaddc
-			  and rbak_joye_state = zaddc) --and (not shuffle or (shuffle and
+				and rbak_joye_state = zaddc) then --and (not shuffle or (shuffle and
 				--( (debug and doshuffle = '0') or (not debug) )))) then
 				if (r.sim.simbit mod NB_BITS_LINE = NB_BITS_LINE - 1)
 					or (r.sim.simbit = nnmax_joye_loop_s + 2)

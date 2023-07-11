@@ -21,7 +21,7 @@ use work.ecc_customize.all;
 use work.ecc_utils.all;
 use work.ecc_pkg.all;
 use work.ecc_vars.all; -- for LARGE_NB_R_ADDR - see (s79), (s80) & (s81)
-use work.ecc_soft.all;
+use work.ecc_software.all;
 use work.mm_ndsp_pkg.all;
 use work.ecc_trng_pkg.all;
 -- pragma translate_off
@@ -89,6 +89,9 @@ entity ecc_axi is
 		small_k_sz : out unsigned(log2(nn) - 1 downto 0);
 		small_k_sz_en_ack : in std_logic;
 		small_k_sz_kpdone : in std_logic;
+		tokenact : out std_logic;
+		zremaskact : out std_logic;
+		zremaskbits : out unsigned(log2(nn - 1) - 1 downto 0);
 		--   Montgomery constants computation
 		agocstmty : out std_logic;
 		mtydone : in std_logic;
@@ -105,23 +108,10 @@ entity ecc_axi is
 		doaop : out std_logic;
 		aopid : out std_logic_vector(2 downto 0); -- id defined in ecc_pkg
 		aopdone : in std_logic;
+		--   token
+		gentoken : out std_logic;
+		tokendone : in std_logic;
 		--   /debug only
-		laststep : in std_logic;
-		firstzdbl : in std_logic;
-		firstzaddu : in std_logic;
-		first2pz : in std_logic;
-		first3pz : in std_logic;
-		torsion2 : in std_logic;
-		kap : in std_logic;
-		kapp : in std_logic;
-		zu : in std_logic;
-		zc : in std_logic;
-		r0z : in std_logic;
-		r1z : in std_logic;
-		pts_are_equal : in std_logic;
-		pts_are_oppos : in std_logic;
-		phimsb : in std_logic;
-		kb0end : in std_logic;
 		--   end of debug only/
 		-- interface with ecc_curve
 		masklsb : out std_logic;
@@ -163,7 +153,6 @@ entity ecc_axi is
 		-- debug features (interface with ecc_scalar)
 		dbgpgmstate : in std_logic_vector(3 downto 0);
 		dbgnbbits : in std_logic_vector(15 downto 0);
-		dbgjoyebit : in std_logic_vector(log2(2*nn - 1) - 1 downto 0);
 		dbgnbstarvrndxyshuf : in std_logic_vector(15 downto 0);
 		-- debug features (interface with ecc_curve)
 		dbgbreakpoints : out breakpoints_type;
@@ -196,6 +185,16 @@ entity ecc_axi is
 		dbgtrngrawduration : in unsigned(31 downto 0);
 		dbgtrngvonneuman : out std_logic;
 		dbgtrngidletime : out unsigned(3 downto 0);
+		-- handshake signals between entropy server ecc_trng
+		-- and the different clients (for debug diagnostics)
+		dbgtrngaxirdy : in std_logic;
+		dbgtrngaxivalid : in std_logic;
+		dbgtrngfprdy : in std_logic;
+		dbgtrngfpvalid : in std_logic;
+		dbgtrngcrvrdy : in std_logic;
+		dbgtrngcrvvalid : in std_logic;
+		dbgtrngshrdy : in std_logic;
+		dbgtrngshvalid : in std_logic;
 		-- debug feature (off-chip trigger)
 		dbgtrigger : out std_logic
 	);
@@ -289,12 +288,14 @@ architecture rtl of ecc_axi is
 		active : std_logic;
 		busy : std_logic;
 		trngreading : std_logic;
+		token : std_logic;
 	end record;
 
 	constant BLNDSHSZ : natural := 4;
 	type ctrl_reg_type is record
 		state : state_type;
-		ierrid : std_logic_vector(31 downto 16); -- error field in R_STATUS register
+		-- ierrid designates the error field in R_STATUS register
+		ierrid : std_logic_vector(STATUS_ERR_MSB downto STATUS_ERR_LSB);
 		newp : std_logic;
 		newa : std_logic;
 		wk : std_logic;
@@ -308,11 +309,13 @@ architecture rtl of ecc_axi is
 		doblinding : std_logic;
 		savedoblinding : std_logic;
 		blindbits : unsigned(log2(nn) - 1 downto 0);
+		blindbitstest : unsigned(log2(nn) - 1 downto 0);
 		doblindsh : std_logic_vector(0 to BLNDSHSZ - 1);
 		nbbldnn : unsigned(btw - 1 downto 0);
 		blindmodww : unsigned(log2(ww) - 1 downto 0);
 		nn_extrabits : unsigned(log2(ww) - 1 downto 0);
 		doblindcheck : std_logic;
+		blindcheckaxiack : std_logic;
 		kppending : std_logic;
 		lockaxi : std_logic;
 		pen : std_logic;
@@ -359,6 +362,17 @@ architecture rtl of ecc_axi is
 		small_k_sz_en : std_logic;
 		small_k_sz_en_en : std_logic;
 		small_k_sz_is_on : std_logic;
+		-- random token for software to bring the scalar in
+		token_act : std_logic;
+		gentoken : std_logic;
+		tokpending : std_logic;
+		tokendone_d : std_logic;
+		tokavail4read : std_logic;
+		tokwasread : std_logic;
+		-- Z-remasking countermeasure
+		zremaskact : std_logic;
+		zremaskbits, zremaskbitstest : unsigned(log2(nn - 1) - 1 downto 0);
+		docheckzremask : std_logic;
 		-- software reset
 		swrst : std_logic;
 		swrst_cnt : unsigned(2 downto 0);
@@ -462,6 +476,20 @@ architecture rtl of ecc_axi is
 		readsh : std_logic_vector(readlat downto 0);
 		noxyshuf : std_logic;
 		noaxirnd : std_logic;
+		trngaxistarv : unsigned(31 downto 0);
+		trngaxiok : unsigned(31 downto 0);
+		trngfpstarv : unsigned(31 downto 0);
+		trngfpok : unsigned(31 downto 0);
+		trngcrvstarv : unsigned(31 downto 0);
+		trngcrvok : unsigned(31 downto 0);
+		trngshstarv : unsigned(31 downto 0);
+		trngshok : unsigned(31 downto 0);
+		-- pragma translate_off
+		trngaxi100 : integer;
+		trngfp100 : integer;
+		trngcrv100 : integer;
+		trngsh100 : integer;
+		-- pragma translate_on
 	end record;
 
 	-- all registers
@@ -582,6 +610,14 @@ begin
 				 & "W_DBG_BKPT wouldn't all be sampled by hardware)"
 			severity FAILURE;
 
+	-- (s234), see (s235)
+	assert (debug or ((not debug) and ( (blinding = 0) or (blinding >= 4))))
+		report "In production mode (debug = FALSE), the number of blinding bits "
+		     & "(parameter 'blinding' in ecc_customize.vhd) must be greater or "
+				 & "equal to 4 (the value " & integer'image(blinding) & "you set "
+				 & "for 'blinding' parameter hence will be replaced with 4)."
+			severity WARNING;
+
 	-- combinational logic
 	comb: process(s_axi_aresetn, r,
 	              s_axi_awaddr, s_axi_awprot, s_axi_awvalid,
@@ -593,7 +629,7 @@ begin
 	              trngvalid, trngdata, initdone,
 	              trngaxiirncount, trngefpirncount, trngcurirncount,
 	              trngshfirncount,
-	              ar01zien, ar0zi, ar1zi, amtydone,
+	              ar01zien, ar0zi, ar1zi, amtydone, tokendone,
 	              -- debug features
 	              dbghalted, dbgdecodepc, dbgbreakpointid,
 	              dbgpgmstate, dbgnbbits, dbgbreakpointhit,
@@ -605,11 +641,9 @@ begin
 	              nndyn_mask_is_zero_s, nndyn_mask_is_all1_but_msb_s,
 	              nndyn_mask_wm2_s, nndyn_wmin_s, nndyn_nnrnd_zerowm1_s,
 	              nndyn_nnm3_s, nndyn_nnp1_s,
-	              small_k_sz_en_ack, small_k_sz_kpdone
-	              -- debug from ecc_scalar
-	              , laststep, firstzdbl, firstzaddu, first2pz, first3pz, 
-	              torsion2, kap, kapp, zu, zc, r0z, r1z, dbgjoyebit,
-	              pts_are_equal, pts_are_oppos, phimsb, kb0end)
+	              small_k_sz_en_ack, small_k_sz_kpdone,
+	              dbgtrngaxirdy, dbgtrngaxivalid, dbgtrngfprdy, dbgtrngfpvalid,
+	              dbgtrngcrvrdy, dbgtrngcrvvalid, dbgtrngshrdy, dbgtrngshvalid)
 		variable v : reg_type;
 		variable vbk : natural range 0 to 3;
 		variable v_nn_mod_ww_sub : unsigned(log2(ww) downto 0); -- log2(ww) + 1 bits
@@ -629,9 +663,9 @@ begin
 		variable dw : std_logic_vector(C_S_AXI_DATA_WIDTH - 1 downto 0);
 		variable v_pop_possible, v_kp_possible : boolean;
 		variable v_busy, v_wlock : boolean;
-		variable vtmp6 : unsigned(31 - BLD_BITS_LSB downto 0);
-		variable vtmp7 : unsigned(31 - BLD_BITS_LSB downto 0);
-		variable v_blindiff : unsigned(31 - BLD_BITS_LSB downto 0);
+		variable vtmp6 : unsigned(BLD_BITS_MSB - BLD_BITS_LSB + 1 downto 0);
+		variable vtmp7 : unsigned(BLD_BITS_MSB - BLD_BITS_LSB + 1 downto 0);
+		variable v_blindiff : unsigned(BLD_BITS_MSB - BLD_BITS_LSB + 1 downto 0);
 		variable vtmp8, vtmp9, vtmp10, vtmp11, vtmp12 : unsigned(log2(nn) downto 0);
 		variable vtmp13, vtmp14 : unsigned(log2(nn) downto 0);
 		variable vtmp15 : signed(log2(nn) downto 0);
@@ -639,6 +673,8 @@ begin
 		variable vtmp18 : signed(log2(ww) downto 0);
 		variable v_axi_wdatax_msb : std_logic_vector(FP_ADDR_MSB - 1 downto 0);
 		variable v_fpaddr0_msb : std_logic_vector(FP_ADDR_MSB - 1 downto 0);
+		variable v_read_no_error : boolean;
+		variable vtmp19, vtmp20, vtmp21 : unsigned(log2(nn - 1) downto 0);
 	begin
 		v := r;
 
@@ -656,6 +692,128 @@ begin
 		v.ctrl.aerr_outpt_ack := '0';
 
 		v.debug.halt := '0'; -- (s154)
+
+		-- (s260)
+		-- The logic below is to allow software driver to get diagnostic infos
+		-- on the TRNG throughput in debug mode. In concrete terms, for each of
+		-- the 4 sources of internal random numbers ("axi", "fp", "crv" & "sh")
+		-- provided by ecc_trng, the IP maintains two counters: a "starv" counter
+		-- and an "ok" counter.
+		--
+		--   - The "starv" counter is incremented in each clock cycle where
+		--     the handshake "rdy" signal is asserted by the corresponding
+		--     client (e.g 'ecc_curve' for "crv") - meaning the client is reques-
+		--     ting a new random value -, but the corresponding "valid" signal
+		--     is deasserted - meaning the server is not ready to drive that
+		--     value.
+		--
+		--   - The "ok" counter is incremented in each clock-cycle where
+		--     both handshake signals ("rdy" and "valid") are asserted - meaning
+		--     an internal random number was actually transferred between the
+		--     server and the client.
+		--
+		-- Thus for each of the 4 sources of internal random numbers, by computing
+		-- the ratio starv / (starv + ok), the software driver can assess the per-
+		-- centage of starving time on the corresponding client interface. This
+		-- value can then be used back to adjust the value of the related parameter
+		-- in file ecc_customize.vhd, i.e one of 'trng_ramsz_[raw|axi|fpr|crv|shf]'
+		-- (size of FIFOs) and 'nbtrng' (and, to a lesser extent, trngta).
+		if debug then
+			-- ecc_trng/ecc_axi interface
+			if dbgtrngaxirdy = '1' then
+				if dbgtrngaxivalid = '1' then
+					v.debug.trngaxiok := r.debug.trngaxiok + 1;
+				elsif dbgtrngaxivalid = '0' then
+					v.debug.trngaxistarv := r.debug.trngaxistarv + 1;
+				end if;
+				-- reset both counters when one of them overflows
+				if (r.debug.trngaxistarv(r.debug.trngaxistarv'length - 1) = '1'
+					and v.debug.trngaxistarv(r.debug.trngaxistarv'length - 1) = '0')
+			 		or (r.debug.trngaxiok(r.debug.trngaxiok'length - 1) = '1'
+					and v.debug.trngaxiok(r.debug.trngaxiok'length - 1) = '0')
+				then
+					v.debug.trngaxiok := (others => '0');
+					v.debug.trngaxistarv := (others => '0');
+				end if;
+			end if;
+			-- ecc_trng/ecc_fp interface
+			if dbgtrngfprdy = '1' then
+				if dbgtrngfpvalid = '1' then
+					v.debug.trngfpok := r.debug.trngfpok + 1;
+				elsif dbgtrngfpvalid = '0' then
+					v.debug.trngfpstarv := r.debug.trngfpstarv + 1;
+				end if;
+				-- reset both counters when one of them overflows
+				if (r.debug.trngfpstarv(r.debug.trngfpstarv'length - 1) = '1'
+					and v.debug.trngfpstarv(r.debug.trngfpstarv'length - 1) = '0')
+			 		or (r.debug.trngfpok(r.debug.trngfpok'length - 1) = '1'
+					and v.debug.trngfpok(r.debug.trngfpok'length - 1) = '0')
+				then
+					v.debug.trngfpok := (others => '0');
+					v.debug.trngfpstarv := (others => '0');
+				end if;
+			end if;
+			-- ecc_trng/ecc_curve interface
+			if dbgtrngcrvrdy = '1' then
+				if dbgtrngcrvvalid = '1' then
+					v.debug.trngcrvok := r.debug.trngcrvok + 1;
+				elsif dbgtrngcrvvalid = '0' then
+					v.debug.trngcrvstarv := r.debug.trngcrvstarv + 1;
+				end if;
+				-- reset both counters when one of them overflows
+				if (r.debug.trngcrvstarv(r.debug.trngcrvstarv'length - 1) = '1'
+					and v.debug.trngcrvstarv(r.debug.trngcrvstarv'length - 1) = '0')
+			 		or (r.debug.trngcrvok(r.debug.trngcrvok'length - 1) = '1'
+					and v.debug.trngcrvok(r.debug.trngcrvok'length - 1) = '0')
+				then
+					v.debug.trngcrvok := (others => '0');
+					v.debug.trngcrvstarv := (others => '0');
+				end if;
+			end if;
+			-- ecc_trng/ecc_fp_dram_sh_* interface
+			if dbgtrngshrdy = '1' then
+				if dbgtrngshvalid = '1' then
+					v.debug.trngshok := r.debug.trngshok + 1;
+				elsif dbgtrngshvalid = '0' then
+					v.debug.trngshstarv := r.debug.trngshstarv + 1;
+				end if;
+				-- reset both counters when one of them overflows
+				if (r.debug.trngshstarv(r.debug.trngshstarv'length - 1) = '1'
+					and v.debug.trngshstarv(r.debug.trngshstarv'length - 1) = '0')
+			 		or (r.debug.trngshok(r.debug.trngshok'length - 1) = '1'
+					and v.debug.trngshok(r.debug.trngshok'length - 1) = '0')
+				then
+					v.debug.trngshok := (others => '0');
+					v.debug.trngshstarv := (others => '0');
+				end if;
+			end if;
+			-- pragma translate_off
+			if (to_integer(r.debug.trngaxistarv) + to_integer(r.debug.trngaxiok)) /= 0
+			then
+				v.debug.trngaxi100 := integer(100 *
+					real(to_integer(r.debug.trngaxistarv)) / real(
+						to_integer(r.debug.trngaxistarv) + to_integer(r.debug.trngaxiok)));
+			end if;
+			if (to_integer(r.debug.trngfpstarv) + to_integer(r.debug.trngfpok)) /= 0
+			then
+				v.debug.trngfp100 := integer(100 *
+					real(to_integer(r.debug.trngfpstarv)) / real(
+						to_integer(r.debug.trngfpstarv) + to_integer(r.debug.trngfpok)));
+			end if;
+			if (to_integer(r.debug.trngcrvstarv) + to_integer(r.debug.trngcrvok)) /= 0
+			then
+				v.debug.trngcrv100 := integer(100 *
+					real(to_integer(r.debug.trngcrvstarv)) / real(
+						to_integer(r.debug.trngcrvstarv) + to_integer(r.debug.trngcrvok)));
+			end if;
+			if (to_integer(r.debug.trngshstarv) + to_integer(r.debug.trngshok)) /= 0
+			then
+				v.debug.trngsh100 := integer(100 *
+					real(to_integer(r.debug.trngshstarv)) / real(
+						to_integer(r.debug.trngshstarv) + to_integer(r.debug.trngshok)));
+			end if;
+			-- pragma translate_on
+		end if; -- debug
 
 		-- v_pop_possible must be always defined to avoid spurious latch inference
 		-- TODO: multicycle constraints are possible  on the following paths (which
@@ -676,15 +834,24 @@ begin
 			v_pop_possible := FALSE;
 		end if;
 
+		-- (s231)
 		-- v_kp_possible must be always defined to avoid spurious latch inference
 		-- TODO: multicycle constraints are possible on the following paths (which
 		-- all go through combinational signal v_kp_possible):
 		--   r.ctrl.doblinding -> r.ctrl.agokp/r.ctrl.lockaxi/r.ctrl.ierrid
 		--   r.ctrl.[kq]_set -> r.ctrl.agokp/r.ctrl.lockaxi/r.ctrl.ierrid
 		--   r.nndyn.valwerr -> r.ctrl.agokp/r.ctrl.lockaxi/r.ctrl.ierrid
+		--   
 		v_kp_possible := v_pop_possible and r.ctrl.k_set = '1' -- (s114)
+			-- signals related to nn_dynamic feature
 			and ((not nn_dynamic) or (nn_dynamic and r.nndyn.valwerr = '0')) and
-		  (r.ctrl.doblinding = '0' or (r.ctrl.doblinding and r.ctrl.q_set) = '1');
+			-- signals related to blinding (order 'q' must be set by softare
+			-- for blinding to make sense)
+			(  ((not debug) and blinding > 0 and r.ctrl.q_set = '1')
+			 or (r.ctrl.doblinding = '0' or (r.ctrl.doblinding and r.ctrl.q_set)='1'))
+			-- signals related to token feature
+			and ( (debug and (r.ctrl.token_act = '0' or r.ctrl.tokwasread = '1' ))
+			     or ((not debug) and r.ctrl.tokwasread = '1') );
 
 		-- (s30) v_busy determines the value of the BUSY bit in R_STATUS register,
 		--       see (s160)
@@ -696,6 +863,7 @@ begin
 		--   or - we are in the process of computing signals associated
 		--        to a new value of nn (prime size, nn_dynamic = TRUE)
 		--   or - we are reading TRNG data (debug = TRUE only)
+		--   or - we are in the process of generating the software token
 		--   or - AXI interface is briefly "locked" to avoid race condition
 		-- then the BUSY bit in R_STATUS register is set and software is not
 		-- supposed to perform any action other than polling the BUSY bit
@@ -718,12 +886,13 @@ begin
 		         or r.write.busy = '1' or r.read.busy = '1'
 		         or (nn_dynamic and r.nndyn.active = '1')
 		         or r.read.trngreading = '1'
+		         or r.ctrl.tokpending = '1'
 		         or r.ctrl.lockaxi = '1';
 		-- (s161) - Compared to v_busy, v_wlock adds the condition that the last
 		-- prime size set by software did not incur an error - thus preventing
 		-- software from performing undesirable actions when nn is not set properly
 		-- yet (this concerns the following write registers: W_CTRL, W_R[01]_NULL,
-		-- W_BLINDING, W_IRQ & W_SMALL_SCALAR, see (s162) - (s168)).
+		-- W_BLINDING, W_IRQ & W_SMALL_SCALAR, see (s162) & (s164)-(s168)).
 		v_wlock := v_busy or (nn_dynamic and r.nndyn.valwerr = '1');
 
 		-- pragma translate_off
@@ -821,57 +990,142 @@ begin
 			v.ctrl.small_k_sz_is_on := '0';
 		end if;
 
-		-- ---------------------------------------------------------------------
-		-- Blinding: check of correctness of nb of blinding bits set by software
-		-- ---------------------------------------------------------------------
-		-- bitwidth of numbers used to compare nb of blinding bits set by software
-		-- is the complete (32 - BLD_BITS_LSB) bits available in W_BLINDING register
-		-- so that software driver can be compiled without any prejudice regarding
-		-- the value set for nn at synthesis time in ecc_customize.vhd. Value of nn
-		-- is made available to software at runtime through R_CAPABILITIES register,
-		-- see (s171).
-		if r.ctrl.doblindcheck = '1' then -- (s127), .doblindcheck was set by (s128)
-			v.ctrl.doblindcheck := '0';
-			if nn_dynamic then -- statically resolved by synthesizer
-				vtmp6 := resize(r.nndyn.valnnm1, 32 - BLD_BITS_LSB);
-			else
-				vtmp6 := to_unsigned(nn - 1, 32 - BLD_BITS_LSB);
-			end if;
-			vtmp7 := -- (s130) see (s129)
-				resize(r.ctrl.blindbits, 32 - BLD_BITS_LSB);
-			-- compute "nn" - "nb of blinding bits"
-			v_blindiff := vtmp6 - vtmp7;
-			if v_blindiff(31 - BLD_BITS_LSB) = '1' then
-				-- means blindbits > nn - 1 (this is an error, signaled back to
-				-- software driver with bit STATUS_ERR_BLN of R_STATUS register)
-				v.ctrl.doblinding := '0';
-				v.ctrl.ierrid(STATUS_ERR_BLN) := '1';
-				-- (s126), set back the AXI handshake signals, see (s125)
+		-- ------------------------------------------------------------------
+		-- (s255)
+		-- Z-remasking: check that value set by software driver is smaller
+		-- or equal to what was statically set in ecc_customize.vhd
+		-- This concerns only production mode (debug = FALSE). In debug mode,
+		-- software driver can do whatever it wants.
+		-- ------------------------------------------------------------------
+		if (not debug) and (zremask > 0) then -- statically resolved by synthesizer
+			if r.ctrl.docheckzremask = '1' then -- (s258), triggered by (s257)
+				v.ctrl.docheckzremask := '0';
+				vtmp19 := '0' & to_unsigned(zremask - 1, log2(nn - 1));
+				vtmp20 := '0' & r.ctrl.zremaskbitstest;
+				vtmp21 := vtmp19 - vtmp20;
+				if vtmp21(log2(nn - 1)) = '1' then
+					-- Means .zremaskbitstest > zremask (NOK: reduces security).
+					-- Ignore value set by sofware, acknowledge the AXI data write
+					-- transaction (see (s252)) and signal back an error to software
+					-- through R_STATUS register.
+					v.ctrl.ierrid(STATUS_ERR_ZREMASK) := '1';
+				elsif vtmp21(log2(nn - 1)) = '0' then
+					-- Means .zremaskbitstest < zremask, or equal (OK: increases security)
+					v.ctrl.zremaskbits := r.ctrl.zremaskbitstest;
+					v.ctrl.zremaskact := '1';
+				end if;
+				-- (s252)
 				v.axi.wready := '1';
 				v.axi.awready := '1';
 				v.axi.arready := '1';
 				v.axi.bvalid := '1';
-			elsif v_blindiff(31 - BLD_BITS_LSB) = '0' then
-				-- means nn - 1 > blindbits (or equal)
-				v.ctrl.doblindsh(0) := '1';
-				-- until the tests triggered by setting .doblindsh(0) to 1 are not
-				-- done, .doblinding stays at 0
+			end if;
+		end if;
+
+		-- ------------------------------------------------------------------
+		-- Blinding: check correctness of nb of blinding bits set by software
+		-- ------------------------------------------------------------------
+		-- The bits used to compare nb of blinding bits set by the software driver
+		-- to what is allowed are the (BLD_BITS_MSB downto BLD_BITS_LSB) bits of
+		-- W_BLINDING register. The software driver can be compiled without any
+		-- prejudice regarding the value set for nn at synthesis time in ecc_cus-
+		-- tomize.vhd, as it can still access the static value of nn at runtime
+		-- through R_CAPABILITIES register, see (s171).
+		-- For (s127) below, .doblindcheck was set by (s128) (when software driver
+		-- wrote register W_BLINDING) or by (s237)/(s242) (when software dynami-
+		-- cally modyfied the value of nn).
+		if r.ctrl.doblindcheck = '1' then -- (s127)
+			v.ctrl.doblindcheck := '0';
+			if nn_dynamic then -- statically resolved by synthesizer
+				vtmp6 := '0' & resize(r.nndyn.valnnm1, BLD_BITS_MSB - BLD_BITS_LSB + 1);
+			else
+				vtmp6 := '0' & to_unsigned(nn - 1, BLD_BITS_MSB - BLD_BITS_LSB + 1);
+			end if;
+			vtmp7 := -- (s130), see (s129)
+				resize(r.ctrl.blindbitstest, BLD_BITS_MSB - BLD_BITS_LSB + 2);
+			-- compute "nn" - "nb of blinding bits"
+			v_blindiff := vtmp6 - vtmp7;
+			if v_blindiff(BLD_BITS_MSB - BLD_BITS_LSB + 1) = '1' then
+				-- This means blindbits > nn - 1. This is an error, which an only be
+				-- provoked by (s241), not by (s243), hence we don't need to recompute
+				--.nn_extrabits here. Nothing changes, we just signal back the error
+				-- to software driver with bit STATUS_ERR_BLN of R_STATUS register.
+				v.ctrl.ierrid(STATUS_ERR_BLN) := '1'; -- (s249)
+				if r.ctrl.blindcheckaxiack = '1' then
+					-- (s126), set back the AXI handshake signals, see (s125)
+					v.axi.wready := '1';
+					v.axi.awready := '1';
+					v.axi.arready := '1';
+					v.axi.bvalid := '1';
+					v.ctrl.blindcheckaxiack := '0';
+				end if;
+			elsif v_blindiff(BLD_BITS_MSB - BLD_BITS_LSB + 1) = '0' then
+				-- (means nn - 1 > blindbits, or equal).
+				-- Setting .doblindsh(0) to 1 by (s244) below is going to trigger a
+				-- sequence of four operations leading to the recomputation of register
+				-- r.ctrl.nn_extrabits, see (s245) below.
+				-- (note that the complete shifting of .doblindsh - meaning: until it
+				-- becomes all 0s again -, does not happen in a row during 4 consecutive
+				-- clock-cycles; instead each of the 4 steps below shift the register
+				-- .doblindsh once its particular job is done).
+				v.ctrl.doblindsh(0) := '1'; -- (s244)
+				-- In the meantime (and not before the tests triggered by setting
+				-- .doblindsh(0) to 1 are over), .doblinding temporarily stays at 0.
 				v.ctrl.doblinding := '0';
 				v.ctrl.ierrid(STATUS_ERR_BLN) := '0';
 			end if;
 		end if;
 
+		-- (s245)
 		-- 1st step: compute max(size of alpha, 4)
+		-- Functionnaly, ecc_scalar (for which signal r.ctrl.blindbits is intended)
+		-- does not support a nb of blinding bits less than 4.
 		if r.ctrl.doblindsh(0) = '1' then
-			vtmp13 := resize(r.ctrl.blindbits, log2(nn) + 1);
-			vtmp14 := to_unsigned(4, log2(nn) + 1);
+			vtmp13 := resize(r.ctrl.blindbitstest, log2(nn) + 1);
+			if (not debug) then -- statically resolved by synthesizer
+				-- In production (non-debug) mode, the minimum value allowed
+				-- for the size of the blinding random depends on what the
+				-- HW designer set for parameter 'blinding' at synthesis time.
+				-- Hence software driver can get more security than what was
+				-- planned statically for the application, but not less.
+				-- (besides, even if no blinding was forced at synthesis time,
+				-- i.e blinding = 0, blinding can still be activated by software
+				-- driver, the minimum bitwidth allowed being 4 bits, but this
+				-- time only for functional purposes).
+				if (blinding > 0) then -- statically resolved by synthesizer
+					if r.nndyn.valnn = to_unsigned(nn, log2(nn)) then
+						-- In line below, max(blinding, 4) can & will be computed
+						-- statically by synthesizer.
+						vtmp14 := to_unsigned(max(blinding, 4), log2(nn) + 1);
+					else
+						-- production (secure-)mode + blinding locked at synthesis time,
+						-- but the nn current value is not the "nominal" static one:
+						-- the minimum we elect for the number of blinding bits is the
+						-- same as set by (s251) : current value of nn, divived by 4.
+						vtmp14 := "000"  & r.nndyn.valnn(log2(nn) - 1 downto 2); -- nn / 4
+					end if;
+				else  -- blinding = 0
+					vtmp14 := to_unsigned(4, log2(nn) + 1);
+				end if;
+			else
+				-- In debug (unsecure-)mode, software driver can set what it wants,
+				-- provided the functional minimum of 4 bits is respected.
+				vtmp14 := to_unsigned(4, log2(nn) + 1);
+			end if;
 			vtmp15 := signed(vtmp13) - signed(vtmp14);
 			if vtmp15(log2(nn)) = '1' then
-				-- means size of alpha < 4 (in this case, force to 4)
-				v.ctrl.blindbits := to_unsigned(4, log2(nn)); -- (s209)
+				-- (means NOK: .blindbitstest is smaller than the minimum required)
+				if (not debug) then -- statically resolved by synthesizer
+					v.ctrl.blindbits := to_unsigned(max(blinding, 4), log2(nn)); -- (s236)
+				else -- debug = TRUE
+					-- means size of alpha < 4 (in this case, force to 4)
+					v.ctrl.blindbits := to_unsigned(4, log2(nn)); -- (s209)
+				end if;
 			elsif vtmp15(log2(nn)) = '0' then
 				-- means size of alpha >= 4
 				null; -- nothing to do, size of alpha is already in r.ctrl.blindbits
+				v.ctrl.blindbits := r.ctrl.blindbitstest;
+				--v.ctrl.doblinding := '1'; -- not yet, will be done by (s246) below
 			end if;
 			v.ctrl.doblindsh := '0' & r.ctrl.doblindsh(0 to BLNDSHSZ - 2);
 		end if;
@@ -891,7 +1145,7 @@ begin
 		end if;
 
 		-- 3rd step: compute (nn + size of alpha + 1) mod ww by subtracting ww
-		-- to it until we reach a strictly negative value
+		-- to it until we reach a strictly negative value.
 		-- In (s205) below we truncate r.ctrl.nnbldnn but it's Ok because in
 		-- the cycle the transfer of r.ctrl.nbbldnn into r.ctrl.blindmodww is
 		-- actually useful, we know that r.ctrl.nbbldnn will hold a residue
@@ -913,20 +1167,23 @@ begin
 			vtmp16 := to_unsigned(ww, log2(ww) + 1);
 			vtmp17 := resize(r.ctrl.blindmodww, log2(ww) + 1);
 			vtmp18 := signed(vtmp16) - signed(vtmp17);
-			v.ctrl.nn_extrabits := unsigned(vtmp18(log2(ww) - 1 downto 0));
+			v.ctrl.nn_extrabits := unsigned(vtmp18(log2(ww) - 1 downto 0)); -- (s238)
 			if r.ctrl.small_k_sz_is_on = '1' then
 				v.ctrl.savedoblinding := '1';
 			elsif r.ctrl.small_k_sz_is_on = '0' then
-				v.ctrl.doblinding := '1';
+				v.ctrl.doblinding := '1'; -- (s246)
 			end if;
-			-- end the four sequences cycle of tests
+			-- end the four-steps sequence of tests
 			v.ctrl.doblindsh := '0' & r.ctrl.doblindsh(0 to BLNDSHSZ - 2);
-			-- (s207), see (s206) for why these statements on AXI ready/valid
-			-- handshake signals are here
-			v.axi.wready := '1';
-			v.axi.awready := '1';
-			v.axi.arready := '1';
-			v.axi.bvalid := '1';
+			if r.ctrl.blindcheckaxiack = '1' then
+				-- (s207), see (s206) as to why these statements on AXI ready/valid
+				-- handshake signals were placed here
+				v.axi.wready := '1';
+				v.axi.awready := '1';
+				v.axi.arready := '1';
+				v.axi.bvalid := '1';
+				v.ctrl.blindcheckaxiack := '0';
+			end if;
 		end if;
 
 		-- some registers require default reset
@@ -1018,7 +1275,7 @@ begin
 			v.axi.awpending := '0';
 			v.axi.dwpending := '0';
 			-- -------------------------------------------------
-			-- decoding write of W_CTRL register
+			-- decoding write to W_CTRL register
 			-- -------------------------------------------------
 			if (debug and r.axi.waddr = W_CTRL)
 				or ((not debug) and r.axi.waddr(ADB - 2 downto 0) =
@@ -1197,7 +1454,7 @@ begin
 									v.write.rnd.maskaddr(log2(n - 1) - 1 downto 0) :=
 										(others => '0');
 								elsif r.ctrl.doblinding = '0' then
-									-- blinding is deactivated
+									-- blinding is disabled
 									-- in this case the masking of the scalar is linear ("xor m")
 									-- and we need a qty of random bits equal to the size of
 									-- scalar
@@ -1251,7 +1508,11 @@ begin
 						--   (actually sample only the LSB of the address field,
 						--   as the external interface is only allowed to read
 						--   XR1 and YR1 locations from ecc_fp_dram)
-						if (not debug) and r.ctrl.read_forbidden = '1' then
+						if (not debug) and -- statically resolved by synthesizer
+							-- when r.ctrl.read_forbidden is asserted, the only large number
+							-- that software is allowed to read is the random token
+							(r.ctrl.read_forbidden = '1' and r.axi.wdatax(CTRL_RD_TOKEN)='0')
+						then
 							v.ctrl.ierrid(STATUS_ERR_RDNB_FBD) := '1';
 						else
 							v.ctrl.ierrid(STATUS_ERR_RDNB_FBD) := '0';
@@ -1272,22 +1533,51 @@ begin
 										& std_logic_vector(to_unsigned(0, log2(n - 1)));
 								end if;
 							end if;
-							v.read.fpre0 := '1';
-							v.read.rdataxcanbefilled := '1';
-							v.read.shdatawwcanbeemptied := '0';
-							v.read.bitsww := to_unsigned(ww - 1, log2(ww - 1));
-							v.read.bitsaxi := to_unsigned(C_S_AXI_DATA_WIDTH - 1, axiw);
-							v.read.active := '1'; -- (s118), will be reset by (s119)
-							v.read.busy := '1'; -- (s138), will be deasserted by (s139)
-							if nn_dynamic then -- statically resolved by synthesizer
-								v.read.bitstotal := r.nndyn.valnnm1;
-							else
-								v.read.bitstotal := to_unsigned(nn - 1, log2(nn));
+							-- bypass the previous write to v.fpaddr0 when software wishes
+							-- to read the random token (bit CTRL_RD_TOKEN is set in W_CTRL)
+							v_read_no_error := TRUE;
+							if r.axi.wdatax(CTRL_RD_TOKEN) = '1' then
+								-- (s225)
+								-- In debug mode the operation is subject to the token feature
+								-- being activated through the W_DBG_CFG_NOTOKEN register
+								-- (see (s224)), while in production mode, the feature is always
+								-- active and cannot be disengaged. In both cases, the token
+								-- can only be read if its generation was previously asked for,
+								-- using a write to register W_TOKEN, see (s226), otherwise the
+								-- read is ignored and an error flag is raised in R_STATUS.
+								-- Register .tokavail4read was asserted by (s228) when ecc_scalar
+								-- signaled us (using tokendone) that the token has been generated
+								-- and is available for software to read.
+								if r.ctrl.tokavail4read = '1' then -- (s229)
+									v.fpaddr0 := CST_ADDR_TOKEN
+										& std_logic_vector(to_unsigned(0, log2(n - 1)));
+									v.read.token := '1';
+								elsif r.ctrl.tokavail4read = '0' then
+									-- This error case is shared with the one where software
+									-- driver asks for generation of the token while a command for
+									-- that is already pending, see (s248).
+									v.ctrl.ierrid(STATUS_ERR_TOKEN) := '1'; -- (s247)
+									v_read_no_error := FALSE;
+								end if;
 							end if;
-							v.ctrl.state := readln;
-							-- deassertion of r.axi.rvalid by (s192) means: no valid read
-							-- data available from the IP yet on AXI read-data channel
-							v.axi.rvalid := '0'; -- (s192)
+							if v_read_no_error then
+								v.read.fpre0 := '1';
+								v.read.rdataxcanbefilled := '1';
+								v.read.shdatawwcanbeemptied := '0';
+								v.read.bitsww := to_unsigned(ww - 1, log2(ww - 1));
+								v.read.bitsaxi := to_unsigned(C_S_AXI_DATA_WIDTH - 1, axiw);
+								v.read.active := '1'; -- (s118), will be reset by (s119)
+								v.read.busy := '1'; -- (s138), will be deasserted by (s139)
+								if nn_dynamic then -- statically resolved by synthesizer
+									v.read.bitstotal := r.nndyn.valnnm1;
+								else
+									v.read.bitstotal := to_unsigned(nn - 1, log2(nn));
+								end if;
+								v.ctrl.state := readln;
+								-- deassertion of r.axi.rvalid by (s192) means: no valid read
+								-- data available from the IP yet on AXI read-data channel
+								v.axi.rvalid := '0'; -- (s192)
+							end if; -- no read error
 						end if;
 					elsif r.axi.wdatax(CTRL_KP) = '1' then
 						-- ----------------------------------------------------------
@@ -1390,7 +1680,7 @@ begin
 					v.ctrl.ierrid(STATUS_ERR_WREG_FBD) := '1';
 				end if; -- v_wlock or debug
 			-- -------------------------------------------------------
-			-- decoding write of W_WRITE_DATA register
+			-- decoding write to W_WRITE_DATA register
 			-- -------------------------------------------------------
 			elsif (debug and r.axi.waddr = W_WRITE_DATA)
 				or ((not debug) and r.axi.waddr(ADB - 2 downto 0) =
@@ -1424,7 +1714,7 @@ begin
 					v.ctrl.ierrid(STATUS_ERR_WREG_FBD) := '1';
 				end if;
 			-- ------------------------------------------------------
-			-- decoding write of W_R0_NULL register
+			-- decoding write to W_R0_NULL register
 			-- ------------------------------------------------------
 			elsif (debug and r.axi.waddr = W_R0_NULL) or
 				((not debug) and r.axi.waddr(ADB - 2 downto 0) =
@@ -1443,7 +1733,7 @@ begin
 					v.ctrl.ierrid(STATUS_ERR_WREG_FBD) := '1';
 				end if;
 			-- ------------------------------------------------------
-			-- decoding write of W_R1_NULL register
+			-- decoding write to W_R1_NULL register
 			-- ------------------------------------------------------
 			elsif (debug and r.axi.waddr = W_R1_NULL) or
 				((not debug) and r.axi.waddr(ADB - 2 downto 0) =
@@ -1462,7 +1752,7 @@ begin
 					v.ctrl.ierrid(STATUS_ERR_WREG_FBD) := '1';
 				end if;
 			-- -------------------------------------------------------------
-			-- decoding write of W_PRIME_SIZE register (s41)
+			-- decoding write to W_PRIME_SIZE register (s41)
 			-- -------------------------------------------------------------
 			elsif (debug and r.axi.waddr = W_PRIME_SIZE) or
 				((not debug) and r.axi.waddr(ADB - 2 downto 0) =
@@ -1495,39 +1785,40 @@ begin
 					v.ctrl.ierrid(STATUS_ERR_WREG_FBD) := '1';
 				end if;
 			-- -----------------------------------------------------
-			-- decoding write of W_BLINDING register
+			-- decoding write to W_BLINDING register - (s241)
 			-- -----------------------------------------------------
 			elsif (debug and r.axi.waddr = W_BLINDING) or
 				((not debug) and r.axi.waddr(ADB - 2 downto 0) =
 					W_BLINDING(ADB - 2 downto 0))
 			then
-				-- (s125) For the W_BLINDING register, a test on the number of
+				-- (s125) - For the W_BLINDING register, a test on the number of
 				-- blinding bits set by software must occur before we release
-				-- the bus so the assertion of the 4 AXI signals {a*wready, arreday
-				-- & bvalid} is delayed to (s126) (this of course only concerns
-				-- the case where software sets BLD_EN bit to 1)
+				-- the bus, which is why the assertion of the 4 AXI signals
+				-- {a*wready, arreday & bvalid} is delayed to (s126) (this of
+				-- course only concerns the case where software sets BLD_EN
+				-- bit to 1).
 				if (not v_wlock) or debug then -- (s165), see (s161)
 					if r.axi.wdatax(BLD_EN) = '1' then
-						-- test that size set is not null, otherwise it should not
-						-- set blinding on
-						if r.axi.wdatax(BLD_BITS_MSB downto BLD_BITS_LSB) /= -- (s170)
-							std_logic_vector(to_unsigned(0, BLD_BITS_MSB - BLD_BITS_LSB + 1))
-						then
-							v.ctrl.blindbits := -- (s129), see (s130)
-								unsigned(r.axi.wdatax(BLD_BITS_MSB downto BLD_BITS_LSB));
-							v.ctrl.doblindcheck := '1'; -- (s128), will trigger (s127)
-						else
-							--v.ctrl.doblinding := '0'; -- useless (already deasserted)
-							-- (s206) the four statements below on AXI ready/valid signals
-							-- are deferred to (s207), which is when computations required
-							-- on r.ctrl.blindbits are completed
-							--v.axi.wready := '1';
-							--v.axi.awready := '1';
-							--v.axi.arready := '1';
-							--v.axi.bvalid := '1';
-						end if;
+						v.ctrl.blindbitstest := -- (s129), see (s130)
+							unsigned(r.axi.wdatax(BLD_BITS_MSB downto BLD_BITS_LSB));
+						v.ctrl.doblindcheck := '1'; -- (s128), will trigger (s127)
+						v.ctrl.blindcheckaxiack := '1';
 					elsif r.axi.wdatax(BLD_EN) = '0' then
-						v.ctrl.doblinding := '0';
+						if (not debug) then -- statically resolved by synthesizer
+							if (blinding > 0) then
+								-- Software driver is attempting to deactivate blinding
+								-- countermeasure but the IP is configured in production
+								-- mode and with blinding countermeasure locked: keep
+								-- things as they are (blinding is activated as per (s240))
+								-- and signal error 'ERR_WREG_FBD' in R_STATUS register.
+								v.ctrl.ierrid(STATUS_ERR_WREG_FBD) := '1';
+							else
+								v.ctrl.doblinding := '0';
+							end if;
+						else -- debug = TRUE
+							-- Software driver has any privilege.
+							v.ctrl.doblinding := '0';
+						end if;
 						v.axi.wready := '1';
 						v.axi.awready := '1';
 						v.axi.arready := '1';
@@ -1543,8 +1834,100 @@ begin
 					v.axi.arready := '1';
 					v.axi.bvalid := '1';
 				end if;
+			-- -------------------------------------------------------------
+			-- decoding write to W_SHUFFLE register
+			-- -------------------------------------------------------------
+			elsif (debug and r.axi.waddr = W_SHUFFLE) or
+				((not debug) and r.axi.waddr(ADB - 2 downto 0) =
+					W_SHUFFLE(ADB - 2 downto 0))
+			then
+				v.axi.wready := '1';
+				v.axi.awready := '1';
+				v.axi.arready := '1';
+				v.axi.bvalid := '1';
+				if debug then -- (s166), see (s161)
+					if r.axi.wdatax(SHUF_EN) = '1' then
+						if shuffle_type = none then
+							v.ctrl.ierrid(STATUS_ERR_WREG_FBD) := '1';
+						else
+							v.ctrl.doshuffle := '1';
+						end if;
+					elsif r.axi.wdatax(SHUF_EN) = '0' then
+						-- Software driver wants to disable shuffling, it's ok because
+						-- we are in debug (unsecure-)mode
+						v.ctrl.doshuffle := '0';
+					end if;
+				else -- debug = FALSE, we are in production (secure-)mode
+					if r.axi.wdatax(SHUF_EN) = '1' then
+						if shuffle_type = none then
+							v.ctrl.ierrid(STATUS_ERR_WREG_FBD) := '1';
+						else
+							v.ctrl.doshuffle := '1';
+						end if;
+					elsif r.axi.wdatax(SHUF_EN) = '0' then
+						if shuffle then
+							-- Software driver wants to disable shuffling, it's NOK because
+							-- we are in production (secure-)mode and the static config
+							-- enforces usage of shuffling
+							v.ctrl.ierrid(STATUS_ERR_WREG_FBD) := '1'; -- (s221)
+						else -- shuffle = FALSE in ecc_customize.vhd
+							v.ctrl.doshuffle := '0';
+						end if;
+					end if;
+				end if;
+			-- -------------------------------------------------------------
+			-- decoding write to W_ZREMASK register
+			-- -------------------------------------------------------------
+			elsif (debug and r.axi.waddr = W_ZREMASK) or
+				((not debug) and r.axi.waddr(ADB - 2 downto 0) =
+					W_ZREMASK(ADB - 2 downto 0))
+			then
+				-- For register W_ZREMASK same remark applies as to W_BLINDING,
+				-- see (s125) above.
+				if (not debug) then -- statically resolved by synthesizer
+					if (zremask = 0) then
+						-- In production (secure-)mode software driver can engage
+						-- Z-remasking even if it was statically disabled (it goes
+						-- in the direction of having more security).
+						v.ctrl.zremaskact := r.axi.wdatax(ZMSK_EN); -- (s253)
+						v.ctrl.zremaskbits := unsigned(
+							r.axi.wdatax(ZMSK_MSB downto ZMSK_LSB));
+						v.axi.wready := '1';
+						v.axi.awready := '1';
+						v.axi.arready := '1';
+						v.axi.bvalid := '1';
+					elsif (zremask > 0) then
+						-- In production (secure-)mode software driver can only
+						-- decrease value of .zremaskbits (because decreasing it goes
+						-- in the direction of having more security).
+						-- A test is triggered by setting .docheckzremask high and if it's
+						-- not conclusive, .zremaskbits won't be modified.
+						if r.axi.wdatax(ZMSK_EN) = '0' then
+							-- Illicit attempt to disable Z-masking, ackonwledge the AXI
+							-- transfer and signal back ERR_WREG_FBD to software driver.
+							v.axi.wready := '1';
+							v.axi.awready := '1';
+							v.axi.arready := '1';
+							v.axi.bvalid := '1';
+							v.ctrl.ierrid(STATUS_ERR_WREG_FBD) := '1';
+						elsif r.axi.wdatax(ZMSK_EN) = '1' then
+							v.ctrl.zremaskbitstest :=
+								unsigned(r.axi.wdatax(ZMSK_MSB downto ZMSK_LSB));
+							v.ctrl.docheckzremask := '1'; -- (s257), will trigger (s258)
+						end if;
+					end if;
+				else -- debug = TRUE
+					-- in debug (unsecure-)mode, software driver can do what it wants.
+					v.ctrl.zremaskact := r.axi.wdatax(ZMSK_EN); -- (s254)
+					v.ctrl.zremaskbits :=
+						unsigned(r.axi.wdatax(ZMSK_MSB downto ZMSK_LSB));
+					v.axi.wready := '1';
+					v.axi.awready := '1';
+					v.axi.arready := '1';
+					v.axi.bvalid := '1';
+				end if;
 			-- ------------------------------------------------
-			-- decoding write of W_IRQ register
+			-- decoding write to W_IRQ register
 			-- ------------------------------------------------
 			elsif (debug and r.axi.waddr = W_IRQ) or
 				((not debug) and r.axi.waddr(ADB - 2 downto 0) =
@@ -1576,7 +1959,8 @@ begin
 				v.axi.awready := '1';
 				v.axi.arready := '1';
 				v.axi.bvalid := '1';
-				v.ctrl.ierrid := r.ctrl.ierrid and not (r.axi.wdatax(31 downto 16));
+				v.ctrl.ierrid := r.ctrl.ierrid and
+					not (r.axi.wdatax(STATUS_ERR_MSB downto STATUS_ERR_LSB));
 				-- .aerr_inpt_ack & .aerr_outpt_ack, if asserted, stay asserted only
 				-- 1 cycle
 				v.ctrl.aerr_inpt_ack := r.axi.wdatax(STATUS_ERR_IN_PT_NOT_ON_CURVE);
@@ -1619,6 +2003,31 @@ begin
 				-- sub-component of the IP
 				v.ctrl.swrst := '1';
 				v.ctrl.swrst_cnt := (others => '1');
+			-- ------------------------------------------------
+			-- decoding write to W_TOKEN register
+			-- ------------------------------------------------
+			-- (s226)
+			elsif (debug and r.axi.waddr = W_TOKEN) or
+				((not debug) and r.axi.waddr(ADB - 2 downto 0) =
+					W_TOKEN(ADB - 2 downto 0))
+			then
+				v.axi.wready := '1';
+				v.axi.awready := '1';
+				v.axi.arready := '1';
+				v.axi.bvalid := '1';
+				if ((not debug) or (debug and r.ctrl.token_act = '1'))
+					and r.ctrl.gentoken = '0' -- no sense if command already issued
+					and r.ctrl.tokpending = '0' -- no sense if action still pengin
+					and r.ctrl.tokavail4read = '0' -- no sense if token avail. & not read
+				then
+					v.ctrl.gentoken := '1';
+					v.ctrl.lockaxi := '1'; -- (s224), will be deasserted by (s225)
+					--v.ctrl.tokavail4read := '0'; useless, thx to reset & (s230)
+				else
+					-- simply signal an error (shared with the error case "token read
+					-- before being generated", see (s247))
+					v.ctrl.ierrid(STATUS_ERR_TOKEN) := '1'; -- (s248)
+				end if;
 			-- ------------------------------
 			-- below are DEBUG only registers
 			-- ------------------------------
@@ -1628,7 +2037,7 @@ begin
 			-- inference of each of them, meaning these registers only exist
 			-- in debug mode)
 			-- -------------------------------------------------------------
-			-- decoding write of W_DBG_HALT register
+			-- decoding write to W_DBG_HALT register
 			-- -------------------------------------------------------------
 			elsif debug and r.axi.waddr = W_DBG_HALT then
 				if r.axi.wdatax(DBG_HALT) = '1'  then
@@ -1639,7 +2048,7 @@ begin
 				v.axi.arready := '1';
 				v.axi.bvalid := '1';
 			-- -------------------------------------------------------------
-			-- decoding write of W_DBG_BKPT register
+			-- decoding write to W_DBG_BKPT register
 			-- -------------------------------------------------------------
 			elsif debug and r.axi.waddr = W_DBG_BKPT then
 				vbk := to_integer(
@@ -1657,7 +2066,7 @@ begin
 				v.axi.arready := '1';
 				v.axi.bvalid := '1';
 			-- --------------------------------------------------------
-			-- decoding write of W_DBG_STEPS register
+			-- decoding write to W_DBG_STEPS register
 			-- --------------------------------------------------------
 			elsif debug and r.axi.waddr = W_DBG_STEPS then
 				if r.axi.wdatax(DBG_RESUME) = '1' then
@@ -1672,7 +2081,7 @@ begin
 				v.axi.arready := '1';
 				v.axi.bvalid := '1';
 			-- ----------------------------------------------------------------
-			-- decoding write of W_DBG_TRIG_ACT register
+			-- decoding write to W_DBG_TRIG_ACT register
 			-- ----------------------------------------------------------------
 			elsif debug and r.axi.waddr = W_DBG_TRIG_ACT then
 				v.debug.trigactive := r.axi.wdatax(0);
@@ -1681,7 +2090,7 @@ begin
 				v.axi.arready := '1';
 				v.axi.bvalid := '1';
 			-- ----------------------------------------------------------
-			-- decoding write of W_DBG_TRIG_UP register
+			-- decoding write to W_DBG_TRIG_UP register
 			-- ----------------------------------------------------------
 			elsif debug and r.axi.waddr = W_DBG_TRIG_UP then
 				v.debug.trigup := r.axi.wdatax(31 downto 0);
@@ -1690,7 +2099,7 @@ begin
 				v.axi.arready := '1';
 				v.axi.bvalid := '1';
 			-- ------------------------------------------------------------
-			-- decoding write of W_DBG_TRIG_DOWN register
+			-- decoding write to W_DBG_TRIG_DOWN register
 			-- ------------------------------------------------------------
 			elsif debug and r.axi.waddr = W_DBG_TRIG_DOWN then
 				v.debug.trigdown := r.axi.wdatax(31 downto 0);
@@ -1699,7 +2108,7 @@ begin
 				v.axi.arready := '1';
 				v.axi.bvalid := '1';
 			-- --------------------------------------------------------------
-			-- decoding write of W_DBG_OP_ADDR register
+			-- decoding write to W_DBG_OP_ADDR register
 			-- --------------------------------------------------------------
 			elsif debug and r.axi.waddr = W_DBG_OP_ADDR then
 				v.debug.iaddr := r.axi.wdatax(IRAM_ADDR_SZ - 1 downto 0);
@@ -1708,7 +2117,7 @@ begin
 				v.axi.arready := '1';
 				v.axi.bvalid := '1';
 			-- ---------------------------------------------------------------
-			-- decoding write of W_DBG_WR_OPCODE register
+			-- decoding write to W_DBG_WR_OPCODE register
 			-- ---------------------------------------------------------------
 			elsif debug and r.axi.waddr = W_DBG_WR_OPCODE then
 				if OPCODE_SZ > C_S_AXI_DATA_WIDTH then -- statically resolved by synth.
@@ -1733,7 +2142,7 @@ begin
 				v.axi.arready := '1';
 				v.axi.bvalid := '1';
 			-- ------------------------------------------------------------
-			-- decoding write of W_DBG_TRNGCTR register
+			-- decoding write to W_DBG_TRNGCTR register
 			-- ------------------------------------------------------------
 			elsif debug and r.axi.waddr = W_DBG_TRNGCTR then
 				-- assert both AWREADY & WREADY signals to allow a new AXI data-beat
@@ -1773,10 +2182,10 @@ begin
 					-- ----------------------------------------------------------
 					v.debug.trng.irnreset := '1'; -- stays asserted 1 cycle thx to (s59)
 				end if;
-				-- activation/deactivation of TRNG post-processing
+				-- activation/disabling of TRNG post-processing
 				v.debug.trng.ppdeact := r.axi.wdatax(8);
 			-- --------------------------------------------------------------
-			-- decoding write of W_DBG_TRNGCFG register
+			-- decoding write to W_DBG_TRNGCFG register
 			-- --------------------------------------------------------------
 			elsif debug and r.axi.waddr = W_DBG_TRNGCFG then
 				v.debug.trng.vonneuman := r.axi.wdatax(DBG_TRNG_VONM);
@@ -1795,7 +2204,7 @@ begin
 				-- drive write-response to initiator
 				v.axi.bvalid := '1';
 			-- -------------------------------------------------------------
-			-- decoding write of W_DBG_FP_WADDR register
+			-- decoding write to W_DBG_FP_WADDR register
 			-- -------------------------------------------------------------
 			elsif debug and r.axi.waddr = W_DBG_FP_WADDR then
 				v.fpaddr0 := r.axi.wdatax(FP_ADDR - 1 downto 0);
@@ -1807,7 +2216,7 @@ begin
 				-- drive write-response to initiator
 				v.axi.bvalid := '1';
 			-- -------------------------------------------------------------
-			-- decoding write of W_DBG_FP_WDATA register
+			-- decoding write to W_DBG_FP_WDATA register
 			-- -------------------------------------------------------------
 			elsif debug and r.axi.waddr = W_DBG_FP_WDATA then
 				v.write.fpwe0 := '1'; -- stays asserted only 1 cycle thx to (s24)
@@ -1821,7 +2230,7 @@ begin
 				-- drive write-response to initiator
 				v.axi.bvalid := '1';
 			-- -------------------------------------------------------------
-			-- decoding write of W_DBG_FP_RADDR register
+			-- decoding write to W_DBG_FP_RADDR register
 			-- -------------------------------------------------------------
 			elsif debug and r.axi.waddr = W_DBG_FP_RADDR then
 				v.fpaddr0 := r.axi.wdatax(FP_ADDR - 1 downto 0);
@@ -1838,7 +2247,7 @@ begin
 				-- drive write-response to initiator
 				v.axi.bvalid := '1';
 			-- -------------------------------------------------------------
-			-- decoding write of W_DBG_CFG_NOXYSHUF register
+			-- decoding write to W_DBG_CFG_NOXYSHUF register
 			-- -------------------------------------------------------------
 			elsif debug and r.axi.waddr = W_DBG_CFG_NOXYSHUF then
 				v.debug.noxyshuf := r.axi.wdatax(XYSHF_DIS);
@@ -1850,7 +2259,7 @@ begin
 				-- drive write-response to initiator
 				v.axi.bvalid := '1';
 			-- -------------------------------------------------------------
-			-- decoding write of W_DBG_CFG_NOAXIMSK register
+			-- decoding write to W_DBG_CFG_NOAXIMSK register
 			-- -------------------------------------------------------------
 			elsif debug and r.axi.waddr = W_DBG_CFG_NOAXIMSK then -- (s202) see (s203)
 				v.debug.noaxirnd := r.axi.wdatax(AXIMSK_DIS);
@@ -1862,23 +2271,37 @@ begin
 				-- drive write-response to initiator
 				v.axi.bvalid := '1';
 			-- -------------------------------------------------------------
-			-- decoding write of W_DBG_CFG_NOMEMSHUF register
+			-- decoding write to W_DBG_CFG_NOTOKEN register
 			-- -------------------------------------------------------------
-			elsif debug and shuffle and -- statically resolved by synthesizer
-				 (r.axi.waddr = W_DBG_CFG_NOMEMSHUF) -- (s221)
-			then
+			elsif debug and r.axi.waddr = W_DBG_CFG_NOTOKEN then
+				v.ctrl.token_act := not r.axi.wdatax(TOK_DIS); -- (s224) see (s225-s226)
 				v.axi.wready := '1';
 				v.axi.awready := '1';
 				v.axi.arready := '1';
 				v.axi.bvalid := '1';
-				if (not v_wlock) or debug then -- (s166), see (s161)
-					v.ctrl.doshuffle := not r.axi.wdatax(MEMSHF_DIS);
-					-- clear possible past error
-					v.ctrl.ierrid(STATUS_ERR_WREG_FBD) := '0';
-				else
-					-- raise error flag (illicite register write)
-					v.ctrl.ierrid(STATUS_ERR_WREG_FBD) := '1';
-				end if;
+			-- -------------------------------------------------------------
+			-- decoding write to W_DBG_RSTTRNGCNT register - (s259)
+			-- -------------------------------------------------------------
+			elsif debug and r.axi.waddr = W_DBG_RSTTRNGCNT then
+				-- reset counters below are bypasses of (s260) increments
+				v.debug.trngaxiok := (others => '0');
+				v.debug.trngaxistarv := (others => '0');
+				v.debug.trngfpok := (others => '0');
+				v.debug.trngfpstarv := (others => '0');
+				v.debug.trngcrvok := (others => '0');
+				v.debug.trngcrvstarv := (others => '0');
+				v.debug.trngshok := (others => '0');
+				v.debug.trngshstarv := (others => '0');
+				v.axi.wready := '1';
+				v.axi.awready := '1';
+				v.axi.arready := '1';
+				v.axi.bvalid := '1';
+				-- pragma translate_off
+				v.debug.trngaxi100 := 0;
+				v.debug.trngfp100 := 0;
+				v.debug.trngcrv100 := 0;
+				v.debug.trngsh100 := 0;
+				-- pragma translate_on
 			else
 				-- unknown target address
 				-- (simply ignore & acknowledge everything)
@@ -2118,17 +2541,17 @@ begin
 					elsif v_fpaddr0_msb = CST_ADDR_YR1 then
 						v.ctrl.y_set := '1';
 					end if;
-					-- (s123) we can't use r.fpaddr0 to detect that scalar k is the large
+					-- (s123) We can't use r.fpaddr0 to detect that scalar k is the large
 					-- nb currently written (because in that case r.fpaddr0 might as well
 					-- contain the address of the mask for k), so we use a special flag
-					-- (r.ctrl.k_is_being_set) that was asserted by (s122)
+					-- (r.ctrl.k_is_being_set) that was asserted by (s122).
 					if r.ctrl.k_is_being_set = '1' then
 						v.ctrl.k_set := '1';
 						v.ctrl.k_is_being_set := '0';
 					end if;
-					-- authorize the reception of a new 32-bit data again from AXI
+					-- Authorize the reception of a new 32-bit data again from AXI
 					-- fabric (note that AWREADY has already been reasserted when
-					-- sampling the 32-bit word from the AXI interface, see (s3) above)
+					-- sampling the 32-bit word from the AXI interface, see (s3) above).
 					v.axi.wready := '1'; -- (s172) bypassed by (s48) & (s193) below
 					v.write.trailingzeros := "00";
 					v.write.active := '0'; -- (s117), reset of (s116)
@@ -2139,14 +2562,14 @@ begin
 				then
 					--v.write.trailingzeros := '1';
 					v.write.trailingzeros := "10";
-					-- we need to determine the nb of extra 0 bits following the most
-					-- significant bits of the large nb that software is currently
-					-- pushing to us
+					-- We need to determine the nb of extra 0 bits following the most
+					-- significant bit of the large number that software is currently
+					-- pushing to us.
 					--v.write.bitstotal := resize(r.ctrl.blindbits - 1, log2(nn));
-					v.write.bitstotal := resize(r.ctrl.nn_extrabits, log2(nn));
+					v.write.bitstotal := resize(r.ctrl.nn_extrabits, log2(nn)); -- (s239)
 					v.axi.wready := '0'; -- (s48)
 					v.write.doshift := '1';
-					-- in this case deassertion of r.write.busy by (s135) must not occur
+					-- In this case deassertion of r.write.busy by (s135) must not occur.
 					v.write.busy := '1'; -- (s136), bypass of (s135)
 				elsif r.write.trailingzeros = "00" then
 					-- set r.write.trailingzeros (there are always trailing zeros to add)
@@ -2170,9 +2593,10 @@ begin
 						-- using .blindbits to set next value of .bitstotal (instead of
 						-- .blindbits - 1) will ensure that we actually add .blindbits
 						-- null bits after the large number (as counting from .blindbits
-						-- downto 0 represents a number of .blindbits + 1 write beats)
-						-- note on (s208), line below: r.ctrl.blindbits cannot be equal
-						-- to 0 nor to 1 (this is from (s209)) so the result is at least 1
+						-- downto 0 represents a number of .blindbits + 1 write beats).
+						-- Note on (s208) (line below): r.ctrl.blindbits cannot be equal
+						-- to 0 nor to 1 (this is from (s209) & (s236)) so the result is
+						-- at least 1.
 						v.write.bitstotal := resize(r.ctrl.blindbits - 1, -- (s208)
 							log2(nn));
 					elsif r.ctrl.wk = '0' or r.ctrl.doblinding = '0' then
@@ -2417,6 +2841,7 @@ begin
 			v.ctrl.y_set := '0';
 			-- authorize SW to read the result
 			v.ctrl.read_forbidden := '0';
+			v.ctrl.tokwasread := '0'; -- (s233), reset of (s232)
 		end if;
 
 		-- -------------------------
@@ -2467,6 +2892,29 @@ begin
 			v.ctrl.read_forbidden := '0';
 		end if;
 		
+		-- -------------------------------------------
+		-- token generation (handshake with ecc_scalar
+		-- -------------------------------------------
+		if r.ctrl.gentoken = '1' and ardy = '1' then
+			v.ctrl.gentoken := '0';
+			v.ctrl.lockaxi := '0'; -- (s225), deassertion of (s224)
+			-- by asserting .tokpending, (s227) ensures BUSY bit
+			-- in R_STATUS register stays high, see (s30)
+			v.ctrl.tokpending := '1'; -- (s227)
+		end if;
+
+		-- ----------------------------------------
+		-- detection of token generation completion
+		-- ----------------------------------------
+		v.ctrl.tokendone_d := tokendone;
+		if tokendone = '1' and r.ctrl.tokendone_d = '0' then
+			v.ctrl.tokpending := '0'; -- this will free BUSY bit in R_STATUS
+			-- Statement (s228) asserting .tokavail4read will allow software
+			-- to read the token, see (s229). This register will be deasserted
+			-- again when software driver has read the token, see (s230).
+			v.ctrl.tokavail4read := '1'; -- (s228)
+		end if;
+
 		-- ------------------------------------
 		-- start of one point-based computation (handshake with ecc_scalar)
 		-- ------------------------------------
@@ -2518,16 +2966,16 @@ begin
 			-- by immediately deasserting r.axi.arready (which directly drives
 			-- s_axi_arready) in (s143) below, we're telling AXI fabric that
 			-- we're not ready to accept a new read address again, not until...
-			--   - [in the case of a read targeting the DATA register] ...we have
-			--     a 32-bit data available that has been gathered from different
-			--     reads & shifts from ecc_fp_dram
+			--   - [in the case of a read targeting the R_READ_DATA register]
+			--     not until we have a 32-bit data available that has been gathered
+			--     from different reads & shifts from ecc_fp_dram ;
 			--   - [in the case of a read targeting any of the registers that
 			--     does not require further processing and for which read payload
-			--     can be directly driven back to initiator, like R_STATUS] ...the
-			--     AXI fabric actually reads the content of the register on the
-			--     data-read channel - that's the reason why we immediately assert
-			--     r.axi.rvalid in this case (which directly drives s_axi_rvalid) -
-			--     see all cases tagged (s5) down below.
+			--     can be directly driven back to initiator, like R_STATUS] ...
+			--     not until the AXI fabric actually reads the content of the
+			--     register on the AXI data-read channel - that's the reason why
+			--     we immediately assert r.axi.rvalid in this case (which directly
+			--     drives s_axi_rvalid) - see all cases tagged (s5) down below.
 			-- In both cases, s_axi_arready will be reasserted upon actual transfer
 			-- of the 32-bit data on the AXI read-data channel, see (s6) below
 			v.axi.arready := '0'; -- (s143)
@@ -2604,8 +3052,8 @@ begin
 				else
 					dw(CAP_DBG_N_PROD) := '0';
 				end if;
-				-- is shuffle implemented
-				if shuffle then -- statically resolved by synthesizer
+				-- is shuffle hardware implemented?
+				if shuffle_type /= none then -- statically resolved by synthesizer
 					dw(CAP_SHF) := '1';
 				else
 					dw(CAP_SHF) := '0';
@@ -2648,7 +3096,7 @@ begin
 			then
 				-- version number, we use the first 32 bits of git commit checksum
 				dw := (others => '0');
-				dw(31 downto 0) := x"0001" & x"0001"; -- version 1.1
+				dw(31 downto 0) := x"0001" & x"0002"; -- version 1.2
 				v.axi.rdatax := dw;
 				v.axi.rvalid := '1'; -- (s5)
 			-- ------------------------------
@@ -2829,7 +3277,7 @@ begin
 			-- -------------------------------------------
 			-- decoding read of R_DBG_IRN_CNT_SHF register
 			-- -------------------------------------------
-			elsif debug and shuffle -- both statically resolved by synthesizer
+			elsif debug and (shuffle_type /= none) -- both statically resolv. by syn.
 			  and s_axi_araddr(ADB + 2 downto 3) = R_DBG_IRN_CNT_SHF
 			then
 				v.axi.rdatax(31 downto 0) :=
@@ -2846,40 +3294,94 @@ begin
 				v.axi.rdatax(31 downto 0) :=
 					(DBG_FP_RDATA_IS_RDY => r.debug.readrdy, others => '0');
 				v.axi.rvalid := '1'; -- (s5)
-			-- -----------------------------------------
-			-- decoding read of R_DBG_EXP_FLAGS register
-			-- -----------------------------------------
+			-- ---------------------------------------------
+			-- decoding read of R_DBG_DIAGNOSTICS_0 register
+			-- ---------------------------------------------
 			elsif debug -- statically resolved by synthesizer
-			  and s_axi_araddr(ADB + 2 downto 3) = R_DBG_EXP_FLAGS
-			then
-				dw := (others => '0');
-				dw(0) := r0z;
-				dw(1) := r1z;
-				dw(2) := kap;
-				dw(3) := kapp;
-				dw(4) := zu;
-				dw(5) := zc;
-				dw(6) := laststep;
-				dw(7) := firstzdbl;
-				dw(8) := firstzaddu;
-				dw(9) := first2pz;
-				dw(10) := first3pz;
-				dw(11) := torsion2;
-				dw(12) := pts_are_equal;
-				dw(13) := pts_are_oppos;
-				dw(14) := phimsb;
-				dw(15) := kb0end;
-				dw(31 downto 16) := std_logic_vector(resize(unsigned(dbgjoyebit), 16));
-				v.axi.rdatax := dw;
-				v.axi.rvalid := '1'; -- (s5)
-			-- -------------------------------------------
-			-- decoding read of R_DBG_DIAGNOSTICS register
-			-- -------------------------------------------
-			elsif debug -- statically resolved by synthesizer
-			  and s_axi_araddr(ADB + 2 downto 3) = R_DBG_DIAGNOSTICS
+			  and s_axi_araddr(ADB + 2 downto 3) = R_DBG_DIAGNOSTICS_0
 			then
 				dw(31 downto 0) :=
 					std_logic_vector(resize(unsigned(dbgnbstarvrndxyshuf), 32));
+				v.axi.rdatax(31 downto 0) := dw(31 downto 0);
+				v.axi.rvalid := '1'; -- (s5)
+			-- ---------------------------------------------
+			-- decoding read of R_DBG_DIAGNOSTICS_1 register
+			-- ---------------------------------------------
+			elsif debug -- statically resolved by synthesizer
+			  and s_axi_araddr(ADB + 2 downto 3) = R_DBG_DIAGNOSTICS_1
+			then
+				dw(31 downto 0) :=
+					std_logic_vector(resize(unsigned(r.debug.trngaxiok), 32));
+				v.axi.rdatax(31 downto 0) := dw(31 downto 0);
+				v.axi.rvalid := '1'; -- (s5)
+			-- ---------------------------------------------
+			-- decoding read of R_DBG_DIAGNOSTICS_2 register
+			-- ---------------------------------------------
+			elsif debug -- statically resolved by synthesizer
+			  and s_axi_araddr(ADB + 2 downto 3) = R_DBG_DIAGNOSTICS_2
+			then
+				dw(31 downto 0) :=
+					std_logic_vector(resize(unsigned(r.debug.trngaxistarv), 32));
+				v.axi.rdatax(31 downto 0) := dw(31 downto 0);
+				v.axi.rvalid := '1'; -- (s5)
+			-- ---------------------------------------------
+			-- decoding read of R_DBG_DIAGNOSTICS_3 register
+			-- ---------------------------------------------
+			elsif debug -- statically resolved by synthesizer
+			  and s_axi_araddr(ADB + 2 downto 3) = R_DBG_DIAGNOSTICS_3
+			then
+				dw(31 downto 0) :=
+					std_logic_vector(resize(unsigned(r.debug.trngfpok), 32));
+				v.axi.rdatax(31 downto 0) := dw(31 downto 0);
+				v.axi.rvalid := '1'; -- (s5)
+			-- ---------------------------------------------
+			-- decoding read of R_DBG_DIAGNOSTICS_4 register
+			-- ---------------------------------------------
+			elsif debug -- statically resolved by synthesizer
+			  and s_axi_araddr(ADB + 2 downto 3) = R_DBG_DIAGNOSTICS_4
+			then
+				dw(31 downto 0) :=
+					std_logic_vector(resize(unsigned(r.debug.trngfpstarv), 32));
+				v.axi.rdatax(31 downto 0) := dw(31 downto 0);
+				v.axi.rvalid := '1'; -- (s5)
+			-- ---------------------------------------------
+			-- decoding read of R_DBG_DIAGNOSTICS_5 register
+			-- ---------------------------------------------
+			elsif debug -- statically resolved by synthesizer
+			  and s_axi_araddr(ADB + 2 downto 3) = R_DBG_DIAGNOSTICS_5
+			then
+				dw(31 downto 0) :=
+					std_logic_vector(resize(unsigned(r.debug.trngcrvok), 32));
+				v.axi.rdatax(31 downto 0) := dw(31 downto 0);
+				v.axi.rvalid := '1'; -- (s5)
+			-- ---------------------------------------------
+			-- decoding read of R_DBG_DIAGNOSTICS_6 register
+			-- ---------------------------------------------
+			elsif debug -- statically resolved by synthesizer
+			  and s_axi_araddr(ADB + 2 downto 3) = R_DBG_DIAGNOSTICS_6
+			then
+				dw(31 downto 0) :=
+					std_logic_vector(resize(unsigned(r.debug.trngcrvstarv), 32));
+				v.axi.rdatax(31 downto 0) := dw(31 downto 0);
+				v.axi.rvalid := '1'; -- (s5)
+			-- ---------------------------------------------
+			-- decoding read of R_DBG_DIAGNOSTICS_7 register
+			-- ---------------------------------------------
+			elsif debug -- statically resolved by synthesizer
+			  and s_axi_araddr(ADB + 2 downto 3) = R_DBG_DIAGNOSTICS_7
+			then
+				dw(31 downto 0) :=
+					std_logic_vector(resize(unsigned(r.debug.trngshok), 32));
+				v.axi.rdatax(31 downto 0) := dw(31 downto 0);
+				v.axi.rvalid := '1'; -- (s5)
+			-- ---------------------------------------------
+			-- decoding read of R_DBG_DIAGNOSTICS_8 register
+			-- ---------------------------------------------
+			elsif debug -- statically resolved by synthesizer
+			  and s_axi_araddr(ADB + 2 downto 3) = R_DBG_DIAGNOSTICS_8
+			then
+				dw(31 downto 0) :=
+					std_logic_vector(resize(unsigned(r.debug.trngshstarv), 32));
 				v.axi.rdatax(31 downto 0) := dw(31 downto 0);
 				v.axi.rvalid := '1'; -- (s5)
 			-- --------------------------------------------
@@ -2905,11 +3407,32 @@ begin
 					v.ctrl.state := idle;
 					v.read.lastwordx := '0';
 					v.read.active := '0'; -- (s119), reset of (s118)
+					-- deassert r.ctrl.tokavail4read if the large number whose
+					-- reading is now over was the random token. Also assert
+					-- r.ctrl.tokwasread so as to allow [k]P computation to
+					-- start, see (s231)
+					if r.read.token = '1' then
+						v.ctrl.tokavail4read := '0'; -- (s230)
+						-- (s232) will be reset by (s233) at the end of [k]P computation
+						v.ctrl.tokwasread := '1'; -- (s232)
+						v.read.token := '0';
+					end if;
 				end if;
 			end if;
 			-- pragma translate_off
 			v.axi.rdatax := (others => 'X');
 			-- pragma translate_on
+		end if;
+
+		-- in debug mode, if software disables token feature (through
+		-- register W_DBG_CFG_NOTOKEN, see (s224)) we immediately deassert
+		-- r.ctrl.tokavail4read so as to not create inconsistent state
+		-- (this only concerns debug mode, as in debug=FALSE situation
+		-- the token feature cannot be disengaged)
+		if debug then -- statically resolved by synthesizer
+			if r.ctrl.token_act = '0' then
+				v.ctrl.tokavail4read := '0';
+			end if;
 		end if;
 
 		--                      --------------------
@@ -3120,6 +3643,67 @@ begin
 				v.nndyn.docnt32done := '0';
 				v.nndyn.valnnp2dww_rdy := '0';
 				v.nndyn.brlwmin_rdy:= '0';
+				-- (s243) - Blinding after dynamic modification of nn: we must compute
+				-- a default value for r.ctrl.blindbits and reassert .doblindcheck so as
+				-- to compute a correct functional value for r.ctrl.nn_extrabits, see
+				-- (s238) & (s239).
+				if (blinding > 0) then -- debug mode or not
+					if r.nndyn.valnn = to_unsigned(nn, log2(nn)) then
+						-- when nn_dynamic feature is present, we must enforce that
+						-- the size of the blinding random stays as required at synthesis
+						-- time (meaning in ecc_customize.vhd) so that software driver
+						-- cannot reduce it simply by reducing the dynamic value of nn
+						-- below the static one (i.e the one set in ecc_customize.vhd
+						-- which is the maximum allowed value for nn) and setting it
+						-- back again to it.
+						v.ctrl.blindbitstest := to_unsigned(blinding, log2(nn));
+						v.ctrl.doblindcheck := '1'; -- (s237), to recompute .nn_extrabits
+						v.ctrl.blindcheckaxiack := '0';
+					else
+						-- The design choice at synthesis time, made in ecc_customize.vhd,
+						-- was to impose a minimum size of the blinding random (this is
+						-- integer parameter 'blinding'), however this parameter naturally
+						-- is tied to the static value of nn (the maximum one, also set in
+						-- ecc_customize.vhd). Now that software driver is dynamically
+						-- reducing nn, we must set an appropriate minimum for the size of
+						-- the blinding random: we elected to take the quarter of the dyna-
+						-- mic value of nn.
+						v.ctrl.blindbitstest := -- (s251)
+							"00"  & r.nndyn.valnn(log2(nn) - 1 downto 2); -- nn / 4
+						v.ctrl.doblindcheck := '1'; -- (s242), to recompute .nn_extrabits
+						v.ctrl.blindcheckaxiack := '0';
+					end if;
+				else
+					-- Parameter 'blinding' = 0 in ecc_customize.vhd.
+					if r.ctrl.doblinding = '1' then
+						-- The blinding was currently active due to software driver configu-
+						-- ration (this is legit, even if statically blinding = 0). We must
+						-- reengage the (s245) sequence of operations in order to recompute
+						-- .nn_extrabits based on the new value of nn, and a nb of blinding
+						-- bits which is the one currently set by software driver. Note that
+						-- if nn has been lowered down by software driver, the current value
+						-- of r.ctrl.blindbits might not be adequate with the new value of
+						-- nn (the former might be be larger than the latter). If this hap-
+						-- pens, (s249) will raise an error, which might disconcert software
+						-- driver as it simply asked for a modification of nn value which is
+						-- completely legit. Anyway it's not a bad thing as software driver
+						-- will be informed this way of the inadequacy of the current value
+						-- of r.ctrl.blindbits as compared to that of nn, and hence will be
+						-- encouraged to update it. Meanwhile, blinding feature will be kept
+						-- disabled by (s250) below (and it might be reengaged by (s246) if
+						-- it turns to be compatible with the new value of nn).
+						v.ctrl.doblinding := '0'; -- (s250)
+						v.ctrl.blindbitstest := r.ctrl.blindbits;
+						v.ctrl.doblindcheck := '1'; -- (s242), to recompute .nn_extrabits
+						v.ctrl.blindcheckaxiack := '0';
+					else
+						-- There is nothing to do: since the hardware design choice was not
+						-- to impose blinding, nor it was not currently activated by software,
+						-- we keep everything as is.
+						-- If it wishes to, software driver can still enable blinding by
+						-- writing into register W_BLINDING - see (s241).
+					end if;
+				end if;
 			end if;
 
 			-- computation of r.nndyn.valw
@@ -3447,6 +4031,7 @@ begin
 			v.read.active := '0';
 			v.read.busy := '0';
 			v.read.trngreading := '0';
+			v.read.token := '0';
 			v.ctrl.newp := '0';
 			v.ctrl.newa := '0';
 			v.ctrl.wk := '0';
@@ -3462,6 +4047,7 @@ begin
 			v.ctrl.doblinding := '0';
 			v.ctrl.savedoblinding := '0';
 			v.ctrl.doblindcheck := '0';
+			-- no need to reset r.ctrl.blindcheckaxiack
     	-- no need to reset r.ctrl.blindbits
 			v.ctrl.pen := '0';
 			v.ctrl.pendownsh := "0000";
@@ -3476,6 +4062,38 @@ begin
 			v.ctrl.poppending := '0';
 			v.ctrl.aoppending := '0';
 			v.ctrl.ierrid := (others => '0');
+			-- (s240) - blinding config upon reset
+			--   Same treatment whether debug = TRUE or not: in both cases,
+			--   the reset config is as set statically by user in ecc_customize.vhd.
+			--   The difference is that in production mode (debug = FALSE) the
+			--   software driver won't be authorized to modify the config (but to
+			--   increase the nb of blinding bits).
+			if blinding > 0 then -- statically resolved by synthesizer
+				v.ctrl.doblinding := '1';
+				v.ctrl.blindbits := to_unsigned(blinding, log2(nn));
+				v.ctrl.nn_extrabits := to_unsigned(
+					-- expression below can & will be determined statically by synthesizer
+					ww - ((nn + blinding + 1) mod ww), log2(ww));
+			else -- blinding = 0 (in ecc_customize.vhd)
+				v.ctrl.doblinding := '0';
+			end if;
+			-- Z-remasking countermeasure
+			if (zremask > 0) then -- statically resolv. by synthesizer
+				-- Whether we're in debug (unsecure-)mode or in production (secure-)mode
+				-- the Z-remasking countermeasure is reset according to what was set in
+				-- ecc_customize.vhd.
+				-- Now if in production mode, the reset value of .zremaskact will act as
+				-- a hardwired signal because the synthesizer will ignore and trim paths
+				-- corresponding to (s253) & (s254). Furthermore, the test logic (s255)
+				-- will enforce that .zremaskbits can only be decreased as compared to
+				-- its reset value in (s256) below.
+				v.ctrl.zremaskact := '1';
+				v.ctrl.zremaskbits :=
+					to_unsigned(zremask - 1, log2(nn - 1)); -- (s256)
+			else -- zremask = 0 in ecc_customize.vhd
+				v.ctrl.zremaskact := '0';
+			end if;
+			v.ctrl.docheckzremask := '0';
 			-- no need to reset v.ctrl.aerr_inpt_ack
 			-- no need to reset v.ctrl.aerr_outpt_ack
 			-- no need to reset r.ctrl.ierrid
@@ -3492,22 +4110,47 @@ begin
 			v.ctrl.y_set := '0';
 			v.ctrl.r0_is_null := '0';
 			v.ctrl.r1_is_null := '0';
-			v.ctrl.read_forbidden := '1'; -- upon reset, no read access to ecc_fp_dram
+			if debug then -- statically resolved by synthesizer
+				-- upon reset, read accessto ecc_fp_dram granted by default
+				v.ctrl.read_forbidden := '0';
+			else
+				-- upon reset, no read access to ecc_fp_dram
+				v.ctrl.read_forbidden := '1';
+			end if;
 			v.ctrl.do_ksz_test := '0';
 			v.ctrl.small_k_sz_en := '0';
 			v.ctrl.small_k_sz_is_on := '0';
 			v.ctrl.swrst := '0'; -- no need to reset r.ctrl.swrst_cnt
 			v.ctrl.doblindsh := (others => '0');
-			if shuffle then -- statically resolved by synthesizer
-				if debug then -- statically resolved by synthesizer
-					-- if in DEBUG mode, shuffle is disactivated by default
-					v.ctrl.doshuffle := '0';
-				else
-					-- if in production mode, shuffle is enabled by default
-					-- (and it can't be deactivated as W_DBG_CFG_NOMEMSHUF
-					-- register does not even exist, see (s221))
+			v.ctrl.gentoken := '0';
+			v.ctrl.tokpending := '0';
+			-- token feature not activated by default in debug mode
+			if debug then -- statically resolved by synthesizer
+				-- if in DEBUG mode, token feature is disabled by default
+				v.ctrl.token_act := '0';
+			else
+				-- in production mode, token feature is always activated
+				-- (synthesizer will trim register .token_act and make it
+				-- a hardwired high-logic signal)
+				v.ctrl.token_act := '1';
+			end if;
+			v.ctrl.tokavail4read := '0';
+			v.ctrl.tokwasread := '0';
+			-- no need to reset r.ctrl.tokendone_d
+			if shuffle_type /= none then -- statically resolved by synthesizer
+				-- Reset policy is the same for both debug (unsecure-)mode
+				-- and production (secure-)mode: it is made according to the
+				-- designer's static choice in ecc_customize.vhd. The diffe-
+				-- rence is that in production mode (debug = FALSE) and when
+				-- shuffle = TRUE, software driver won't be able to disengage
+				-- shuffling, as (s221) won't allow it.
+				if shuffle then
 					v.ctrl.doshuffle := '1';
+				else
+					v.ctrl.doshuffle := '0';
 				end if;
+			else -- shuffle_type = none
+				v.ctrl.doshuffle := '0'; -- will synthesize as a hard-wired 0
 			end if;
 			v.write.rnd.irnempty := '1';
 			v.write.rnd.trngrdy := '1';
@@ -3566,6 +4209,7 @@ begin
 				v.nndyn.dodec22 := '0';
 				v.nndyn.docnt32done := '0';
 				v.nndyn.doburst01 := '0';
+				-- no need to reset r.nndyn.start, thx to (s124)
 			else -- nn_dynamic = FALSE
 				v.nndyn.valnn := to_unsigned(nn, log2(nn));
 				v.nndyn.valnnm1 := to_unsigned(nn - 1, log2(nn));
@@ -3618,6 +4262,14 @@ begin
 				v.debug.readrdy := '0';
 				v.debug.noxyshuf := '1'; -- in debug mode, we start wo/ XY-shuffling
 				v.debug.noaxirnd := '1'; -- in debug mode, we start wo/ AXI rnd masking
+				v.debug.trngaxistarv := (others => '0');
+				v.debug.trngaxiok := (others => '0');
+				v.debug.trngfpstarv := (others => '0');
+				v.debug.trngfpok := (others => '0');
+				v.debug.trngcrvstarv := (others => '0');
+				v.debug.trngcrvok := (others => '0');
+				v.debug.trngshstarv := (others => '0');
+				v.debug.trngshok := (others => '0');
 			else
 				v.debug.trng.using := '1'; -- present also when debug=FALSE, see (s38)
 			end if;
@@ -3660,6 +4312,10 @@ begin
 	small_k_sz_en <= r.ctrl.small_k_sz_en;
 	small_k_sz_en_en <= r.ctrl.small_k_sz_en_en;
 	small_k_sz <= r.ctrl.small_k_sz;
+	gentoken <= r.ctrl.gentoken;
+	tokenact <= r.ctrl.token_act;
+	zremaskact <= r.ctrl.zremaskact;
+	zremaskbits <= r.ctrl.zremaskbits;
 
 	-- to ecc_curve
 	masklsb <= r.write.rnd.masklsb;
@@ -3814,7 +4470,7 @@ begin
 	-- Simulation process to log on simulator console the random value used by
 	-- ecc_axi (which it got from ecc_trng) to mask the scalar k on-the-fly
 	-- before writing it to ecc_fp_dram (reminder: the masking is either
-	-- additive - if blinding has been set by user -, or boolean otherwise).
+	-- additive - if blinding is currently active -, or boolean otherwise).
 	process(s_axi_aclk, s_axi_aresetn)
 		variable bdx, bdx0 : integer;
 		variable v_k : std_logic_vector(2*nn - 1 downto 0);

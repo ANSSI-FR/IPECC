@@ -44,7 +44,6 @@
 	NNADD,p31	YR0	YR1	G
 	NNSUB	G	twop	red
 	NNADD,p5	red	patchme	G
-	NOP
 	STOP
 
 .zaddcL:
@@ -85,5 +84,4 @@
 	NNSUB	J	Ec	YSUB
 	NNADD,p5	YSUB	patchme	YSUB
 	NNMOV,p1	YSUB		YR1
-	NOP
 	STOP

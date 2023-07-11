@@ -1913,11 +1913,34 @@ begin
 									v.decode.patch.opay1det := '1';
 								end if;
 							end if; -- ptadd
-						elsif r.decode.c.patchid = "101100" then -- ",p44" patch (not used)
-						elsif r.decode.c.patchid = "101101" then -- ",p45" patch (not used)
-						elsif r.decode.c.patchid = "101110" then -- ",p46" patch (not used)
-						elsif r.decode.c.patchid = "101111" then -- ",p47" patch (not used)
-							null;
+						elsif r.decode.c.patchid = "101100" then -- ",p44" patch (z-remasking)
+							if firstzdbl = '0' then
+								v.decode.patch.opax1next := '1';
+								v.decode.patch.opcx1next := '1';
+							elsif firstzdbl = '1' then -- we're in .setupL routine, do nothing
+								null;
+							end if;
+						elsif r.decode.c.patchid = "101101" then -- ",p45" patch (z-remask)
+							if firstzdbl = '0' then
+								v.decode.patch.opay1next := '1';
+								v.decode.patch.opcy1next := '1';
+							elsif firstzdbl = '1' then -- we're in .setupL routine, do nothing
+								null;
+							end if;
+						elsif r.decode.c.patchid = "101110" then -- ",p46" patch (z-remask)
+							if firstzdbl = '0' then
+								v.decode.patch.opax0next := '1';
+								v.decode.patch.opcx0next := '1';
+							elsif firstzdbl = '1' then -- we're in .setupL routine, do nothing
+								null;
+							end if;
+						elsif r.decode.c.patchid = "101111" then -- ",p47" patch (z-remask)
+							if firstzdbl = '0' then
+								v.decode.patch.opay0next := '1';
+								v.decode.patch.opcy0next := '1';
+							elsif firstzdbl = '1' then -- we're in .setupL routine, do nothing
+								null;
+							end if;
 						elsif r.decode.c.patchid = "110000" then -- detect possible 0-result for patch ",p48"
 							-- patch ,p48 includes the same functionality as ,p4
 							v.ctrl.detectxmxz := '1';

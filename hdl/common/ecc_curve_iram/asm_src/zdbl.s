@@ -124,5 +124,4 @@
   # set result of double
   NNMOV,p59  XR0tmp           XR0
   NNMOV,p60  YR0tmp           YR0
-  NOP
   RET
