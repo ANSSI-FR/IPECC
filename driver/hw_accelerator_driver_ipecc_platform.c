@@ -101,7 +101,7 @@ int hw_driver_setup(volatile unsigned char **base_addr_p, volatile unsigned char
 		 */
 		devmem_fd = open("/dev/mem", O_RDWR | O_SYNC);
 		if(devmem_fd == -1){
-			printf("Error when opening /dev/devmem\n");
+			printf("Error when opening /dev/mem\n");
 			perror("open devmem");
 			ret = -1;
 			goto err;

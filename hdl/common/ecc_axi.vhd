@@ -3294,91 +3294,91 @@ begin
 				v.axi.rdatax(31 downto 0) :=
 					(DBG_FP_RDATA_IS_RDY => r.debug.readrdy, others => '0');
 				v.axi.rvalid := '1'; -- (s5)
-			-- ---------------------------------------------
-			-- decoding read of R_DBG_DIAGNOSTICS_0 register
-			-- ---------------------------------------------
+			-- -------------------------------------------
+			-- decoding read of R_DBG_TRNG_DIAG_0 register
+			-- -------------------------------------------
 			elsif debug -- statically resolved by synthesizer
-			  and s_axi_araddr(ADB + 2 downto 3) = R_DBG_DIAGNOSTICS_0
+			  and s_axi_araddr(ADB + 2 downto 3) = R_DBG_TRNG_DIAG_0
 			then
 				dw(31 downto 0) :=
 					std_logic_vector(resize(unsigned(dbgnbstarvrndxyshuf), 32));
 				v.axi.rdatax(31 downto 0) := dw(31 downto 0);
 				v.axi.rvalid := '1'; -- (s5)
-			-- ---------------------------------------------
-			-- decoding read of R_DBG_DIAGNOSTICS_1 register
-			-- ---------------------------------------------
+			-- -------------------------------------------
+			-- decoding read of R_DBG_TRNG_DIAG_1 register
+			-- -------------------------------------------
 			elsif debug -- statically resolved by synthesizer
-			  and s_axi_araddr(ADB + 2 downto 3) = R_DBG_DIAGNOSTICS_1
+			  and s_axi_araddr(ADB + 2 downto 3) = R_DBG_TRNG_DIAG_1
 			then
 				dw(31 downto 0) :=
 					std_logic_vector(resize(unsigned(r.debug.trngaxiok), 32));
 				v.axi.rdatax(31 downto 0) := dw(31 downto 0);
 				v.axi.rvalid := '1'; -- (s5)
-			-- ---------------------------------------------
-			-- decoding read of R_DBG_DIAGNOSTICS_2 register
-			-- ---------------------------------------------
+			-- -------------------------------------------
+			-- decoding read of R_DBG_TRNG_DIAG_2 register
+			-- -------------------------------------------
 			elsif debug -- statically resolved by synthesizer
-			  and s_axi_araddr(ADB + 2 downto 3) = R_DBG_DIAGNOSTICS_2
+			  and s_axi_araddr(ADB + 2 downto 3) = R_DBG_TRNG_DIAG_2
 			then
 				dw(31 downto 0) :=
 					std_logic_vector(resize(unsigned(r.debug.trngaxistarv), 32));
 				v.axi.rdatax(31 downto 0) := dw(31 downto 0);
 				v.axi.rvalid := '1'; -- (s5)
-			-- ---------------------------------------------
-			-- decoding read of R_DBG_DIAGNOSTICS_3 register
-			-- ---------------------------------------------
+			-- -------------------------------------------
+			-- decoding read of R_DBG_TRNG_DIAG_3 register
+			-- -------------------------------------------
 			elsif debug -- statically resolved by synthesizer
-			  and s_axi_araddr(ADB + 2 downto 3) = R_DBG_DIAGNOSTICS_3
+			  and s_axi_araddr(ADB + 2 downto 3) = R_DBG_TRNG_DIAG_3
 			then
 				dw(31 downto 0) :=
 					std_logic_vector(resize(unsigned(r.debug.trngfpok), 32));
 				v.axi.rdatax(31 downto 0) := dw(31 downto 0);
 				v.axi.rvalid := '1'; -- (s5)
-			-- ---------------------------------------------
-			-- decoding read of R_DBG_DIAGNOSTICS_4 register
-			-- ---------------------------------------------
+			-- -------------------------------------------
+			-- decoding read of R_DBG_TRNG_DIAG_4 register
+			-- -------------------------------------------
 			elsif debug -- statically resolved by synthesizer
-			  and s_axi_araddr(ADB + 2 downto 3) = R_DBG_DIAGNOSTICS_4
+			  and s_axi_araddr(ADB + 2 downto 3) = R_DBG_TRNG_DIAG_4
 			then
 				dw(31 downto 0) :=
 					std_logic_vector(resize(unsigned(r.debug.trngfpstarv), 32));
 				v.axi.rdatax(31 downto 0) := dw(31 downto 0);
 				v.axi.rvalid := '1'; -- (s5)
-			-- ---------------------------------------------
-			-- decoding read of R_DBG_DIAGNOSTICS_5 register
-			-- ---------------------------------------------
+			-- -------------------------------------------
+			-- decoding read of R_DBG_TRNG_DIAG_5 register
+			-- -------------------------------------------
 			elsif debug -- statically resolved by synthesizer
-			  and s_axi_araddr(ADB + 2 downto 3) = R_DBG_DIAGNOSTICS_5
+			  and s_axi_araddr(ADB + 2 downto 3) = R_DBG_TRNG_DIAG_5
 			then
 				dw(31 downto 0) :=
 					std_logic_vector(resize(unsigned(r.debug.trngcrvok), 32));
 				v.axi.rdatax(31 downto 0) := dw(31 downto 0);
 				v.axi.rvalid := '1'; -- (s5)
-			-- ---------------------------------------------
-			-- decoding read of R_DBG_DIAGNOSTICS_6 register
-			-- ---------------------------------------------
+			-- -------------------------------------------
+			-- decoding read of R_DBG_TRNG_DIAG_6 register
+			-- -------------------------------------------
 			elsif debug -- statically resolved by synthesizer
-			  and s_axi_araddr(ADB + 2 downto 3) = R_DBG_DIAGNOSTICS_6
+			  and s_axi_araddr(ADB + 2 downto 3) = R_DBG_TRNG_DIAG_6
 			then
 				dw(31 downto 0) :=
 					std_logic_vector(resize(unsigned(r.debug.trngcrvstarv), 32));
 				v.axi.rdatax(31 downto 0) := dw(31 downto 0);
 				v.axi.rvalid := '1'; -- (s5)
-			-- ---------------------------------------------
-			-- decoding read of R_DBG_DIAGNOSTICS_7 register
-			-- ---------------------------------------------
+			-- -------------------------------------------
+			-- decoding read of R_DBG_TRNG_DIAG_7 register
+			-- -------------------------------------------
 			elsif debug -- statically resolved by synthesizer
-			  and s_axi_araddr(ADB + 2 downto 3) = R_DBG_DIAGNOSTICS_7
+			  and s_axi_araddr(ADB + 2 downto 3) = R_DBG_TRNG_DIAG_7
 			then
 				dw(31 downto 0) :=
 					std_logic_vector(resize(unsigned(r.debug.trngshok), 32));
 				v.axi.rdatax(31 downto 0) := dw(31 downto 0);
 				v.axi.rvalid := '1'; -- (s5)
-			-- ---------------------------------------------
-			-- decoding read of R_DBG_DIAGNOSTICS_8 register
-			-- ---------------------------------------------
+			-- -------------------------------------------
+			-- decoding read of R_DBG_TRNG_DIAG_8 register
+			-- -------------------------------------------
 			elsif debug -- statically resolved by synthesizer
-			  and s_axi_araddr(ADB + 2 downto 3) = R_DBG_DIAGNOSTICS_8
+			  and s_axi_araddr(ADB + 2 downto 3) = R_DBG_TRNG_DIAG_8
 			then
 				dw(31 downto 0) :=
 					std_logic_vector(resize(unsigned(r.debug.trngshstarv), 32));

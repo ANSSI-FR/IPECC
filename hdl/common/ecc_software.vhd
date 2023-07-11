@@ -76,7 +76,7 @@ package ecc_software is
 	constant R_CAPABILITIES : rat := std_nat(2, ADB);        -- 0x010
 	constant R_PRIME_SIZE : rat := std_nat(3, ADB);          -- 0x018
 	constant R_HW_VERSION : rat := std_nat(4, ADB);          -- 0x020
-	-- reserved                                              -- 0x030...0x0f8
+	-- reserved                                              -- 0x028...0x0f8
 	-- (0x100: start of read DEBUG registers)
 	constant R_DBG_CAPABILITIES_0 : rat := std_nat(32, ADB); -- 0x100
 	constant R_DBG_CAPABILITIES_1 : rat := std_nat(33, ADB); -- 0x108
@@ -93,15 +93,15 @@ package ecc_software is
 	constant R_DBG_IRN_CNT_CUR : rat := std_nat(44, ADB);    -- 0x160
 	constant R_DBG_IRN_CNT_SHF : rat := std_nat(45, ADB);    -- 0x168
 	constant R_DBG_FP_RDATA_RDY : rat := std_nat(46, ADB);   -- 0x170
-	constant R_DBG_DIAGNOSTICS_0 : rat := std_nat(47, ADB);  -- 0x178
-	constant R_DBG_DIAGNOSTICS_1 : rat := std_nat(48, ADB);  -- 0x180
-	constant R_DBG_DIAGNOSTICS_2 : rat := std_nat(49, ADB);  -- 0x188
-	constant R_DBG_DIAGNOSTICS_3 : rat := std_nat(50, ADB);  -- 0x190
-	constant R_DBG_DIAGNOSTICS_4 : rat := std_nat(51, ADB);  -- 0x198
-	constant R_DBG_DIAGNOSTICS_5 : rat := std_nat(52, ADB);  -- 0x1a0
-	constant R_DBG_DIAGNOSTICS_6 : rat := std_nat(53, ADB);  -- 0x1a8
-	constant R_DBG_DIAGNOSTICS_7 : rat := std_nat(54, ADB);  -- 0x1b0
-	constant R_DBG_DIAGNOSTICS_8 : rat := std_nat(55, ADB);  -- 0x1b8
+	constant R_DBG_TRNG_DIAG_0 : rat := std_nat(47, ADB);    -- 0x178
+	constant R_DBG_TRNG_DIAG_1 : rat := std_nat(48, ADB);    -- 0x180
+	constant R_DBG_TRNG_DIAG_2 : rat := std_nat(49, ADB);    -- 0x188
+	constant R_DBG_TRNG_DIAG_3 : rat := std_nat(50, ADB);    -- 0x190
+	constant R_DBG_TRNG_DIAG_4 : rat := std_nat(51, ADB);    -- 0x198
+	constant R_DBG_TRNG_DIAG_5 : rat := std_nat(52, ADB);    -- 0x1a0
+	constant R_DBG_TRNG_DIAG_6 : rat := std_nat(53, ADB);    -- 0x1a8
+	constant R_DBG_TRNG_DIAG_7 : rat := std_nat(54, ADB);    -- 0x1b0
+	constant R_DBG_TRNG_DIAG_8 : rat := std_nat(55, ADB);    -- 0x1b8
 	-- reserved                                              -- 0x1c0...0x1f8
 
 	-- bit positions in W_CTRL register
