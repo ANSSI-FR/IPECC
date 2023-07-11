@@ -2123,9 +2123,9 @@ begin
 				v.axi.arready := '1';
 				v.axi.bvalid := '1';
 			-- ------------------------------------------------------------
-			-- decoding write to W_DBG_TRNGCTR register
+			-- decoding write to W_DBG_TRNG_CTRL register
 			-- ------------------------------------------------------------
-			elsif debug and r.axi.waddr = W_DBG_TRNGCTR then
+			elsif debug and r.axi.waddr = W_DBG_TRNG_CTRL then
 				-- assert both AWREADY & WREADY signals to allow a new AXI data-beat
 				-- to happen again
 				v.axi.awready := '1';

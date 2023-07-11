@@ -99,7 +99,7 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 #define IPECC_W_DBG_TRIG_DOWN 		(ipecc_baddr + IPECC_ALIGNED(0x128))
 #define IPECC_W_DBG_OP_ADDR   		(ipecc_baddr + IPECC_ALIGNED(0x130))
 #define IPECC_W_DBG_WR_OPCODE 		(ipecc_baddr + IPECC_ALIGNED(0x138))
-#define IPECC_W_DBG_TRNGCTR 		(ipecc_baddr + IPECC_ALIGNED(0x140))
+#define IPECC_W_DBG_TRNG_CTRL 		(ipecc_baddr + IPECC_ALIGNED(0x140))
 #define IPECC_W_DBG_TRNGCFG 		(ipecc_baddr + IPECC_ALIGNED(0x148))
 #define IPECC_W_DBG_FP_WADDR  		(ipecc_baddr + IPECC_ALIGNED(0x150))
 #define IPECC_W_DBG_FP_WDATA 		(ipecc_baddr + IPECC_ALIGNED(0x158))
@@ -119,11 +119,8 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 #define IPECC_W_CTRL_PT_NEG		((uint32_t)0x1 << 4)
 #define IPECC_W_CTRL_PT_EQU		((uint32_t)0x1 << 5)
 #define IPECC_W_CTRL_PT_OPP		((uint32_t)0x1 << 6)
-#define IPECC_W_CTRL_FP_ADD		((uint32_t)0x1 << 7)
-#define IPECC_W_CTRL_FP_SUB		((uint32_t)0x1 << 8)
-#define IPECC_W_CTRL_FP_MUL		((uint32_t)0x1 << 9)
-#define IPECC_W_CTRL_FP_INV		((uint32_t)0x1 << 10)
-#define IPECC_W_CTRL_FP_INVEXP		((uint32_t)0x1 << 11)
+/* bits 7-11 reserved */
+#define IPECC_W_CTRL_RD_TOKEN   ((uint32_t)0x1 << 12
 #define IPECC_W_CTRL_WRITE_NB		((uint32_t)0x1 << 16)
 #define IPECC_W_CTRL_READ_NB		((uint32_t)0x1 << 17)
 #define IPECC_W_CTRL_WRITE_K		((uint32_t)0x1 << 18)
@@ -135,16 +132,16 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 #define IPECC_W_BLINDING_BITS_MSK	(0xfffffff)
 #define IPECC_W_BLINDING_BITS_POS	(4)
 
-/* fields for W_DBG_TRNGCTR */
+/* fields for W_DBG_TRNG_CTRL */
 /* Reset the raw FIFO (1) */
-#define IPECC_W_DBG_TRNGCTR_RESET_FIFO_RAW		((uint32_t)0x1 << 0)
+#define IPECC_W_DBG_TRNG_CTRL_RESET_FIFO_RAW		((uint32_t)0x1 << 0)
 /* Activate raw FIFO reading (1) */
-#define IPECC_W_DBG_TRNGCTR_READ_FIFO_RAW		((uint32_t)0x1 << 4)
+#define IPECC_W_DBG_TRNG_CTRL_READ_FIFO_RAW		((uint32_t)0x1 << 4)
 /* Deactivate RNG Post-Processing (1) */
-#define IPECC_W_DBG_TRNGCTR_DEACTIVATE_PP		((uint32_t)0x1 << 8)
+#define IPECC_W_DBG_TRNG_CTRL_DEACTIVATE_PP		((uint32_t)0x1 << 8)
 /* Reading offset in bits inside  the FIFO on 12 bits */
-#define IPECC_W_DBG_TRNGCTR_FIFO_ADDR_MSK		(0xfffff)
-#define IPECC_W_DBG_TRNGCTR_FIFO_ADDR_POS		(12)
+#define IPECC_W_DBG_TRNG_CTRL_FIFO_ADDR_MSK		(0xfffff)
+#define IPECC_W_DBG_TRNG_CTRL_FIFO_ADDR_POS		(12)
 
 /* Fields for W_DBG_TRNGCFG */
 /* Von Neumann debiaser activate (1) / deactivate (0) */
@@ -203,7 +200,6 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 #define IPECC_R_STATUS_KP		((uint32_t)0x1 << 4)
 #define IPECC_R_STATUS_MTY		((uint32_t)0x1 << 5)
 #define IPECC_R_STATUS_POP		((uint32_t)0x1 << 6)
-#define IPECC_R_STATUS_AOP		((uint32_t)0x1 << 7)
 #define IPECC_R_STATUS_R_OR_W		((uint32_t)0x1 << 8)
 #define IPECC_R_STATUS_INIT		((uint32_t)0x1 << 9)
 #define IPECC_R_STATUS_ENOUGH_RND	((uint32_t)0x1 << 10)
@@ -258,7 +254,6 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 #define IPECC_IS_BUSY_KP() 	(!!(IPECC_GET_REG(IPECC_R_STATUS) & IPECC_R_STATUS_KP))
 #define IPECC_IS_BUSY_MTY() 	(!!(IPECC_GET_REG(IPECC_R_STATUS) & IPECC_R_STATUS_MTY))
 #define IPECC_IS_BUSY_POP() 	(!!(IPECC_GET_REG(IPECC_R_STATUS) & IPECC_R_STATUS_POP))
-#define IPECC_IS_BUSY_AOP() 	(!!(IPECC_GET_REG(IPECC_R_STATUS) & IPECC_R_STATUS_AOP))
 #define IPECC_IS_BUSY_R_W() 	(!!(IPECC_GET_REG(IPECC_R_STATUS) & IPECC_R_STATUS_R_OR_W))
 #define IPECC_IS_BUSY_RND() 	(!!(IPECC_GET_REG(IPECC_R_STATUS) & IPECC_R_STATUS_ENOUGH_RND))
 #define IPECC_IS_BUSY_INIT() 	(!!(IPECC_GET_REG(IPECC_R_STATUS) & IPECC_R_STATUS_INIT))
@@ -386,13 +381,13 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 /****** DEBUG ************/
 /** TRNG handling **/
 /* Reset the raw FIFO */
-#define IPECC_TRNG_RESET_FIFO_RAW() IPECC_SET_REG(IPECC_W_DBG_TRNGCTR, IPECC_W_DBG_TRNGCTR_RESET_FIFO_RAW)
+#define IPECC_TRNG_RESET_FIFO_RAW() IPECC_SET_REG(IPECC_W_DBG_TRNG_CTRL, IPECC_W_DBG_TRNG_CTRL_RESET_FIFO_RAW)
 /* Read the FIFOs at an offset */
 #define IPECC_TRNG_READ_FIFO_RAW(addr, a) do {								\
 	ip_ecc_word val = 0;										\
-	val |= IPECC_W_DBG_TRNGCTR_READ_FIFO_RAW;							\
-	val |= ((addr & IPECC_W_DBG_TRNGCTR_FIFO_ADDR_MSK) << IPECC_W_DBG_TRNGCTR_FIFO_ADDR_POS);  	\
-	IPECC_SET_REG(IPECC_W_DBG_TRNGCTR, val);							\
+	val |= IPECC_W_DBG_TRNG_CTRL_READ_FIFO_RAW;							\
+	val |= ((addr & IPECC_W_DBG_TRNG_CTRL_FIFO_ADDR_MSK) << IPECC_W_DBG_TRNG_CTRL_FIFO_ADDR_POS);  	\
+	IPECC_SET_REG(IPECC_W_DBG_TRNG_CTRL, val);							\
 	(*(a)) = IPECC_GET_REG(IPECC_R_DBG_TRNG_DATA);							\
 } while(0)
 /* Get the RAW FIFO size in bits */
@@ -405,7 +400,7 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 #define IPECC_TRNG_RAW_FIFO_ADDR() ((IPECC_GET_REG(IPECC_R_DBG_TRNG_STAT) >> IPECC_R_DBG_TRNG_STAT_RAW_FIFO_OFFSET_POS) & IPECC_R_DBG_TRNG_STAT_RAW_FIFO_OFFSET_MSK)
 /* Configure elements for random generation */
 /* Deactivate the Post-Processing */
-#define IPECC_TRNG_DEACTIVATE_PP() (IPECC_SET_REG(IPECC_W_DBG_TRNGCTR, IPECC_W_DBG_TRNGCTR_DEACTIVATE_PP))
+#define IPECC_TRNG_DEACTIVATE_PP() (IPECC_SET_REG(IPECC_W_DBG_TRNG_CTRL, IPECC_W_DBG_TRNG_CTRL_DEACTIVATE_PP))
 /* Set options for the TRNG */
 #define IPECC_TRNG_SET_OPTIONS(debias, ta, cycles, bypass) do {						\
 	ip_ecc_word val = IPECC_GET_REG(IPECC_W_DBG_TRNGCFG);						\
