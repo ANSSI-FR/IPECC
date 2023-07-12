@@ -61,7 +61,7 @@ The main features of IPECC are:
 
 5. Reduced silicon area thanks to Co-Z arithmetic
 
-6. Customizable number of Montgomery multiplier
+6. Customizable number of Montgomery multipliers
 
 7. Customizable number of multiplier-accumulators per Montgomery multiplier
 
