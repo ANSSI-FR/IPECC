@@ -100,14 +100,14 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 #define IPECC_W_DBG_OP_ADDR   		(ipecc_baddr + IPECC_ALIGNED(0x130))
 #define IPECC_W_DBG_WR_OPCODE 		(ipecc_baddr + IPECC_ALIGNED(0x138))
 #define IPECC_W_DBG_TRNG_CTRL 		(ipecc_baddr + IPECC_ALIGNED(0x140))
-#define IPECC_W_DBG_TRNGCFG 		(ipecc_baddr + IPECC_ALIGNED(0x148))
+#define IPECC_W_DBG_TRNG_CFG 		(ipecc_baddr + IPECC_ALIGNED(0x148))
 #define IPECC_W_DBG_FP_WADDR  		(ipecc_baddr + IPECC_ALIGNED(0x150))
 #define IPECC_W_DBG_FP_WDATA 		(ipecc_baddr + IPECC_ALIGNED(0x158))
 #define IPECC_W_DBG_FP_RADDR  		(ipecc_baddr + IPECC_ALIGNED(0x160))
-#define IPECC_W_DBG_CFG_NOXYSHUF  		(ipecc_baddr + IPECC_ALIGNED(0x168))
-#define IPECC_W_DBG_CFG_NOAXIMSK  		(ipecc_baddr + IPECC_ALIGNED(0x170))
-#define IPECC_W_DBG_CFG_NOTOKEN  		(ipecc_baddr + IPECC_ALIGNED(0x178))
-#define IPECC_W_DBG_RSTTRNGCNT      (ipecc_baddr + IPECC_ALIGNED(0x180))
+#define IPECC_W_DBG_CFG_XYSHUF  		(ipecc_baddr + IPECC_ALIGNED(0x168))
+#define IPECC_W_DBG_CFG_AXIMSK  		(ipecc_baddr + IPECC_ALIGNED(0x170))
+#define IPECC_W_DBG_CFG_TOKEN  		(ipecc_baddr + IPECC_ALIGNED(0x178))
+#define IPECC_W_DBG_RESET_TRNG_CNT    (ipecc_baddr + IPECC_ALIGNED(0x180))
 /*	-- reserved                                                           0x188...0x1f8  */
 
 
@@ -127,37 +127,131 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 #define IPECC_W_CTRL_NBADDR_MSK		(0xfff)
 #define IPECC_W_CTRL_NBADDR_POS		(20)
 
+/* Fields for W_R0_NULL */
+#define IPECC_W_R0_NULL      ((uint32_t)0x1 << 0)
+
+/* Fields for W_R1_NULL */
+#define IPECC_W_R1_NULL      ((uint32_t)0x1 << 0)
+
 /* Fields for W_BLINDING */
 #define IPECC_W_BLINDING_EN		((uint32_t)0x1 << 0)
 #define IPECC_W_BLINDING_BITS_MSK	(0xfffffff)
 #define IPECC_W_BLINDING_BITS_POS	(4)
 
-/* fields for W_DBG_TRNG_CTRL */
+/* Fields for W_SHUFFLE */
+#define IPECC_W_SHUFFLE_EN    ((uint32_t)0x1 << 0)
+
+/* Fields for W_ZREMASK */
+#define IPECC_W_ZREMASK_EN    ((uint32_t)0x1 << 0)
+#define IPECC_W_ZREMASK_BITS_MSK	(0xffff)
+#define IPECC_W_ZREMASK_BITS_POS	(16)
+
+/* Fields for W_TOKEN */
+/* no field here: action is performed simply by writing to the
+   register address, whatever the value written */
+
+/* Fields for W_IRQ */
+/* enable IRQ (1) or disable (0) */
+#define IPECC_W_IRQ_EN    ((uint32_t)0x1 << 0)
+
+/* Fields for W_ERR_ACK */
+/* These are the same as for the ERR_ bits in R_STATUS (see below) */
+
+/* Fields for W_SMALL_SCALAR  */
+#define IPECC_W_SMALL_SCALAR_K_POS    (0)
+#define IPECC_W_SMALL_SCALAR_K_MSK    (0xffff)
+
+/* Fields for W_SOFT_RESET */
+/* no field here: action is performed simply by writing to the
+   register address, whatever the value written */
+
+/* Fields for W_DBG_HALT */
+#define IPECC_W_DBG_HALT_DO_HALT   ((uint32_t)0x1 << 0)
+
+/* Fields for W_DBG_BKPT */
+#define IPECC_W_DBG_BKPT_EN     ((uint32_t)0x1 << 0)
+#define IPECC_W_DBG_BKPT_ID_POS    (1)
+#define IPECC_W_DBG_BKPT_ID_MSK    (0x3)
+#define IPECC_W_DBG_BKPT_ADDR_POS   (4)
+#define IPECC_W_DBG_BKPT_ADDR_MSK   (0xfff)
+#define IPECC_W_DBG_BKPT_NBIT_POS   (16)
+#define IPECC_W_DBG_BKPT_NBIT_MSK   (0xfff)
+#define IPECC_W_DBG_BKPT_STATE_POS     (28)
+#define IPECC_W_DBG_BKPT_STATE_MSK     (0xf)
+
+/* Fields for W_DBG_STEPS */
+#define IPECC_W_DBG_STEPS_RUN_NB_OP    ((uint32_t)0x1 << 0)
+#define IPECC_W_DBG_STEPS_NB_OP_POS    (8)
+#define IPECC_W_DBG_STEPS_NB_OP_MSK    (0xffff)
+#define IPECC_W_DBG_STEPS_RESUME     ((uint32_t)0x1 << 28)
+
+/* Fields for W_DBG_TRIG_ACT */
+/* enable trig (1) or disable it (0) */
+#define IPECC_W_DBG_TRIG_ACT_EN     ((uint32_t)0x1 << 0)
+
+/* Fields for W_DBG_TRIG_UP & W_DBG_TRIG_DOWN*/
+#define IPECC_W_DBG_TRIG_POS    (0)
+#define IPECC_W_DBG_TRIG_MSK    (0xffffffff)
+
+/* Fields for W_DBG_OP_ADDR */
+#define IPECC_W_DBG_OP_ADDR_POS   (0)
+#define IPECC_W_DBG_OP_ADDR_MSK   (0xffff)
+
+/* Fields for W_DBG_WR_OPCODE */
+#define IPECC_W_DBG_WR_OPCODE_POS   (0)
+#define IPECC_W_DBG_WR_OPCODE_MSK   (0xffffffff)
+
+/* Fields for W_DBG_TRNG_CTRL */
 /* Reset the raw FIFO (1) */
 #define IPECC_W_DBG_TRNG_CTRL_RESET_FIFO_RAW		((uint32_t)0x1 << 0)
+#define IPECC_W_DBG_TRNG_CTRL_RESET_FIFO_IRN		((uint32_t)0x1 << 1)
 /* Activate raw FIFO reading (1) */
 #define IPECC_W_DBG_TRNG_CTRL_READ_FIFO_RAW		((uint32_t)0x1 << 4)
 /* Deactivate RNG Post-Processing (1) */
 #define IPECC_W_DBG_TRNG_CTRL_DEACTIVATE_PP		((uint32_t)0x1 << 8)
-/* Reading offset in bits inside  the FIFO on 12 bits */
+/* Reading offset in bits inside the FIFO on 20 bits */
 #define IPECC_W_DBG_TRNG_CTRL_FIFO_ADDR_MSK		(0xfffff)
 #define IPECC_W_DBG_TRNG_CTRL_FIFO_ADDR_POS		(12)
 
-/* Fields for W_DBG_TRNGCFG */
+/* Fields for W_DBG_TRNG_CFG */
 /* Von Neumann debiaser activate (1) / deactivate (0) */
-#define IPECC_W_DBG_TRNGCFG_ACTIVE_DEBIAS		((uint32_t)0x1 << 0)
-/* TA value in number of cycles (32 by default) */
-#define IPECC_W_DBG_TRNGCFG_TA_POS			(4)
-#define IPECC_W_DBG_TRNGCFG_TA_MSK			(0xfffff)
-/* 4-bit number of cycles in the TRNG */
-#define IPECC_W_DBG_TRNGCFG_TRNG_CYCLES_POS		(24)
-#define IPECC_W_DBG_TRNGCFG_TRNG_CYCLES_MSK		(4)
+#define IPECC_W_DBG_TRNG_CFG_ACTIVE_DEBIAS		((uint32_t)0x1 << 0)
+/* TA value (in nb of system clock cycles) */
+#define IPECC_W_DBG_TRNG_CFG_TA_POS			(4)
+#define IPECC_W_DBG_TRNG_CFG_TA_MSK			(0xfffff)
+/* latency (in nb of system clock cycles) between each phase of
+   one-bit generation in the TRNG */
+#define IPECC_W_DBG_TRNG_CFG_TRNG_IDLE_POS		(24)
+#define IPECC_W_DBG_TRNG_CFG_TRNG_IDLE_MSK		(0xf)
 /* Complete bypass of the TRNG (1) or not (0) */
-#define IPECC_W_DBG_TRNGCFG_TRNG_BYPASS			((uint32_t)0x1 << 31)
+#define IPECC_W_DBG_TRNG_CFG_TRNG_BYPASS			((uint32_t)0x1 << 1)
+/* Deterministic bit value produced when complete bypass is on */
+#define IPECC_W_DBG_TRNG_CFG_TRNG_BYPASS_BIT		((uint32_t)0x1 << 2)
 
+/* Fields for  IPECC_W_DBG_FP_WADDR */
+#define IPECC_W_DBG_FP_WADDR_POS     (0)
+#define IPECC_W_DBG_FP_WADDR_MSK     (0xffffffff)
 
-/* Reset register in the dedicated RESET IP */
-#define IPECC_W_RESET			(ipecc_reset_baddr)
+/* Fields for  IPECC_W_DBG_FP_WDATA */
+#define IPECC_W_DBG_FP_WDATA_POS     (0)
+#define IPECC_W_DBG_FP_WDATA_MSK     (0xffffffff)
+
+/* Fields for  IPECC_W_DBG_FP_RADDR */
+#define IPECC_W_DBG_FP_RADDR_POS     (0)
+#define IPECC_W_DBG_FP_RADDR_MSK     (0xffffffff)
+
+/* Fields for  IPECC_W_DBG_CFG_NOXYSHUF */
+#define IPECC_W_DBG_CFG_XYSHUF_EN    ((uint32_t)0x1 << 0)
+
+/* Fields for  IPECC_W_DBG_CFG_AXIMSK */
+#define IPECC_W_DBG_CFG_AXIMSK_EN    ((uint32_t)0x1 << 0)
+
+/* Fields for  IPECC_W_DBG_CFG_TOKEN */
+#define IPECC_W_DBG_CFG_TOKEN_EN    ((uint32_t)0x1 << 0)
+
+/* Fields for  IPECC_W_DBG_RESET_TRNG_CNT */
+/* no field here: action is performed simply by writing to the
+   register address, whatever the value written */
 
 /***********************************************************/
 /***********************************************************/
@@ -175,6 +269,7 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 #define IPECC_R_DBG_TIME       (ipecc_baddr + IPECC_ALIGNED(0x120))
 /* Time to fill the RNG raw FIFO in cycles */
 #define IPECC_R_DBG_RAWDUR      (ipecc_baddr + IPECC_ALIGNED(0x128))
+#define IPECC_R_DBG_FLAGS      (ipecc_baddr + IPECC_ALIGNED(0x130))
 #define IPECC_R_DBG_TRNG_STATUS     (ipecc_baddr + IPECC_ALIGNED(0x138))
 /* Read TRNG data */
 #define IPECC_R_DBG_TRNG_DATA      (ipecc_baddr + IPECC_ALIGNED(0x140))
@@ -218,20 +313,86 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 #define IPECC_R_CAPABILITIES_NNMAX_MSK	(0xfffff)
 #define IPECC_R_CAPABILITIES_NNMAX_POS	(12)
 
-/* Fields for R_DBG_STATUS */
-#define IPECC_R_DBG_STATUS_P_NOT_SET		((uint32_t)0x1 << 0)
-#define IPECC_R_DBG_STATUS_P_NOT_SET_MTY	((uint32_t)0x1 << 1)
-#define IPECC_R_DBG_STATUS_A_NOT_SET		((uint32_t)0x1 << 2)
-#define IPECC_R_DBG_STATUS_A_NOT_SET_MTY	((uint32_t)0x1 << 3)
-#define IPECC_R_DBG_STATUS_B_NOT_SET		((uint32_t)0x1 << 4)
-#define IPECC_R_DBG_STATUS_K_NOT_SET		((uint32_t)0x1 << 5)
-#define IPECC_R_DBG_STATUS_NNDYN_NOERR		((uint32_t)0x1 << 6)
-#define IPECC_R_DBG_STATUS_NOT_BLN_OR_Q_NOT_SET	((uint32_t)0x1 << 7)
+/* Fields for R_HW_VERSION */
+#define IPECC_R_HW_VERSION_MAJOR_POS    (16)
+#define IPECC_R_HW_VERSION_MAJOR_POS    (0xffff)
+#define IPECC_R_HW_VERSION_MINOR_POS    (0)
+#define IPECC_R_HW_VERSION_MINOR_POS    (0xffff)
 
-/* Fields for R_DBG_TRNG_STAT */
-#define IPECC_R_DBG_TRNG_STAT_RAW_FIFO_FULL		((uint32_t)0x1 << 0)
-#define IPECC_R_DBG_TRNG_STAT_RAW_FIFO_OFFSET_MSK	(0xffffff)
-#define IPECC_R_DBG_TRNG_STAT_RAW_FIFO_OFFSET_POS	(8)
+/* Fields for R_DBG_CAPABILITIES_0 */
+#define IPECC_R_DBG_CAPABILITIES_0_WW_POS    (0)
+#define IPECC_R_DBG_CAPABILITIES_0_WW_MSK    (32)
+
+/* Fields for R_DBG_CAPABILITIES_1 */
+#define IPECC_R_DBG_CAPABILITIES_1_NBOPCODES_POS    (0)
+#define IPECC_R_DBG_CAPABILITIES_1_NBOPCODES_MSK    (0xffff)
+#define IPECC_R_DBG_CAPABILITIES_1_OPCODE_SZ_POS    (16)
+#define IPECC_R_DBG_CAPABILITIES_1_OPCODE_SZ_MSK    (0xffff)
+
+/* Fields for R_DBG_CAPABILITIES_2 */
+#define IPECC_R_DBG_CAPABILITIES_2_RAW_RAMSZ_POS    (0)
+#define IPECC_R_DBG_CAPABILITIES_2_RAW_RAMSZ_MSK    (0xffffffff)
+
+/* Fields for R_DBG_STATUS */
+#define IPECC_R_DBG_STATUS_HALTED    (((uint32_t)0x1 << 0)
+#define IPECC_R_DBG_STATUS_BKID_POS     (1)
+#define IPECC_R_DBG_STATUS_BKID_MSK     (0x3)
+#define IPECC_R_DBG_STATUS_BK_HIT     (((uint32_t)0x1 << 3)
+#define IPECC_R_DBG_STATUS_PC_POS     (4)
+#define IPECC_R_DBG_STATUS_PC_MSK     (0xfff)
+#define IPECC_R_DBG_STATUS_STATE_POS     (28)
+#define IPECC_R_DBG_STATUS_STATE_MSK     (0xf)
+
+/* Fields for R_DBG_TIME */
+#define IPECC_R_DBG_TIME_POS     (0)
+#define IPECC_R_DBG_TIME_MSK     (0xffffffff)
+
+/* Fields for R_DBG_RAWDUR */
+#define IPECC_R_DBG_RAWDUR_POS     (0)
+#define IPECC_R_DBG_RAWDUR_MSK     (0xffffffff)
+
+/* Fields for R_DBG_FLAGS */
+#define IPECC_R_DBG_FLAGS_P_NOT_SET		((uint32_t)0x1 << 0)
+#define IPECC_R_DBG_FLAGS_P_NOT_SET_MTY	((uint32_t)0x1 << 1)
+#define IPECC_R_DBG_FLAGS_A_NOT_SET		((uint32_t)0x1 << 2)
+#define IPECC_R_DBG_FLAGS_A_NOT_SET_MTY	((uint32_t)0x1 << 3)
+#define IPECC_R_DBG_FLAGS_B_NOT_SET		((uint32_t)0x1 << 4)
+#define IPECC_R_DBG_FLAGS_K_NOT_SET		((uint32_t)0x1 << 5)
+#define IPECC_R_DBG_FLAGS_NNDYN_NOERR		((uint32_t)0x1 << 6)
+#define IPECC_R_DBG_FLAGS_NOT_BLN_OR_Q_NOT_SET	((uint32_t)0x1 << 7)
+
+/* Fields for R_DBG_TRNG_STATUS */
+#define IPECC_R_DBG_TRNG_STATUS_RAW_FIFO_FULL		((uint32_t)0x1 << 0)
+#define IPECC_R_DBG_TRNG_STATUS_RAW_FIFO_OFFSET_MSK	(0xffffff)
+#define IPECC_R_DBG_TRNG_STATUS_RAW_FIFO_OFFSET_POS	(8)
+
+/* Fields for R_DBG_TRNG_DATA */
+#define  IPECC_R_DBG_TRNG_DATA_BIT_POS    (0)
+#define  IPECC_R_DBG_TRNG_DATA_BIT_MSK    (0x1)
+
+/* Fields for R_DBG_FP_RDATA */
+#define  IPECC_R_DBG_FP_RDATA_WWDATA_POS    (0)
+#define  IPECC_R_DBG_FP_RDATA_WWDATA_MSK    (0xffffffff)
+
+/* Fields for R_DBG_IRN_CNT_AXI, R_DBG_IRN_CNT_EFP,
+ * R_DBG_IRN_CNT_CUR & R_DBG_IRN_CNT_SHF */
+#define  IPECC_R_DBG_IRN_CNT_COUNT_POS    (0)
+#define  IPECC_R_DBG_IRN_CNT_COUNT_MSK    (0xffffffff)
+
+/* Fields for R_DBG_FP_RDATA_RDY */
+#define IPECC_R_DBG_FP_RDATA_RDY     ((uint32_t)0x1 << 0)
+
+/* Fields for R_DBG_TRNG_DIAG_0 */
+#define IPECC_R_DBG_TRNG_DIAG_0_STARV_POS     (0)
+#define IPECC_R_DBG_TRNG_DIAG_0_STARV_MSK     (0xffffffff)
+
+/* Fields for R_DBG_TRNG_DIAG_[1357] */
+#define IPECC_R_DBG_TRNG_DIAG_CNT_OK_POS     (0)
+#define IPECC_R_DBG_TRNG_DIAG_CNT_OK_MSK     (0xffffffff)
+
+/* Fields for R_DBG_TRNG_DIAG_[2468] */
+#define IPECC_R_DBG_TRNG_DIAG_CNT_STARV_POS     (0)
+#define IPECC_R_DBG_TRNG_DIAG_CNT_STARV_MSK     (0xffffffff)
 
 /***********************************************************/
 /***********************************************************/
@@ -403,12 +564,12 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 #define IPECC_TRNG_DEACTIVATE_PP() (IPECC_SET_REG(IPECC_W_DBG_TRNG_CTRL, IPECC_W_DBG_TRNG_CTRL_DEACTIVATE_PP))
 /* Set options for the TRNG */
 #define IPECC_TRNG_SET_OPTIONS(debias, ta, cycles, bypass) do {						\
-	ip_ecc_word val = IPECC_GET_REG(IPECC_W_DBG_TRNGCFG);						\
-	val |= ((debias) ? IPECC_W_DBG_TRNGCFG_ACTIVE_DEBIAS : 0);					\
-	val |= ((ta) & IPECC_W_DBG_TRNGCFG_TA_MSK) << IPECC_W_DBG_TRNGCFG_TA_POS;			\
-	val |= ((cycles) & IPECC_W_DBG_TRNGCFG_TRNG_CYCLES_MSK) << IPECC_W_DBG_TRNGCFG_TRNG_CYCLES_POS; \
-	val |= ((bypass) ? IPECC_W_DBG_TRNGCFG_TRNG_BYPASS : 0);					\
-	IPECC_SET_REG(IPECC_W_DBG_TRNGCFG, val);							\
+	ip_ecc_word val = IPECC_GET_REG(IPECC_W_DBG_TRNG_CFG);						\
+	val |= ((debias) ? IPECC_W_DBG_TRNG_CFG_ACTIVE_DEBIAS : 0);					\
+	val |= ((ta) & IPECC_W_DBG_TRNG_CFG_TA_MSK) << IPECC_W_DBG_TRNG_CFG_TA_POS;			\
+	val |= ((cycles) & IPECC_W_DBG_TRNG_CFG_TRNG_CYCLES_MSK) << IPECC_W_DBG_TRNG_CFG_TRNG_CYCLES_POS; \
+	val |= ((bypass) ? IPECC_W_DBG_TRNG_CFG_TRNG_BYPASS : 0);					\
+	IPECC_SET_REG(IPECC_W_DBG_TRNG_CFG, val);							\
 } while(0)
 
 typedef enum {

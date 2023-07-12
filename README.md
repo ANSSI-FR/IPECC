@@ -61,15 +61,17 @@ The main features of IPECC are:
 
 5. Reduced silicon area thanks to Co-Z arithmetic
 
-6. Customizable number of multiplier-accumulators within each Montgomery multiplier
+6. Customizable number of Montgomery multiplier
 
-7. Built-in TRNG design (ES-TRNG from [KU-Leuven, CHES'2018](https://tches.iacr.org/index.php/TCHES/article/view/7276))
+7. Customizable number of multiplier-accumulators per Montgomery multiplier
 
-8. Automatic computation of Montgomery constants
+8. Built-in TRNG design (ES-TRNG from [KU-Leuven, CHES'2018](https://tches.iacr.org/index.php/TCHES/article/view/7276))
 
-9. Optional dynamically changeable size of large numbers/security parameter
+9. Automatic computation of Montgomery constants
 
-10. Optional GALS (Montgomery multipliers with their own sped-up clock domain)
+10. Optional dynamically changeable size of large numbers/security parameter
+
+11. Optional GALS (Montgomery multipliers with their own sped-up clock domain)
 
 ## Hardware
 
