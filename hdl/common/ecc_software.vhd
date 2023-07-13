@@ -35,39 +35,39 @@ package ecc_software is
 	-- -----------------------------------------------
 	-- addresses of all AXI-accessible write registers
 	-- -----------------------------------------------
-	constant W_CTRL : rat := std_nat(0, ADB);               -- 0x000
-	constant W_WRITE_DATA : rat := std_nat(1, ADB);         -- 0x008
-	constant W_R0_NULL : rat := std_nat(2, ADB);            -- 0x010
-	constant W_R1_NULL : rat := std_nat(3, ADB);            -- 0x018
-	constant W_PRIME_SIZE : rat := std_nat(4, ADB);         -- 0x020
-	constant W_BLINDING : rat := std_nat(5, ADB);           -- 0x028
-	constant W_SHUFFLE : rat := std_nat(6, ADB);            -- 0x030
-	constant W_ZREMASK : rat := std_nat(7, ADB);            -- 0x038
-	constant W_TOKEN : rat := std_nat(8, ADB);              -- 0x040
-	constant W_IRQ : rat := std_nat(9, ADB);                -- 0x048
-	constant W_ERR_ACK : rat := std_nat(10, ADB);           -- 0x050
-	constant W_SMALL_SCALAR : rat := std_nat(11, ADB);      -- 0x058
-	constant W_SOFT_RESET : rat := std_nat(12, ADB);        -- 0x060
-	-- reserved                                             -- 0x060...0x0f8
+	constant W_CTRL : rat := std_nat(0, ADB);                -- 0x000
+	constant W_WRITE_DATA : rat := std_nat(1, ADB);          -- 0x008
+	constant W_R0_NULL : rat := std_nat(2, ADB);             -- 0x010
+	constant W_R1_NULL : rat := std_nat(3, ADB);             -- 0x018
+	constant W_PRIME_SIZE : rat := std_nat(4, ADB);          -- 0x020
+	constant W_BLINDING : rat := std_nat(5, ADB);            -- 0x028
+	constant W_SHUFFLE : rat := std_nat(6, ADB);             -- 0x030
+	constant W_ZREMASK : rat := std_nat(7, ADB);             -- 0x038
+	constant W_TOKEN : rat := std_nat(8, ADB);               -- 0x040
+	constant W_IRQ : rat := std_nat(9, ADB);                 -- 0x048
+	constant W_ERR_ACK : rat := std_nat(10, ADB);            -- 0x050
+	constant W_SMALL_SCALAR : rat := std_nat(11, ADB);       -- 0x058
+	constant W_SOFT_RESET : rat := std_nat(12, ADB);         -- 0x060
+	-- reserved                                              -- 0x060...0x0f8
 	-- (0x100: start of write DEBUG registers)
-	constant W_DBG_HALT : rat := std_nat(32, ADB);          -- 0x100
-	constant W_DBG_BKPT : rat := std_nat(33, ADB);          -- 0x108
-	constant W_DBG_STEPS : rat := std_nat(34, ADB);         -- 0x110
-	constant W_DBG_TRIG_ACT : rat := std_nat(35, ADB);      -- 0x118
-	constant W_DBG_TRIG_UP : rat := std_nat(36, ADB);       -- 0x120
-	constant W_DBG_TRIG_DOWN : rat := std_nat(37, ADB);     -- 0x128
-	constant W_DBG_OP_ADDR : rat := std_nat(38, ADB);       -- 0x130
-	constant W_DBG_WR_OPCODE : rat := std_nat(39, ADB);     -- 0x138
-	constant W_DBG_TRNG_CTRL : rat := std_nat(40, ADB);     -- 0x140
-	constant W_DBG_TRNGCFG : rat := std_nat(41, ADB);       -- 0x148
-	constant W_DBG_FP_WADDR : rat := std_nat(42, ADB);      -- 0x150
-	constant W_DBG_FP_WDATA : rat := std_nat(43, ADB);      -- 0x158
-	constant W_DBG_FP_RADDR : rat := std_nat(44, ADB);      -- 0x160
-	constant W_DBG_CFG_NOXYSHUF : rat := std_nat(45, ADB);  -- 0x168
-	constant W_DBG_CFG_NOAXIMSK : rat := std_nat(46, ADB);  -- 0x170
-	constant W_DBG_CFG_NOTOKEN : rat := std_nat(47, ADB);   -- 0x178
-	constant W_DBG_RSTTRNGCNT : rat := std_nat(48, ADB);    -- 0x180
-	-- reserved                                             -- 0x188...0x1f8
+	constant W_DBG_HALT : rat := std_nat(32, ADB);           -- 0x100
+	constant W_DBG_BKPT : rat := std_nat(33, ADB);           -- 0x108
+	constant W_DBG_STEPS : rat := std_nat(34, ADB);          -- 0x110
+	constant W_DBG_TRIG_ACT : rat := std_nat(35, ADB);       -- 0x118
+	constant W_DBG_TRIG_UP : rat := std_nat(36, ADB);        -- 0x120
+	constant W_DBG_TRIG_DOWN : rat := std_nat(37, ADB);      -- 0x128
+	constant W_DBG_OP_ADDR : rat := std_nat(38, ADB);        -- 0x130
+	constant W_DBG_WR_OPCODE : rat := std_nat(39, ADB);      -- 0x138
+	constant W_DBG_TRNG_CTRL : rat := std_nat(40, ADB);      -- 0x140
+	constant W_DBG_TRNG_CFG : rat := std_nat(41, ADB);       -- 0x148
+	constant W_DBG_FP_WADDR : rat := std_nat(42, ADB);       -- 0x150
+	constant W_DBG_FP_WDATA : rat := std_nat(43, ADB);       -- 0x158
+	constant W_DBG_FP_RADDR : rat := std_nat(44, ADB);       -- 0x160
+	constant W_DBG_CFG_XYSHUF : rat := std_nat(45, ADB);     -- 0x168
+	constant W_DBG_CFG_AXIMSK : rat := std_nat(46, ADB);     -- 0x170
+	constant W_DBG_CFG_TOKEN : rat := std_nat(47, ADB);      -- 0x178
+	constant W_DBG_RESET_TRNG_CNT : rat := std_nat(48, ADB); -- 0x180
+	-- reserved                                              -- 0x188...0x1f8
 	-- ----------------------------------------------
 	-- addresses of all AXI-accessible read registers
 	-- ----------------------------------------------
@@ -104,6 +104,9 @@ package ecc_software is
 	constant R_DBG_TRNG_DIAG_8 : rat := std_nat(55, ADB);    -- 0x1b8
 	-- reserved                                              -- 0x1c0...0x1f8
 
+	-- ----------------------------------------------
+	-- bit positions / fields in write registers
+	-- ----------------------------------------------
 	-- bit positions in W_CTRL register
 	constant CTRL_KP : natural := 0;
 	constant CTRL_PT_ADD : natural := 1;
@@ -143,38 +146,101 @@ package ecc_software is
 	-- bit positions in W_IRQ register
 	constant IRQ_EN : natural := 0;
 
+	-- bit positions in W_ERR_ACK
+	-- same as the ERR_* bits in R_STATUS (see below)
+
 	-- bit positions in W_PRIME_SIZE register
 	constant PMSZ_VALNN_LSB : natural := 0;
 	constant PMSZ_VALNN_SZ : natural := log2(nn);
 	constant PMSZ_VALNN_MSB : natural := PMSZ_VALNN_LSB + PMSZ_VALNN_SZ - 1;
 
+	-- bit positions in W_DBG_HALT register
+	constant DBG_HALT : natural := 0;
+
+	-- bit positions in W_DBG_BKPT register
+	constant DBG_BKPT_EN : natural := 0;
+	constant DBG_BKPT_ID_LSB : natural := 1;
+	constant DBG_BKPT_ID_MSB : natural := 2;
+	constant DBG_BKPT_ADDR_LSB : natural := 4;
+	constant DBG_BKPT_ADDR_MSB : natural := 4 + IRAM_ADDR_SZ - 1;
+	constant DBG_BKPT_NBBIT_LSB : natural := 16;
+	constant DBG_BKPT_NBBIT_MSB : natural := 27;
+	constant DBG_BKPT_STATE_LSB : natural := 28;
+	constant DBG_BKPT_STATE_MSB : natural := 31;
+
+	-- bit positions in W_DBG_STEPS register
+	constant DBG_OPCODE_RUN : natural := 0;
+	constant DBG_OPCODE_NB_LSB : natural := 8;
+	constant DBG_OPCODE_NB_MSB : natural := 23;
+	constant DBG_RESUME : natural := 28;
+
+	-- bit positions in W_DBG_TRIG_ACT
+	constant TRIG_EN : natural := 0;
+
+	-- bit positions in W_DBG_TRIG_UP & W_DBG_TRIG_DOWN
+	constant TRIG_LSB : natural := 0;
+	constant TRIG_MSB : natural := 31;
+
+	-- bit positions in W_DBG_TRNG_CTRL register
+	constant DBG_TRNG_RAW_RESET : natural := 0;
+	constant DBG_TRNG_IRN_RESET : natural := 1;
+	constant DBG_TRNG_RAW_READ : natural := 4;
+	constant DBG_TRNG_PP_DEACT : natural := 8;
+	constant DBG_TRNG_RAW_ADDR_LSB : natural := 12;
+	constant DBG_TRNG_RAW_ADDR_MSB : natural :=
+		DBG_TRNG_RAW_ADDR_LSB + log2(raw_ram_size - 1) - 1;
+
+	-- bit positions in W_DBG_TRNG_CFG register
+	constant DBG_TRNG_VONM : natural := 0;
+	constant DBG_TRNG_COMPLETE_BYPASS : natural := 1;
+	constant DBG_TRNG_COMPLETE_BYPASS_BIT : natural := 2;
+	constant DBG_TRNG_TA_LSB : natural := 4;
+	constant DBG_TRNG_TA_MSB : natural := 23;
+	constant DBG_TRNG_IDLE_LSB : natural := 24;
+	constant DBG_TRNG_IDLE_MSB : natural := 27;
+
+	-- bit positions in W_DBG_CFG_XYSHUF register
+	constant XYSHF_EN : natural := 0;
+
+	-- bit positions in W_DBG_CFG_AXIMSK register
+	constant AXIMSK_EN : natural := 0;
+
+	-- bit positions in W_DBG_CFG_TOKEN register
+	constant TOK_EN : natural := 0;
+
+	-- ----------------------------------------------
+	-- bit positions / fields in read registers
+	-- ----------------------------------------------
 	-- bit positions in R_STATUS register (AXI interface w/ software)
 	constant STATUS_BUSY : natural := 0;
 	constant STATUS_KP : natural := 4;
 	constant STATUS_MTY : natural := 5;
 	constant STATUS_POP : natural := 6;
-	constant STATUS_R_OR_W : natural := 8;
-	constant STATUS_INIT : natural := 9;
-	constant STATUS_ENOUGH_RND : natural := 10;
-	constant STATUS_NNDYNACT : natural := 11;
-	constant STATUS_YES : natural := 13;
-	constant STATUS_R0_IS_NULL : natural := 14;
-	constant STATUS_R1_IS_NULL : natural := 15;
+	constant STATUS_R_OR_W : natural := 7;
+	constant STATUS_INIT : natural := 8;
+	constant STATUS_NNDYNACT : natural := 9;
+	constant STATUS_WK_ENOUGH_RND : natural := 10;
+	constant STATUS_YES : natural := 11;
+	constant STATUS_R0_IS_NULL : natural := 12;
+	constant STATUS_R1_IS_NULL : natural := 13;
+	constant STATUS_ERR_LSB : natural := 16;
 	constant STATUS_ERR_IN_PT_NOT_ON_CURVE : natural := 16;
 	constant STATUS_ERR_OUT_PT_NOT_ON_CURVE : natural := 17;
-	constant STATUS_ERR_LSB : natural := 20;
-	constant STATUS_ERR_COMP : natural := 20;
-	constant STATUS_ERR_WREG_FBD : natural := 21;
-	constant STATUS_ERR_KP_FBD : natural := 22;
-	constant STATUS_ERR_NNDYN : natural := 23;
-	constant STATUS_ERR_POP_FBD : natural := 24;
-	constant STATUS_ERR_RDNB_FBD : natural := 25;
-	constant STATUS_ERR_BLN : natural := 26;
-	constant STATUS_ERR_UNKNOWN_REG : natural := 27;
-	constant STATUS_ERR_TOKEN : natural := 28;
-	constant STATUS_ERR_SHUFFLE : natural := 29;
-	constant STATUS_ERR_ZREMASK : natural := 30;
-	constant STATUS_ERR_MSB : natural := 30;
+	constant STATUS_ERR_I_LSB : natural := STATUS_ERR_LSB + 2;
+	constant STATUS_ERR_I_COMP : natural := STATUS_ERR_I_LSB + 0;
+	constant STATUS_ERR_I_WREG_FBD : natural := STATUS_ERR_I_LSB + 1;
+	constant STATUS_ERR_I_KP_FBD : natural := STATUS_ERR_I_LSB + 2;
+	constant STATUS_ERR_I_NNDYN : natural := STATUS_ERR_I_LSB + 3;
+	constant STATUS_ERR_I_POP_FBD : natural := STATUS_ERR_I_LSB + 4;
+	constant STATUS_ERR_I_RDNB_FBD : natural := STATUS_ERR_I_LSB + 5;
+	constant STATUS_ERR_I_BLN : natural := STATUS_ERR_I_LSB + 6;
+	constant STATUS_ERR_I_UNKNOWN_REG : natural := STATUS_ERR_I_LSB + 7;
+	constant STATUS_ERR_I_TOKEN : natural := STATUS_ERR_I_LSB + 8;
+	constant STATUS_ERR_I_SHUFFLE : natural := STATUS_ERR_I_LSB + 9;
+	constant STATUS_ERR_I_ZREMASK : natural := STATUS_ERR_I_LSB + 10;
+	constant STATUS_ERR_I_WK_NOT_ENOUGH_RANDOM : natural := STATUS_ERR_I_LSB + 11;
+	constant STATUS_ERR_I_MSB : natural := STATUS_ERR_LSB + 15; -- ERR_I_LSB + 13;
+	constant STATUS_ERR_MSB : natural := 31;
 
 	-- bit positions in R_CAPABILITIES register
 	constant CAP_DBG_N_PROD : natural := 0;
@@ -183,6 +249,9 @@ package ecc_software is
 	constant CAP_W64 : natural := 9;
 	constant CAP_NNMAX_LSB : natural := 12;
 	constant CAP_NNMAX_MSB : natural := CAP_NNMAX_LSB + log2(nn) - 1;
+
+	-- bit positions in R_PRIME_SIZE
+	--   (same definitions as for W_PRIME_SIZE register, see above)
 
 	-- bit positions in R_DBG_STATUS register
 	constant DBG_STATUS_HALTED : natural := 0;
@@ -205,56 +274,6 @@ package ecc_software is
 	constant FLAGS_K_NOT_SET : natural := 5;
 	constant FLAGS_NNDYN_NOERR : natural := 6;
 	constant FLAGS_NOT_BLN_OR_Q_NOT_SET : natural := 7;
-
-	-- bit positions in W_DBG_TRNGCFG register
-	constant DBG_TRNG_VONM : natural := 0;
-	constant DBG_TRNG_COMPLETE_BYPASS : natural := 1;
-	constant DBG_TRNG_COMPLETE_BYPASS_BIT : natural := 2;
-	constant DBG_TRNG_TA_LSB : natural := 4;
-	constant DBG_TRNG_TA_MSB : natural := 23;
-	constant DBG_TRNG_IDLE_LSB : natural := 24;
-	constant DBG_TRNG_IDLE_MSB : natural := 27;
-
-	-- bit positions in W_DBG_TRNG_CTRL register
-	constant DBG_TRNG_RAW_RESET : natural := 0;
-	constant DBG_TRNG_IRN_RESET : natural := 1;
-	constant DBG_TRNG_RAW_READ : natural := 4;
-	constant DBG_TRNG_PP_DEACT : natural := 8;
-	constant DBG_TRNG_RAW_ADDR_LSB : natural := 12;
-	constant DBG_TRNG_RAW_ADDR_MSB : natural :=
-		DBG_TRNG_RAW_ADDR_LSB + log2(raw_ram_size - 1) - 1;
-
-	-- bit positions in W_DBG_HALT register
-	constant DBG_HALT : natural := 0;
-
-	-- bit positions in W_DBG_BKPT register
-	constant DBG_BKPT_EN : natural := 0;
-	constant DBG_BKPT_ID_LSB : natural := 1;
-	constant DBG_BKPT_ID_MSB : natural := 2;
-	constant DBG_BKPT_ADDR_LSB : natural := 4;
-	constant DBG_BKPT_ADDR_MSB : natural := 4 + IRAM_ADDR_SZ - 1;
-	constant DBG_BKPT_NBBIT_LSB : natural := 16;
-	constant DBG_BKPT_NBBIT_MSB : natural := 27;
-	constant DBG_BKPT_STATE_LSB : natural := 28;
-	constant DBG_BKPT_STATE_MSB : natural := 31;
-
-	-- bit positions in W_DBG_STEPS register
-	constant DBG_RESUME : natural := 28;
-	constant DBG_OPCODE_RUN : natural := 0;
-	constant DBG_OPCODE_NB_LSB : natural := 8;
-	constant DBG_OPCODE_NB_MSB : natural := 23;
-
-	-- bit positions in W_DBG_CFG_NOXYSHUF register
-	constant XYSHF_DIS : natural := 0;
-
-	-- bit positions in W_DBG_CFG_NOAXIMSK register
-	constant AXIMSK_DIS : natural := 0;
-
-	-- bit positions in W_DBG_CFG_NOTOKEN register
-	constant TOK_DIS : natural := 0;
-
-	-- bit positions in R_PRIME_SIZE
-	--   (same definitions as for W_PRIME_SIZE register, see above)
 
 	-- bit positions in R_DBG_FP_RDATA_RDY
 	constant DBG_FP_RDATA_IS_RDY : natural := 0;

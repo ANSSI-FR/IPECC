@@ -15,7 +15,7 @@ OUT_VHD_VARS=ecc_vars.vhd
 # Assembly source files
 ASM_SRC=asm_src
 ASM_LABELS=$(ASM_SRC)/ecc_addr.txt
-PFX_SRC_FILES=monty-cst check-on-curve blinding adpa setup double itoh zaddu zaddc subtractP exit eucl-inv cst-time-inv addition ptops fpops zdbl znegc token zremask
+PFX_SRC_FILES=monty-cst check-on-curve blinding adpa setup double itoh zaddu zaddc subtractP exit eucl-inv cst-time-inv addition ptops zdbl znegc token zremask
 ASM_SRC_FILES:=$(addsuffix .s,$(PFX_SRC_FILES))
 ASM_SRC_FILES:=$(addprefix $(ASM_SRC)/,$(ASM_SRC_FILES))
 ASM_VAR_DEFINITIONS=$(ASM_SRC)/vardefs.csv

@@ -1883,7 +1883,7 @@ begin
 						-- is high then token was generated and read back by the software
 						-- before [k]P computation was started (ecc_axi refuses to launch
 						-- computation as long as software has not done so, issuing error
-						-- STATUS_ERR_KP_FBD whenever it happens). This ensures coherency
+						-- STATUS_ERR_I_KP_FBD whenever it happens). This ensures coherency
 						-- in the fact that we're now going to mask the coordinates of [k]P
 						-- result with the very same token (which is done by executing
 						-- routine .token_kP_maskL, the address of which is pointed to by

@@ -291,7 +291,8 @@ architecture rtl of ecc_axi is
 	type ctrl_reg_type is record
 		state : state_type;
 		-- ierrid designates the error field in R_STATUS register
-		ierrid : std_logic_vector(STATUS_ERR_MSB downto STATUS_ERR_LSB);
+		-- (w/ the exception of errors 'IN_PT_NOT_ON_CURVE' & 'OUT_PT_NOT_ON_CURVE')
+		ierrid : std_logic_vector(STATUS_ERR_I_MSB downto STATUS_ERR_I_LSB);
 		newp : std_logic;
 		newa : std_logic;
 		wk : std_logic;
@@ -1000,7 +1001,7 @@ begin
 					-- Ignore value set by sofware, acknowledge the AXI data write
 					-- transaction (see (s252)) and signal back an error to software
 					-- through R_STATUS register.
-					v.ctrl.ierrid(STATUS_ERR_ZREMASK) := '1';
+					v.ctrl.ierrid(STATUS_ERR_I_ZREMASK) := '1';
 				elsif vtmp21(log2(nn - 1)) = '0' then
 					-- Means .zremaskbitstest < zremask, or equal (OK: increases security)
 					v.ctrl.zremaskbits := r.ctrl.zremaskbitstest;
@@ -1041,8 +1042,8 @@ begin
 				-- This means blindbits > nn - 1. This is an error, which an only be
 				-- provoked by (s241), not by (s243), hence we don't need to recompute
 				--.nn_extrabits here. Nothing changes, we just signal back the error
-				-- to software driver with bit STATUS_ERR_BLN of R_STATUS register.
-				v.ctrl.ierrid(STATUS_ERR_BLN) := '1'; -- (s249)
+				-- to software driver with bit STATUS_ERR_I_BLN of R_STATUS register.
+				v.ctrl.ierrid(STATUS_ERR_I_BLN) := '1'; -- (s249)
 				if r.ctrl.blindcheckaxiack = '1' then
 					-- (s126), set back the AXI handshake signals, see (s125)
 					v.axi.wready := '1';
@@ -1064,7 +1065,7 @@ begin
 				-- In the meantime (and not before the tests triggered by setting
 				-- .doblindsh(0) to 1 are over), .doblinding temporarily stays at 0.
 				v.ctrl.doblinding := '0';
-				v.ctrl.ierrid(STATUS_ERR_BLN) := '0';
+				v.ctrl.ierrid(STATUS_ERR_I_BLN) := '0';
 			end if;
 		end if;
 
@@ -1248,7 +1249,7 @@ begin
 			v.axi.bvalid := '0';
 		end if;
 
-		v_writebn_accepted := TRUE; -- (s54) see (s56)
+		v_writebn_accepted := TRUE; -- (s54), see (s56)
 
 		-- -----------------------------------------------------------
 		-- r.axi.awpending & r.axi.dwpending both HIGH: new write-beat
@@ -1292,7 +1293,7 @@ begin
 					--   3. software wants to start a [k]P computation, see (s188)
 					--   4. software asks for a point-based operation (other than [k]P),
 					--      see (s189)
-					-- In any other case, error flag STATUS_ERR_WREG_FBD is raised in
+					-- In any other case, error flag STATUS_ERR_I_WREG_FBD is raised in
 					-- R_STATUS register. Note that no error flag is raised in case
 					-- several actions are asked for in the same W_CTRL write, instead
 					-- priorities described above simply are applied
@@ -1402,7 +1403,9 @@ begin
 							-- --------------------------------
 							v.ctrl.k_set := '0';
 							v.ctrl.k_is_being_set := '1'; -- (s122), see (s123)
-							if r.write.rnd.enough_random = '1' then
+							if r.write.rnd.enough_random = '1'
+								or (debug and r.debug.noaxirnd = '1')
+							then
 								v.ctrl.wk := '1';
 								v.ctrl.k_is_null := '1';
 								-- (s72) init of wecnt, used only when blinding is active,
@@ -1466,8 +1469,11 @@ begin
 								v.write.rnd.bitsirn := to_unsigned(ww - 1, log2(ww - 1));
 								v.write.rnd.bitsww := to_unsigned(ww - 1, log2(ww - 1));
 								v.write.rnd.carry := 0;
+								-- remove any previous possible error
+								v.ctrl.ierrid(STATUS_ERR_I_WK_NOT_ENOUGH_RANDOM) := '0';
 							else -- not enough random
-								v_writebn_accepted := FALSE; -- (s55) see (s56)
+								v_writebn_accepted := FALSE; -- (s55), see (s56)
+								v.ctrl.ierrid(STATUS_ERR_I_WK_NOT_ENOUGH_RANDOM) := '1';
 							end if;
 						else
 							v.ctrl.wk := '0';
@@ -1482,7 +1488,7 @@ begin
 							v.write.bitstotal := to_unsigned(nn - 1, log2(nn));
 						end if;
 						v.write.trailingzeros := "00";
-						if v_writebn_accepted then -- (s56) see (s54) & (s55)
+						if v_writebn_accepted then -- (s56), see (s54) & (s55)
 							-- thx to (s55) above, if there is not enough random to mask the
 							-- scalar, attempting to write it will fail (subsequent writes
 							-- of data words to the WRITE_DATA register will simply be
@@ -1504,9 +1510,9 @@ begin
 							-- that software is allowed to read is the random token
 							(r.ctrl.read_forbidden = '1' and r.axi.wdatax(CTRL_RD_TOKEN)='0')
 						then
-							v.ctrl.ierrid(STATUS_ERR_RDNB_FBD) := '1';
+							v.ctrl.ierrid(STATUS_ERR_I_RDNB_FBD) := '1';
 						else
-							v.ctrl.ierrid(STATUS_ERR_RDNB_FBD) := '0';
+							v.ctrl.ierrid(STATUS_ERR_I_RDNB_FBD) := '0';
 							if debug then -- statically resolved by synthesizer
 								-- (s78), see (s77)
 								v.fpaddr0 := r.axi.wdatax(
@@ -1528,9 +1534,8 @@ begin
 							-- to read the random token (bit CTRL_RD_TOKEN is set in W_CTRL)
 							v_read_no_error := TRUE;
 							if r.axi.wdatax(CTRL_RD_TOKEN) = '1' then
-								-- (s225)
 								-- In debug mode the operation is subject to the token feature
-								-- being activated through the W_DBG_CFG_NOTOKEN register
+								-- being activated through the W_DBG_CFG_TOKEN register
 								-- (see (s224)), while in production mode, the feature is always
 								-- active and cannot be disengaged. In both cases, the token
 								-- can only be read if its generation was previously asked for,
@@ -1547,7 +1552,7 @@ begin
 									-- This error case is shared with the one where software
 									-- driver asks for generation of the token while a command for
 									-- that is already pending, see (s248).
-									v.ctrl.ierrid(STATUS_ERR_TOKEN) := '1'; -- (s247)
+									v.ctrl.ierrid(STATUS_ERR_I_TOKEN) := '1'; -- (s247)
 									v_read_no_error := FALSE;
 								end if;
 							end if;
@@ -1578,10 +1583,10 @@ begin
 						if v_kp_possible then -- (s115)
 							v.ctrl.agokp := '1'; -- (s174)
 							v.ctrl.lockaxi := '1'; -- (s68), will be deasserted by (s69)
-							v.ctrl.ierrid(STATUS_ERR_KP_FBD) := '0'; -- (s175)
+							v.ctrl.ierrid(STATUS_ERR_I_KP_FBD) := '0'; -- (s175)
 						else
 							-- SW settings are not enough to perform a point-computation
-							v.ctrl.ierrid(STATUS_ERR_KP_FBD) := '1'; -- (s176)
+							v.ctrl.ierrid(STATUS_ERR_I_KP_FBD) := '1'; -- (s176)
 						end if;
 					-- ----------------------------------------------------------
 					--               other point-based operations
@@ -1593,10 +1598,10 @@ begin
 							v.ctrl.dopop := '1';
 							v.ctrl.popid := ECC_AXI_POINT_ADD;
 							v.ctrl.lockaxi := '1'; -- (s89), will be deasserted by (s90)
-							v.ctrl.ierrid(STATUS_ERR_POP_FBD) := '0';
+							v.ctrl.ierrid(STATUS_ERR_I_POP_FBD) := '0';
 						else
 							-- SW settings are not enough to perform a point-computation
-							v.ctrl.ierrid(STATUS_ERR_POP_FBD) := '1';
+							v.ctrl.ierrid(STATUS_ERR_I_POP_FBD) := '1';
 						end if;
 					elsif r.axi.wdatax(CTRL_PT_DBL) = '1' then
 						-- SW is asking for a point doubling
@@ -1604,10 +1609,10 @@ begin
 							v.ctrl.dopop := '1';
 							v.ctrl.popid := ECC_AXI_POINT_DBL;
 							v.ctrl.lockaxi := '1'; -- (s89), will be deasserted by (s90)
-							v.ctrl.ierrid(STATUS_ERR_POP_FBD) := '0';
+							v.ctrl.ierrid(STATUS_ERR_I_POP_FBD) := '0';
 						else
 							-- SW settings are not enough to perform a point-computation
-							v.ctrl.ierrid(STATUS_ERR_POP_FBD) := '1';
+							v.ctrl.ierrid(STATUS_ERR_I_POP_FBD) := '1';
 						end if;
 					elsif r.axi.wdatax(CTRL_PT_CHK) = '1' then
 						-- SW is asking to check if a point is on curve
@@ -1615,10 +1620,10 @@ begin
 							v.ctrl.dopop := '1';
 							v.ctrl.popid := ECC_AXI_POINT_CHK;
 							v.ctrl.lockaxi := '1'; -- (s89), will be deasserted by (s90)
-							v.ctrl.ierrid(STATUS_ERR_POP_FBD) := '0';
+							v.ctrl.ierrid(STATUS_ERR_I_POP_FBD) := '0';
 						else
 							-- SW settings are not enough to perform a point-computation
-							v.ctrl.ierrid(STATUS_ERR_POP_FBD) := '1';
+							v.ctrl.ierrid(STATUS_ERR_I_POP_FBD) := '1';
 						end if;
 					elsif r.axi.wdatax(CTRL_PT_NEG) = '1' then
 						-- SW wants to compute the opposite of a given point
@@ -1626,10 +1631,10 @@ begin
 							v.ctrl.dopop := '1';
 							v.ctrl.popid := ECC_AXI_POINT_NEG;
 							v.ctrl.lockaxi := '1'; -- (s89), will be deasserted by (s90)
-							v.ctrl.ierrid(STATUS_ERR_POP_FBD) := '0';
+							v.ctrl.ierrid(STATUS_ERR_I_POP_FBD) := '0';
 						else
 							-- SW settings are not enough to perform a point-computation
-							v.ctrl.ierrid(STATUS_ERR_POP_FBD) := '1';
+							v.ctrl.ierrid(STATUS_ERR_I_POP_FBD) := '1';
 						end if;
 					elsif r.axi.wdatax(CTRL_PT_EQU) = '1' then
 						-- SW wants to compute the opposite of a given point
@@ -1637,10 +1642,10 @@ begin
 							v.ctrl.dopop := '1';
 							v.ctrl.popid := ECC_AXI_POINT_EQU;
 							v.ctrl.lockaxi := '1'; -- (s89), will be deasserted by (s90)
-							v.ctrl.ierrid(STATUS_ERR_POP_FBD) := '0';
+							v.ctrl.ierrid(STATUS_ERR_I_POP_FBD) := '0';
 						else
 							-- SW settings are not enough to perform a point-computation
-							v.ctrl.ierrid(STATUS_ERR_POP_FBD) := '1';
+							v.ctrl.ierrid(STATUS_ERR_I_POP_FBD) := '1';
 						end if;
 					elsif r.axi.wdatax(CTRL_PT_OPP) = '1' then
 						-- SW wants to compute the opposite of a given point
@@ -1648,17 +1653,17 @@ begin
 							v.ctrl.dopop := '1';
 							v.ctrl.popid := ECC_AXI_POINT_OPP;
 							v.ctrl.lockaxi := '1'; -- (s89), will be deasserted by (s90)
-							v.ctrl.ierrid(STATUS_ERR_POP_FBD) := '0';
+							v.ctrl.ierrid(STATUS_ERR_I_POP_FBD) := '0';
 						else
 							-- SW settings are not enough to perform a point-computation
-							v.ctrl.ierrid(STATUS_ERR_POP_FBD) := '1';
+							v.ctrl.ierrid(STATUS_ERR_I_POP_FBD) := '1';
 						end if;
 					end if; -- decoding content of W_CTRL register
-					v.ctrl.ierrid(STATUS_ERR_WREG_FBD) := '0'; -- clr possible past error
+					v.ctrl.ierrid(STATUS_ERR_I_WREG_FBD) := '0'; -- clr possible past error
 				else
 					-- raise error flag (illicite register write)
 					-- (s191)
-					v.ctrl.ierrid(STATUS_ERR_WREG_FBD) := '1';
+					v.ctrl.ierrid(STATUS_ERR_I_WREG_FBD) := '1';
 				end if; -- v_wlock or debug
 			-- -------------------------------------------------------
 			-- decoding write to W_WRITE_DATA register
@@ -1674,7 +1679,7 @@ begin
 				if r.ctrl.state = writeln then -- (s57)
 					v.write.new32 := '1';
 					-- clear possible past error
-					v.ctrl.ierrid(STATUS_ERR_WREG_FBD) := '0';
+					v.ctrl.ierrid(STATUS_ERR_I_WREG_FBD) := '0';
 					-- AWREADY is asserted again (we can accept a new address again)
 					-- but NOT WREADY: we CANNOT accept that a new data be pushed to us.
 					-- Assertion of WREADY (which is currently low thx to (s0) see above)
@@ -1692,7 +1697,7 @@ begin
 					-- low from (s0)
 					v.axi.wready := '1';
 					-- raise error flag (illicite register write)
-					v.ctrl.ierrid(STATUS_ERR_WREG_FBD) := '1';
+					v.ctrl.ierrid(STATUS_ERR_I_WREG_FBD) := '1';
 				end if;
 			-- ------------------------------------------------------
 			-- decoding write to W_R0_NULL register
@@ -1708,10 +1713,10 @@ begin
 				if (not v_wlock) or debug then -- (163), see (s161)
 					v.ctrl.r0_is_null := r.axi.wdatax(WR0_IS_NULL);
 					-- clear possible past error
-					v.ctrl.ierrid(STATUS_ERR_WREG_FBD) := '0';
+					v.ctrl.ierrid(STATUS_ERR_I_WREG_FBD) := '0';
 				else
 					-- raise error flag (illicite register write)
-					v.ctrl.ierrid(STATUS_ERR_WREG_FBD) := '1';
+					v.ctrl.ierrid(STATUS_ERR_I_WREG_FBD) := '1';
 				end if;
 			-- ------------------------------------------------------
 			-- decoding write to W_R1_NULL register
@@ -1727,10 +1732,10 @@ begin
 				if (not v_wlock) or debug then -- (s164), see (s161)
 					v.ctrl.r1_is_null := r.axi.wdatax(WR1_IS_NULL);
 					-- clear possible past error
-					v.ctrl.ierrid(STATUS_ERR_WREG_FBD) := '0';
+					v.ctrl.ierrid(STATUS_ERR_I_WREG_FBD) := '0';
 				else
 					-- raise error flag (illicite register write)
-					v.ctrl.ierrid(STATUS_ERR_WREG_FBD) := '1';
+					v.ctrl.ierrid(STATUS_ERR_I_WREG_FBD) := '1';
 				end if;
 			-- -------------------------------------------------------------
 			-- decoding write to W_PRIME_SIZE register (s41)
@@ -1756,14 +1761,14 @@ begin
 						v.nndyn.active := '1';
 						v.nndyn.testnn := '1'; -- asserted only 1 cycle, see (s169)
 						-- clear possible past error
-						v.ctrl.ierrid(STATUS_ERR_WREG_FBD) := '0';
+						v.ctrl.ierrid(STATUS_ERR_I_WREG_FBD) := '0';
 					else
 						-- raise error flag (illicite register write)
-						v.ctrl.ierrid(STATUS_ERR_WREG_FBD) := '1';
+						v.ctrl.ierrid(STATUS_ERR_I_WREG_FBD) := '1';
 					end if;
 				else
 					-- raise error flag (illicite register write)
-					v.ctrl.ierrid(STATUS_ERR_WREG_FBD) := '1';
+					v.ctrl.ierrid(STATUS_ERR_I_WREG_FBD) := '1';
 				end if;
 			-- -----------------------------------------------------
 			-- decoding write to W_BLINDING register - (s241)
@@ -1792,7 +1797,7 @@ begin
 								-- mode and with blinding countermeasure locked: keep
 								-- things as they are (blinding is activated as per (s240))
 								-- and signal error 'ERR_WREG_FBD' in R_STATUS register.
-								v.ctrl.ierrid(STATUS_ERR_WREG_FBD) := '1';
+								v.ctrl.ierrid(STATUS_ERR_I_WREG_FBD) := '1';
 							else
 								v.ctrl.doblinding := '0';
 							end if;
@@ -1806,10 +1811,10 @@ begin
 						v.axi.bvalid := '1';
 					end if;
 					-- clear possible past error
-					v.ctrl.ierrid(STATUS_ERR_WREG_FBD) := '0';
+					v.ctrl.ierrid(STATUS_ERR_I_WREG_FBD) := '0';
 				else
 					-- raise error flag (illicite register write)
-					v.ctrl.ierrid(STATUS_ERR_WREG_FBD) := '1';
+					v.ctrl.ierrid(STATUS_ERR_I_WREG_FBD) := '1';
 					v.axi.wready := '1';
 					v.axi.awready := '1';
 					v.axi.arready := '1';
@@ -1829,7 +1834,7 @@ begin
 				if debug then -- (s166), see (s161)
 					if r.axi.wdatax(SHUF_EN) = '1' then
 						if shuffle_type = none then
-							v.ctrl.ierrid(STATUS_ERR_WREG_FBD) := '1';
+							v.ctrl.ierrid(STATUS_ERR_I_WREG_FBD) := '1';
 						else
 							v.ctrl.doshuffle := '1';
 						end if;
@@ -1841,7 +1846,7 @@ begin
 				else -- debug = FALSE, we are in production (secure-)mode
 					if r.axi.wdatax(SHUF_EN) = '1' then
 						if shuffle_type = none then
-							v.ctrl.ierrid(STATUS_ERR_WREG_FBD) := '1';
+							v.ctrl.ierrid(STATUS_ERR_I_WREG_FBD) := '1';
 						else
 							v.ctrl.doshuffle := '1';
 						end if;
@@ -1850,7 +1855,7 @@ begin
 							-- Software driver wants to disable shuffling, it's NOK because
 							-- we are in production (secure-)mode and the static config
 							-- enforces usage of shuffling
-							v.ctrl.ierrid(STATUS_ERR_WREG_FBD) := '1'; -- (s221)
+							v.ctrl.ierrid(STATUS_ERR_I_WREG_FBD) := '1'; -- (s221)
 						else -- shuffle = FALSE in ecc_customize.vhd
 							v.ctrl.doshuffle := '0';
 						end if;
@@ -1890,7 +1895,7 @@ begin
 							v.axi.awready := '1';
 							v.axi.arready := '1';
 							v.axi.bvalid := '1';
-							v.ctrl.ierrid(STATUS_ERR_WREG_FBD) := '1';
+							v.ctrl.ierrid(STATUS_ERR_I_WREG_FBD) := '1';
 						elsif r.axi.wdatax(ZMSK_EN) = '1' then
 							v.ctrl.zremaskbitstest :=
 								unsigned(r.axi.wdatax(ZMSK_MSB downto ZMSK_LSB));
@@ -1923,10 +1928,10 @@ begin
 				if (not v_wlock) or debug then -- (s167), see (s161)
 					v.ctrl.irqen := r.axi.wdatax(IRQ_EN);
 					-- clear possible past error
-					v.ctrl.ierrid(STATUS_ERR_WREG_FBD) := '0';
+					v.ctrl.ierrid(STATUS_ERR_I_WREG_FBD) := '0';
 				else
 					-- raise error flag (illicite register write)
-					v.ctrl.ierrid(STATUS_ERR_WREG_FBD) := '1';
+					v.ctrl.ierrid(STATUS_ERR_I_WREG_FBD) := '1';
 				end if;
 			-- ------------------------------------------------
 			-- decoding write to W_ERR_ACK register
@@ -1941,7 +1946,7 @@ begin
 				v.axi.arready := '1';
 				v.axi.bvalid := '1';
 				v.ctrl.ierrid := r.ctrl.ierrid and
-					not (r.axi.wdatax(STATUS_ERR_MSB downto STATUS_ERR_LSB));
+					not (r.axi.wdatax(STATUS_ERR_I_MSB downto STATUS_ERR_I_LSB));
 				-- .aerr_inpt_ack & .aerr_outpt_ack, if asserted, stay asserted only
 				-- 1 cycle
 				v.ctrl.aerr_inpt_ack := r.axi.wdatax(STATUS_ERR_IN_PT_NOT_ON_CURVE);
@@ -1965,7 +1970,7 @@ begin
 					v.ctrl.do_ksz_test := '1';
 				else
 					-- raise error flag (illicite register write)
-					v.ctrl.ierrid(STATUS_ERR_WREG_FBD) := '1';
+					v.ctrl.ierrid(STATUS_ERR_I_WREG_FBD) := '1';
 					v.axi.wready := '1'; -- (s159), see (s157)
 				end if;
 			-- ------------------------------------------------
@@ -2007,7 +2012,7 @@ begin
 				else
 					-- simply signal an error (shared with the error case "token read
 					-- before being generated", see (s247))
-					v.ctrl.ierrid(STATUS_ERR_TOKEN) := '1'; -- (s248)
+					v.ctrl.ierrid(STATUS_ERR_I_TOKEN) := '1'; -- (s248)
 				end if;
 			-- ------------------------------
 			-- below are DEBUG only registers
@@ -2065,7 +2070,7 @@ begin
 			-- decoding write to W_DBG_TRIG_ACT register
 			-- ----------------------------------------------------------------
 			elsif debug and r.axi.waddr = W_DBG_TRIG_ACT then
-				v.debug.trigactive := r.axi.wdatax(0);
+				v.debug.trigactive := r.axi.wdatax(TRIG_EN);
 				v.axi.wready := '1';
 				v.axi.awready := '1';
 				v.axi.arready := '1';
@@ -2074,7 +2079,7 @@ begin
 			-- decoding write to W_DBG_TRIG_UP register
 			-- ----------------------------------------------------------
 			elsif debug and r.axi.waddr = W_DBG_TRIG_UP then
-				v.debug.trigup := r.axi.wdatax(31 downto 0);
+				v.debug.trigup := r.axi.wdatax(TRIG_MSB downto TRIG_LSB);
 				v.axi.wready := '1';
 				v.axi.awready := '1';
 				v.axi.arready := '1';
@@ -2083,7 +2088,7 @@ begin
 			-- decoding write to W_DBG_TRIG_DOWN register
 			-- ------------------------------------------------------------
 			elsif debug and r.axi.waddr = W_DBG_TRIG_DOWN then
-				v.debug.trigdown := r.axi.wdatax(31 downto 0);
+				v.debug.trigdown := r.axi.wdatax(TRIG_MSB downto TRIG_LSB);
 				v.axi.wready := '1';
 				v.axi.awready := '1';
 				v.axi.arready := '1';
@@ -2166,9 +2171,9 @@ begin
 				-- activation/disabling of TRNG post-processing
 				v.debug.trng.ppdeact := r.axi.wdatax(8);
 			-- --------------------------------------------------------------
-			-- decoding write to W_DBG_TRNGCFG register
+			-- decoding write to W_DBG_TRNG_CFG register
 			-- --------------------------------------------------------------
-			elsif debug and r.axi.waddr = W_DBG_TRNGCFG then
+			elsif debug and r.axi.waddr = W_DBG_TRNG_CFG then
 				v.debug.trng.vonneuman := r.axi.wdatax(DBG_TRNG_VONM);
 				v.debug.trng.completebypass := r.axi.wdatax(DBG_TRNG_COMPLETE_BYPASS);
 				v.debug.trng.completebypassbit := r.axi.wdatax(
@@ -2228,10 +2233,10 @@ begin
 				-- drive write-response to initiator
 				v.axi.bvalid := '1';
 			-- -------------------------------------------------------------
-			-- decoding write to W_DBG_CFG_NOXYSHUF register
+			-- decoding write to W_DBG_CFG_XYSHUF register
 			-- -------------------------------------------------------------
-			elsif debug and r.axi.waddr = W_DBG_CFG_NOXYSHUF then
-				v.debug.noxyshuf := r.axi.wdatax(XYSHF_DIS);
+			elsif debug and r.axi.waddr = W_DBG_CFG_XYSHUF then
+				v.debug.noxyshuf := not r.axi.wdatax(XYSHF_EN);
 				-- assert both AWREADY & WREADY signals to allow a new AXI data-beat
 				-- to happen again
 				v.axi.awready := '1';
@@ -2240,10 +2245,10 @@ begin
 				-- drive write-response to initiator
 				v.axi.bvalid := '1';
 			-- -------------------------------------------------------------
-			-- decoding write to W_DBG_CFG_NOAXIMSK register
+			-- decoding write to W_DBG_CFG_AXIMSK register
 			-- -------------------------------------------------------------
-			elsif debug and r.axi.waddr = W_DBG_CFG_NOAXIMSK then -- (s202) see (s203)
-				v.debug.noaxirnd := r.axi.wdatax(AXIMSK_DIS);
+			elsif debug and r.axi.waddr = W_DBG_CFG_AXIMSK then -- (s202) see (s203)
+				v.debug.noaxirnd := not r.axi.wdatax(AXIMSK_EN);
 				-- assert both AWREADY & WREADY signals to allow a new AXI data-beat
 				-- to happen again
 				v.axi.awready := '1';
@@ -2252,18 +2257,18 @@ begin
 				-- drive write-response to initiator
 				v.axi.bvalid := '1';
 			-- -------------------------------------------------------------
-			-- decoding write to W_DBG_CFG_NOTOKEN register
+			-- decoding write to W_DBG_CFG_TOKEN register
 			-- -------------------------------------------------------------
-			elsif debug and r.axi.waddr = W_DBG_CFG_NOTOKEN then
-				v.ctrl.token_act := not r.axi.wdatax(TOK_DIS); -- (s224) see (s225-s226)
+			elsif debug and r.axi.waddr = W_DBG_CFG_TOKEN then
+				v.ctrl.token_act := r.axi.wdatax(TOK_EN); -- (s224) see (s225-s226)
 				v.axi.wready := '1';
 				v.axi.awready := '1';
 				v.axi.arready := '1';
 				v.axi.bvalid := '1';
 			-- -------------------------------------------------------------
-			-- decoding write to W_DBG_RSTTRNGCNT register - (s259)
+			-- decoding write to W_DBG_RESET_TRNG_CNT register - (s259)
 			-- -------------------------------------------------------------
-			elsif debug and r.axi.waddr = W_DBG_RSTTRNGCNT then
+			elsif debug and r.axi.waddr = W_DBG_RESET_TRNG_CNT then
 				-- reset counters below are bypasses of (s260) increments
 				v.debug.trngaxiok := (others => '0');
 				v.debug.trngaxistarv := (others => '0');
@@ -2291,7 +2296,7 @@ begin
 				v.axi.arready := '1';
 				v.axi.bvalid := '1';
 				-- raise error flag (illicite register access)
-				v.ctrl.ierrid(STATUS_ERR_UNKNOWN_REG) := '1';
+				v.ctrl.ierrid(STATUS_ERR_I_UNKNOWN_REG) := '1';
 			end if;
 		end if; -- awpending = dwpending = 1 (one data beat)
 
@@ -2324,7 +2329,7 @@ begin
 			v.write.rnd.bitsirn := to_unsigned(ww - 1, log2(ww - 1));
 		end if;
 
-		-- (s203), bypass by debug feature, see (s202) register W_DBG_CFG_NOAXIMSK
+		-- (s203), bypass by debug feature, see (s202) register W_DBG_CFG_AXIMSK
 		if r.debug.noaxirnd = '1' then
 			v.write.rnd.irn := (others => '0');
 		end if;
@@ -2953,7 +2958,7 @@ begin
 				dw(STATUS_POP) := r.ctrl.poppending;
 				dw(STATUS_R_OR_W) := r.write.busy or r.read.busy;
 				dw(STATUS_INIT) := not initdone;
-				dw(STATUS_ENOUGH_RND) := not r.write.rnd.enough_random;
+				dw(STATUS_WK_ENOUGH_RND) := not r.write.rnd.enough_random;
 				if nn_dynamic then -- statically resolved by synthesizer
 					dw(STATUS_NNDYNACT) := r.nndyn.active;
 				else
@@ -2962,7 +2967,7 @@ begin
 				dw(STATUS_YES) := r.ctrl.yes; -- (s98), was set by (s96)
 				dw(STATUS_R0_IS_NULL) := r.ctrl.r0_is_null;
 				dw(STATUS_R1_IS_NULL) := r.ctrl.r1_is_null;
-				dw(STATUS_ERR_MSB downto STATUS_ERR_LSB) := r.ctrl.ierrid;
+				dw(STATUS_ERR_I_MSB downto STATUS_ERR_I_LSB) := r.ctrl.ierrid;
 				dw(STATUS_ERR_IN_PT_NOT_ON_CURVE) := aerr_inpt_not_on_curve;
 				dw(STATUS_ERR_OUT_PT_NOT_ON_CURVE) := aerr_outpt_not_on_curve;
 				v.axi.rdatax := dw;
@@ -3344,7 +3349,7 @@ begin
 				v.axi.rdatax := (others => '1'); -- 0xFFFFFFFF
 				v.axi.rvalid := '1'; -- (s5)
 				-- raise error flag (illicite register access)
-				v.ctrl.ierrid(STATUS_ERR_UNKNOWN_REG) := '1';
+				v.ctrl.ierrid(STATUS_ERR_I_UNKNOWN_REG) := '1';
 			end if;
 		end if;
 
@@ -3378,7 +3383,7 @@ begin
 		end if;
 
 		-- in debug mode, if software disables token feature (through
-		-- register W_DBG_CFG_NOTOKEN, see (s224)) we immediately deassert
+		-- register W_DBG_CFG_TOKEN, see (s224)) we immediately deassert
 		-- r.ctrl.tokavail4read so as to not create inconsistent state
 		-- (this only concerns debug mode, as in debug=FALSE situation
 		-- the token feature cannot be disengaged)
@@ -3544,12 +3549,12 @@ begin
 					v.ctrl.state := idle;
 					v.nndyn.active := '0';
 					-- raise error flag (illicite dynamic value for nn)
-					v.ctrl.ierrid(STATUS_ERR_NNDYN) := '1';
+					v.ctrl.ierrid(STATUS_ERR_I_NNDYN) := '1';
 				elsif v_nndyn_testnn(31 - CAP_NNMAX_LSB) = '0' then -- nn >= .valnn (OK)
 					v.nndyn.start := '1'; -- asserted only 1 cycle, see (s124)
 					v.nndyn.valnn := r.nndyn.valnntest;
 					-- clear possible past error
-					v.ctrl.ierrid(STATUS_ERR_NNDYN) := '0'; -- (s131)
+					v.ctrl.ierrid(STATUS_ERR_I_NNDYN) := '0'; -- (s131)
 					-- invalidates values of 'a' & 'p'
 					v.ctrl.p_set := '0';
 					v.ctrl.p_set_and_mty := '0';
@@ -3809,7 +3814,7 @@ begin
 			-- w = 1 is forbidden (same as in static case)
 			if r.nndyn.valw = to_unsigned(1, log2(w)) then
 				v.nndyn.valwerr := '1';
-				v.ctrl.ierrid(STATUS_ERR_NNDYN) := '1';
+				v.ctrl.ierrid(STATUS_ERR_I_NNDYN) := '1';
 			else
 				v.nndyn.valwerr := '0';
 				-- no need to reset a possible past error in r.ctrl.ierrid, it was
@@ -4075,16 +4080,9 @@ begin
 			v.ctrl.doblindsh := (others => '0');
 			v.ctrl.gentoken := '0';
 			v.ctrl.tokpending := '0';
-			-- token feature not activated by default in debug mode
-			if debug then -- statically resolved by synthesizer
-				-- if in DEBUG mode, token feature is disabled by default
-				v.ctrl.token_act := '0';
-			else
-				-- in production mode, token feature is always activated
-				-- (synthesizer will trim register .token_act and make it
-				-- a hardwired high-logic signal)
-				v.ctrl.token_act := '1';
-			end if;
+			-- token feature activated by default in debug mode
+			-- (and cant't be disengaged in production mode)
+			v.ctrl.token_act := '1';
 			v.ctrl.tokavail4read := '0';
 			v.ctrl.tokwasread := '0';
 			-- no need to reset r.ctrl.tokendone_d
@@ -4211,8 +4209,8 @@ begin
 				v.debug.halt := '0';
 				-- no need to reset r.debug.readsh
 				v.debug.readrdy := '0';
-				v.debug.noxyshuf := '1'; -- in debug mode, we start wo/ XY-shuffling
-				v.debug.noaxirnd := '1'; -- in debug mode, we start wo/ AXI rnd masking
+				v.debug.noxyshuf := '0'; -- start with XY-shuffling enabled
+				v.debug.noaxirnd := '0'; -- start with AXI rnd masking enabled
 				v.debug.trngaxistarv := (others => '0');
 				v.debug.trngaxiok := (others => '0');
 				v.debug.trngfpstarv := (others => '0');

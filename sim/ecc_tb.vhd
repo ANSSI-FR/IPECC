@@ -164,7 +164,6 @@ begin
 
 	-- emulation of stimuli signals
 	process
-		variable v_debug_reg : std_logic_vector(31 downto 0);
 		variable vtoken : std_logic512;
 	begin
 

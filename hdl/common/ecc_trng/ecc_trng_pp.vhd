@@ -25,10 +25,10 @@ use work.ecc_trng_pkg.all;
 use std.textio.all;
 -- pragma translate_on
 
--- released version of ecc_trng_pp DOES NOT actually implement any crypto-
--- graphic preprocessing - instead it only reformats bytes received from
--- the entropy source (es_trng) into words of 'pp_irn_width' bits (generic
--- parameter that should typically be set to 32 or 64 bits).
+-- This released version of ecc_trng_pp DOES NOT actually implement any
+-- cryptographic preprocessing - instead it only reformats bytes received
+-- from the entropy source (es_trng) into words of 'pp_irn_width' bits
+-- (generic parameter that should typically be set to 32 or 64 bits).
 
 entity ecc_trng_pp is
 	port(

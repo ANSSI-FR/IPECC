@@ -438,7 +438,7 @@ package ecc_tb_pkg is
 		signal axo: in axi_out_type);
 
 	-- emulate software driver read of the R_DBG_STATUS and returns the value
-	procedure read_dbg_status(
+	procedure read_debug_status(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
 		signal axo: in axi_out_type;
@@ -491,26 +491,26 @@ package ecc_tb_pkg is
 		signal axo: in axi_out_type;
 		constant valnn: in positive);
 
-	-- to activate [XY]R[01] coords shuffle
-	procedure debug_activate_xyshuf(
+	-- to enable [XY]R[01] coords shuffle
+	procedure debug_enable_xyshuf(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
 		signal axo: in axi_out_type);
 
-	-- to deactivate [XY]R[01] coords shuffle
-	procedure debug_deactivate_xyshuf(
+	-- to disable [XY]R[01] coords shuffle
+	procedure debug_disable_xyshuf(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
 		signal axo: in axi_out_type);
 
-	-- to activate AXI on-the-fly masking of the scalar
-	procedure debug_activate_aximask(
+	-- to enable AXI on-the-fly masking of the scalar
+	procedure debug_enable_aximask(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
 		signal axo: in axi_out_type);
 
-	-- to deactivate AXI on-the-fly masking of the scalar
-	procedure debug_deactivate_aximask(
+	-- to disable AXI on-the-fly masking of the scalar
+	procedure debug_disable_aximask(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
 		signal axo: in axi_out_type);
@@ -553,12 +553,12 @@ package ecc_tb_pkg is
 		constant limb: in natural range 0 to n - 1;
 		variable val : inout std_logic_ww);
 
-	procedure activate_token(
+	procedure debug_enable_token(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
 		signal axo: in axi_out_type);
 
-	procedure deactivate_token(
+	procedure debug_disable_token(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
 		signal axo: in axi_out_type);
@@ -570,7 +570,7 @@ package ecc_tb_pkg is
 		constant valnn : in positive;
 		variable vtoken : inout std_logic512);
 
-	procedure dbg_reset_trng_diagnostic_counters(
+	procedure debug_reset_trng_diagnostic_counters(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
 		signal axo: in axi_out_type);
@@ -1016,41 +1016,47 @@ package body ecc_tb_pkg is
 		axi.rready <= '1';
 		wait until clk'event and clk = '1' and axo.rvalid = '1';
 		axi.rready <= '0';
-		if axo.rdata(STATUS_ERR_COMP) = '1' then
-			echol("ECC_TB: R_STATUS shows STATUS_ERR_COMP error");
-		end if;
-		if axo.rdata(STATUS_ERR_WREG_FBD) = '1' then
-			echol("ECC_TB: R_STATUS shows STATUS_ERR_WREG_FBD error");
-		end if;
-		if axo.rdata(STATUS_ERR_KP_FBD) = '1' then
-			echol("ECC_TB: R_STATUS shows STATUS_ERR_KP_FBD error");
-		end if;
-		if axo.rdata(STATUS_ERR_NNDYN) = '1' then
-			echol("ECC_TB: R_STATUS shows STATUS_ERR_NNDYN error");
-		end if;
-		if axo.rdata(STATUS_ERR_POP_FBD) = '1' then
-			echol("ECC_TB: R_STATUS shows STATUS_ERR_POP_FBD error");
-		end if;
-		if axo.rdata(STATUS_ERR_RDNB_FBD) = '1' then
-			echol("ECC_TB: R_STATUS shows STATUS_ERR_RDNB_FBD error");
-		end if;
-		if axo.rdata(STATUS_ERR_BLN) = '1' then
-			echol("ECC_TB: R_STATUS shows STATUS_ERR_BLN error");
-		end if;
-		if axo.rdata(STATUS_ERR_TOKEN) = '1' then
-			echol("ECC_TB: R_STATUS shows STATUS_ERR_TOKEN error");
-		end if;
-		if axo.rdata(STATUS_ERR_ZREMASK) = '1' then
-			echol("ECC_TB: R_STATUS shows STATUS_ERR_ZREMASK error");
-		end if;
-		if axo.rdata(STATUS_ERR_UNKNOWN_REG) = '1' then
-			echol("ECC_TB: R_STATUS shows STATUS_ERR_UNKNOWN_REG error");
-		end if;
 		if axo.rdata(STATUS_ERR_IN_PT_NOT_ON_CURVE) = '1' then
 			echol("ECC_TB: R_STATUS shows STATUS_ERR_IN_PT_NOT_ON_CURVE error");
 		end if;
 		if axo.rdata(STATUS_ERR_OUT_PT_NOT_ON_CURVE) = '1' then
 			echol("ECC_TB: R_STATUS shows STATUS_ERR_OUT_PT_NOT_ON_CURVE error");
+		end if;
+		if axo.rdata(STATUS_ERR_I_COMP) = '1' then
+			echol("ECC_TB: R_STATUS shows STATUS_ERR_I_COMP error");
+		end if;
+		if axo.rdata(STATUS_ERR_I_WREG_FBD) = '1' then
+			echol("ECC_TB: R_STATUS shows STATUS_ERR_I_WREG_FBD error");
+		end if;
+		if axo.rdata(STATUS_ERR_I_KP_FBD) = '1' then
+			echol("ECC_TB: R_STATUS shows STATUS_ERR_I_KP_FBD error");
+		end if;
+		if axo.rdata(STATUS_ERR_I_NNDYN) = '1' then
+			echol("ECC_TB: R_STATUS shows STATUS_ERR_I_NNDYN error");
+		end if;
+		if axo.rdata(STATUS_ERR_I_POP_FBD) = '1' then
+			echol("ECC_TB: R_STATUS shows STATUS_ERR_I_POP_FBD error");
+		end if;
+		if axo.rdata(STATUS_ERR_I_RDNB_FBD) = '1' then
+			echol("ECC_TB: R_STATUS shows STATUS_ERR_I_RDNB_FBD error");
+		end if;
+		if axo.rdata(STATUS_ERR_I_BLN) = '1' then
+			echol("ECC_TB: R_STATUS shows STATUS_ERR_I_BLN error");
+		end if;
+		if axo.rdata(STATUS_ERR_I_UNKNOWN_REG) = '1' then
+			echol("ECC_TB: R_STATUS shows STATUS_ERR_I_UNKNOWN_REG error");
+		end if;
+		if axo.rdata(STATUS_ERR_I_TOKEN) = '1' then
+			echol("ECC_TB: R_STATUS shows STATUS_ERR_I_TOKEN error");
+		end if;
+		if axo.rdata(STATUS_ERR_I_SHUFFLE) = '1' then
+			echol("ECC_TB: R_STATUS shows STATUS_ERR_I_SHUFFLE error");
+		end if;
+		if axo.rdata(STATUS_ERR_I_ZREMASK) = '1' then
+			echol("ECC_TB: R_STATUS shows STATUS_ERR_I_ZREMASK error");
+		end if;
+		if axo.rdata(STATUS_ERR_I_WK_NOT_ENOUGH_RANDOM) = '1' then
+			echol("ECC_TB: R_STATUS shows STATUS_ERR_I_WK_NOT_ENOUGH_RANDOM error");
 		end if;
 		wait until clk'event and clk = '1';
 	end procedure;
@@ -1242,7 +1248,7 @@ package body ecc_tb_pkg is
 		wait until clk'event and clk = '1' and axo.awready = '1';
 		axi.awaddr <= (others => 'X'); axi.awvalid <= '0';
 		dw := (others => '0');
-		dw(31 downto STATUS_ERR_COMP) := (others => '1');
+		dw(STATUS_ERR_MSB downto STATUS_ERR_LSB) := (others => '1');
 		axi.wdata <= dw;
 		axi.wvalid <= '1';
 		wait until clk'event and clk = '1' and axo.wready = '1';
@@ -2021,7 +2027,7 @@ package body ecc_tb_pkg is
 		wait until clk'event and clk = '1';
 	end procedure;
 
-	procedure read_dbg_status(
+	procedure read_debug_status(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
 		signal axo: in axi_out_type;
@@ -2203,67 +2209,67 @@ package body ecc_tb_pkg is
 		hex_echol(pay(max(xmsb, ymsb) downto 0));
 	end procedure;
 
-	procedure debug_activate_xyshuf(
+	procedure debug_enable_xyshuf(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
 		signal axo: in axi_out_type) is
 	begin
 		wait until clk'event and clk = '1';
-		-- write W_DBG_CFG_NOXYSHUF register
-		axi.awaddr <= W_DBG_CFG_NOXYSHUF & "000"; axi.awvalid <= '1';
+		-- write W_DBG_CFG_XYSHUF register
+		axi.awaddr <= W_DBG_CFG_XYSHUF & "000"; axi.awvalid <= '1';
 		wait until clk'event and clk = '1' and axo.awready = '1';
 		axi.awaddr <= (others => 'X'); axi.awvalid <= '0';
-		axi.wdata <= (XYSHF_DIS => '0', others => '0'); axi.wvalid <= '1';
+		axi.wdata <= (XYSHF_EN => '1', others => '0'); axi.wvalid <= '1';
 		wait until clk'event and clk = '1' and axo.wready = '1';
 		axi.wdata <= (others => 'X'); axi.wvalid <= '0';
 		wait until clk'event and clk = '1';
 	end procedure;
 
-	procedure debug_deactivate_xyshuf(
+	procedure debug_disable_xyshuf(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
 		signal axo: in axi_out_type) is
 	begin
 		wait until clk'event and clk = '1';
-		-- write W_DBG_CFG_NOXYSHUF register
-		axi.awaddr <= W_DBG_CFG_NOXYSHUF & "000"; axi.awvalid <= '1';
+		-- write W_DBG_CFG_XYSHUF register
+		axi.awaddr <= W_DBG_CFG_XYSHUF & "000"; axi.awvalid <= '1';
 		wait until clk'event and clk = '1' and axo.awready = '1';
 		axi.awaddr <= (others => 'X'); axi.awvalid <= '0';
-		axi.wdata <= (XYSHF_DIS => '1', others => '0'); axi.wvalid <= '1';
+		axi.wdata <= (XYSHF_EN => '0', others => '0'); axi.wvalid <= '1';
 		wait until clk'event and clk = '1' and axo.wready = '1';
 		axi.wdata <= (others => 'X'); axi.wvalid <= '0';
 		wait until clk'event and clk = '1';
 	end procedure;
 
-	-- to activate AXI on-the-fly masking of the scalar
-	procedure debug_activate_aximask(
+	-- to enable AXI on-the-fly masking of the scalar
+	procedure debug_enable_aximask(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
 		signal axo: in axi_out_type) is
 	begin
 		wait until clk'event and clk = '1';
-		-- write W_DBG_CFG_NOAXIMSK register
-		axi.awaddr <= W_DBG_CFG_NOAXIMSK & "000"; axi.awvalid <= '1';
+		-- write W_DBG_CFG_AXIMSK register
+		axi.awaddr <= W_DBG_CFG_AXIMSK & "000"; axi.awvalid <= '1';
 		wait until clk'event and clk = '1' and axo.awready = '1';
 		axi.awaddr <= (others => 'X'); axi.awvalid <= '0';
-		axi.wdata <= (AXIMSK_DIS => '0', others => '0'); axi.wvalid <= '1';
+		axi.wdata <= (AXIMSK_EN => '1', others => '0'); axi.wvalid <= '1';
 		wait until clk'event and clk = '1' and axo.wready = '1';
 		axi.wdata <= (others => 'X'); axi.wvalid <= '0';
 		wait until clk'event and clk = '1';
 	end procedure;
 
-	-- to deactivate AXI on-the-fly masking of the scalar
-	procedure debug_deactivate_aximask(
+	-- to disable AXI on-the-fly masking of the scalar
+	procedure debug_disable_aximask(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
 		signal axo: in axi_out_type) is
 	begin
 		wait until clk'event and clk = '1';
-		-- write W_DBG_CFG_NOAXIMSK register
-		axi.awaddr <= W_DBG_CFG_NOAXIMSK & "000"; axi.awvalid <= '1';
+		-- write W_DBG_CFG_AXIMSK register
+		axi.awaddr <= W_DBG_CFG_AXIMSK & "000"; axi.awvalid <= '1';
 		wait until clk'event and clk = '1' and axo.awready = '1';
 		axi.awaddr <= (others => 'X'); axi.awvalid <= '0';
-		axi.wdata <= (AXIMSK_DIS => '1', others => '0'); axi.wvalid <= '1';
+		axi.wdata <= (AXIMSK_EN => '0', others => '0'); axi.wvalid <= '1';
 		wait until clk'event and clk = '1' and axo.wready = '1';
 		axi.wdata <= (others => 'X'); axi.wvalid <= '0';
 		wait until clk'event and clk = '1';
@@ -2400,7 +2406,7 @@ package body ecc_tb_pkg is
 		wait until clk'event and clk = '1';
 	end procedure dbgread_one_limb_from_ecc_fp_dram;
 
-	procedure activate_token(
+	procedure debug_enable_token(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
 		signal axo: in axi_out_type)
@@ -2408,20 +2414,20 @@ package body ecc_tb_pkg is
 		variable dw : std_logic_vector(AXIDW - 1 downto 0);
 	begin
 		wait until clk'event and clk = '1';
-		-- write register W_DBG_CFG_NOTOKEN with bit TOK_DIS set to 0
-		axi.awaddr <= W_DBG_CFG_NOTOKEN & "000"; axi.awvalid <= '1';
+		-- write register W_DBG_CFG_TOKEN with bit TOK_EN set to 1
+		axi.awaddr <= W_DBG_CFG_TOKEN & "000"; axi.awvalid <= '1';
 		wait until clk'event and clk = '1' and axo.awready = '1';
 		axi.awaddr <= (others => 'X'); axi.awvalid <= '0';
 		dw := (others => '0');
-		dw(TOK_DIS) := '0';
+		dw(TOK_EN) := '1';
 		axi.wdata <= dw;
 		axi.wvalid <= '1';
 		wait until clk'event and clk = '1' and axo.wready = '1';
 		axi.wdata <= (others => 'X'); axi.wvalid <= '0';
 		wait until clk'event and clk = '1';
-	end procedure activate_token;
+	end procedure debug_enable_token;
 
-	procedure deactivate_token(
+	procedure debug_disable_token(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
 		signal axo: in axi_out_type)
@@ -2429,18 +2435,18 @@ package body ecc_tb_pkg is
 		variable dw : std_logic_vector(AXIDW - 1 downto 0);
 	begin
 		wait until clk'event and clk = '1';
-		-- write register W_DBG_CFG_NOTOKEN with bit TOK_DIS set to 1
-		axi.awaddr <= W_DBG_CFG_NOTOKEN & "000"; axi.awvalid <= '1';
+		-- write register W_DBG_CFG_TOKEN with bit TOK_EN set to 0
+		axi.awaddr <= W_DBG_CFG_TOKEN & "000"; axi.awvalid <= '1';
 		wait until clk'event and clk = '1' and axo.awready = '1';
 		axi.awaddr <= (others => 'X'); axi.awvalid <= '0';
 		dw := (others => '0');
-		dw(TOK_DIS) := '1';
+		dw(TOK_EN) := '0';
 		axi.wdata <= dw;
 		axi.wvalid <= '1';
 		wait until clk'event and clk = '1' and axo.wready = '1';
 		axi.wdata <= (others => 'X'); axi.wvalid <= '0';
 		wait until clk'event and clk = '1';
-	end procedure deactivate_token;
+	end procedure debug_disable_token;
 
 	procedure get_token(
 		signal clk: in std_logic;
@@ -2499,17 +2505,17 @@ package body ecc_tb_pkg is
 		wait until clk'event and clk = '1';
 	end procedure get_token;
 
-	procedure dbg_reset_trng_diagnostic_counters(
+	procedure debug_reset_trng_diagnostic_counters(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
 		signal axo: in axi_out_type)
 	is 
 		variable dw : std_logic_vector(AXIDW - 1 downto 0);
 	begin
-		-- write register W_DBG_RSTTRNGCNT (content is indifferent, only
+		-- write register W_DBG_RESET_TRNG_CNT (content is indifferent, only
 		-- matters the action of writing at the proper register address)
 		wait until clk'event and clk = '1';
-		axi.awaddr <= W_DBG_RSTTRNGCNT & "000"; axi.awvalid <= '1';
+		axi.awaddr <= W_DBG_RESET_TRNG_CNT & "000"; axi.awvalid <= '1';
 		wait until clk'event and clk = '1' and axo.awready = '1';
 		axi.awaddr <= (others => 'X'); axi.awvalid <= '0';
 		dw := (others => 'X');
@@ -2518,6 +2524,6 @@ package body ecc_tb_pkg is
 		wait until clk'event and clk = '1' and axo.wready = '1';
 		axi.wdata <= (others => 'X'); axi.wvalid <= '0';
 		wait until clk'event and clk = '1';
-	end procedure dbg_reset_trng_diagnostic_counters;
+	end procedure debug_reset_trng_diagnostic_counters;
 
 end package body;
