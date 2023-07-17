@@ -127,6 +127,7 @@ architecture struct of ecc_trng_srv is
 	-- pragma translate_on
 
 	signal rdy : std_logic_vector(0 to 3);
+	signal dbgrsti : std_logic;
 
 begin
 
@@ -158,7 +159,7 @@ begin
 			dbgdeact => gnd,
 			dbgwaddr => open,
 			dbgraddr => gndd0,
-			dbgrst => gnd
+			dbgrst => dbgrsti
 		);
 
 	-- IRN fifo for ecc_fp random data
@@ -181,7 +182,7 @@ begin
 			dbgdeact => gnd,
 			dbgwaddr => open,
 			dbgraddr => gndd1,
-			dbgrst => gnd
+			dbgrst => dbgrsti
 		);
 
 	-- IRN fifo for ecc_curve random data
@@ -204,7 +205,7 @@ begin
 			dbgdeact => gnd,
 			dbgwaddr => open,
 			dbgraddr => gndd2,
-			dbgrst => gnd
+			dbgrst => dbgrsti
 		);
 
 	-- IRN fifo for ecc_fp_dram_sh random data
@@ -229,7 +230,7 @@ begin
 			dbgdeact => gnd,
 			dbgwaddr => open,
 			dbgraddr => gndd3,
-			dbgrst => gnd
+			dbgrst => dbgrsti
 		);
 
 	comb: process(r, rstn, irn_reset, data_s, valid_s, rdy, swrst,
@@ -571,7 +572,7 @@ begin
 		end loop;
 	
 		-- synchronous reset
-		if rstn = '0' or irn_reset = '1' or swrst = '1' then
+		if rstn = '0' or (debug and irn_reset = '1') or swrst = '1' then
 			v.ppdatain_can_be_emptied := '0';
 			v.priority := 0;
 			v.valid(0) := '0'; -- on reset, nothing to serve to client 0
@@ -605,6 +606,9 @@ begin
 			r <= rin;
 		end if;
 	end process regs;
+
+	-- FIFO can only be emptied using their 'dbgrst' port if in debug mode
+	dbgrsti <= irn_reset when debug else gnd;
 
 	-- drive outputs
 	--   client 0
