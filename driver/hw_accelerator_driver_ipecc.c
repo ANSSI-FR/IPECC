@@ -689,9 +689,8 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
  */
 /* This register exists in hardware only if the IP was synthesized in DEBUG (unsecure-)mode
  * (as opposed to prodution (secure-)mode. */
-#define IPECC_GET_MAJOR_VERSION()  (IPECC_GET_REG(IPECC_R_HW_VERSION) & 
-#define IPECC_GET_MINOR_VERSION() 
-
+#define IPECC_GET_MAJOR_VERSION()  ((IPECC_GET_REG(IPECC_R_HW_VERSION) >> IPECC_R_HW_VERSION_MAJOR_POS) & IPECC_R_HW_VERSION_MAJOR_MSK)
+#define IPECC_GET_MINOR_VERSION()  ((IPECC_GET_REG(IPECC_R_HW_VERSION) >> IPECC_R_HW_VERSION_MINOR_POS) & IPECC_R_HW_VERSION_MINOR_MSK)
 
 
 /****** DEBUG ************/
