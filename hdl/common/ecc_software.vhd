@@ -86,7 +86,7 @@ package ecc_software is
 	constant R_DBG_RAWDUR : rat := std_nat(37, ADB);         -- 0x128
 	constant R_DBG_FLAGS : rat := std_nat(38, ADB);          -- 0x130
 	constant R_DBG_TRNG_STATUS : rat := std_nat(39, ADB);    -- 0x138
-	constant R_DBG_TRNG_DATA : rat := std_nat(40, ADB);      -- 0x140
+	constant R_DBG_TRNG_RAW_DATA : rat := std_nat(40, ADB);  -- 0x140
 	constant R_DBG_FP_RDATA : rat := std_nat(41, ADB);       -- 0x148
 	constant R_DBG_IRN_CNT_AXI : rat := std_nat(42, ADB);    -- 0x150
 	constant R_DBG_IRN_CNT_EFP : rat := std_nat(43, ADB);    -- 0x158

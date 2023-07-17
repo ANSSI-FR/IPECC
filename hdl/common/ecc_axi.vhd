@@ -3177,11 +3177,11 @@ begin
 				  & "0000"
 				  & "000" & dbgtrngrawfull;
 				v.axi.rvalid := '1'; -- (s5)
-			-- -----------------------------------------
-			-- decoding read of R_DBG_TRNG_DATA register
-			-- -----------------------------------------
+			-- ---------------------------------------------
+			-- decoding read of R_DBG_TRNG_RAW_DATA register
+			-- ---------------------------------------------
 			elsif debug -- statically resolved by synthesizer
-			  and s_axi_araddr(ADB + 2 downto 3) = R_DBG_TRNG_DATA
+			  and s_axi_araddr(ADB + 2 downto 3) = R_DBG_TRNG_RAW_DATA
 			then
 				if r.ctrl.state = readraw then
 					--v.debug.trng.raw.arpending := '1';
