@@ -2283,8 +2283,8 @@ package body ecc_tb_pkg is
 		constant val: in std_logic_vector(OPCODE_SZ - 1 downto 0)) is
 	begin
 		wait until clk'event and clk = '1';
-		-- write W_DBG_OP_ADDR register
-		axi.awaddr <= W_DBG_OP_ADDR & "000"; axi.awvalid <= '1';
+		-- write W_DBG_OP_WADDR register
+		axi.awaddr <= W_DBG_OP_WADDR & "000"; axi.awvalid <= '1';
 		wait until clk'event and clk = '1' and axo.awready = '1';
 		axi.awaddr <= (others => 'X'); axi.awvalid <= '0';
 		axi.wdata <= std_logic_vector(to_unsigned(addr, AXIDW));
@@ -2292,8 +2292,8 @@ package body ecc_tb_pkg is
 		wait until clk'event and clk = '1' and axo.wready = '1';
 		axi.wdata <= (others => 'X'); axi.wvalid <= '0';
 		wait until clk'event and clk = '1';
-		-- write W_DBG_WR_OPCODE register
-		axi.awaddr <= W_DBG_WR_OPCODE & "000"; axi.awvalid <= '1';
+		-- write W_DBG_OPCODE register
+		axi.awaddr <= W_DBG_OPCODE & "000"; axi.awvalid <= '1';
 		wait until clk'event and clk = '1' and axo.awready = '1';
 		axi.awaddr <= (others => 'X'); axi.awvalid <= '0';
 		axi.wdata <= std_logic_vector(resize(unsigned(val), AXIDW));

@@ -2094,18 +2094,18 @@ begin
 				v.axi.arready := '1';
 				v.axi.bvalid := '1';
 			-- --------------------------------------------------------------
-			-- decoding write to W_DBG_OP_ADDR register
+			-- decoding write to W_DBG_OP_WADDR register
 			-- --------------------------------------------------------------
-			elsif debug and r.axi.waddr = W_DBG_OP_ADDR then
+			elsif debug and r.axi.waddr = W_DBG_OP_WADDR then
 				v.debug.iwaddr := r.axi.wdatax(IRAM_ADDR_SZ - 1 downto 0);
 				v.axi.wready := '1';
 				v.axi.awready := '1';
 				v.axi.arready := '1';
 				v.axi.bvalid := '1';
 			-- ---------------------------------------------------------------
-			-- decoding write to W_DBG_WR_OPCODE register
+			-- decoding write to W_DBG_OPCODE register
 			-- ---------------------------------------------------------------
-			elsif debug and r.axi.waddr = W_DBG_WR_OPCODE then
+			elsif debug and r.axi.waddr = W_DBG_OPCODE then
 				if OPCODE_SZ > C_S_AXI_DATA_WIDTH then -- statically resolved by synth.
 					if r.debug.idatabeat = '0' then
 						v.debug.idatabeat := '1';

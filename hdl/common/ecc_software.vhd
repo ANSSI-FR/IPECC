@@ -56,8 +56,8 @@ package ecc_software is
 	constant W_DBG_TRIG_ACT : rat := std_nat(35, ADB);       -- 0x118
 	constant W_DBG_TRIG_UP : rat := std_nat(36, ADB);        -- 0x120
 	constant W_DBG_TRIG_DOWN : rat := std_nat(37, ADB);      -- 0x128
-	constant W_DBG_OP_ADDR : rat := std_nat(38, ADB);        -- 0x130
-	constant W_DBG_WR_OPCODE : rat := std_nat(39, ADB);      -- 0x138
+	constant W_DBG_OP_WADDR : rat := std_nat(38, ADB);       -- 0x130
+	constant W_DBG_OPCODE : rat := std_nat(39, ADB);         -- 0x138
 	constant W_DBG_TRNG_CTRL : rat := std_nat(40, ADB);      -- 0x140
 	constant W_DBG_TRNG_CFG : rat := std_nat(41, ADB);       -- 0x148
 	constant W_DBG_FP_WADDR : rat := std_nat(42, ADB);       -- 0x150
