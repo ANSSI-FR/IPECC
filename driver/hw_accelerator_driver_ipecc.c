@@ -614,7 +614,7 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
  * (token handling)
  */
 #define IPECC_ASK_FOR_TOKEN_GENERATION() do { \
-	IPECC_SET_REG(IPECC_W_TOKEN, 1); /* writen value actually is indifferent */ \
+	IPECC_SET_REG(IPECC_W_TOKEN, 1); /* written value actually is indifferent */ \
 } while (0)
 
 /*
@@ -689,7 +689,7 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
  * (soft reset handling)
  */
 #define IPECC_SOFT_RESET() do { \
-	(IPECC_SET_REG(IPECC_W_SOFT_RESET, 1)); \
+	(IPECC_SET_REG(IPECC_W_SOFT_RESET, 1)); /* written value actually is indifferent */ \
 } while (0)
 
 /*
@@ -963,11 +963,45 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 } while (0)
 
 /* Actions involving register W_DBG_RESET_TRNG_CNT */
+/* Reset the diagnostic counters that software driver can access through
+ * registers R_DBG_TRNG_DIAG_1 to R_DBG_TRNG_DIAG_8 */
+#define IPECC_RESET_TRNG_DIAGNOSTIC_COUNTERS() do { \
+	IPECC_SET_REG(IPECC_W_DBG_RESET_TRNG_CNT, 1); /* written value actually is indifferent */ \
+} while (0)
 
-/* Actions involving register R_DBG_CAPABILITIES_0 */
-/* Actions involving register R_DBG_CAPABILITIES_1 */
+/* Actions involving register R_DBG_CAPABILITIES_0.
+ *
+ * Parameter 'ww' designates the bit size of the limbs that large numbers
+ * are made of in large number memory.
+ *
+ * The software driver normally does not need to bother about this parameter,
+ * otherwise in debug mode when using the macros IPECC_DBG_SET_FP_WRITE_DATA
+ * & IPECC_DBG_GET_FP_READ_DATA.
+ * (see these macros). */
+#define IPECC_GET_WW()  (IPECC_GET_REG(IPECC_R_DBG_CAPABILITIES_0))
+
+/* Actions involving register R_DBG_CAPABILITIES_1.
+ *
+ * To get the number of opcode words forming the complete footprint of
+ * the microcode.
+ */
+#define IPECC_GET_NBOPCODES() \
+	(((IPECC_GET_REG(IPECC_R_DBG_CAPABILITIES_1)) \
+		>> IPECC_R_DBG_CAPABILITIES_1_NBOPCODES_POS) & IPECC_R_DBG_CAPABILITIES_1_NBOPCODES_MSK)
+
+/* To get the bitwidth of opcode words. */
+#define IPECC_GET_OPCODE_SIZE() \
+	(((IPECC_GET_REG(IPECC_R_DBG_CAPABILITIES_1)) \
+		>> IPECC_R_DBG_CAPABILITIES_1_OPCODE_SZ_POS) & IPECC_R_DBG_CAPABILITIES_1_OPCODE_SZ_MSK)
+
 /* Actions involving register R_DBG_CAPABILITIES_2 */
+/* To get the size (in bits) of the TRNG FIFO buffering raw random numbers. */
+#define IPECC_GET_TRNG_RAW_RANDOM_SIZE() \
+	(((IPECC_GET_REG(IPECC_R_DBG_CAPABILITIES_2)) \
+		>> IPECC_R_DBG_CAPABILITIES_2_RAW_RAMSZ_POS) & IPECC_R_DBG_CAPABILITIES_2_RAW_RAMSZ_MSK)
+
 /* Actions involving register R_DBG_STATUS */
+
 /* Actions involving register R_DBG_TIME */
 /* Actions involving register R_DBG_RAWDUR */
 /* Actions involving register R_DBG_FLAGS */
