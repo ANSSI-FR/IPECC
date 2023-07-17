@@ -611,6 +611,14 @@ begin
 				 & "for 'blinding' parameter hence will be replaced with 4)."
 			severity WARNING;
 
+	-- (s262), see (s261)
+	assert ((not debug) or
+			(log2(raw_ram_size) <= (DBG_TRNG_RAW_ADDR_MSB - DBG_TRNG_RAW_ADDR_LSB + 1)))
+		report "The TRNG raw random FIFO is too large for its size to fit in register"
+	       & "W_DBG_TRNG_CTRL. Access to raw random data will be impacted (address "
+				 & "will be truncated)."
+			severity WARNING;
+
 	-- combinational logic
 	comb: process(s_axi_aresetn, r,
 	              s_axi_awaddr, s_axi_awprot, s_axi_awvalid,
@@ -2148,7 +2156,7 @@ begin
 					--   that is the least significant bits which are in number
 					--   log2(raw_ram_size-1))
 					if r.ctrl.state = idle then
-						v.debug.trng.raw.raddr :=
+						v.debug.trng.raw.raddr := -- (s261), see (s262)
 							r.axi.wdatax(DBG_TRNG_RAW_ADDR_MSB downto DBG_TRNG_RAW_ADDR_LSB);
 						v.ctrl.state := readraw;
 						-- deassertion r.axi.rvalid by (s26) (drives output s_axi_rvalid)

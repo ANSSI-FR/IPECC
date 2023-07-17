@@ -720,7 +720,9 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
  * (setting/unsetting breakpoints in the microcode).
  */
 /* IP main FSM state is accessible in debug mode,
- * below are defined the corresponding state codes. */
+ * below are defined the corresponding state codes
+ *
+ * (see also macro IPECC_GET_FSM_STATE()). */
 #define IPECC_DEBUG_STATE_ANY_OR_IDLE  0
 #define IPECC_DEBUG_STATE_CSTMTY  1
 #define IPECC_DEBUG_STATE_CHECKONCURVE  2
@@ -730,7 +732,6 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 #define IPECC_DEBUG_STATE_ADPA  6
 #define IPECC_DEBUG_STATE_SETUP  7
 #define IPECC_DEBUG_STATE_DOUBLE  8
-#define IPECC_DEBUG_STATE_SWITCH3P  9
 #define IPECC_DEBUG_STATE_ITOH  10
 #define IPECC_DEBUG_STATE_ZADDU  11
 #define IPECC_DEBUG_STATE_ZADDC  12
@@ -748,7 +749,7 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 	    | (((state) & IPECC_W_DBG_BKPT_STATE_MSK) << IPECC_W_DBG_BKPT_STATE_POS )); \
 } while (0)
 
-/* Set a breakpoint, valid for any state & for any scalar bit.
+/* Set a breakpoint, valid for any state & for any bit of the scalar.
  */
 #define IPECC_SET_BREAKPOINT(id, addr, nbbit, state) do { \
 	IPECC_SET_BKT((id), (addr), 0, IPECC_DEBUG_STATE_ANY_OR_IDLE); \
@@ -1001,6 +1002,36 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 		>> IPECC_R_DBG_CAPABILITIES_2_RAW_RAMSZ_POS) & IPECC_R_DBG_CAPABILITIES_2_RAW_RAMSZ_MSK)
 
 /* Actions involving register R_DBG_STATUS */
+
+/* Is IP currently halted? (on a breakpoint hit, or after having been asked to run a certain
+ * nb of microcode opcodes) */
+#define IPECC_IS_IP_HALTED()    (!!(IPECC_GET_REG(IPECC_R_DBG_STATUS) & IPECC_R_DBG_STATUS_HALTED))
+
+/* Did IP was halted on a breakpoint hit? */
+#define IPECC_IS_IP_HALTED_ON_BKPT_HIT()  (!!(IPECC_GET_REG(IPECC_R_DBG_STATUS) & IPECC_R_DBG_STATUS_BK_HIT))
+
+/* Get the 'breakpoint ID' field in R_DBG_STATUS register.
+ * If IPECC_IS_IP_HALTED_ON_BKPT_HIT() confirms that the IP is halted due to a breakpoint hit,
+ * then this field gives the ID of that breakpoint.
+ */
+#define IPECC_GET_BKPT_ID_IP_IS_HALTED_ON() \
+	(((IPECC_GET_REG(R_DBG_STATUS)) >> IPECC_R_DBG_STATUS_BKID_POS) & IPECC_R_DBG_STATUS_BKID_MSK)
+
+/* Get the current value of PC (program counter).
+ * This is the value of the decode stage of the pipeline; hance the opcode that address is pointing
+ * to has not been executed yet.
+ */
+#define IPECC_GET_PC() \
+	(((IPECC_GET_REG(R_DBG_STATUS)) >> IPECC_R_DBG_STATUS_PC_POS) & IPECC_R_DBG_STATUS_PC_MSK)
+
+/* Get the ID of the state the main FSM is currently in.
+ *
+ * (see also macros related to register W_DBG_BKPT, namely IPECC_SET_BKPT & IPECC_SET_BREAKPOINT). */
+#define IPECC_GET_FSM_STATE() \
+	(((IPECC_GET_REG(R_DBG_STATUS)) >> IPECC_R_DBG_STATUS_STATE_POS) & IPECC_R_DBG_STATUS_STATE_MSK)
+
+
+
 
 /* Actions involving register R_DBG_TIME */
 /* Actions involving register R_DBG_RAWDUR */

@@ -262,7 +262,6 @@ package ecc_pkg is
 	constant DEBUG_STATE_ADPA : std_logic4 := std_nat(6, 4);
 	constant DEBUG_STATE_SETUP : std_logic4 := std_nat(7, 4);
 	constant DEBUG_STATE_DOUBLE : std_logic4 := std_nat(8, 4);
-	constant DEBUG_STATE_SWITCH3P : std_logic4 := std_nat(9, 4);
 	constant DEBUG_STATE_ITOH : std_logic4 := std_nat(10, 4);
 	constant DEBUG_STATE_ZADDU : std_logic4 := std_nat(11, 4);
 	constant DEBUG_STATE_ZADDC : std_logic4 := std_nat(12, 4);
