@@ -97,8 +97,8 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 #define IPECC_W_DBG_TRIG_ACT 		(ipecc_baddr + IPECC_ALIGNED(0x118))
 #define IPECC_W_DBG_TRIG_UP		(ipecc_baddr + IPECC_ALIGNED(0x120))
 #define IPECC_W_DBG_TRIG_DOWN 		(ipecc_baddr + IPECC_ALIGNED(0x128))
-#define IPECC_W_DBG_OP_ADDR   		(ipecc_baddr + IPECC_ALIGNED(0x130))
-#define IPECC_W_DBG_WR_OPCODE 		(ipecc_baddr + IPECC_ALIGNED(0x138))
+#define IPECC_W_DBG_OP_WADDR   		(ipecc_baddr + IPECC_ALIGNED(0x130))
+#define IPECC_W_DBG_OPCODE 		(ipecc_baddr + IPECC_ALIGNED(0x138))
 #define IPECC_W_DBG_TRNG_CTRL 		(ipecc_baddr + IPECC_ALIGNED(0x140))
 #define IPECC_W_DBG_TRNG_CFG 		(ipecc_baddr + IPECC_ALIGNED(0x148))
 #define IPECC_W_DBG_FP_WADDR  		(ipecc_baddr + IPECC_ALIGNED(0x150))
@@ -127,8 +127,8 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 #define IPECC_R_DBG_FLAGS      (ipecc_baddr + IPECC_ALIGNED(0x130))
 #define IPECC_R_DBG_TRNG_STATUS     (ipecc_baddr + IPECC_ALIGNED(0x138))
 /* Read TRNG data */
-#define IPECC_R_DBG_TRNG_DATA      (ipecc_baddr + IPECC_ALIGNED(0x140))
-#define IPECC_R_DBG_FP_RDATA  		(ipecc_baddr + IPECC_ALIGNED(0x148))
+#define IPECC_R_DBG_TRNG_RAW_DATA   (ipecc_baddr + IPECC_ALIGNED(0x140))
+#define IPECC_R_DBG_FP_RDATA  		 (ipecc_baddr + IPECC_ALIGNED(0x148))
 #define IPECC_R_DBG_IRN_CNT_AXI  		(ipecc_baddr + IPECC_ALIGNED(0x150))
 #define IPECC_R_DBG_IRN_CNT_EFP  		(ipecc_baddr + IPECC_ALIGNED(0x158))
 #define IPECC_R_DBG_IRN_CNT_CUR  		(ipecc_baddr + IPECC_ALIGNED(0x160))
@@ -168,6 +168,10 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 /* Fields for W_R0_NULL & W_R1_NULL */
 #define IPECC_W_POINT_IS_NULL      ((uint32_t)0x1 << 0)
 #define IPECC_W_POINT_IS_NOT_NULL      ((uint32_t)0x0 << 0)
+
+/* Fields for W_PRIME_SIZE & R_PRIME_SIZE */
+#define IPECC_W_PRIME_SIZE_POS   (0)
+#define IPECC_W_PRIME_SIZE_MSK   (0xffff)
 
 /* Fields for W_BLINDING */
 #define IPECC_W_BLINDING_EN		((uint32_t)0x1 << 0)
@@ -228,17 +232,17 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 /* enable trig (1) or disable it (0) */
 #define IPECC_W_DBG_TRIG_ACT_EN     ((uint32_t)0x1 << 0)
 
-/* Fields for W_DBG_TRIG_UP & W_DBG_TRIG_DOWN*/
+/* Fields for W_DBG_TRIG_UP & W_DBG_TRIG_DOWN */
 #define IPECC_W_DBG_TRIG_POS    (0)
 #define IPECC_W_DBG_TRIG_MSK    (0xffffffff)
 
-/* Fields for W_DBG_OP_ADDR */
-#define IPECC_W_DBG_OP_ADDR_POS   (0)
-#define IPECC_W_DBG_OP_ADDR_MSK   (0xffff)
+/* Fields for W_DBG_OP_WADDR */
+#define IPECC_W_DBG_OP_WADDR_POS   (0)
+#define IPECC_W_DBG_OP_WADDR_MSK   (0xffff)
 
-/* Fields for W_DBG_WR_OPCODE */
-#define IPECC_W_DBG_WR_OPCODE_POS   (0)
-#define IPECC_W_DBG_WR_OPCODE_MSK   (0xffffffff)
+/* Fields for W_DBG_OPCODE */
+#define IPECC_W_DBG_OPCODE_POS   (0)
+#define IPECC_W_DBG_OPCODE_MSK   (0xffffffff)
 
 /* Fields for W_DBG_TRNG_CTRL */
 /* Reset the raw FIFO (1) */
@@ -368,9 +372,9 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 #define IPECC_R_DBG_TRNG_STATUS_RAW_FIFO_OFFSET_MSK	(0xffffff)
 #define IPECC_R_DBG_TRNG_STATUS_RAW_FIFO_OFFSET_POS	(8)
 
-/* Fields for R_DBG_TRNG_DATA */
-#define  IPECC_R_DBG_TRNG_DATA_BIT_POS    (0)
-#define  IPECC_R_DBG_TRNG_DATA_BIT_MSK    (0x1)
+/* Fields for R_DBG_TRNG_RAW_DATA */
+#define  IPECC_R_DBG_TRNG_RAW_DATA_POS    (0)
+#define  IPECC_R_DBG_TRNG_RAW_DATA_MSK    (0x1)
 
 /* Fields for R_DBG_FP_RDATA */
 #define  IPECC_R_DBG_FP_RDATA_WWDATA_POS    (0)
@@ -444,10 +448,12 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
  *    and error flag 'WK_NOT_ENOUGH_RANDOM' will be set in register R_STATUS). */
 #define IPECC_IS_ENOUGH_RND_WRITE_SCALAR() 	(!!(IPECC_GET_REG(IPECC_R_STATUS) & IPECC_R_WK_STATUS_ENOUGH_RND))
 
-/*******************************************************************************
- * Low-level actions macros: actions involving a direct write to an IP register,
- * along with related helper macros
- *******************************************************************************/
+/************************************************************
+ * Low-level action macros: actions involving a direct write
+ * or read to/from an IP register along with related helper
+ * macros.
+ * These low-level macros are sorted by their target register.
+ *************************************************************/
 
 /*
  * Actions involving registers W_CTRL & R_STATUS
@@ -537,19 +543,19 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 /* IPECC_GET_NN_SIZE - to get the value of 'nn' the IP is currently set with
  *                     (or what is the static value if hardware was not synthesized
  *                     with the 'nn modifiable at runtime' option) */
-#define IPECC_GET_NN_SIZE() (IPECC_GET_REG(IPECC_R_PRIME_SIZE))
+#define IPECC_GET_NN_SIZE() (((IPECC_GET_REG(IPECC_R_PRIME_SIZE)) >> IPECC_W_PRIME_SIZE_POS) & IPECC_W_PRIME_SIZE_MSK)
 
 /* IPECC_SET_NN_SIZE - to set the value of nn (only with hardware synthesized
  *                     with the 'nn modifiable at runtime' option) */
 #define IPECC_SET_NN_SIZE(sz) do { \
-	IPECC_SET_REG(IPECC_W_PRIME_SIZE, sz); \
+	IPECC_SET_REG(IPECC_W_PRIME_SIZE, ((sz) & IPECC_W_PRIME_SIZE_MSK) << IPECC_W_PRIME_SIZE_POS); \
 } while(0)
 
 /*
  * Actions involving register W_BLINDING
+ * (blinding handling)/
  */
 
-/* Blinding handling */
 #define IPECC_DISABLE_BLINDING() do { \
 	IPECC_SET_REG(IPECC_W_BLINDING, 0); \
 } while(0)
@@ -557,7 +563,7 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 	uint32_t val = 0; \
 	/* Enable blinding */ \
 	val |= IPECC_W_BLINDING_EN; \
-	/* Configure bliding */ \
+	/* Configure blinding */ \
 	val |= ((blinding_size & IPECC_W_BLINDING_BITS_MSK) << IPECC_W_BLINDING_BITS_POS); \
 	IPECC_SET_REG(IPECC_W_BLINDING, val); \
 } while(0)
@@ -571,11 +577,14 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 	IPECC_SET_REG(IPECC_W_SHUFFLE, IPECC_W_SHUFFLE_EN); \
 } while (0)
 
+#define IPECC_DISABLE_SHUFFLE() do { \
+	IPECC_SET_REG(IPECC_W_SHUFFLE, IPECC_W_SHUFFLE_DIS); \
+} while (0)
+
 /*
  * Actions involving register W_ZREMASK
+ * (enable & configure Z-remask countermeasure)
  */
-
-/* Enable & configure Z-remask countermeasure */
 #define IPECC_ENABLE_ZREMASK(zremask_period) do { \
 	uint32_t val = 0; \
 	/* Enable Z-remasking */ \
@@ -591,24 +600,24 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 
 /*
  * Actions involving register W_TOKEN
+ * (token handling)
  */
-
-/* Token handling */
 #define IPECC_ASK_FOR_TOKEN_GENERATION() do { \
 	IPECC_SET_REG(IPECC_W_TOKEN, 1); /* writen value actually is indifferent */ \
 } while (0)
 
 /*
  * Actions involving register W_IRQ
+ * (interrupt request handling)
  */
 
-/* Irq handling */
 #define IPECC_ENABLE_IRQ() do { \
 	IPECC_SET_REG(IPECC_W_IRQ, IPECC_W_IRQ_EN); \
 } while (0)
 
 /*
  * Actions using register W_ERR_ACK
+ * (error detection & acknowlegment)
  */
 
 /* Definition of error bits.
@@ -656,9 +665,9 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 
 /*
  * Actions using register W_SMALL_SCALAR
+ * (set small scalar size)
  */
 
-/* Set small scalar size */
 #define IPECC_SET_SMALL_SCALAR_SIZE(sz) do { \
 	IPECC_SET_REG(IPECC_W_SMALL_SCALAR, \
 			(sz & IPECC_W_SMALL_SCALAR_K_MSK) << IPECC_W_SMALL_SCALAR_K_POS); \
@@ -666,32 +675,210 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 
 /*
  * Actions using register W_SOFT_RESET
+ * (soft reset handling)
  */
-
-/* Reset handling */
 #define IPECC_SOFT_RESET() do { \
 	(IPECC_SET_REG(IPECC_W_SOFT_RESET, 1)); \
 } while (0)
 
 /*
  * Actions using register R_CAPABILITIES
+ * (Capabilities handling)
  */
-
-/* Capabilities handling */
 /* IPECC_IS_DYNAMIC_NN_SUPPORTED - to know if the IP hardware was synthesized with
  *                                 the option 'nn modifiable at runtime' */
 #define IPECC_IS_DYNAMIC_NN_SUPPORTED()     (!!((IPECC_GET_REG(IPECC_R_CAPABILITIES) & IPECC_R_CAPABILITIES_NNDYN)))
 #define IPECC_IS_SHUFFLING_SUPPORTED()    (!!((IPECC_GET_REG(IPECC_R_CAPABILITIES) & IPECC_R_CAPABILITIES_SHF)))
 #define IPECC_IS_W64()      (!!((IPECC_GET_REG(IPECC_R_CAPABILITIES) & IPECC_R_CAPABILITIES_W64)))
 
-/*
- * Actions using register R_HW_VERSION
- */
+/* Actions using register R_HW_VERSION */
+
 /* This register exists in hardware only if the IP was synthesized in DEBUG (unsecure-)mode
  * (as opposed to prodution (secure-)mode. */
 #define IPECC_GET_MAJOR_VERSION()  ((IPECC_GET_REG(IPECC_R_HW_VERSION) >> IPECC_R_HW_VERSION_MAJOR_POS) & IPECC_R_HW_VERSION_MAJOR_MSK)
 #define IPECC_GET_MINOR_VERSION()  ((IPECC_GET_REG(IPECC_R_HW_VERSION) >> IPECC_R_HW_VERSION_MINOR_POS) & IPECC_R_HW_VERSION_MINOR_MSK)
 
+/* Actions involving register W_DBG_HALT
+ * (halting the IP).
+ */
+#define IPECC_DEBUG_HALT_NOW()  do { \
+	IPECC_SET_REG(IPECC_W_DBG_HALT, IPECC_W_DBG_HALT_DO_HALT); \
+} while (0)
+
+/* Actions involving register W_DBG_BKPT
+ * (setting/unsetting breakpoints in the microcode).
+ */
+/* IP main FSM state is accessible in debug mode,
+ * below are defined the corresponding state codes. */
+#define IPECC_DEBUG_STATE_ANY_OR_IDLE  0
+#define IPECC_DEBUG_STATE_CSTMTY  1
+#define IPECC_DEBUG_STATE_CHECKONCURVE  2
+#define IPECC_DEBUG_STATE_BLINDINIT  3
+#define IPECC_DEBUG_STATE_BLINDBIT  4
+#define IPECC_DEBUG_STATE_BLINDEXIT  5
+#define IPECC_DEBUG_STATE_ADPA  6
+#define IPECC_DEBUG_STATE_SETUP  7
+#define IPECC_DEBUG_STATE_DOUBLE  8
+#define IPECC_DEBUG_STATE_SWITCH3P  9
+#define IPECC_DEBUG_STATE_ITOH  10
+#define IPECC_DEBUG_STATE_ZADDU  11
+#define IPECC_DEBUG_STATE_ZADDC  12
+#define IPECC_DEBUG_STATE_SUBTRACTP  13
+#define IPECC_DEBUG_STATE_EXIT  14
+
+/* Set a breakpoint, valid in a specific state & for a specific bit-
+ * position of the scalar.
+ */
+#define IPECC_SET_BKPT(id, addr, nbbit, state) do { \
+	IPECC_SET_REG(IPECC_W_DBG_BKPT_EN \
+			| (((id) & IPECC_W_DBG_BKPT_ID_MSK) << IPECC_W_DBG_BKPT_ID_POS ) \
+	    | (((addr) & IPECC_W_DBG_BKPT_ADDR_MSK) << IPECC_W_DBG_BKPT_ADDR_POS ) \
+	    | (((nbbit) & IPECC_W_DBG_BKPT_NBIT_MSK ) << IPECC_W_DBG_BKPT_NBBIT_POS ) \
+	    | (((state) & IPECC_W_DBG_BKPT_STATE_MSK) << IPECC_W_DBG_BKPT_STATE_POS )); \
+} while (0)
+
+/* Set a breakpoint, valid for any state & for any scalar bit.
+ */
+#define IPECC_SET_BREAKPOINT(id, addr, nbbit, state) do { \
+	IPECC_SET_BKT((id), (addr), 0, IPECC_DEBUG_STATE_ANY_OR_IDLE); \
+} while (0)
+
+/* Remove a breakpoint */
+#define IPECC_REMOVE_BREAKPOINT(id) do { \
+	IPECC_SET_REG(IPECC_W_DBG_BKPT_DIS \
+			| (((id) & IPECC_W_DBG_BKPT_ID_MSK) << IPECC_W_DBG_BKPT_ID_POS )); \
+} while (0)
+
+
+/* Actions involving register W_DBG_STEPS
+ * (running part of microcode when debug halted & resuming execution)
+ */
+#define IPECC_RUN_OPCODES(nb) do { \
+	IPECC_SET_REG(IPECC_W_DBG_STEPS_RUN_NB_OP \
+			| (((nb) & IPECC_W_DBG_STEPS_NB_OP_MSK) << IPECC_W_DBG_STEPS_NB_OP_POS )); \
+} while (0)
+
+#define IPECC_RESUME() do { \
+	IPECC_SET_REG(IPECC_W_DBG_STEPS_RESUME); \
+} while (0)
+
+/* Actions involving register W_DBG_TRIG_ACT
+ * (arming both signal-up & signal-down triggers)
+ */
+#define IPECC_ARM_TRIGGER() do { \
+	IPECC_SET_REG(IPECC_W_DBG_TRIG_ACT, IPECC_W_DBG_TRIG_ACT_EN); \
+} while (0)
+
+/* Actions involving register W_DBG_TRIG_UP
+ * ('time' is expressed in multiple of the clock cycles starting from
+ * the begining of [k]P computation). */
+#define IPECC_SET_TRIGGER_UP(time) do { \
+	IPECC_SET_REG(IPECC_W_DBG_TRIG_UP, ((time) & IPECC_W_DBG_TRIG_MSK) << IPECC_W_DBG_TRIG_POS); \
+} while (0)
+
+/* Actions involving register W_DBG_TRIG_DOWN
+ * (same as for IPECC_SET_TRIGGER_UP). */
+#define IPECC_SET_TRIGGER_DOWN() do { \
+	IPECC_SET_REG(IPECC_W_DBG_TRIG_DOWN, ((time) & IPECC_W_DBG_TRIG_MSK) << IPECC_W_DBG_TRIG_POS); \
+} while (0)
+
+/* Actions involving register W_DBG_OP_WADDR */
+#define IPECC_SET_OPCODE_WRITE_ADDRES(addr) do { \
+	IPECC_SET_REG(IPECC_W_DBG_OP_WADDR, ((addr) & IPECC_W_DBG_OP_WADDR_MSK) << IPECC_W_DBG_OP_WADDR_POS); \
+} while (0)
+
+/* Actions involving register W_DBG_OPCODE */
+#define IPECC_SET_OPCODE_TO_WRITE(opcode) do { \
+	IPECC_SET_REG(IPECC_W_DBG_OPCODE, ((addr) & IPECC_W_DBG_OPCODE_MSK) << IPECC_W_DBG_OPCODE_POS); \
+} while (0)
+
+/* Actions involving register W_DBG_TRNG_CTRL & 
+ * (controlling TRNG behaviour) */
+/* IPECC_TRNG_RESET_EMPTY_RAW_FIFO() - Empty the FIFO buffering raw random bits of the TRNG
+ *                                     and reset associated logic. */
+#define IPECC_TRNG_RESET_EMPTY_RAW_FIFO() do { \
+	IPECC_SET_REG(W_DBG_TRNG_CTRL, IPECC_W_DBG_TRNG_CTRL_RESET_FIFO_RAW); \
+} while (0)
+
+/* IPECC_TRNG_RESET_EMPTY_IRN_FIFOS() - Empty the FIFOs buffering internal random bits of the TRNG
+ *                                      (all channels) and reset associated logic. */
+#define IPECC_TRNG_RESET_EMPTY_IRN_FIFOS() do { \
+	IPECC_SET_REG(W_DBG_TRNG_CTRL, IPECC_W_DBG_TRNG_CTRL_RESET_FIFO_IRN); \
+} while (0)
+
+/* IPECC_TRNG_SET_RAW_BIT_READ_ADDR() - Set address in the TRNG raw FIFO memory array where to read
+ *                                      a raw random bit from, and fetch the corresponding bit.
+ * (see also IPECC_TRNG_GET_RAW_BIT() */
+#define IPECC_TRNG_SET_RAW_BIT_ADDR(bitaddr) do { \
+	IPECC_SET_REG(W_DBG_TRNG_CTRL, IPECC_W_DBG_TRNG_CTRL_READ_FIFO_RAW \
+			| ((bitaddr) & IPECC_W_DBG_TRNG_CTRL_FIFO_ADDR_MSK) << IPECC_W_DBG_TRNG_CTRL_FIFO_ADDR_POS); \
+} while  (0)
+
+/* IPECC_TRNG_GET_RAW_BIT() - Get the raw random bit fetched by IPECC_TRNG_SET_RAW_BIT_READ_ADDR (c.f that macro) */
+#define IPECC_TRNG_GET_RAW_BIT() do { \
+	(((IPECC_GET_REG(W_DBG_TRNG_CTRL)) >> IPECC_R_DBG_TRNG_RAW_DATA_POS) & IPECC_R_DBG_TRNG_RAW_DATA_MSK) \
+} while  (0)
+
+
+
+
+
+/* Actions involving register W_DBG_TRNG_CFG
+ * (configuration of TRNG) */
+#define IPECC_() do { \
+} while (0)
+
+/* Actions involving register W_DBG_FP_WADDR */
+#define IPECC_() do { \
+} while (0)
+
+/* Actions involving register W_DBG_FP_WDATA */
+#define IPECC_() do { \
+} while (0)
+
+/* Actions involving register W_DBG_FP_RADDR */
+#define IPECC_() do { \
+} while (0)
+
+/* Actions involving register W_DBG_CFG_XYSHUF */
+#define IPECC_() do { \
+} while (0)
+
+/* Actions involving register W_DBG_CFG_AXIMSK */
+#define IPECC_() do { \
+} while (0)
+
+/* Actions involving register W_DBG_CFG_TOKEN */
+#define IPECC_() do { \
+} while (0)
+
+/* Actions involving register W_DBG_RESET_TRNG_CNT */
+#define IPECC_() do { \
+} while (0)
+
+/* Actions involving register R_DBG_CAPABILITIES_0 */
+/* Actions involving register R_DBG_CAPABILITIES_1 */
+/* Actions involving register R_DBG_CAPABILITIES_2 */
+/* Actions involving register R_DBG_STATUS */
+/* Actions involving register R_DBG_TIME */
+/* Actions involving register R_DBG_RAWDUR */
+/* Actions involving register R_DBG_FLAGS */
+/* Actions involving register R_DBG_TRNG_STATUS */
+/* Actions involving register R_DBG_FP_RDATA */
+/* Actions involving register R_DBG_IRN_CNT_AXI */
+/* Actions involving register R_DBG_IRN_CNT_EFP */
+/* Actions involving register R_DBG_IRN_CNT_CUR */
+/* Actions involving register R_DBG_IRN_CNT_SHF */
+/* Actions involving register R_DBG_FP_RDATA_RDY */
+/* Actions involving register R_DBG_TRNG_DIAG_0 */
+/* Actions involving register R_DBG_TRNG_DIAG_1 */
+/* Actions involving register R_DBG_TRNG_DIAG_2 */
+/* Actions involving register R_DBG_TRNG_DIAG_3 */
+/* Actions involving register R_DBG_TRNG_DIAG_4 */
+/* Actions involving register R_DBG_TRNG_DIAG_5 */
+/* Actions involving register R_DBG_TRNG_DIAG_6 */
+/* Actions involving register R_DBG_TRNG_DIAG_7 */
+/* Actions involving register R_DBG_TRNG_DIAG_8 */
 
 /****** DEBUG ************/
 /* TRNG handling */
