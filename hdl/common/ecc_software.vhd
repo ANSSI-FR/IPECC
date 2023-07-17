@@ -224,23 +224,24 @@ package ecc_software is
 	constant STATUS_R0_IS_NULL : natural := 12;
 	constant STATUS_R1_IS_NULL : natural := 13;
 	constant STATUS_ERR_LSB : natural := 16;
-	constant STATUS_ERR_IN_PT_NOT_ON_CURVE : natural := 16;
-	constant STATUS_ERR_OUT_PT_NOT_ON_CURVE : natural := 17;
-	constant STATUS_ERR_I_LSB : natural := STATUS_ERR_LSB + 2;
-	constant STATUS_ERR_I_COMP : natural := STATUS_ERR_I_LSB + 0;
-	constant STATUS_ERR_I_WREG_FBD : natural := STATUS_ERR_I_LSB + 1;
-	constant STATUS_ERR_I_KP_FBD : natural := STATUS_ERR_I_LSB + 2;
-	constant STATUS_ERR_I_NNDYN : natural := STATUS_ERR_I_LSB + 3;
-	constant STATUS_ERR_I_POP_FBD : natural := STATUS_ERR_I_LSB + 4;
-	constant STATUS_ERR_I_RDNB_FBD : natural := STATUS_ERR_I_LSB + 5;
-	constant STATUS_ERR_I_BLN : natural := STATUS_ERR_I_LSB + 6;
-	constant STATUS_ERR_I_UNKNOWN_REG : natural := STATUS_ERR_I_LSB + 7;
-	constant STATUS_ERR_I_TOKEN : natural := STATUS_ERR_I_LSB + 8;
-	constant STATUS_ERR_I_SHUFFLE : natural := STATUS_ERR_I_LSB + 9;
-	constant STATUS_ERR_I_ZREMASK : natural := STATUS_ERR_I_LSB + 10;
-	constant STATUS_ERR_I_WK_NOT_ENOUGH_RANDOM : natural := STATUS_ERR_I_LSB + 11;
-	constant STATUS_ERR_I_MSB : natural := STATUS_ERR_LSB + 15; -- ERR_I_LSB + 13;
+	constant STATUS_ERR_IN_PT_NOT_ON_CURVE : natural := STATUS_ERR_LSB;
+	constant STATUS_ERR_OUT_PT_NOT_ON_CURVE : natural := STATUS_ERR_LSB + 1;
+	constant STATUS_ERR_I_COMP : natural := STATUS_ERR_LSB + 2;
+	constant STATUS_ERR_I_WREG_FBD : natural := STATUS_ERR_LSB + 3;
+	constant STATUS_ERR_I_KP_FBD : natural := STATUS_ERR_LSB + 4;
+	constant STATUS_ERR_I_NNDYN : natural := STATUS_ERR_LSB + 5;
+	constant STATUS_ERR_I_POP_FBD : natural := STATUS_ERR_LSB + 6;
+	constant STATUS_ERR_I_RDNB_FBD : natural := STATUS_ERR_LSB + 7;
+	constant STATUS_ERR_I_BLN : natural := STATUS_ERR_LSB + 8;
+	constant STATUS_ERR_I_UNKNOWN_REG : natural := STATUS_ERR_LSB + 9;
+	constant STATUS_ERR_I_TOKEN : natural := STATUS_ERR_LSB + 10;
+	constant STATUS_ERR_I_SHUFFLE : natural := STATUS_ERR_LSB + 11;
+	constant STATUS_ERR_I_ZREMASK : natural := STATUS_ERR_LSB + 12;
+	constant STATUS_ERR_I_WK_NOT_ENOUGH_RANDOM : natural := STATUS_ERR_LSB + 13;
 	constant STATUS_ERR_MSB : natural := 31;
+	-- range of field .ierrid in ecc_axi.vhd
+	constant STATUS_ERR_I_LSB : natural := STATUS_ERR_LSB + 2;
+	constant STATUS_ERR_I_MSB : natural := STATUS_ERR_MSB;
 
 	-- bit positions in R_CAPABILITIES register
 	constant CAP_DBG_N_PROD : natural := 0;

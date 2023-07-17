@@ -162,7 +162,7 @@ entity ecc_axi is
 		dbgbreakpointid : in std_logic_vector(1 downto 0);
 		dbgbreakpointhit : in std_logic;
 		-- debug features (interface with ecc_curve_iram)
-		dbgiaddr : out std_logic_vector(IRAM_ADDR_SZ - 1 downto 0);
+		dbgiwaddr : out std_logic_vector(IRAM_ADDR_SZ - 1 downto 0);
 		dbgiwdata : out std_logic_vector(OPCODE_SZ - 1 downto 0);
 		dbgiwe : out std_logic;
 		-- debug features (interface with ecc_fp)
@@ -448,7 +448,7 @@ architecture rtl of ecc_axi is
 
 	-- debug features
 	type debug_reg_type is record
-		iaddr : std_logic_vector(IRAM_ADDR_SZ - 1 downto 0);
+		iwaddr : std_logic_vector(IRAM_ADDR_SZ - 1 downto 0);
 		iwdata : std_logic_vector(OPCODE_SZ - 1 downto 0);
 		iwe : std_logic;
 		counter : unsigned(31 downto 0);
@@ -2097,7 +2097,7 @@ begin
 			-- decoding write to W_DBG_OP_ADDR register
 			-- --------------------------------------------------------------
 			elsif debug and r.axi.waddr = W_DBG_OP_ADDR then
-				v.debug.iaddr := r.axi.wdatax(IRAM_ADDR_SZ - 1 downto 0);
+				v.debug.iwaddr := r.axi.wdatax(IRAM_ADDR_SZ - 1 downto 0);
 				v.axi.wready := '1';
 				v.axi.awready := '1';
 				v.axi.arready := '1';
@@ -3635,7 +3635,7 @@ begin
 					-- Parameter 'blinding' = 0 in ecc_customize.vhd.
 					if r.ctrl.doblinding = '1' then
 						-- The blinding was currently active due to software driver configu-
-						-- ration (this is legit, even if statically blinding = 0). We must
+						-- ration (this is legit, even if statically 'blinding'=0). We must
 						-- reengage the (s245) sequence of operations in order to recompute
 						-- .nn_extrabits based on the new value of nn, and a nb of blinding
 						-- bits which is the one currently set by software driver. Note that
@@ -4387,7 +4387,7 @@ begin
 	trngrdy <= r.write.rnd.trngrdy;
 
 	-- debug features (to ecc_curve_iram)
-	dbgiaddr <= r.debug.iaddr;
+	dbgiwaddr <= r.debug.iwaddr;
 	dbgiwdata <= r.debug.iwdata;
 	dbgiwe <= r.debug.iwe;
 	dbgtrigger <= r.debug.trigger;

@@ -220,7 +220,7 @@ architecture struct of ecc is
 			dbgbreakpointid : in std_logic_vector(1 downto 0);
 			dbgbreakpointhit : in std_logic;
 			-- debug features (interface with ecc_curve_iram)
-			dbgiaddr : out std_logic_vector(IRAM_ADDR_SZ - 1 downto 0);
+			dbgiwaddr : out std_logic_vector(IRAM_ADDR_SZ - 1 downto 0);
 			dbgiwdata : out std_logic_vector(OPCODE_SZ - 1 downto 0);
 			dbgiwe : out std_logic;
 			-- debug features (interface with ecc_fp)
@@ -923,7 +923,7 @@ architecture struct of ecc is
 	signal dbgnbstarvrndxyshuf : std_logic_vector(15 downto 0);
 	signal dbghalted_s : std_logic;
 	-- debug features (signals between ecc_axi & ecc_curve_iram)
-	signal dbgiaddr : std_logic_vector(IRAM_ADDR_SZ - 1 downto 0);
+	signal dbgiwaddr : std_logic_vector(IRAM_ADDR_SZ - 1 downto 0);
 	signal dbgiwdata : std_logic_vector(OPCODE_SZ - 1 downto 0);
 	signal dbgiwe : std_logic;
 	-- debug features (signals between ecc_axi & ecc_curve)
@@ -1132,7 +1132,7 @@ begin
 			dbgbreakpointid => dbgbreakpointid,
 			dbgbreakpointhit => dbgbreakpointhit,
 			-- debug features (interface with ecc_curve_iram)
-			dbgiaddr => dbgiaddr,
+			dbgiwaddr => dbgiwaddr,
 			dbgiwdata => dbgiwdata,
 			dbgiwe => dbgiwe,
 			-- debug features (interface with ecc_fp)
@@ -1367,7 +1367,7 @@ begin
 			-- port A: write-only interface to AXI-lite interface
 			clka => s_axi_aclk,
 			wea => dbgiwe,
-			addra => dbgiaddr,
+			addra => dbgiwaddr,
 			dia => dbgiwdata,
 			-- port B: read-only interface to ecc_curve
 			clkb => s_axi_aclk,

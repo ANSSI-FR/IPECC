@@ -2148,7 +2148,7 @@ begin
 	-- TODO: many multicycles can be set on paths r.kp.substate -> dbg*
 	-- (on the other hand these are debug only paths, so it does not
 	-- really make sense to make effort to improve timing)
-	dbgpgmstate <= DEBUG_STATE_IDLE when r.ctrl.state = idle
+	dbgpgmstate <= DEBUG_STATE_ANY_OR_IDLE when r.ctrl.state = idle
 	  else DEBUG_STATE_CSTMTY when r.ctrl.state = cst
 	  else DEBUG_STATE_CHECKONCURVE when r.kp.substate = checkoncurve
 	  else DEBUG_STATE_BLINDINIT when r.kp.substate = blindinit

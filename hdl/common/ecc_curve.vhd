@@ -481,7 +481,7 @@ begin
 			if debug
 				and dbgbreakpoints(i).act = '1'
 				and r.fetch.pc = dbgbreakpoints(i).addr
-				and (dbgbreakpoints(i).state = "0000"
+				and (dbgbreakpoints(i).state = DEBUG_STATE_ANY_OR_IDLE
 					or (   (dbgpgmstate /= DEBUG_STATE_BLINDBIT)
 				     and (dbgpgmstate /= DEBUG_STATE_ITOH)
 				     and (dbgpgmstate /= DEBUG_STATE_ZADDU)

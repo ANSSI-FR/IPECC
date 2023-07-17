@@ -253,21 +253,21 @@ package ecc_pkg is
 	constant OPCODE_BRA_RET : std_logic_vector(OP_OP_SZ - 1 downto 0) := "1000";
 
 	-- states of ecc_scalar
-	constant DEBUG_STATE_IDLE : std_logic4 := std_logic_vector(to_unsigned(0, 4));
-	constant DEBUG_STATE_CSTMTY : std_logic4 := std_logic_vector(to_unsigned(1, 4));
-	constant DEBUG_STATE_CHECKONCURVE : std_logic4 := std_logic_vector(to_unsigned(2, 4));
-	constant DEBUG_STATE_BLINDINIT : std_logic4 := std_logic_vector(to_unsigned(3, 4));
-	constant DEBUG_STATE_BLINDBIT : std_logic4 := std_logic_vector(to_unsigned(4, 4));
-	constant DEBUG_STATE_BLINDEXIT : std_logic4 := std_logic_vector(to_unsigned(5, 4));
-	constant DEBUG_STATE_ADPA : std_logic4 := std_logic_vector(to_unsigned(6, 4));
-	constant DEBUG_STATE_SETUP : std_logic4 := std_logic_vector(to_unsigned(7, 4));
-	constant DEBUG_STATE_DOUBLE : std_logic4 := std_logic_vector(to_unsigned(8, 4));
-	constant DEBUG_STATE_SWITCH3P : std_logic4 := std_logic_vector(to_unsigned(9, 4));
-	constant DEBUG_STATE_ITOH : std_logic4 := std_logic_vector(to_unsigned(10, 4));
-	constant DEBUG_STATE_ZADDU : std_logic4 := std_logic_vector(to_unsigned(11, 4));
-	constant DEBUG_STATE_ZADDC : std_logic4 := std_logic_vector(to_unsigned(12, 4));
-	constant DEBUG_STATE_SUBTRACTP : std_logic4 := std_logic_vector(to_unsigned(13, 4));
-	constant DEBUG_STATE_EXIT : std_logic4 := std_logic_vector(to_unsigned(14, 4));
+	constant DEBUG_STATE_ANY_OR_IDLE : std_logic4 := std_nat(0, 4);
+	constant DEBUG_STATE_CSTMTY : std_logic4 := std_nat(1, 4);
+	constant DEBUG_STATE_CHECKONCURVE : std_logic4 := std_nat(2, 4);
+	constant DEBUG_STATE_BLINDINIT : std_logic4 := std_nat(3, 4);
+	constant DEBUG_STATE_BLINDBIT : std_logic4 := std_nat(4, 4);
+	constant DEBUG_STATE_BLINDEXIT : std_logic4 := std_nat(5, 4);
+	constant DEBUG_STATE_ADPA : std_logic4 := std_nat(6, 4);
+	constant DEBUG_STATE_SETUP : std_logic4 := std_nat(7, 4);
+	constant DEBUG_STATE_DOUBLE : std_logic4 := std_nat(8, 4);
+	constant DEBUG_STATE_SWITCH3P : std_logic4 := std_nat(9, 4);
+	constant DEBUG_STATE_ITOH : std_logic4 := std_nat(10, 4);
+	constant DEBUG_STATE_ZADDU : std_logic4 := std_nat(11, 4);
+	constant DEBUG_STATE_ZADDC : std_logic4 := std_nat(12, 4);
+	constant DEBUG_STATE_SUBTRACTP : std_logic4 := std_nat(13, 4);
+	constant DEBUG_STATE_EXIT : std_logic4 := std_nat(14, 4);
 
 	type breakpoint_type is record
 		addr : std_logic_vector(IRAM_ADDR_SZ - 1 downto 0);
