@@ -135,14 +135,17 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 #define IPECC_W_BLINDING_EN		((uint32_t)0x1 << 0)
 #define IPECC_W_BLINDING_BITS_MSK	(0xfffffff)
 #define IPECC_W_BLINDING_BITS_POS	(4)
+#define IPECC_W_BLINDING_DIS		((uint32_t)0x0 << 0)
 
 /* Fields for W_SHUFFLE */
 #define IPECC_W_SHUFFLE_EN    ((uint32_t)0x1 << 0)
+#define IPECC_W_SHUFFLE_DIS    ((uint32_t)0x0 << 0)
 
 /* Fields for W_ZREMASK */
 #define IPECC_W_ZREMASK_EN    ((uint32_t)0x1 << 0)
 #define IPECC_W_ZREMASK_BITS_MSK	(0xffff)
 #define IPECC_W_ZREMASK_BITS_POS	(16)
+#define IPECC_W_ZREMASK_DIS    ((uint32_t)0x0 << 0)
 
 /* Fields for W_TOKEN */
 /* no field here: action is performed simply by writing to the
@@ -259,7 +262,7 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 #define IPECC_R_CAPABILITIES  		(ipecc_baddr + IPECC_ALIGNED(0x010))
 #define IPECC_R_PRIME_SIZE  		(ipecc_baddr + IPECC_ALIGNED(0x018))
 #define IPECC_R_HW_VERSION      (ipecc_baddr + IPECC_ALIGNED(0x020))
-/*	-- reserved                                                           0x028...0x0f8 */
+/*	-- reserved                               0x028...0x0f8 */
 #define IPECC_R_DBG_CAPABILITIES_0	(ipecc_baddr + IPECC_ALIGNED(0x100))
 #define IPECC_R_DBG_CAPABILITIES_1	(ipecc_baddr + IPECC_ALIGNED(0x108))
 #define IPECC_R_DBG_CAPABILITIES_2	(ipecc_baddr + IPECC_ALIGNED(0x110))
@@ -286,7 +289,7 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 #define IPECC_R_DBG_TRNG_DIAG_6  		(ipecc_baddr + IPECC_ALIGNED(0x1a8))
 #define IPECC_R_DBG_TRNG_DIAG_7  		(ipecc_baddr + IPECC_ALIGNED(0x1b0))
 #define IPECC_R_DBG_TRNG_DIAG_8  		(ipecc_baddr + IPECC_ALIGNED(0x1b8))
-/*	-- reserved                                                           0x1c0...0x1f8 */
+/*	-- reserved                               0x1c0...0x1f8 */
 
 /* Fields for R_STATUS */
 #define IPECC_R_STATUS_BUSY		((uint32_t)0x1 << 0)
@@ -407,8 +410,8 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 #define IPECC_BNUM_R1_Y		7
 
 /* Handling the IP busy state */
-#define IPECC_BUSY_WAIT() do {  \
-	while(IPECC_GET_REG(IPECC_R_STATUS) & IPECC_R_STATUS_BUSY){};  \
+#define IPECC_BUSY_WAIT() do { \
+	while(IPECC_GET_REG(IPECC_R_STATUS) & IPECC_R_STATUS_BUSY){}; \
 } while(0)
 /* The following macros IPECC_IS_BUSY_* are to obtain more info, when the IP is busy,
  * on why it is busy.
@@ -453,25 +456,77 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
  *    and error flag 'WK_NOT_ENOUGH_RANDOM' will be set in register R_STATUS). */
 #define IPECC_IS_ENOUGH_RND_WRITE_SCALAR() 	(!!(IPECC_GET_REG(IPECC_R_STATUS) & IPECC_R_WK_STATUS_ENOUGH_RND))
 
+/*******************************************************************************
+ * Low-level actions macros: actions involving a direct write to an IP register,
+ * along with related helper macros
+ *******************************************************************************/
+
+/*
+ * Actions involving register W_CTRL
+ */
+
+/* commands execution */
+#define IPECC_EXEC_PT_ADD() (IPECC_SET_REG(IPECC_W_CTRL, IPECC_W_CTRL_PT_ADD))
+#define IPECC_EXEC_PT_DBL() (IPECC_SET_REG(IPECC_W_CTRL, IPECC_W_CTRL_PT_DBL))
+#define IPECC_EXEC_PT_CHK() (IPECC_SET_REG(IPECC_W_CTRL, IPECC_W_CTRL_PT_CHK))
+#define IPECC_EXEC_PT_EQU() (IPECC_SET_REG(IPECC_W_CTRL, IPECC_W_CTRL_PT_EQU))
+#define IPECC_EXEC_PT_OPP() (IPECC_SET_REG(IPECC_W_CTRL, IPECC_W_CTRL_PT_OPP))
+#define IPECC_EXEC_PT_NEG() (IPECC_SET_REG(IPECC_W_CTRL, IPECC_W_CTRL_PT_NEG))
+#define IPECC_EXEC_PT_KP()  (IPECC_SET_REG(IPECC_W_CTRL, IPECC_W_CTRL_PT_KP))
+
+/*
+ * Actions involving register W_WRITE_DATA
+ */
+
+/* Addresses and data handling */
+#define IPECC_SET_READ_ADDR(addr) do { \
+	ip_ecc_word val = 0; \
+	val |= IPECC_W_CTRL_READ_NB; \
+	val |= ((addr & IPECC_W_CTRL_NBADDR_MSK) << IPECC_W_CTRL_NBADDR_POS); \
+	IPECC_SET_REG(IPECC_W_CTRL, val); \
+} while(0)
+
+#define IPECC_READ_DATA() (IPECC_GET_REG(IPECC_R_READ_DATA))
+
+#define IPECC_SET_WRITE_ADDR(addr, scal) do { \
+	ip_ecc_word val = 0; \
+	val |= IPECC_W_CTRL_WRITE_NB; \
+	val |= ((scal) ? IPECC_W_CTRL_WRITE_K : 0); \
+	val |= ((addr & IPECC_W_CTRL_NBADDR_MSK) << IPECC_W_CTRL_NBADDR_POS); \
+	IPECC_SET_REG(IPECC_W_CTRL, val); \
+} while(0)
+
+#define IPECC_WRITE_DATA(val) do { \
+	IPECC_SET_REG(IPECC_W_WRITE_DATA, val); \
+} while(0)
+
+/*
+ * Actions involving registers W_R[01]_NULL
+ */
+
 /* Infinity point handling with R0/R1 NULL flags */
 #define IPECC_GET_R0_INF() (!!(IPECC_GET_REG(IPECC_R_STATUS) & IPECC_R_STATUS_R0_IS_NULL))
 #define IPECC_GET_R1_INF() (!!(IPECC_GET_REG(IPECC_R_STATUS) & IPECC_R_STATUS_R1_IS_NULL))
 
-#define IPECC_CLEAR_R0_INF() do {  \
-	IPECC_SET_REG(IPECC_W_R0_NULL, IPECC_W_POINT_IS_NOT_NULL);  \
+#define IPECC_CLEAR_R0_INF() do { \
+	IPECC_SET_REG(IPECC_W_R0_NULL, IPECC_W_POINT_IS_NOT_NULL); \
 } while(0)
-#define IPECC_SET_R0_INF() do {  \
-	IPECC_SET_REG(IPECC_W_R0_NULL, IPECC_W_POINT_IS_NULL);  \
+#define IPECC_SET_R0_INF() do { \
+	IPECC_SET_REG(IPECC_W_R0_NULL, IPECC_W_POINT_IS_NULL); \
 } while(0)
-#define IPECC_CLEAR_R1_INF() do {  \
-	IPECC_SET_REG(IPECC_W_R1_NULL, IPECC_W_POINT_IS_NOT_NULL);  \
+#define IPECC_CLEAR_R1_INF() do { \
+	IPECC_SET_REG(IPECC_W_R1_NULL, IPECC_W_POINT_IS_NOT_NULL); \
 } while(0)
-#define IPECC_SET_R1_INF() do {  \
-	IPECC_SET_REG(IPECC_W_R1_NULL, IPECC_W_POINT_IS_NULL);  \
+#define IPECC_SET_R1_INF() do { \
+	IPECC_SET_REG(IPECC_W_R1_NULL, IPECC_W_POINT_IS_NULL); \
 } while(0)
 
+/*
+ * Actions involving registers W_PRIME_SIZE
+ */
+
 /* NN size (static and dynamic) handling */
-#define IPECC_GET_NN_MAX_SIZE() ((IPECC_GET_REG(IPECC_R_CAPABILITIES) >> IPECC_R_CAPABILITIES_NNMAX_POS)  \
+#define IPECC_GET_NN_MAX_SIZE() ((IPECC_GET_REG(IPECC_R_CAPABILITIES) >> IPECC_R_CAPABILITIES_NNMAX_POS) \
 				& IPECC_R_CAPABILITIES_NNMAX_MSK)
 
 /* IPECC_GET_NN_SIZE - to get the value of 'nn' the IP is currently set with
@@ -481,47 +536,86 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 
 /* IPECC_SET_NN_SIZE - to set the value of nn (only with hardware synthesized
  *                     with the 'nn modifiable at runtime' option) */
-#define IPECC_SET_NN_SIZE(sz) do {  \
-	IPECC_SET_REG(IPECC_W_PRIME_SIZE, sz);  \
+#define IPECC_SET_NN_SIZE(sz) do { \
+	IPECC_SET_REG(IPECC_W_PRIME_SIZE, sz); \
 } while(0)
+
+/*
+ * Actions involving register W_BLINDING
+ */
 
 /* Blinding handling */
-#define IPECC_DISABLE_BLINDING() do {  \
-	IPECC_SET_REG(IPECC_W_BLINDING, 0);  \
+#define IPECC_DISABLE_BLINDING() do { \
+	IPECC_SET_REG(IPECC_W_BLINDING, 0); \
 } while(0)
-#define IPECC_SET_BLINDING_SIZE(blinding_size) do {  \
-	uint32_t val = 0;  \
-	/* Enable blinding */  \
-	val |= IPECC_W_BLINDING_EN;  \
-	/* Configure bliding */  \
-	val |= ((blinding_size & IPECC_W_BLINDING_BITS_MSK) << IPECC_W_BLINDING_BITS_POS);  \
-	IPECC_SET_REG(IPECC_W_BLINDING, val);  \
+#define IPECC_SET_BLINDING_SIZE(blinding_size) do { \
+	uint32_t val = 0; \
+	/* Enable blinding */ \
+	val |= IPECC_W_BLINDING_EN; \
+	/* Configure bliding */ \
+	val |= ((blinding_size & IPECC_W_BLINDING_BITS_MSK) << IPECC_W_BLINDING_BITS_POS); \
+	IPECC_SET_REG(IPECC_W_BLINDING, val); \
 } while(0)
 
-/* Shuffling countermeasure */
-#define IPECC_ENABLE_SHUFFLE() do {  \
-	IPECC_SET_REG(IPECC_W_SHUFFLE, IPECC_W_SHUFFLE_EN);  \
+/*
+ * Action involving register W_SHUFFLE
+ */
+
+/* Enable shuffling countermeasure */
+#define IPECC_ENABLE_SHUFFLE() do { \
+	IPECC_SET_REG(IPECC_W_SHUFFLE, IPECC_W_SHUFFLE_EN); \
 } while (0)
 
-/* Z-remask countermeasure */
-#define IPECC_ENABLE_ZREMASK(zremask_period) do {  \
-	uint32_t val = 0;  \
-	/* Enable Z-remasking */  \
-	val |= IPECC_W_ZREMASK_EN;  \
-	/* Configure Z-remasking */  \
-	val |= ((zremask_period & IPECC_W_ZREMASK_BITS_MSK) << IPECC_W_ZREMASK_BITS_POS);  \
+/*
+ * Actions involving register W_ZREMASK
+ */
+
+/* Enable & configure Z-remask countermeasure */
+#define IPECC_ENABLE_ZREMASK(zremask_period) do { \
+	uint32_t val = 0; \
+	/* Enable Z-remasking */ \
+	val |= IPECC_W_ZREMASK_EN; \
+	/* Configure Z-remasking */ \
+	val |= ((zremask_period & IPECC_W_ZREMASK_BITS_MSK) << IPECC_W_ZREMASK_BITS_POS); \
 	IPECC_SET_REG(IPECC_W_ZREMASK, val); \
 } while (0)
-#define IPECC_DISABLE_ZREMASK() (IPECC_SET_REG(IPECC_W_Z_REMASK, IPECC_W_ZREMASK_EN))
 
+#define IPECC_DISABLE_ZREMASK() do { \
+	(IPECC_SET_REG(IPECC_W_Z_REMASK, IPECC_W_ZREMASK_DIS)); \
+} while (0)
+
+/*
+ * Actions involving register W_TOKEN
+ */
+
+/* Token handling */
+#define IPECC_ASK_FOR_TOKEN_GENERATION() do { \
+	IPECC_SET_REG(IPECC_W_TOKEN, 1); /* writen value actually is indifferent */ \
+} while (0)
+
+/*
+ * Actions involving register W_IRQ
+ */
+
+/* Irq handling */
+#define IPECC_ENABLE_IRQ() do { \
+	IPECC_SET_REG(IPECC_W_IRQ, IPECC_W_IRQ_EN); \
+} while (0)
+
+/*
+ * Actions using register W_ERR_ACK
+ */
 
 /* Reset handling */
-#define IPECC_RESET() (IPECC_SET_REG(IPECC_W_SOFT_RESET, 1))
+#define IPECC_SOFT_RESET() do { \
+	(IPECC_SET_REG(IPECC_W_SOFT_RESET, 1)); \
+} while (0)
 
 /* Set small scalar size */
-#define IPECC_SET_SMALL_SCALAR_SIZE(sz)  \
-	IPECC_SET_REG(IPECC_W_SMALL_SCALAR,  \
-			(sz & IPECC_W_SMALL_SCALAR_K_MSK) << IPECC_W_SMALL_SCALAR_K_POS)
+#define IPECC_SET_SMALL_SCALAR_SIZE(sz) do { \
+	IPECC_SET_REG(IPECC_W_SMALL_SCALAR, \
+			(sz & IPECC_W_SMALL_SCALAR_K_MSK) << IPECC_W_SMALL_SCALAR_K_POS); \
+} while (0)
 
 
 
@@ -529,37 +623,6 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 #define IPECC_GET_ONCURVE() (!!(IPECC_GET_REG(IPECC_R_STATUS) & IPECC_R_STATUS_YES))
 #define IPECC_GET_EQU()     (!!(IPECC_GET_REG(IPECC_R_STATUS) & IPECC_R_STATUS_YES))
 #define IPECC_GET_OPP()     (!!(IPECC_GET_REG(IPECC_R_STATUS) & IPECC_R_STATUS_YES))
-
-/* Addresses and data handling */
-#define IPECC_SET_READ_ADDR(addr) do {  \
-	ip_ecc_word val = 0;  \
-	val |= IPECC_W_CTRL_READ_NB;  \
-	val |= ((addr & IPECC_W_CTRL_NBADDR_MSK) << IPECC_W_CTRL_NBADDR_POS);  \
-	IPECC_SET_REG(IPECC_W_CTRL, val);  \
-} while(0)
-
-#define IPECC_READ_DATA() (IPECC_GET_REG(IPECC_R_READ_DATA))
-
-#define IPECC_SET_WRITE_ADDR(addr, scal) do {  \
-	ip_ecc_word val = 0;  \
-	val |= IPECC_W_CTRL_WRITE_NB;  \
-	val |= ((scal) ? IPECC_W_CTRL_WRITE_K : 0);  \
-	val |= ((addr & IPECC_W_CTRL_NBADDR_MSK) << IPECC_W_CTRL_NBADDR_POS);  \
-	IPECC_SET_REG(IPECC_W_CTRL, val);  \
-} while(0)
-
-#define IPECC_WRITE_DATA(val) do {  \
-	IPECC_SET_REG(IPECC_W_WRITE_DATA, val);  \
-} while(0)
-
-/* Commands execution */
-#define IPECC_EXEC_PT_ADD() (IPECC_SET_REG(IPECC_W_CTRL, IPECC_W_CTRL_PT_ADD))
-#define IPECC_EXEC_PT_DBL() (IPECC_SET_REG(IPECC_W_CTRL, IPECC_W_CTRL_PT_DBL))
-#define IPECC_EXEC_PT_CHK() (IPECC_SET_REG(IPECC_W_CTRL, IPECC_W_CTRL_PT_CHK))
-#define IPECC_EXEC_PT_EQU() (IPECC_SET_REG(IPECC_W_CTRL, IPECC_W_CTRL_PT_EQU))
-#define IPECC_EXEC_PT_OPP() (IPECC_SET_REG(IPECC_W_CTRL, IPECC_W_CTRL_PT_OPP))
-#define IPECC_EXEC_PT_NEG() (IPECC_SET_REG(IPECC_W_CTRL, IPECC_W_CTRL_PT_NEG))
-#define IPECC_EXEC_PT_KP()  (IPECC_SET_REG(IPECC_W_CTRL, IPECC_W_CTRL_PT_KP))
 
 /* Error handling */
 #define IPECC_ERR_IN_PT_NOT_ON_CURVE	((uint32_t)0x1 << 0)
@@ -604,32 +667,32 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 /* Reset the raw FIFO */
 #define IPECC_TRNG_RESET_FIFO_RAW() IPECC_SET_REG(IPECC_W_DBG_TRNG_CTRL, IPECC_W_DBG_TRNG_CTRL_RESET_FIFO_RAW)
 /* Read the FIFOs at an offset */
-#define IPECC_TRNG_READ_FIFO_RAW(addr, a) do {  \
-	ip_ecc_word val = 0;  \
-	val |= IPECC_W_DBG_TRNG_CTRL_READ_FIFO_RAW;  \
-	val |= ((addr & IPECC_W_DBG_TRNG_CTRL_FIFO_ADDR_MSK) << IPECC_W_DBG_TRNG_CTRL_FIFO_ADDR_POS);  \
-	IPECC_SET_REG(IPECC_W_DBG_TRNG_CTRL, val);  \
-	(*(a)) = IPECC_GET_REG(IPECC_R_DBG_TRNG_DATA);  \
+#define IPECC_TRNG_READ_FIFO_RAW(addr, a) do { \
+	ip_ecc_word val = 0; \
+	val |= IPECC_W_DBG_TRNG_CTRL_READ_FIFO_RAW; \
+	val |= ((addr & IPECC_W_DBG_TRNG_CTRL_FIFO_ADDR_MSK) << IPECC_W_DBG_TRNG_CTRL_FIFO_ADDR_POS); \
+	IPECC_SET_REG(IPECC_W_DBG_TRNG_CTRL, val); \
+	(*(a)) = IPECC_GET_REG(IPECC_R_DBG_TRNG_DATA); \
 } while(0)
 /* Get the RAW FIFO size in bits */
 #define IPECC_TRNG_RAW_FIFO_SZ() 32000 /* XXX */
 /* Get the current status (FIFO full), reading or writing offset in the RAW FIFO */
 #define IPECC_TRNG_RAW_FIFO_ISFULL() (!!(IPECC_GET_REG(IPECC_R_DBG_TRNG_STAT) & IPECC_R_DBG_TRNG_STAT_RAW_FIFO_FULL))
-#define IPECC_TRNG_RAW_FIFO_FULL_BUSY_WAIT() do {  \
-        while(!IPECC_TRNG_RAW_FIFO_ISFULL()){};  \
+#define IPECC_TRNG_RAW_FIFO_FULL_BUSY_WAIT() do { \
+        while(!IPECC_TRNG_RAW_FIFO_ISFULL()){}; \
 } while(0)
 #define IPECC_TRNG_RAW_FIFO_ADDR() ((IPECC_GET_REG(IPECC_R_DBG_TRNG_STAT) >> IPECC_R_DBG_TRNG_STAT_RAW_FIFO_OFFSET_POS) & IPECC_R_DBG_TRNG_STAT_RAW_FIFO_OFFSET_MSK)
 /* Configure elements for random generation */
 /* Deactivate the Post-Processing */
 #define IPECC_TRNG_DEACTIVATE_PP() (IPECC_SET_REG(IPECC_W_DBG_TRNG_CTRL, IPECC_W_DBG_TRNG_CTRL_DEACTIVATE_PP))
 /* Set options for the TRNG */
-#define IPECC_TRNG_SET_OPTIONS(debias, ta, latency, bypass) do {  \
-	ip_ecc_word val = IPECC_GET_REG(IPECC_W_DBG_TRNG_CFG);  \
-	val |= ((debias) ? IPECC_W_DBG_TRNG_CFG_ACTIVE_DEBIAS : 0);  \
-	val |= ((ta) & IPECC_W_DBG_TRNG_CFG_TA_MSK) << IPECC_W_DBG_TRNG_CFG_TA_POS;  \
-	val |= ((latency) & IPECC_W_DBG_TRNG_CFG_TRNG_IDLE_MSK) << IPECC_W_DBG_TRNG_CFG_TRNG_IDLE_POS;  \
-	val |= ((bypass) ? IPECC_W_DBG_TRNG_CFG_TRNG_BYPASS : 0);  \
-	IPECC_SET_REG(IPECC_W_DBG_TRNG_CFG, val);  \
+#define IPECC_TRNG_SET_OPTIONS(debias, ta, latency, bypass) do { \
+	ip_ecc_word val = IPECC_GET_REG(IPECC_W_DBG_TRNG_CFG); \
+	val |= ((debias) ? IPECC_W_DBG_TRNG_CFG_ACTIVE_DEBIAS : 0); \
+	val |= ((ta) & IPECC_W_DBG_TRNG_CFG_TA_MSK) << IPECC_W_DBG_TRNG_CFG_TA_POS; \
+	val |= ((latency) & IPECC_W_DBG_TRNG_CFG_TRNG_IDLE_MSK) << IPECC_W_DBG_TRNG_CFG_TRNG_IDLE_POS; \
+	val |= ((bypass) ? IPECC_W_DBG_TRNG_CFG_TRNG_BYPASS : 0); \
+	IPECC_SET_REG(IPECC_W_DBG_TRNG_CFG, val); \
 } while(0)
 
 typedef enum {
@@ -1338,7 +1401,7 @@ static inline int driver_setup(void)
 			goto err;
 		}
 		/* Reset the IP for a clean state */
-		IPECC_RESET();
+		IPECC_SOFT_RESET();
 		/* We are in the initialized state */
 		hw_driver_setup_state = 1;
 	}
@@ -1352,7 +1415,7 @@ err:
 int hw_driver_reset(void)
 {
 	/* Reset the IP for a clean state */
-        IPECC_RESET();
+        IPECC_SOFT_RESET();
 
 	return 0;
 }
