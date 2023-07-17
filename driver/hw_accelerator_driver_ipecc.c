@@ -127,11 +127,9 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 #define IPECC_W_CTRL_NBADDR_MSK		(0xfff)
 #define IPECC_W_CTRL_NBADDR_POS		(20)
 
-/* Fields for W_R0_NULL */
-#define IPECC_W_R0_NULL      ((uint32_t)0x1 << 0)
-
-/* Fields for W_R1_NULL */
-#define IPECC_W_R1_NULL      ((uint32_t)0x1 << 0)
+/* Fields for W_R0_NULL & W_R1_NULL */
+#define IPECC_W_POINT_IS_NULL      ((uint32_t)0x1 << 0)
+#define IPECC_W_POINT_IS_NOT_NULL      ((uint32_t)0x0 << 0)
 
 /* Fields for W_BLINDING */
 #define IPECC_W_BLINDING_EN		((uint32_t)0x1 << 0)
@@ -278,7 +276,7 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 #define IPECC_R_DBG_IRN_CNT_EFP  		(ipecc_baddr + IPECC_ALIGNED(0x158))
 #define IPECC_R_DBG_IRN_CNT_CUR  		(ipecc_baddr + IPECC_ALIGNED(0x160))
 #define IPECC_R_DBG_IRN_CNT_SHF  		(ipecc_baddr + IPECC_ALIGNED(0x168))
-#define IPECC_R_DBG_FP_RDATA_RDY  		(ipecc_baddr + IPECC_ALIGNED(0x170))
+#define IPECC_R_DBG_FP_RDATA_RDY    (ipecc_baddr + IPECC_ALIGNED(0x170))
 #define IPECC_R_DBG_TRNG_DIAG_0  		(ipecc_baddr + IPECC_ALIGNED(0x178))
 #define IPECC_R_DBG_TRNG_DIAG_1  		(ipecc_baddr + IPECC_ALIGNED(0x180))
 #define IPECC_R_DBG_TRNG_DIAG_2  		(ipecc_baddr + IPECC_ALIGNED(0x188))
@@ -297,8 +295,8 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 #define IPECC_R_STATUS_POP		((uint32_t)0x1 << 6)
 #define IPECC_R_STATUS_R_OR_W		((uint32_t)0x1 << 8)
 #define IPECC_R_STATUS_INIT		((uint32_t)0x1 << 9)
-#define IPECC_R_STATUS_ENOUGH_RND	((uint32_t)0x1 << 10)
-#define IPECC_R_STATUS_NNDYNACT		((uint32_t)0x1 << 11)
+#define IPECC_R_STATUS_NNDYNACT		((uint32_t)0x1 << 10)
+#define IPECC_R_WK_STATUS_ENOUGH_RND	((uint32_t)0x1 << 11)
 #define IPECC_R_STATUS_YES		((uint32_t)0x1 << 13)
 #define IPECC_R_STATUS_R0_IS_NULL	((uint32_t)0x1 << 14)
 #define IPECC_R_STATUS_R1_IS_NULL	((uint32_t)0x1 << 15)
@@ -315,9 +313,9 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 
 /* Fields for R_HW_VERSION */
 #define IPECC_R_HW_VERSION_MAJOR_POS    (16)
-#define IPECC_R_HW_VERSION_MAJOR_POS    (0xffff)
+#define IPECC_R_HW_VERSION_MAJOR_MSK    (0xffff)
 #define IPECC_R_HW_VERSION_MINOR_POS    (0)
-#define IPECC_R_HW_VERSION_MINOR_POS    (0xffff)
+#define IPECC_R_HW_VERSION_MINOR_MSK    (0xffff)
 
 /* Fields for R_DBG_CAPABILITIES_0 */
 #define IPECC_R_DBG_CAPABILITIES_0_WW_POS    (0)
@@ -380,7 +378,7 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 #define  IPECC_R_DBG_IRN_CNT_COUNT_MSK    (0xffffffff)
 
 /* Fields for R_DBG_FP_RDATA_RDY */
-#define IPECC_R_DBG_FP_RDATA_RDY     ((uint32_t)0x1 << 0)
+#define IPECC_R_DBG_FP_RDATA_RDY_IS_READY     ((uint32_t)0x1 << 0)
 
 /* Fields for R_DBG_TRNG_DIAG_0 */
 #define IPECC_R_DBG_TRNG_DIAG_0_STARV_POS     (0)
@@ -412,28 +410,66 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 #define IPECC_BUSY_WAIT() do {						\
 	while(IPECC_GET_REG(IPECC_R_STATUS) & IPECC_R_STATUS_BUSY){};	\
 } while(0)
+/* The following macros IPECC_IS_BUSY_* are to obtain more info, when the IP is busy,
+ * on why it is busy.
+ * However one should keep in mind that polling code should restrict to IPECC_BUSY_WAIT
+ * to determine if previous action/job submitted to the IP is done and if the IP is
+ * ready to receive next command. The following macros (all in the form IPECC_IS_BUSY_*)
+ * are only provided as a way for software to get extra information on the reason why
+ * the IP being busy */
+
+/* IPECC_IS_BUSY_KP - the IP is busy computing a [k]P */
 #define IPECC_IS_BUSY_KP() 	(!!(IPECC_GET_REG(IPECC_R_STATUS) & IPECC_R_STATUS_KP))
+
+/* IPECC_IS_BUSY_MTY - the IP is busy computing the Montgomery constants */
 #define IPECC_IS_BUSY_MTY() 	(!!(IPECC_GET_REG(IPECC_R_STATUS) & IPECC_R_STATUS_MTY))
+
+/* IPECC_IS_BUSY_POP - the IP is busy computing a point operation other than [k]P,
+ * e.g addition, doubling, etc */
 #define IPECC_IS_BUSY_POP() 	(!!(IPECC_GET_REG(IPECC_R_STATUS) & IPECC_R_STATUS_POP))
+
+/* IPECC_IS_BUSY_R_W - the IP is busy transferring a big number from/to the AXI interface
+ * to/from its internal memory of big numbers */
 #define IPECC_IS_BUSY_R_W() 	(!!(IPECC_GET_REG(IPECC_R_STATUS) & IPECC_R_STATUS_R_OR_W))
-#define IPECC_IS_BUSY_RND() 	(!!(IPECC_GET_REG(IPECC_R_STATUS) & IPECC_R_STATUS_ENOUGH_RND))
+
+/* IPECC_IS_BUSY_INIT - the IP is in its reset/initialization process */
 #define IPECC_IS_BUSY_INIT() 	(!!(IPECC_GET_REG(IPECC_R_STATUS) & IPECC_R_STATUS_INIT))
+
+/* IPECC_IS_BUSY_NNDYNACT - the IP is busy computing internal signals due to the refresh
+ *                          of 'nn' main security parameter (only with a hardware synthesized
+ *                          with 'nn modifiable at runtime' option) */
 #define IPECC_IS_BUSY_NNDYNACT() (!!(IPECC_GET_REG(IPECC_R_STATUS) & IPECC_R_STATUS_NNDYNACT))
+
+/* IPECC_IS_ENOUGH_RND_WRITE_SCALAR -
+ *    to know if the IP is ready to accept a new scalar (writing the scalar is a
+ *    particular case of writing a big number: the IP must first gather enough random
+ *    to mask it).
+ *
+ *    This bit is not part of the "busy" state, meaning the IP won't show a high
+ *    STATUS_BUSY bit just because there is not enough random to mask the scalar (yet).
+ *
+ *    Software must first check that this bit is active (1) before writing a new scalar
+ *    (otherwise data written by software when transmitting the scalar will be ignored
+ *    and error flag 'WK_NOT_ENOUGH_RANDOM' will be set in register R_STATUS). */
+#define IPECC_IS_ENOUGH_RND_WRITE_SCALAR() 	(!!(IPECC_GET_REG(IPECC_R_STATUS) & IPECC_R_WK_STATUS_ENOUGH_RND))
 
 /** NN size (static and dynamic) handling **/
 #define IPECC_GET_NN_MAX_SIZE() ((IPECC_GET_REG(IPECC_R_CAPABILITIES) >> IPECC_R_CAPABILITIES_NNMAX_POS) \
 				& IPECC_R_CAPABILITIES_NNMAX_MSK)
 
+/* IPECC_GET_NN_SIZE - to get the value of 'nn' the IP is currently set with
+ *                     (or what is the static value if hardware was not synthesized
+ *                     with the 'nn modifiable at runtime' option) */
 #define IPECC_GET_NN_SIZE() (IPECC_GET_REG(IPECC_R_PRIME_SIZE))
 
+/* IPECC_SET_NN_SIZE - to set the value of nn (only with hardware synthesized
+ *                     with the 'nn modifiable at runtime' option) */
 #define IPECC_SET_NN_SIZE(sz) do {								\
 	IPECC_SET_REG(IPECC_W_PRIME_SIZE, sz);							\
 } while(0)
 
-#define IPECC_IS_NN_DYN_ACTIVE()  (!!IPECC_GET_REG(IPECC_R_STATUS_NNDYNACT))
-
 /** Blinding handling **/
-#define IPECC_CLEAR_BLINDING() do {								\
+#define IPECC_DISABLE_BLINDING() do {								\
 	IPECC_SET_REG(IPECC_W_BLINDING, 0);							\
 } while(0)
 #define IPECC_SET_BLINDING_SIZE(blinding_size) do { 						\
@@ -450,16 +486,16 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 #define IPECC_GET_R1_INF() (!!(IPECC_GET_REG(IPECC_R_STATUS) & IPECC_R_STATUS_R1_IS_NULL))
 
 #define IPECC_CLEAR_R0_INF() do {						\
-	IPECC_SET_REG(IPECC_W_R0_NULL, 0);					\
+	IPECC_SET_REG(IPECC_W_R0_NULL, IPECC_W_POINT_IS_NOT_NULL);					\
 } while(0)
 #define IPECC_SET_R0_INF() do {							\
-	IPECC_SET_REG(IPECC_W_R0_NULL, 1);					\
+	IPECC_SET_REG(IPECC_W_R0_NULL, IPECC_W_POINT_IS_NULL);					\
 } while(0)
 #define IPECC_CLEAR_R1_INF() do {						\
-	IPECC_SET_REG(IPECC_W_R1_NULL, 0);					\
+	IPECC_SET_REG(IPECC_W_R1_NULL, IPECC_W_POINT_IS_NOT_NULL);					\
 } while(0)
 #define IPECC_SET_R1_INF() do {							\
-	IPECC_SET_REG(IPECC_W_R1_NULL, 1);					\
+	IPECC_SET_REG(IPECC_W_R1_NULL, IPECC_W_POINT_IS_NULL);					\
 } while(0)
 
 /** On curve/equality/opposition flags handling **/
@@ -499,16 +535,20 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 #define IPECC_EXEC_PT_KP()  (IPECC_SET_REG(IPECC_W_CTRL, IPECC_W_CTRL_PT_KP))
 
 /** Error handling **/
-#define IPECC_ERR_COMP			((uint32_t)0x1 << 0) 
-#define IPECC_ERR_WREG_FBD 		((uint32_t)0x1 << 1)
-#define	IPECC_ERR_KP_FBD   		((uint32_t)0x1 << 2)
-#define IPECC_ERR_NNDYN			((uint32_t)0x1 << 3)
-#define IPECC_ERR_POP_FBD		((uint32_t)0x1 << 4)
-#define IPECC_ERR_RDNB_FBD		((uint32_t)0x1 << 5)
-#define IPECC_ERR_BLN			((uint32_t)0x1 << 6)
-#define IPECC_ERR_UNKOWN_REG		((uint32_t)0x1 << 7)
-#define IPECC_ERR_IN_PT_NOT_ON_CURVE	((uint32_t)0x1 << 8)
-#define IPECC_ERR_OUT_PT_NOT_ON_CURVE	((uint32_t)0x1 << 9)
+#define IPECC_ERR_IN_PT_NOT_ON_CURVE	((uint32_t)0x1 << 0)
+#define IPECC_ERR_OUT_PT_NOT_ON_CURVE	((uint32_t)0x1 << 1)
+#define IPECC_ERR_COMP			((uint32_t)0x1 << 2)
+#define IPECC_ERR_WREG_FBD 		((uint32_t)0x1 << 3)
+#define IPECC_ERR_KP_FBD   		((uint32_t)0x1 << 4)
+#define IPECC_ERR_NNDYN			((uint32_t)0x1 << 5)
+#define IPECC_ERR_POP_FBD		((uint32_t)0x1 << 6)
+#define IPECC_ERR_RDNB_FBD		((uint32_t)0x1 << 7)
+#define IPECC_ERR_BLN			((uint32_t)0x1 << 8)
+#define IPECC_ERR_UNKOWN_REG		((uint32_t)0x1 << 9)
+#define IPECC_ERR_TOKEN		((uint32_t)0x1 << 10)
+#define IPECC_ERR_SHUFFLE   ((uint32_t)0x1 << 11)
+#define IPECC_ERR_ZREMASK		((uint32_t)0x1 << 12)
+#define IPECC_ERR_WK_NOT_ENOUGH_RANDOM  ((uint32_t)0x1 << 13)
 
 
 #define IPECC_GET_ERROR() ((IPECC_GET_REG(IPECC_R_STATUS) >> IPECC_R_STATUS_ERRID_POS) & IPECC_R_STATUS_ERRID_MSK)
@@ -526,18 +566,21 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 #define IPECC_ACK_ERROR(err) (IPECC_SET_REG(IPECC_W_ERR_ACK, (((err) & IPECC_R_STATUS_ERRID_MSK) << IPECC_R_STATUS_ERRID_POS)))
 
 /** Capabilities handling **/
-#define IPECC_IS_NN_DYN_SUPPORTED() (!!((IPECC_GET_REG(IPECC_R_CAPABILITIES) & IPECC_R_CAPABILITIES_NNDYN)))
-#define IPECC_IS_SHF_SUPPORTED()    (!!((IPECC_GET_REG(IPECC_R_CAPABILITIES) & IPECC_R_CAPABILITIES_SHF)))
-#define IPECC_IS_W64()           (!!((IPECC_GET_REG(IPECC_R_CAPABILITIES) & IPECC_R_CAPABILITIES_W64)))
+/* IPECC_IS_DYNAMIC_NN_SUPPORTED - to know if the IP hardware was synthesized with
+ *                             the option 'nn modifiable at runtime' */
+#define IPECC_IS_DYNAMIC_NN_SUPPORTED()     (!!((IPECC_GET_REG(IPECC_R_CAPABILITIES) & IPECC_R_CAPABILITIES_NNDYN)))
+#define IPECC_IS_SHUFFLING_SUPPORTED()    (!!((IPECC_GET_REG(IPECC_R_CAPABILITIES) & IPECC_R_CAPABILITIES_SHF)))
+#define IPECC_IS_W64()      (!!((IPECC_GET_REG(IPECC_R_CAPABILITIES) & IPECC_R_CAPABILITIES_W64)))
 
-#define IPECC_ACTIVATE_SHF() (IPECC_SET_REG(IPECC_W_SHUFFLE, 1))
+#define IPECC_ACTIVATE_SHUFFLE() (IPECC_SET_REG(IPECC_W_SHUFFLE, IPECC_W_SHUFFLE_EN))
 
 /** Reset handling **/
-#define IPECC_RESET() (IPECC_SET_REG(IPECC_W_RESET, 1))
+#define IPECC_RESET() (IPECC_SET_REG(IPECC_W_SOFT_RESET, 1))
 
 /** Set small scalar size **/
-#define IPECC_SET_SMALL_SCALAR_SIZE(sz) IPECC_SET_REG(IPECC_W_SMALL_SCALAR, sz)
-
+#define IPECC_SET_SMALL_SCALAR_SIZE(sz)  \
+	IPECC_SET_REG(IPECC_W_SMALL_SCALAR, \
+			(sz & IPECC_W_SMALL_SCALAR_K_MSK) << IPECC_W_SMALL_SCALAR_K_POS)
 
 /****** DEBUG ************/
 /** TRNG handling **/
@@ -563,11 +606,11 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 /* Deactivate the Post-Processing */
 #define IPECC_TRNG_DEACTIVATE_PP() (IPECC_SET_REG(IPECC_W_DBG_TRNG_CTRL, IPECC_W_DBG_TRNG_CTRL_DEACTIVATE_PP))
 /* Set options for the TRNG */
-#define IPECC_TRNG_SET_OPTIONS(debias, ta, cycles, bypass) do {						\
+#define IPECC_TRNG_SET_OPTIONS(debias, ta, latency, bypass) do {						\
 	ip_ecc_word val = IPECC_GET_REG(IPECC_W_DBG_TRNG_CFG);						\
 	val |= ((debias) ? IPECC_W_DBG_TRNG_CFG_ACTIVE_DEBIAS : 0);					\
 	val |= ((ta) & IPECC_W_DBG_TRNG_CFG_TA_MSK) << IPECC_W_DBG_TRNG_CFG_TA_POS;			\
-	val |= ((cycles) & IPECC_W_DBG_TRNG_CFG_TRNG_CYCLES_MSK) << IPECC_W_DBG_TRNG_CFG_TRNG_CYCLES_POS; \
+	val |= ((latency) & IPECC_W_DBG_TRNG_CFG_TRNG_IDLE_MSK) << IPECC_W_DBG_TRNG_CFG_TRNG_IDLE_POS; \
 	val |= ((bypass) ? IPECC_W_DBG_TRNG_CFG_TRNG_BYPASS : 0);					\
 	IPECC_SET_REG(IPECC_W_DBG_TRNG_CFG, val);							\
 } while(0)
@@ -825,10 +868,8 @@ static inline int ip_ecc_activate_shuffling(void)
 	IPECC_BUSY_WAIT();
 
 	/* We also activate the shuffling if supported */
-	if(IPECC_IS_SHF_SUPPORTED()){
-		ip_ecc_log("IPECC_ACTIVATE_SHF before\n");
-		IPECC_ACTIVATE_SHF();
-		ip_ecc_log("IPECC_ACTIVATE_SHF after\n");
+	if(IPECC_IS_SHUFFLING_SUPPORTED()){
+		IPECC_ACTIVATE_SHUFFLE();
 
 		/* Wait until the IP is not busy */
 		IPECC_BUSY_WAIT();
@@ -861,7 +902,7 @@ static inline int ip_ecc_set_nn_bit_size(unsigned int bit_sz)
 	/* NOTE: when NN dynamic is not supported we leave
 	 * our inherent maximum size.
 	 */
-	if(IPECC_IS_NN_DYN_SUPPORTED()){
+	if(IPECC_IS_DYNAMIC_NN_SUPPORTED()){
 		/* Set the current dynamic value */
 		ip_ecc_log("IPECC_SET_NN_SIZE before\n");
 		IPECC_SET_NN_SIZE(bit_sz);
@@ -891,7 +932,7 @@ err:
 static inline unsigned int ip_ecc_get_nn_bit_size(void)
 {
 	/* Size is in bits, we return number of words */
-	if(IPECC_IS_NN_DYN_SUPPORTED()){
+	if(IPECC_IS_DYNAMIC_NN_SUPPORTED()){
 		return (unsigned int)IPECC_GET_NN_SIZE();
 	}
 	else{
@@ -907,15 +948,11 @@ static inline int ip_ecc_set_blinding_size(unsigned int blinding_size)
 
 	if(blinding_size == 0){
 		/* Clear the blinding as a size of 0 means that */
-		ip_ecc_log("IPECC_CLEAR_BLINDING before\n");
-		IPECC_CLEAR_BLINDING();
-		ip_ecc_log("IPECC_CLEAR_BLINDING after\n");
+		IPECC_DISABLE_BLINDING();
 	}
 	else{
 		/* Set the bliding size and enable it */
-		ip_ecc_log("IPECC_SET_BLINDING_SIZE before\n");
 		IPECC_SET_BLINDING_SIZE(blinding_size);
-		ip_ecc_log("IPECC_SET_BLINDING_SIZE after\n");
 	}
 
 	/* Wait until the IP is not busy */

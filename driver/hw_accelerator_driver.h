@@ -47,6 +47,17 @@ int hw_driver_set_curve(const unsigned char *a, unsigned int a_sz, const unsigne
 /* Activate the blinding for scalar multiplication */
 int hw_driver_set_blinding(unsigned int blinding_size);
 
+/* Activate the shuffling for scalar multiplication */
+int hw_driver_set_shuffling(void);
+
+/* Activate and configure the periodic Z-remasking countermeasure
+ * (the 'period' arguement is expressed in number of bits of the scalar */
+int hw_driver_set_zremask(unsigned int period);
+
+/* Ask the IP for a random one-shot token to whiten the [k]P result with
+ * The token is of the same size of */
+int hw_driver_get_token(unsigned char* token);
+
 /* Check if an affine point (x, y) is on the curve that has been previously set in the hardware */
 int hw_driver_is_on_curve(const unsigned char *x, unsigned int x_sz, const unsigned char *y, unsigned int y_sz,
 			  int *on_curve);
