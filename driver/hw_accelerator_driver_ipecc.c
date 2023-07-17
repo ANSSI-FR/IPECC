@@ -250,11 +250,15 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 #define IPECC_W_DBG_TRNG_CTRL_RESET_FIFO_IRN		((uint32_t)0x1 << 1)
 /* Activate raw FIFO reading (1) */
 #define IPECC_W_DBG_TRNG_CTRL_READ_FIFO_RAW		((uint32_t)0x1 << 4)
-/* Deactivate RNG Post-Processing (1) */
-#define IPECC_W_DBG_TRNG_CTRL_DEACTIVATE_PP		((uint32_t)0x1 << 8)
 /* Reading offset in bits inside the FIFO on 20 bits */
 #define IPECC_W_DBG_TRNG_CTRL_FIFO_ADDR_MSK		(0xfffff)
 #define IPECC_W_DBG_TRNG_CTRL_FIFO_ADDR_POS		(12)
+/* Deactivate RNG Post-Processing (1) */
+#define IPECC_W_DBG_TRNG_CTRL_DISABLE_PP		((uint32_t)0x1 << 28)
+/* Complete bypass of the TRNG (1) or not (0) */
+#define IPECC_W_DBG_TRNG_CTRL_TRNG_BYPASS			((uint32_t)0x1 << 29)
+/* Deterministic bit value produced when complete bypass is on */
+#define IPECC_W_DBG_TRNG_CTRL_TRNG_BYPASS_BIT		((uint32_t)0x1 << 30)
 
 /* Fields for W_DBG_TRNG_CFG */
 /* Von Neumann debiaser activate (1) / deactivate (0) */
@@ -266,33 +270,32 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
    one-bit generation in the TRNG */
 #define IPECC_W_DBG_TRNG_CFG_TRNG_IDLE_POS		(24)
 #define IPECC_W_DBG_TRNG_CFG_TRNG_IDLE_MSK		(0xf)
-/* Complete bypass of the TRNG (1) or not (0) */
-#define IPECC_W_DBG_TRNG_CFG_TRNG_BYPASS			((uint32_t)0x1 << 1)
-/* Deterministic bit value produced when complete bypass is on */
-#define IPECC_W_DBG_TRNG_CFG_TRNG_BYPASS_BIT		((uint32_t)0x1 << 2)
 
-/* Fields for  IPECC_W_DBG_FP_WADDR */
+/* Fields for IPECC_W_DBG_FP_WADDR */
 #define IPECC_W_DBG_FP_WADDR_POS     (0)
 #define IPECC_W_DBG_FP_WADDR_MSK     (0xffffffff)
 
-/* Fields for  IPECC_W_DBG_FP_WDATA */
-#define IPECC_W_DBG_FP_WDATA_POS     (0)
-#define IPECC_W_DBG_FP_WDATA_MSK     (0xffffffff)
+/* Fields for IPECC_W_DBG_FP_WDATA & IPECC_R_DBG_FP_RDATA */
+#define IPECC_W_DBG_FP_DATA_POS     (0)
+#define IPECC_W_DBG_FP_DATA_MSK     (0xffffffff)
 
-/* Fields for  IPECC_W_DBG_FP_RADDR */
+/* Fields for IPECC_W_DBG_FP_RADDR */
 #define IPECC_W_DBG_FP_RADDR_POS     (0)
 #define IPECC_W_DBG_FP_RADDR_MSK     (0xffffffff)
 
-/* Fields for  IPECC_W_DBG_CFG_NOXYSHUF */
+/* Fields for IPECC_W_DBG_CFG_NOXYSHUF */
 #define IPECC_W_DBG_CFG_XYSHUF_EN    ((uint32_t)0x1 << 0)
+#define IPECC_W_DBG_CFG_XYSHUF_DIS    ((uint32_t)0x0 << 0)
 
-/* Fields for  IPECC_W_DBG_CFG_AXIMSK */
+/* Fields for IPECC_W_DBG_CFG_AXIMSK */
 #define IPECC_W_DBG_CFG_AXIMSK_EN    ((uint32_t)0x1 << 0)
+#define IPECC_W_DBG_CFG_AXIMSK_DIS    ((uint32_t)0x0 << 0)
 
-/* Fields for  IPECC_W_DBG_CFG_TOKEN */
+/* Fields for IPECC_W_DBG_CFG_TOKEN */
 #define IPECC_W_DBG_CFG_TOKEN_EN    ((uint32_t)0x1 << 0)
+#define IPECC_W_DBG_CFG_TOKEN_DIS    ((uint32_t)0x0 << 0)
 
-/* Fields for  IPECC_W_DBG_RESET_TRNG_CNT */
+/* Fields for IPECC_W_DBG_RESET_TRNG_CNT */
 /* no field here: action is performed simply by writing to the
    register address, whatever the value written */
 
@@ -376,10 +379,6 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 #define  IPECC_R_DBG_TRNG_RAW_DATA_POS    (0)
 #define  IPECC_R_DBG_TRNG_RAW_DATA_MSK    (0x1)
 
-/* Fields for R_DBG_FP_RDATA */
-#define  IPECC_R_DBG_FP_RDATA_WWDATA_POS    (0)
-#define  IPECC_R_DBG_FP_RDATA_WWDATA_MSK    (0xffffffff)
-
 /* Fields for R_DBG_IRN_CNT_AXI, R_DBG_IRN_CNT_EFP,
  * R_DBG_IRN_CNT_CUR & R_DBG_IRN_CNT_SHF */
 #define  IPECC_R_DBG_IRN_CNT_COUNT_POS    (0)
@@ -400,6 +399,17 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 #define IPECC_R_DBG_TRNG_DIAG_CNT_STARV_POS     (0)
 #define IPECC_R_DBG_TRNG_DIAG_CNT_STARV_MSK     (0xffffffff)
 
+
+/************************************************************
+ * Low-level action macros: actions involving a direct write
+ * or read to/from an IP register along with related helper
+ * macros.
+ *
+ * Sorted by target register.
+ *************************************************************/
+/*
+ * Actions involving registers R_STATUS & W_CTRL
+ */
 
 /* Handling the IP busy state */
 #define IPECC_BUSY_WAIT() do { \
@@ -435,8 +445,8 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
  *                          with 'nn modifiable at runtime' option) */
 #define IPECC_IS_BUSY_NNDYNACT() (!!(IPECC_GET_REG(IPECC_R_STATUS) & IPECC_R_STATUS_NNDYNACT))
 
-/* IPECC_IS_ENOUGH_RND_WRITE_SCALAR -
- *    to know if the IP is ready to accept a new scalar (writing the scalar is a
+/* IPECC_IS_ENOUGH_RND_WRITE_SCALAR()
+ *    To know if the IP is ready to accept a new scalar (writing the scalar is a
  *    particular case of writing a big number: the IP must first gather enough random
  *    to mask it).
  *
@@ -448,16 +458,6 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
  *    and error flag 'WK_NOT_ENOUGH_RANDOM' will be set in register R_STATUS). */
 #define IPECC_IS_ENOUGH_RND_WRITE_SCALAR() 	(!!(IPECC_GET_REG(IPECC_R_STATUS) & IPECC_R_WK_STATUS_ENOUGH_RND))
 
-/************************************************************
- * Low-level action macros: actions involving a direct write
- * or read to/from an IP register along with related helper
- * macros.
- * These low-level macros are sorted by their target register.
- *************************************************************/
-
-/*
- * Actions involving registers W_CTRL & R_STATUS
- */
 
 /* commands execution */
 #define IPECC_EXEC_PT_ADD() (IPECC_SET_REG(IPECC_W_CTRL, IPECC_W_CTRL_PT_ADD))
@@ -572,11 +572,22 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
  * Action involving register W_SHUFFLE
  */
 
-/* Enable shuffling countermeasure */
+/* Enable shuffling countermeasure.
+ *   - Shuffling method is set statically (at synthesis time) and cannot be
+ *     modified dynamically.
+ *   - Shuffling can be always be activated if a shuffling method was selected
+ *     at synthesis time.
+ */
 #define IPECC_ENABLE_SHUFFLE() do { \
 	IPECC_SET_REG(IPECC_W_SHUFFLE, IPECC_W_SHUFFLE_EN); \
 } while (0)
 
+/* Disable the shuffling countermeasure.
+ *   - Shuffling cannot be deactivated if it was hardware-locked at synthesis
+ *     time & the IP was synthesized in production (secure-)mode.
+ *   - If IP was synthesized in debug (unsecure-)mode, shuffling can be arbitra-
+ *     rily enabled/disabled
+ */
 #define IPECC_DISABLE_SHUFFLE() do { \
 	IPECC_SET_REG(IPECC_W_SHUFFLE, IPECC_W_SHUFFLE_DIS); \
 } while (0)
@@ -701,7 +712,7 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 /* Actions involving register W_DBG_HALT
  * (halting the IP).
  */
-#define IPECC_DEBUG_HALT_NOW()  do { \
+#define IPECC_HALT_NOW()  do { \
 	IPECC_SET_REG(IPECC_W_DBG_HALT, IPECC_W_DBG_HALT_DO_HALT); \
 } while (0)
 
@@ -792,69 +803,166 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 	IPECC_SET_REG(IPECC_W_DBG_OPCODE, ((addr) & IPECC_W_DBG_OPCODE_MSK) << IPECC_W_DBG_OPCODE_POS); \
 } while (0)
 
-/* Actions involving register W_DBG_TRNG_CTRL & 
+/* Actions involving register W_DBG_TRNG_CTRL
  * (controlling TRNG behaviour) */
-/* IPECC_TRNG_RESET_EMPTY_RAW_FIFO() - Empty the FIFO buffering raw random bits of the TRNG
- *                                     and reset associated logic. */
+
+/* Empty the FIFO buffering raw random bits of the TRNG
+ * and reset associated logic. */
 #define IPECC_TRNG_RESET_EMPTY_RAW_FIFO() do { \
 	IPECC_SET_REG(W_DBG_TRNG_CTRL, IPECC_W_DBG_TRNG_CTRL_RESET_FIFO_RAW); \
 } while (0)
 
-/* IPECC_TRNG_RESET_EMPTY_IRN_FIFOS() - Empty the FIFOs buffering internal random bits of the TRNG
- *                                      (all channels) and reset associated logic. */
+/* Empty the FIFOs buffering internal random bits of the TRNG
+ * (all channels) and reset associated logic. */
 #define IPECC_TRNG_RESET_EMPTY_IRN_FIFOS() do { \
 	IPECC_SET_REG(W_DBG_TRNG_CTRL, IPECC_W_DBG_TRNG_CTRL_RESET_FIFO_IRN); \
 } while (0)
 
-/* IPECC_TRNG_SET_RAW_BIT_READ_ADDR() - Set address in the TRNG raw FIFO memory array where to read
- *                                      a raw random bit from, and fetch the corresponding bit.
- * (see also IPECC_TRNG_GET_RAW_BIT() */
+/* Set address in the TRNG raw FIFO memory array where to read
+ * a raw random bit from, and fetch the corresponding bit.
+ * (see also IPECC_TRNG_GET_RAW_BIT).
+ */
 #define IPECC_TRNG_SET_RAW_BIT_ADDR(bitaddr) do { \
 	IPECC_SET_REG(W_DBG_TRNG_CTRL, IPECC_W_DBG_TRNG_CTRL_READ_FIFO_RAW \
 			| ((bitaddr) & IPECC_W_DBG_TRNG_CTRL_FIFO_ADDR_MSK) << IPECC_W_DBG_TRNG_CTRL_FIFO_ADDR_POS); \
-} while  (0)
+} while (0)
 
-/* IPECC_TRNG_GET_RAW_BIT() - Get the raw random bit fetched by IPECC_TRNG_SET_RAW_BIT_READ_ADDR (c.f that macro) */
+/* Get the raw random bit fetched by IPECC_TRNG_SET_RAW_BIT_READ_ADDR (c.f that macro) */
 #define IPECC_TRNG_GET_RAW_BIT() do { \
 	(((IPECC_GET_REG(W_DBG_TRNG_CTRL)) >> IPECC_R_DBG_TRNG_RAW_DATA_POS) & IPECC_R_DBG_TRNG_RAW_DATA_MSK) \
-} while  (0)
+} while (0)
 
+/* Disable the post-processing logic that produces internal random numbers
+ * from raw random bits.
+ * Watchout: implicitly activate the TRNG raw random source by deasserting
+ * the 'complete bypass' bit.
+ */
+#define IPECC_TRNG_ENABLE_POSTPROC() do { \
+	IPECC_SET_REG(W_DBG_TRNG_CTRL, IPECC_W_DBG_TRNG_CTRL_DISABLE_PP); \
+} while (0)
 
+/* Disable the post-processing logic that produces internal random numbers
+ * from raw random bits.
+ * Watchout: implicitly activate the TRNG raw random source by deasserting
+ * the 'complete bypass' bit.
+ */
+#define IPECC_TRNG_DISABLE_POSTPROC() do { \
+	IPECC_SET_REG(W_DBG_TRNG_CTRL, 0); \
+} while (0)
 
+/* Completely turn-off the TRNG function as regard to random clients.
+ * 'bit' sets the deterministic value (0 or 1) that internal random
+ * numbers will get (instead of random) when the complete bypass is turned
+ * on.
+ */
+#define IPECC_TRNG_COMPLETE_BYPASS(bit) do { \
+	IPECC_SET_REG(W_DBG_TRNG_CTRL, IPECC_W_DBG_TRNG_CTRL_TRNG_BYPASS \
+			| ((bit) & 0x1) << IPECC_W_DBG_TRNG_CTRL_TRNG_BYPASS_BIT); \
+} while (0)
 
+/* Undo the action of IPECC_TRNG_COMPLETE_BYPASS().
+ * Watchout: implicitly also re-activate the post-processing logic
+ * by deasserting 'post-proc disable' bit.
+ */
+#define IPECC_TRNG_UNDO_COMPLETE_BYPASS() do { \
+	IPECC_SET_REG(W_DBG_TRNG_CTRL, 0); \
+} while (0)
 
 /* Actions involving register W_DBG_TRNG_CFG
  * (configuration of TRNG) */
-#define IPECC_() do { \
+#define IPECC_TRNG_CONFIG(debias, ta, idlenb) do { \
+	uint32_t val = 0; \
+	/* Configure Von Neumann debias logic */ \
+	if (debias) { \
+		val |= IPECC_W_DBG_TRNG_CFG_ACTIVE_DEBIAS ; \
+	} \
+	val |= ((ta) & IPECC_W_DBG_TRNG_CFG_TA_MSK) << IPECC_W_DBG_TRNG_CFG_TA_POS; \
+	val |= ((idlenb) & IPECC_W_DBG_TRNG_CFG_TRNG_IDLE_MSK) << IPECC_W_DBG_TRNG_CFG_TRNG_IDLE_POS; \
+	IPECC_SET_REG(W_DBG_TRNG_CFG, val); \
 } while (0)
 
-/* Actions involving register W_DBG_FP_WADDR */
-#define IPECC_() do { \
+/* Actions involving registers W_DBG_FP_WADDR & W_DBG_FP_WDATA */
+
+/* Set the address in the memory of large numbers at which to write a data word.
+ * The data itself can be subsequently transmitted using IPECC_DBG_SET_FP_WRITE_DATA().
+ */
+#define IPECC_DBG_SET_FP_WRITE_ADDR(addr) do { \
+	IPECC_SET_REG(IPECC_W_DBG_FP_WADDR, ((addr) & IPECC_W_DBG_FP_WADDR_MSK) << IPECC_W_DBG_FP_WADDR_POS); \
 } while (0)
 
-/* Actions involving register W_DBG_FP_WDATA */
-#define IPECC_() do { \
+/* Set the data to be written in memory of large numbers, at the address previously
+ * set using IPECC_DBG_SET_FP_WRITE_ADDR(), and performs the write.
+ * This is a ww-bit word which is a limb of a larger large-number.
+ */
+#define IPECC_DBG_SET_FP_WRITE_DATA(limb) do { \
+	IPECC_SET_REG(IPECC_W_DBG_FP_WDATA, ((limb) & IPECC_W_DBG_FP_DATA_MSK) << IPECC_W_DBG_FP_DATA_POS); \
 } while (0)
 
-/* Actions involving register W_DBG_FP_RADDR */
-#define IPECC_() do { \
+/* Actions involving register W_DBG_FP_RADDR & IPECC_R_DBG_FP_RDATA */
+
+/* Set the address in the memory of large numbers at which a data word is to be read.
+ * The data itself can be subsequently obtained using IPECC_DBG_GET_FP_READ_DATA().
+ */
+#define IPECC_DBG_SET_FP_READ_ADDR(addr) do { \
+	IPECC_SET_REG(IPECC_W_DBG_FP_RADDR, ((addr) & IPECC_W_DBG_FP_RADDR_MSK) << IPECC_W_DBG_FP_RADDR_POS); \
 } while (0)
+
+/* Obtain the data word from memory of large numbers whose address
+ * was previously set using IPECC_DBG_SET_FP_READ_ADDR().
+ */ 
+#define IPECC_DBG_GET_FP_READ_DATA() \
+	(((IPECC_GET_REG(IPECC_R_DBG_FP_RDATA)) >> IPECC_W_DBG_FP_DATA_MSK) & IPECC_W_DBG_FP_DATA_POS)
 
 /* Actions involving register W_DBG_CFG_XYSHUF */
-#define IPECC_() do { \
+
+/* Enable the XY-coords shuffling of R0 & R1 sensitivie points
+ */
+#define IPECC_DBG_ENABLE_XYSHUF() do { \
+	IPECC_SET_REG(IPECC_W_DBG_CFG_XYSHUF, IPECC_W_DBG_CFG_XYSHUF_EN); \
+} while (0)
+
+/* Disable the XY-coords shuffling or R0 & R1 sensitive points
+ * (can only by done in debug (unsecure-)mode).
+ */
+#define IPECC_DBG_DISABLE_XYSHUF() do { \
+	IPECC_SET_REG(IPECC_W_DBG_CFG_XYSHUF, IPECC_W_DBG_CFG_XYSHUF_DIS); \
 } while (0)
 
 /* Actions involving register W_DBG_CFG_AXIMSK */
-#define IPECC_() do { \
+
+/* Enable on-the-fly masking of the scalar by the AXI interface along its
+ * writting in memory of large numbers.
+ */
+#define IPECC_DBG_ENABLE_AXIMSK() do { \
+	IPECC_SET_REG(IPECC_W_DBG_CFG_AXIMSK, IPECC_W_DBG_CFG_AXIMSK_EN); \
+} while (0)
+
+/* Disable on-the-fly masking of the scalar by the AXI interface along its
+ * writting in memory of large numbers.
+ * (can only by done in debug (unsecure-)mode).
+ */
+#define IPECC_DBG_DISABLE_AXIMSK() do { \
+	IPECC_SET_REG(IPECC_W_DBG_CFG_AXIMSK, IPECC_W_DBG_CFG_AXIMSK_DIS); \
 } while (0)
 
 /* Actions involving register W_DBG_CFG_TOKEN */
-#define IPECC_() do { \
+
+/* Enable token feature - a random value used to mask the coordinates
+ * of result [k]P that software driver gets before launching the [k]P
+ * computation.
+ */
+#define IPECC_DBG_ENABLE_TOKEN() do { \
+	IPECC_SET_REG(IPECC_W_DBG_CFG_TOKEN, IPECC_W_DBG_CFG_TOKEN_EN); \
+} while (0)
+
+/* Disale token feature.
+ * (can only by done in debug (unsecure-)mode).
+ */
+#define IPECC_DBG_DISABLE_TOKEN() do { \
+	IPECC_SET_REG(IPECC_W_DBG_CFG_TOKEN, IPECC_W_DBG_CFG_TOKEN_DIS); \
 } while (0)
 
 /* Actions involving register W_DBG_RESET_TRNG_CNT */
-#define IPECC_() do { \
-} while (0)
 
 /* Actions involving register R_DBG_CAPABILITIES_0 */
 /* Actions involving register R_DBG_CAPABILITIES_1 */
@@ -902,8 +1010,9 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 #define IPECC_TRNG_RAW_FIFO_ADDR() ((IPECC_GET_REG(IPECC_R_DBG_TRNG_STAT) >> IPECC_R_DBG_TRNG_STAT_RAW_FIFO_OFFSET_POS) & IPECC_R_DBG_TRNG_STAT_RAW_FIFO_OFFSET_MSK)
 /* Configure elements for random generation */
 /* Deactivate the Post-Processing */
-#define IPECC_TRNG_DEACTIVATE_PP() (IPECC_SET_REG(IPECC_W_DBG_TRNG_CTRL, IPECC_W_DBG_TRNG_CTRL_DEACTIVATE_PP))
+//#define IPECC_TRNG_DEACTIVATE_PP() (IPECC_SET_REG(IPECC_W_DBG_TRNG_CTRL, IPECC_W_DBG_TRNG_CTRL_DEACTIVATE_PP))
 /* Set options for the TRNG */
+#if 0
 #define IPECC_TRNG_SET_OPTIONS(debias, ta, latency, bypass) do { \
 	ip_ecc_word val = IPECC_GET_REG(IPECC_W_DBG_TRNG_CFG); \
 	val |= ((debias) ? IPECC_W_DBG_TRNG_CFG_ACTIVE_DEBIAS : 0); \
@@ -912,6 +1021,7 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 	val |= ((bypass) ? IPECC_W_DBG_TRNG_CFG_TRNG_BYPASS : 0); \
 	IPECC_SET_REG(IPECC_W_DBG_TRNG_CFG, val); \
 } while(0)
+#endif
 
 typedef enum {
 	EC_HW_REG_A      = 0,
@@ -1557,13 +1667,13 @@ static inline int ip_ecc_configure_trng(int debias, uint32_t ta, uint32_t cycles
 
 	if(pp){
 		/* Deactivate the Post-Processing if asked to */
-		IPECC_TRNG_DEACTIVATE_PP();
+		//IPECC_TRNG_DEACTIVATE_PP();
 		/* Wait until the IP is not busy */
 		IPECC_BUSY_WAIT();
 	}
 	
 	/* Set other options */
-	IPECC_TRNG_SET_OPTIONS(debias, ta, cycles, bypass);
+	//IPECC_TRNG_SET_OPTIONS(debias, ta, cycles, bypass);
 	/* Wait until the IP is not busy */
 	IPECC_BUSY_WAIT();
 
