@@ -110,6 +110,44 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 #define IPECC_W_DBG_RESET_TRNG_CNT    (ipecc_baddr + IPECC_ALIGNED(0x180))
 /*	-- reserved                                                           0x188...0x1f8  */
 
+/* read-only registers */
+#define IPECC_R_STATUS  		(ipecc_baddr + IPECC_ALIGNED(0x000))
+#define IPECC_R_READ_DATA  		(ipecc_baddr + IPECC_ALIGNED(0x008))
+#define IPECC_R_CAPABILITIES  		(ipecc_baddr + IPECC_ALIGNED(0x010))
+#define IPECC_R_PRIME_SIZE  		(ipecc_baddr + IPECC_ALIGNED(0x018))
+#define IPECC_R_HW_VERSION      (ipecc_baddr + IPECC_ALIGNED(0x020))
+/*	-- reserved                               0x028...0x0f8 */
+#define IPECC_R_DBG_CAPABILITIES_0	(ipecc_baddr + IPECC_ALIGNED(0x100))
+#define IPECC_R_DBG_CAPABILITIES_1	(ipecc_baddr + IPECC_ALIGNED(0x108))
+#define IPECC_R_DBG_CAPABILITIES_2	(ipecc_baddr + IPECC_ALIGNED(0x110))
+#define IPECC_R_DBG_STATUS  		(ipecc_baddr + IPECC_ALIGNED(0x118))
+#define IPECC_R_DBG_TIME       (ipecc_baddr + IPECC_ALIGNED(0x120))
+/* Time to fill the RNG raw FIFO in cycles */
+#define IPECC_R_DBG_RAWDUR      (ipecc_baddr + IPECC_ALIGNED(0x128))
+#define IPECC_R_DBG_FLAGS      (ipecc_baddr + IPECC_ALIGNED(0x130))
+#define IPECC_R_DBG_TRNG_STATUS     (ipecc_baddr + IPECC_ALIGNED(0x138))
+/* Read TRNG data */
+#define IPECC_R_DBG_TRNG_DATA      (ipecc_baddr + IPECC_ALIGNED(0x140))
+#define IPECC_R_DBG_FP_RDATA  		(ipecc_baddr + IPECC_ALIGNED(0x148))
+#define IPECC_R_DBG_IRN_CNT_AXI  		(ipecc_baddr + IPECC_ALIGNED(0x150))
+#define IPECC_R_DBG_IRN_CNT_EFP  		(ipecc_baddr + IPECC_ALIGNED(0x158))
+#define IPECC_R_DBG_IRN_CNT_CUR  		(ipecc_baddr + IPECC_ALIGNED(0x160))
+#define IPECC_R_DBG_IRN_CNT_SHF  		(ipecc_baddr + IPECC_ALIGNED(0x168))
+#define IPECC_R_DBG_FP_RDATA_RDY    (ipecc_baddr + IPECC_ALIGNED(0x170))
+#define IPECC_R_DBG_TRNG_DIAG_0  		(ipecc_baddr + IPECC_ALIGNED(0x178))
+#define IPECC_R_DBG_TRNG_DIAG_1  		(ipecc_baddr + IPECC_ALIGNED(0x180))
+#define IPECC_R_DBG_TRNG_DIAG_2  		(ipecc_baddr + IPECC_ALIGNED(0x188))
+#define IPECC_R_DBG_TRNG_DIAG_3  		(ipecc_baddr + IPECC_ALIGNED(0x190))
+#define IPECC_R_DBG_TRNG_DIAG_4  		(ipecc_baddr + IPECC_ALIGNED(0x198))
+#define IPECC_R_DBG_TRNG_DIAG_5  		(ipecc_baddr + IPECC_ALIGNED(0x1a0))
+#define IPECC_R_DBG_TRNG_DIAG_6  		(ipecc_baddr + IPECC_ALIGNED(0x1a8))
+#define IPECC_R_DBG_TRNG_DIAG_7  		(ipecc_baddr + IPECC_ALIGNED(0x1b0))
+#define IPECC_R_DBG_TRNG_DIAG_8  		(ipecc_baddr + IPECC_ALIGNED(0x1b8))
+/*	-- reserved                               0x1c0...0x1f8 */
+
+/*******************************************
+ * Bit & fields positions in these registers
+ *******************************************/
 
 /* Fields for W_CTRL */
 #define IPECC_W_CTRL_PT_KP		((uint32_t)0x1 << 0)
@@ -254,43 +292,6 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 /* no field here: action is performed simply by writing to the
    register address, whatever the value written */
 
-/***********************************************************/
-/***********************************************************/
-/* read-only registers */
-#define IPECC_R_STATUS  		(ipecc_baddr + IPECC_ALIGNED(0x000))
-#define IPECC_R_READ_DATA  		(ipecc_baddr + IPECC_ALIGNED(0x008))
-#define IPECC_R_CAPABILITIES  		(ipecc_baddr + IPECC_ALIGNED(0x010))
-#define IPECC_R_PRIME_SIZE  		(ipecc_baddr + IPECC_ALIGNED(0x018))
-#define IPECC_R_HW_VERSION      (ipecc_baddr + IPECC_ALIGNED(0x020))
-/*	-- reserved                               0x028...0x0f8 */
-#define IPECC_R_DBG_CAPABILITIES_0	(ipecc_baddr + IPECC_ALIGNED(0x100))
-#define IPECC_R_DBG_CAPABILITIES_1	(ipecc_baddr + IPECC_ALIGNED(0x108))
-#define IPECC_R_DBG_CAPABILITIES_2	(ipecc_baddr + IPECC_ALIGNED(0x110))
-#define IPECC_R_DBG_STATUS  		(ipecc_baddr + IPECC_ALIGNED(0x118))
-#define IPECC_R_DBG_TIME       (ipecc_baddr + IPECC_ALIGNED(0x120))
-/* Time to fill the RNG raw FIFO in cycles */
-#define IPECC_R_DBG_RAWDUR      (ipecc_baddr + IPECC_ALIGNED(0x128))
-#define IPECC_R_DBG_FLAGS      (ipecc_baddr + IPECC_ALIGNED(0x130))
-#define IPECC_R_DBG_TRNG_STATUS     (ipecc_baddr + IPECC_ALIGNED(0x138))
-/* Read TRNG data */
-#define IPECC_R_DBG_TRNG_DATA      (ipecc_baddr + IPECC_ALIGNED(0x140))
-#define IPECC_R_DBG_FP_RDATA  		(ipecc_baddr + IPECC_ALIGNED(0x148))
-#define IPECC_R_DBG_IRN_CNT_AXI  		(ipecc_baddr + IPECC_ALIGNED(0x150))
-#define IPECC_R_DBG_IRN_CNT_EFP  		(ipecc_baddr + IPECC_ALIGNED(0x158))
-#define IPECC_R_DBG_IRN_CNT_CUR  		(ipecc_baddr + IPECC_ALIGNED(0x160))
-#define IPECC_R_DBG_IRN_CNT_SHF  		(ipecc_baddr + IPECC_ALIGNED(0x168))
-#define IPECC_R_DBG_FP_RDATA_RDY    (ipecc_baddr + IPECC_ALIGNED(0x170))
-#define IPECC_R_DBG_TRNG_DIAG_0  		(ipecc_baddr + IPECC_ALIGNED(0x178))
-#define IPECC_R_DBG_TRNG_DIAG_1  		(ipecc_baddr + IPECC_ALIGNED(0x180))
-#define IPECC_R_DBG_TRNG_DIAG_2  		(ipecc_baddr + IPECC_ALIGNED(0x188))
-#define IPECC_R_DBG_TRNG_DIAG_3  		(ipecc_baddr + IPECC_ALIGNED(0x190))
-#define IPECC_R_DBG_TRNG_DIAG_4  		(ipecc_baddr + IPECC_ALIGNED(0x198))
-#define IPECC_R_DBG_TRNG_DIAG_5  		(ipecc_baddr + IPECC_ALIGNED(0x1a0))
-#define IPECC_R_DBG_TRNG_DIAG_6  		(ipecc_baddr + IPECC_ALIGNED(0x1a8))
-#define IPECC_R_DBG_TRNG_DIAG_7  		(ipecc_baddr + IPECC_ALIGNED(0x1b0))
-#define IPECC_R_DBG_TRNG_DIAG_8  		(ipecc_baddr + IPECC_ALIGNED(0x1b8))
-/*	-- reserved                               0x1c0...0x1f8 */
-
 /* Fields for R_STATUS */
 #define IPECC_R_STATUS_BUSY		((uint32_t)0x1 << 0)
 #define IPECC_R_STATUS_KP		((uint32_t)0x1 << 4)
@@ -395,19 +396,6 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 #define IPECC_R_DBG_TRNG_DIAG_CNT_STARV_POS     (0)
 #define IPECC_R_DBG_TRNG_DIAG_CNT_STARV_MSK     (0xffffffff)
 
-/***********************************************************/
-/***********************************************************/
-/* Big numbers internal RAM memory map (by index) */
-#define IPECC_BNUM_P		0
-#define IPECC_BNUM_A		1
-#define IPECC_BNUM_B		2
-#define IPECC_BNUM_Q		3
-/* NOTE: K and R0_X share the same index */
-#define IPECC_BNUM_K		4
-#define IPECC_BNUM_R0_X		4
-#define IPECC_BNUM_R0_Y		5
-#define IPECC_BNUM_R1_X		6
-#define IPECC_BNUM_R1_Y		7
 
 /* Handling the IP busy state */
 #define IPECC_BUSY_WAIT() do { \
@@ -462,7 +450,7 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
  *******************************************************************************/
 
 /*
- * Actions involving register W_CTRL
+ * Actions involving registers W_CTRL & R_STATUS
  */
 
 /* commands execution */
@@ -474,8 +462,13 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 #define IPECC_EXEC_PT_NEG() (IPECC_SET_REG(IPECC_W_CTRL, IPECC_W_CTRL_PT_NEG))
 #define IPECC_EXEC_PT_KP()  (IPECC_SET_REG(IPECC_W_CTRL, IPECC_W_CTRL_PT_KP))
 
+/* On curve/equality/opposition flags handling */
+#define IPECC_GET_ONCURVE() (!!(IPECC_GET_REG(IPECC_R_STATUS) & IPECC_R_STATUS_YES))
+#define IPECC_GET_EQU()     (!!(IPECC_GET_REG(IPECC_R_STATUS) & IPECC_R_STATUS_YES))
+#define IPECC_GET_OPP()     (!!(IPECC_GET_REG(IPECC_R_STATUS) & IPECC_R_STATUS_YES))
+
 /*
- * Actions involving register W_WRITE_DATA
+ * Actions involving register W_WRITE_DATA & R_READ_DATA
  */
 
 /* Addresses and data handling */
@@ -485,6 +478,18 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 	val |= ((addr & IPECC_W_CTRL_NBADDR_MSK) << IPECC_W_CTRL_NBADDR_POS); \
 	IPECC_SET_REG(IPECC_W_CTRL, val); \
 } while(0)
+
+/* Big numbers internal RAM memory map (by index) */
+#define IPECC_BNUM_P		0
+#define IPECC_BNUM_A		1
+#define IPECC_BNUM_B		2
+#define IPECC_BNUM_Q		3
+/* NOTE: K and R0_X share the same index */
+#define IPECC_BNUM_K		4
+#define IPECC_BNUM_R0_X		4
+#define IPECC_BNUM_R0_Y		5
+#define IPECC_BNUM_R1_X		6
+#define IPECC_BNUM_R1_Y		7
 
 #define IPECC_READ_DATA() (IPECC_GET_REG(IPECC_R_READ_DATA))
 
@@ -501,7 +506,7 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 } while(0)
 
 /*
- * Actions involving registers W_R[01]_NULL
+ * Actions involving registers W_R[01]_NULL & R_STATUS
  */
 
 /* Infinity point handling with R0/R1 NULL flags */
@@ -522,7 +527,7 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 } while(0)
 
 /*
- * Actions involving registers W_PRIME_SIZE
+ * Actions involving registers W_PRIME_SIZE & R_PRIME_SIZE
  */
 
 /* NN size (static and dynamic) handling */
@@ -606,25 +611,20 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
  * Actions using register W_ERR_ACK
  */
 
-/* Reset handling */
-#define IPECC_SOFT_RESET() do { \
-	(IPECC_SET_REG(IPECC_W_SOFT_RESET, 1)); \
-} while (0)
-
-/* Set small scalar size */
-#define IPECC_SET_SMALL_SCALAR_SIZE(sz) do { \
-	IPECC_SET_REG(IPECC_W_SMALL_SCALAR, \
-			(sz & IPECC_W_SMALL_SCALAR_K_MSK) << IPECC_W_SMALL_SCALAR_K_POS); \
-} while (0)
-
-
-
-/* On curve/equality/opposition flags handling */
-#define IPECC_GET_ONCURVE() (!!(IPECC_GET_REG(IPECC_R_STATUS) & IPECC_R_STATUS_YES))
-#define IPECC_GET_EQU()     (!!(IPECC_GET_REG(IPECC_R_STATUS) & IPECC_R_STATUS_YES))
-#define IPECC_GET_OPP()     (!!(IPECC_GET_REG(IPECC_R_STATUS) & IPECC_R_STATUS_YES))
-
-/* Error handling */
+/* Definition of error bits.
+ *
+ * Exact same bit positions exist both in R_STATUS register and in W_ERR_ACK register.
+ *
+ * Hence an error set (=1) by hardware in R_STATUS register can always be acknowledged by
+ * the software driver by writing a 1 at the exact same bit position in W_ERR_ACK register,
+ * thus having hardware reset back the error (=0) in the exact same bit position in R_STATUS
+ * register.
+ *
+ * Note however that following bit positions start at 0 and hence are relative: correspon-
+ * ding real bit positions are actually shifted by IPECC_R_STATUS_ERRID_POS (both in R_STATUS
+ * and W_ERR_ACK register), however higher-level of the software does not need to bother with
+ * these details as they are masked by macros IPECC_GET_ERROR() & IPECC_ACK_ERROR() below,
+ * which perform the actual bit-shift of IPECC_R_STATUS_ERRID_POS positions */
 #define IPECC_ERR_IN_PT_NOT_ON_CURVE	((uint32_t)0x1 << 0)
 #define IPECC_ERR_OUT_PT_NOT_ON_CURVE	((uint32_t)0x1 << 1)
 #define IPECC_ERR_COMP			((uint32_t)0x1 << 2)
@@ -640,7 +640,6 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 #define IPECC_ERR_ZREMASK		((uint32_t)0x1 << 12)
 #define IPECC_ERR_WK_NOT_ENOUGH_RANDOM  ((uint32_t)0x1 << 13)
 
-
 #define IPECC_GET_ERROR() ((IPECC_GET_REG(IPECC_R_STATUS) >> IPECC_R_STATUS_ERRID_POS) & IPECC_R_STATUS_ERRID_MSK)
 #define IPECC_ERROR_IS_COMP()			(!!(IPECC_GET_ERROR() & IPECC_ERR_COMP))
 #define IPECC_ERROR_IS_WREG_FBD()		(!!(IPECC_GET_ERROR() & IPECC_ERR_WREG_FBD))
@@ -655,12 +654,45 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 
 #define IPECC_ACK_ERROR(err) (IPECC_SET_REG(IPECC_W_ERR_ACK, (((err) & IPECC_R_STATUS_ERRID_MSK) << IPECC_R_STATUS_ERRID_POS)))
 
+/*
+ * Actions using register W_SMALL_SCALAR
+ */
+
+/* Set small scalar size */
+#define IPECC_SET_SMALL_SCALAR_SIZE(sz) do { \
+	IPECC_SET_REG(IPECC_W_SMALL_SCALAR, \
+			(sz & IPECC_W_SMALL_SCALAR_K_MSK) << IPECC_W_SMALL_SCALAR_K_POS); \
+} while (0)
+
+/*
+ * Actions using register W_SOFT_RESET
+ */
+
+/* Reset handling */
+#define IPECC_SOFT_RESET() do { \
+	(IPECC_SET_REG(IPECC_W_SOFT_RESET, 1)); \
+} while (0)
+
+/*
+ * Actions using register R_CAPABILITIES
+ */
+
 /* Capabilities handling */
 /* IPECC_IS_DYNAMIC_NN_SUPPORTED - to know if the IP hardware was synthesized with
- *                             the option 'nn modifiable at runtime' */
+ *                                 the option 'nn modifiable at runtime' */
 #define IPECC_IS_DYNAMIC_NN_SUPPORTED()     (!!((IPECC_GET_REG(IPECC_R_CAPABILITIES) & IPECC_R_CAPABILITIES_NNDYN)))
 #define IPECC_IS_SHUFFLING_SUPPORTED()    (!!((IPECC_GET_REG(IPECC_R_CAPABILITIES) & IPECC_R_CAPABILITIES_SHF)))
 #define IPECC_IS_W64()      (!!((IPECC_GET_REG(IPECC_R_CAPABILITIES) & IPECC_R_CAPABILITIES_W64)))
+
+/*
+ * Actions using register R_HW_VERSION
+ */
+/* This register exists in hardware only if the IP was synthesized in DEBUG (unsecure-)mode
+ * (as opposed to prodution (secure-)mode. */
+#define IPECC_GET_MAJOR_VERSION()  (IPECC_GET_REG(IPECC_R_HW_VERSION) & 
+#define IPECC_GET_MINOR_VERSION() 
+
+
 
 /****** DEBUG ************/
 /* TRNG handling */
