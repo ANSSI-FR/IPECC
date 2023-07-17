@@ -2169,15 +2169,15 @@ begin
 					v.debug.trng.irnreset := '1'; -- stays asserted 1 cycle thx to (s59)
 				end if;
 				-- activation/disabling of TRNG post-processing
-				v.debug.trng.ppdeact := r.axi.wdatax(8);
+				v.debug.trng.ppdeact := r.axi.wdatax(DBG_TRNG_PP_DISABLE);
+				v.debug.trng.completebypass := r.axi.wdatax(DBG_TRNG_COMPLETE_BYPASS);
+				v.debug.trng.completebypassbit := r.axi.wdatax(
+					DBG_TRNG_COMPLETE_BYPASS_BIT);
 			-- --------------------------------------------------------------
 			-- decoding write to W_DBG_TRNG_CFG register
 			-- --------------------------------------------------------------
 			elsif debug and r.axi.waddr = W_DBG_TRNG_CFG then
 				v.debug.trng.vonneuman := r.axi.wdatax(DBG_TRNG_VONM);
-				v.debug.trng.completebypass := r.axi.wdatax(DBG_TRNG_COMPLETE_BYPASS);
-				v.debug.trng.completebypassbit := r.axi.wdatax(
-					DBG_TRNG_COMPLETE_BYPASS_BIT);
 				v.debug.trng.ta :=
 					unsigned(r.axi.wdatax(DBG_TRNG_TA_MSB downto DBG_TRNG_TA_LSB));
 				v.debug.trng.idletime :=

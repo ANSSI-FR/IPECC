@@ -185,15 +185,15 @@ package ecc_software is
 	constant DBG_TRNG_RAW_RESET : natural := 0;
 	constant DBG_TRNG_IRN_RESET : natural := 1;
 	constant DBG_TRNG_RAW_READ : natural := 4;
-	constant DBG_TRNG_PP_DEACT : natural := 8;
-	constant DBG_TRNG_RAW_ADDR_LSB : natural := 12;
+	constant DBG_TRNG_RAW_ADDR_LSB : natural := 8;
 	constant DBG_TRNG_RAW_ADDR_MSB : natural :=
 		DBG_TRNG_RAW_ADDR_LSB + log2(raw_ram_size - 1) - 1;
+	constant DBG_TRNG_PP_DISABLE : natural := 28;
+	constant DBG_TRNG_COMPLETE_BYPASS : natural := 29;
+	constant DBG_TRNG_COMPLETE_BYPASS_BIT : natural := 30;
 
 	-- bit positions in W_DBG_TRNG_CFG register
 	constant DBG_TRNG_VONM : natural := 0;
-	constant DBG_TRNG_COMPLETE_BYPASS : natural := 1;
-	constant DBG_TRNG_COMPLETE_BYPASS_BIT : natural := 2;
 	constant DBG_TRNG_TA_LSB : natural := 4;
 	constant DBG_TRNG_TA_MSB : natural := 23;
 	constant DBG_TRNG_IDLE_LSB : natural := 24;
