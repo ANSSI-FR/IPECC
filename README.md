@@ -1,5 +1,4 @@
-# IPECC, an open-source VHDL IP for generic elliptic curve cryptography over finite field
-## With an emphasis on side-channel resistance
+# IPECC, an open-source VHDL IP for generic elliptic curve cryptography over finite field, with emphasis on side-channel resistance
 
 Copyright (C) 2023
 
