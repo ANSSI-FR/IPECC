@@ -340,7 +340,9 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 
 /* Fields for R_DBG_CAPABILITIES_2 */
 #define IPECC_R_DBG_CAPABILITIES_2_RAW_RAMSZ_POS    (0)
-#define IPECC_R_DBG_CAPABILITIES_2_RAW_RAMSZ_MSK    (0xffffffff)
+#define IPECC_R_DBG_CAPABILITIES_2_RAW_RAMSZ_MSK    (0xffff)
+#define IPECC_R_DBG_CAPABILITIES_2_IRN_SHF_WIDTH_POS    (16)
+#define IPECC_R_DBG_CAPABILITIES_2_IRN_SHF_WIDTH_MSK    (0xffff)
 
 /* Fields for R_DBG_STATUS */
 #define IPECC_R_DBG_STATUS_HALTED    (((uint32_t)0x1 << 0)
@@ -391,27 +393,27 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 #define IPECC_R_DBG_TRNG_DIAG_0_STARV_POS     (0)
 #define IPECC_R_DBG_TRNG_DIAG_0_STARV_MSK     (0xffffffff)
 
-/* Fields for R_DBG_TRNG_DIAG_[1357] */
+/* Fields for R_DBG_TRNG_DIAG_[1|3|5|7] */
 #define IPECC_R_DBG_TRNG_DIAG_CNT_OK_POS     (0)
 #define IPECC_R_DBG_TRNG_DIAG_CNT_OK_MSK     (0xffffffff)
 
-/* Fields for R_DBG_TRNG_DIAG_[2468] */
+/* Fields for R_DBG_TRNG_DIAG_[2|4|6|8] */
 #define IPECC_R_DBG_TRNG_DIAG_CNT_STARV_POS     (0)
 #define IPECC_R_DBG_TRNG_DIAG_CNT_STARV_MSK     (0xffffffff)
 
-
-/************************************************************
+/*************************************************************
  * Low-level action macros: actions involving a direct write
- * or read to/from an IP register along with related helper
+ * or read to/from an IP register, along with related helper
  * macros.
  *
  * Sorted by target register.
  *************************************************************/
 /*
  * Actions involving registers R_STATUS & W_CTRL
+ * *********************************************
  */
-
-/* Handling the IP busy state */
+/* Handling the IP busy state.
+ */
 #define IPECC_BUSY_WAIT() do { \
 	while(IPECC_GET_REG(IPECC_R_STATUS) & IPECC_R_STATUS_BUSY){}; \
 } while(0)
@@ -423,43 +425,49 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
  * are only provided as a way for software to get extra information on the reason why
  * the IP being busy */
 
-/* IPECC_IS_BUSY_KP - the IP is busy computing a [k]P */
+/* Is the IP busy computing a [k]P?
+ */
 #define IPECC_IS_BUSY_KP() 	(!!(IPECC_GET_REG(IPECC_R_STATUS) & IPECC_R_STATUS_KP))
 
-/* IPECC_IS_BUSY_MTY - the IP is busy computing the Montgomery constants */
+/* Is the IP busy computing the Montgomery constants?
+ */
 #define IPECC_IS_BUSY_MTY() 	(!!(IPECC_GET_REG(IPECC_R_STATUS) & IPECC_R_STATUS_MTY))
 
-/* IPECC_IS_BUSY_POP - the IP is busy computing a point operation other than [k]P,
- * e.g addition, doubling, etc */
+/* Is the IP busy computing a point operation other than [k]P?
+ * (e.g addition, doubling, etc)
+ */
 #define IPECC_IS_BUSY_POP() 	(!!(IPECC_GET_REG(IPECC_R_STATUS) & IPECC_R_STATUS_POP))
 
-/* IPECC_IS_BUSY_R_W - the IP is busy transferring a big number from/to the AXI interface
- * to/from its internal memory of big numbers */
+/* Is the IP busy transferring a big number from/to the AXI interface
+ * to/from its internal memory of big numbers?
+ */
 #define IPECC_IS_BUSY_R_W() 	(!!(IPECC_GET_REG(IPECC_R_STATUS) & IPECC_R_STATUS_R_OR_W))
 
-/* IPECC_IS_BUSY_INIT - the IP is in its reset/initialization process */
+/* Is the IP is in its reset/initialization process?
+ */
 #define IPECC_IS_BUSY_INIT() 	(!!(IPECC_GET_REG(IPECC_R_STATUS) & IPECC_R_STATUS_INIT))
 
-/* IPECC_IS_BUSY_NNDYNACT - the IP is busy computing internal signals due to the refresh
- *                          of 'nn' main security parameter (only with a hardware synthesized
- *                          with 'nn modifiable at runtime' option) */
+/* Is the IP busy computing internal signals due to the refresh
+ * of 'nn' main security parameter? (only with a hardware synthesized
+ * with 'nn modifiable at runtime' option)
+ */
 #define IPECC_IS_BUSY_NNDYNACT() (!!(IPECC_GET_REG(IPECC_R_STATUS) & IPECC_R_STATUS_NNDYNACT))
 
-/* IPECC_IS_ENOUGH_RND_WRITE_SCALAR()
- *    To know if the IP is ready to accept a new scalar (writing the scalar is a
- *    particular case of writing a big number: the IP must first gather enough random
- *    to mask it).
+/* To know if the IP is ready to accept a new scalar (writing the scalar is a
+ * particular case of writing a big number: the IP must first gather enough random
+ * to mask it).
  *
- *    This bit is not part of the "busy" state, meaning the IP won't show a high
- *    STATUS_BUSY bit just because there is not enough random to mask the scalar (yet).
+ * This bit is not part of the "busy" state, meaning the IP won't show a high
+ * STATUS_BUSY bit just because there is not enough random to mask the scalar (yet).
  *
- *    Software must first check that this bit is active (1) before writing a new scalar
- *    (otherwise data written by software when transmitting the scalar will be ignored
- *    and error flag 'WK_NOT_ENOUGH_RANDOM' will be set in register R_STATUS). */
+ * Software must first check that this bit is active (1) before writing a new scalar
+ * (otherwise data written by software when transmitting the scalar will be ignored
+ * and error flag 'WK_NOT_ENOUGH_RANDOM' will be set in register R_STATUS).
+ */
 #define IPECC_IS_ENOUGH_RND_WRITE_SCALAR() 	(!!(IPECC_GET_REG(IPECC_R_STATUS) & IPECC_R_WK_STATUS_ENOUGH_RND))
 
-
-/* commands execution */
+/* Commands execution
+ */
 #define IPECC_EXEC_PT_ADD() (IPECC_SET_REG(IPECC_W_CTRL, IPECC_W_CTRL_PT_ADD))
 #define IPECC_EXEC_PT_DBL() (IPECC_SET_REG(IPECC_W_CTRL, IPECC_W_CTRL_PT_DBL))
 #define IPECC_EXEC_PT_CHK() (IPECC_SET_REG(IPECC_W_CTRL, IPECC_W_CTRL_PT_CHK))
@@ -468,16 +476,18 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 #define IPECC_EXEC_PT_NEG() (IPECC_SET_REG(IPECC_W_CTRL, IPECC_W_CTRL_PT_NEG))
 #define IPECC_EXEC_PT_KP()  (IPECC_SET_REG(IPECC_W_CTRL, IPECC_W_CTRL_PT_KP))
 
-/* On curve/equality/opposition flags handling */
+/* On curve/equality/opposition flags handling
+ */
 #define IPECC_GET_ONCURVE() (!!(IPECC_GET_REG(IPECC_R_STATUS) & IPECC_R_STATUS_YES))
 #define IPECC_GET_EQU()     (!!(IPECC_GET_REG(IPECC_R_STATUS) & IPECC_R_STATUS_YES))
 #define IPECC_GET_OPP()     (!!(IPECC_GET_REG(IPECC_R_STATUS) & IPECC_R_STATUS_YES))
 
 /*
  * Actions involving register W_WRITE_DATA & R_READ_DATA
+ * *****************************************************
  */
-
-/* Addresses and data handling */
+/* Addresses and data handling.
+ */
 #define IPECC_SET_READ_ADDR(addr) do { \
 	ip_ecc_word val = 0; \
 	val |= IPECC_W_CTRL_READ_NB; \
@@ -485,7 +495,8 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 	IPECC_SET_REG(IPECC_W_CTRL, val); \
 } while(0)
 
-/* Big numbers internal RAM memory map (by index) */
+/* Big numbers internal RAM memory map (by index).
+ */
 #define IPECC_BNUM_P		0
 #define IPECC_BNUM_A		1
 #define IPECC_BNUM_B		2
@@ -513,9 +524,10 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 
 /*
  * Actions involving registers W_R[01]_NULL & R_STATUS
+ * ***************************************************
  */
-
-/* Infinity point handling with R0/R1 NULL flags */
+/* Infinity point handling with R0/R1 NULL flags.
+ */
 #define IPECC_GET_R0_INF() (!!(IPECC_GET_REG(IPECC_R_STATUS) & IPECC_R_STATUS_R0_IS_NULL))
 #define IPECC_GET_R1_INF() (!!(IPECC_GET_REG(IPECC_R_STATUS) & IPECC_R_STATUS_R1_IS_NULL))
 
@@ -534,17 +546,21 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 
 /*
  * Actions involving registers W_PRIME_SIZE & R_PRIME_SIZE
+ * *******************************************************
  *
  * NN size (static and dynamic) handling.
  */
+/* To get the value of 'nn' the IP is currently set with
+ * (or what is the static value if hardware was not synthesized
+ * with the 'nn modifiable at runtime' option).
+ */
+#define IPECC_GET_NN_SIZE() \
+	(((IPECC_GET_REG(IPECC_R_PRIME_SIZE)) >> IPECC_W_PRIME_SIZE_POS) \
+	 & IPECC_W_PRIME_SIZE_MSK)
 
-/* IPECC_GET_NN_SIZE - to get the value of 'nn' the IP is currently set with
- *                     (or what is the static value if hardware was not synthesized
- *                     with the 'nn modifiable at runtime' option) */
-#define IPECC_GET_NN_SIZE() (((IPECC_GET_REG(IPECC_R_PRIME_SIZE)) >> IPECC_W_PRIME_SIZE_POS) & IPECC_W_PRIME_SIZE_MSK)
-
-/* IPECC_SET_NN_SIZE - to set the value of nn (only with hardware synthesized
- *                     with the 'nn modifiable at runtime' option) */
+/* To set the value of nn (only with hardware synthesized
+ * with the 'nn modifiable at runtime' option).
+ */
 #define IPECC_SET_NN_SIZE(sz) do { \
 	IPECC_SET_REG(IPECC_W_PRIME_SIZE, ((sz) & IPECC_W_PRIME_SIZE_MSK) << IPECC_W_PRIME_SIZE_POS); \
 } while(0)
@@ -552,11 +568,17 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 /*
  * Actions involving register W_BLINDING
  * (blinding handling)/
+ * *************************************
  */
 
+/* To disable blinding.
+ * */
 #define IPECC_DISABLE_BLINDING() do { \
 	IPECC_SET_REG(IPECC_W_BLINDING, 0); \
 } while(0)
+
+/* To enable & configure blinding countermeaure.
+ * */
 #define IPECC_SET_BLINDING_SIZE(blinding_size) do { \
 	uint32_t val = 0; \
 	/* Enable blinding */ \
@@ -567,12 +589,15 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 } while(0)
 
 /*
- * Action involving register W_SHUFFLE
+ * Actions involving register W_SHUFFLE
+ * ************************************
  */
 
 /* Enable shuffling countermeasure.
+ *
  *   - Shuffling method is set statically (at synthesis time) and cannot be
  *     modified dynamically.
+ *
  *   - Shuffling can be always be activated if a shuffling method was selected
  *     at synthesis time.
  */
@@ -581,8 +606,10 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 } while (0)
 
 /* Disable the shuffling countermeasure.
+ *
  *   - Shuffling cannot be deactivated if it was hardware-locked at synthesis
  *     time & the IP was synthesized in production (secure-)mode.
+ *
  *   - If IP was synthesized in debug (unsecure-)mode, shuffling can be arbitra-
  *     rily enabled/disabled
  */
@@ -592,7 +619,9 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 
 /*
  * Actions involving register W_ZREMASK
- * (enable & configure Z-remask countermeasure)
+ * ********************************************
+ */
+/* To enable & configure Z-remask countermeasure.
  */
 #define IPECC_ENABLE_ZREMASK(zremask_period) do { \
 	uint32_t val = 0; \
@@ -610,7 +639,9 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 /*
  * Actions involving register W_TOKEN
  * (token handling)
+ * **********************************
  */
+/* Have the IP generate a fresh random token. */
 #define IPECC_ASK_FOR_TOKEN_GENERATION() do { \
 	IPECC_SET_REG(IPECC_W_TOKEN, 1); /* written value actually is indifferent */ \
 } while (0)
@@ -618,8 +649,9 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 /*
  * Actions involving register W_IRQ
  * (interrupt request handling)
+ * ********************************
  */
-
+/* Enable interrupt requests */
 #define IPECC_ENABLE_IRQ() do { \
 	IPECC_SET_REG(IPECC_W_IRQ, IPECC_W_IRQ_EN); \
 } while (0)
@@ -627,6 +659,7 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 /*
  * Actions using register W_ERR_ACK
  * (error detection & acknowlegment)
+ * *********************************
  */
 
 /* Definition of error bits.
@@ -658,25 +691,50 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 #define IPECC_ERR_ZREMASK		((uint32_t)0x1 << 12)
 #define IPECC_ERR_WK_NOT_ENOUGH_RANDOM  ((uint32_t)0x1 << 13)
 
+/* Get the complete error field.
+ */
 #define IPECC_GET_ERROR() ((IPECC_GET_REG(IPECC_R_STATUS) >> IPECC_R_STATUS_ERRID_POS) & IPECC_R_STATUS_ERRID_MSK)
+
+/* To identify 'Computation' error */
 #define IPECC_ERROR_IS_COMP()			(!!(IPECC_GET_ERROR() & IPECC_ERR_COMP))
+
+/* To identify 'Forbidden register access' error */
 #define IPECC_ERROR_IS_WREG_FBD()		(!!(IPECC_GET_ERROR() & IPECC_ERR_WREG_FBD))
+
+/* To identify '[k]P computation not possible' error */
 #define IPECC_ERROR_IS_KP_FBD()			(!!(IPECC_GET_ERROR() & IPECC_ERR_KP_FBD))
+
+/* To identify 'nn value not in authorized range' error */
 #define IPECC_ERROR_IS_NNDYN()			(!!(IPECC_GET_ERROR() & IPECC_ERR_NNDYN))
+
+/* To identify 'Point operation (other than [k]P) not possible' error */
 #define IPECC_ERROR_IS_POP_FBD()		(!!(IPECC_GET_ERROR() & IPECC_ERR_POP_FBD))
+
+/* To identify 'Read large number command cannot be satisfied' error */
 #define IPECC_ERROR_IS_RDNB_FBD()		(!!(IPECC_GET_ERROR() & IPECC_ERR_RDNB_FBD))
+
+/* To identify 'Blinding configuration' error */
 #define IPECC_ERROR_IS_BLN()			(!!(IPECC_GET_ERROR() & IPECC_ERR_BLN))
+
+/* To identify 'Unknown register' error */
 #define IPECC_ERROR_IS_UNKOWN_REG()		(!!(IPECC_GET_ERROR() & IPECC_ERR_UNKOWN_REG))
+
+/* To identify 'Input point is not on curve' error */
 #define IPECC_ERROR_IS_IN_PT_NOT_ON_CURVE 	(!!(IPECC_GET_ERROR() & IPECC_ERR_IN_PT_NOT_ON_CURVE))
+
+/* To identify 'Output point is not on curve' error */
 #define IPECC_ERROR_IS_OUT_PT_NOT_ON_CURVE 	(!!(IPECC_GET_ERROR() & IPECC_ERR_OUT_PT_NOT_ON_CURVE))
 
+/* To acknowledge error(s) to the IP.
+ */
 #define IPECC_ACK_ERROR(err) (IPECC_SET_REG(IPECC_W_ERR_ACK, (((err) & IPECC_R_STATUS_ERRID_MSK) << IPECC_R_STATUS_ERRID_POS)))
 
 /*
  * Actions using register W_SMALL_SCALAR
- * (set small scalar size)
+ * *************************************
  */
-
+/* Set small scalar size.
+ */
 #define IPECC_SET_SMALL_SCALAR_SIZE(sz) do { \
 	IPECC_SET_REG(IPECC_W_SMALL_SCALAR, \
 			(sz & IPECC_W_SMALL_SCALAR_K_MSK) << IPECC_W_SMALL_SCALAR_K_POS); \
@@ -685,7 +743,9 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 /*
  * Actions using register W_SOFT_RESET
  * (soft reset handling)
+ * ***********************************
  */
+/* Perform a software reset */
 #define IPECC_SOFT_RESET() do { \
 	(IPECC_SET_REG(IPECC_W_SOFT_RESET, 1)); /* written value actually is indifferent */ \
 } while (0)
@@ -693,10 +753,15 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 /*
  * Actions using register R_CAPABILITIES
  * (Capabilities handling)
+ * *************************************
  */
-/* IPECC_IS_DYNAMIC_NN_SUPPORTED - to know if the IP hardware was synthesized with
- *                                 the option 'nn modifiable at runtime' */
+/* To know if the IP hardware was synthesized with 
+ * the option 'nn modifiable at runtime' */
 #define IPECC_IS_DYNAMIC_NN_SUPPORTED()     (!!((IPECC_GET_REG(IPECC_R_CAPABILITIES) & IPECC_R_CAPABILITIES_NNDYN)))
+
+/* To know if the IP hardware was synthesized with
+ * the 'shuffling memory of large numbers' countermeasure.
+ */
 #define IPECC_IS_SHUFFLING_SUPPORTED()    (!!((IPECC_GET_REG(IPECC_R_CAPABILITIES) & IPECC_R_CAPABILITIES_SHF)))
 #define IPECC_IS_W64()      (!!((IPECC_GET_REG(IPECC_R_CAPABILITIES) & IPECC_R_CAPABILITIES_W64)))
 
@@ -707,10 +772,14 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 #define IPECC_GET_NN_MAX_SIZE() ((IPECC_GET_REG(IPECC_R_CAPABILITIES) >> IPECC_R_CAPABILITIES_NNMAX_POS) \
 				& IPECC_R_CAPABILITIES_NNMAX_MSK)
 
-/* To know if the IP was synthesized in debug (unsecure-)mode or in production (secure-)mode. */
+/* To know if the IP was synthesized in debug (unsecure-)mode
+ * or in production (secure-)mode.
+ */
 #define IPECC_IS_DEBUG_OR_PROD()  (!!(IPECC_GET_REG(IPECC_R_CAPABILITIES) & IPECC_R_CAPABILITIES_DBG_N_PROD))
 
-/* Actions using register R_HW_VERSION */
+/* Actions using register R_HW_VERSION
+ * ***********************************
+ */
 
 /* This register exists in hardware only if the IP was synthesized in DEBUG (unsecure-)mode
  * (as opposed to prodution (secure-)mode. */
@@ -718,14 +787,16 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 #define IPECC_GET_MINOR_VERSION()  ((IPECC_GET_REG(IPECC_R_HW_VERSION) >> IPECC_R_HW_VERSION_MINOR_POS) & IPECC_R_HW_VERSION_MINOR_MSK)
 
 /* Actions involving register W_DBG_HALT
- * (halting the IP).
+ * *************************************
  */
+
+/* To halt the IP */
 #define IPECC_HALT_NOW()  do { \
 	IPECC_SET_REG(IPECC_W_DBG_HALT, IPECC_W_DBG_HALT_DO_HALT); \
 } while (0)
 
 /* Actions involving register W_DBG_BKPT
- * (setting/unsetting breakpoints in the microcode).
+ * *************************************
  */
 /* IP main FSM state is accessible in debug mode,
  * below are defined the corresponding state codes
@@ -769,9 +840,11 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 			| (((id) & IPECC_W_DBG_BKPT_ID_MSK) << IPECC_W_DBG_BKPT_ID_POS )); \
 } while (0)
 
-
 /* Actions involving register W_DBG_STEPS
- * (running part of microcode when debug halted & resuming execution)
+ * **************************************
+ */
+/* Running part of microcode when debug halted
+ * & resuming execution.
  */
 #define IPECC_RUN_OPCODES(nb) do { \
 	IPECC_SET_REG(IPECC_W_DBG_STEPS_RUN_NB_OP \
@@ -783,14 +856,18 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 } while (0)
 
 /* Actions involving register W_DBG_TRIG_ACT
- * (arming both signal-up & signal-down triggers)
+ * *****************************************
+ */
+/* Arming both signal rising-edge & falling-edge triggers.
  */
 #define IPECC_ARM_TRIGGER() do { \
 	IPECC_SET_REG(IPECC_W_DBG_TRIG_ACT, IPECC_W_DBG_TRIG_ACT_EN); \
 } while (0)
 
 /* Actions involving register W_DBG_TRIG_UP
- * ('time' is expressed in multiple of the clock cycles starting from
+ * ****************************************
+ */
+/* ('time' is expressed in multiple of the clock cycles starting from
  * the begining of [k]P computation). */
 #define IPECC_SET_TRIGGER_UP(time) do { \
 	IPECC_SET_REG(IPECC_W_DBG_TRIG_UP, ((time) & IPECC_W_DBG_TRIG_MSK) << IPECC_W_DBG_TRIG_POS); \
@@ -802,18 +879,24 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 	IPECC_SET_REG(IPECC_W_DBG_TRIG_DOWN, ((time) & IPECC_W_DBG_TRIG_MSK) << IPECC_W_DBG_TRIG_POS); \
 } while (0)
 
-/* Actions involving register W_DBG_OP_WADDR */
+/* Actions involving register W_DBG_OP_WADDR
+ * *****************************************
+ */
 #define IPECC_SET_OPCODE_WRITE_ADDRES(addr) do { \
 	IPECC_SET_REG(IPECC_W_DBG_OP_WADDR, ((addr) & IPECC_W_DBG_OP_WADDR_MSK) << IPECC_W_DBG_OP_WADDR_POS); \
 } while (0)
 
-/* Actions involving register W_DBG_OPCODE */
+/* Actions involving register W_DBG_OPCODE
+ * ***************************************
+ */
 #define IPECC_SET_OPCODE_TO_WRITE(opcode) do { \
 	IPECC_SET_REG(IPECC_W_DBG_OPCODE, ((addr) & IPECC_W_DBG_OPCODE_MSK) << IPECC_W_DBG_OPCODE_POS); \
 } while (0)
 
 /* Actions involving register W_DBG_TRNG_CTRL
- * (controlling TRNG behaviour) */
+ * (controlling TRNG behaviour)
+ * ******************************************
+ */
 
 /* Empty the FIFO buffering raw random bits of the TRNG
  * and reset associated logic. */
@@ -878,7 +961,9 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 } while (0)
 
 /* Actions involving register W_DBG_TRNG_CFG
- * (configuration of TRNG) */
+ * (configuration of TRNG).
+ * *****************************************
+ */
 #define IPECC_TRNG_CONFIG(debias, ta, idlenb) do { \
 	uint32_t val = 0; \
 	/* Configure Von Neumann debias logic */ \
@@ -890,7 +975,9 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 	IPECC_SET_REG(W_DBG_TRNG_CFG, val); \
 } while (0)
 
-/* Actions involving registers W_DBG_FP_WADDR & W_DBG_FP_WDATA */
+/* Actions involving registers W_DBG_FP_WADDR & W_DBG_FP_WDATA
+ * ***********************************************************
+ */
 
 /* Set the address in the memory of large numbers at which to write a data word.
  * The data itself can be subsequently transmitted using IPECC_DBG_SET_FP_WRITE_DATA().
@@ -907,7 +994,10 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 	IPECC_SET_REG(IPECC_W_DBG_FP_WDATA, ((limb) & IPECC_W_DBG_FP_DATA_MSK) << IPECC_W_DBG_FP_DATA_POS); \
 } while (0)
 
-/* Actions involving register W_DBG_FP_RADDR, IPECC_R_DBG_FP_RDATA & IPECC_R_DBG_FP_RDATA_RDY */
+/* Actions involving register W_DBG_FP_RADDR, IPECC_R_DBG_FP_RDATA &
+ * IPECC_R_DBG_FP_RDATA_RDY
+ * *****************************************************************
+ */
 
 /* Set the address in the memory of large numbers at which a data word is to be read.
  * The data itself can be subsequently obtained using IPECC_DBG_GET_FP_READ_DATA().
@@ -928,7 +1018,9 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 #define IPECC_DBG_GET_FP_READ_DATA() \
 	(((IPECC_GET_REG(IPECC_R_DBG_FP_RDATA)) >> IPECC_W_DBG_FP_DATA_MSK) & IPECC_W_DBG_FP_DATA_POS)
 
-/* Actions involving register W_DBG_CFG_XYSHUF */
+/* Actions involving register W_DBG_CFG_XYSHUF
+ * *******************************************
+ */
 
 /* Enable the XY-coords shuffling of R0 & R1 sensitivie points
  */
@@ -943,7 +1035,8 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 	IPECC_SET_REG(IPECC_W_DBG_CFG_XYSHUF, IPECC_W_DBG_CFG_XYSHUF_DIS); \
 } while (0)
 
-/* Actions involving register W_DBG_CFG_AXIMSK */
+/* Actions involving register W_DBG_CFG_AXIMSK
+ * *******************************************/
 
 /* Enable on-the-fly masking of the scalar by the AXI interface along its
  * writting in memory of large numbers.
@@ -960,7 +1053,9 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 	IPECC_SET_REG(IPECC_W_DBG_CFG_AXIMSK, IPECC_W_DBG_CFG_AXIMSK_DIS); \
 } while (0)
 
-/* Actions involving register W_DBG_CFG_TOKEN */
+/* Actions involving register W_DBG_CFG_TOKEN
+ * ******************************************
+ */
 
 /* Enable token feature - a random value used to mask the coordinates
  * of result [k]P that software driver gets before launching the [k]P
@@ -977,18 +1072,27 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 	IPECC_SET_REG(IPECC_W_DBG_CFG_TOKEN, IPECC_W_DBG_CFG_TOKEN_DIS); \
 } while (0)
 
-/* Actions involving register W_DBG_RESET_TRNG_CNT.
- *
- * Reset the diagnostic counters that software driver can access through
+/* Actions involving register W_DBG_RESET_TRNG_CNT
+ * ***********************************************
+ */
+
+/* Reset the diagnostic counters that software driver can access through
  * registers R_DBG_TRNG_DIAG_1 to R_DBG_TRNG_DIAG_8.
  *
  * It is advised to reset the counters before any new [k]P computation
- * to avoid their overflow. */
+ * to avoid their overflow.
+ *
+ * Note: register R_DBG_TRNG_DIAG_0 is not impacted.
+ */
 #define IPECC_RESET_TRNG_DIAGNOSTIC_COUNTERS() do { \
 	IPECC_SET_REG(IPECC_W_DBG_RESET_TRNG_CNT, 1); /* written value actually is indifferent */ \
 } while (0)
 
-/* Actions involving register R_DBG_CAPABILITIES_0.
+/* Actions involving register R_DBG_CAPABILITIES_0
+ * ***********************************************
+ */
+
+/* Get the value of parameter 'ww'.
  *
  * Parameter 'ww' designates the bit size of the limbs that large numbers
  * are made of in large number memory.
@@ -996,12 +1100,15 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
  * The software driver normally does not need to bother about this parameter,
  * otherwise in debug mode when using the macros IPECC_DBG_SET_FP_WRITE_DATA
  * & IPECC_DBG_GET_FP_READ_DATA.
- * (see these macros). */
+ * (see these macros).
+ */
 #define IPECC_GET_WW()  (IPECC_GET_REG(IPECC_R_DBG_CAPABILITIES_0))
 
-/* Actions involving register R_DBG_CAPABILITIES_1.
- *
- * To get the number of opcode words forming the complete footprint of
+/* Actions involving register R_DBG_CAPABILITIES_1
+ * ***********************************************
+ */
+
+/* To get the number of opcode words forming the complete footprint of
  * the microcode.
  */
 #define IPECC_GET_NBOPCODES() \
@@ -1013,13 +1120,24 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 	(((IPECC_GET_REG(IPECC_R_DBG_CAPABILITIES_1)) \
 		>> IPECC_R_DBG_CAPABILITIES_1_OPCODE_SZ_POS) & IPECC_R_DBG_CAPABILITIES_1_OPCODE_SZ_MSK)
 
-/* Actions involving register R_DBG_CAPABILITIES_2 */
+/* Actions involving register R_DBG_CAPABILITIES_2
+ * ***********************************************
+ */
 /* To get the size (in bits) of the TRNG FIFO buffering raw random numbers. */
 #define IPECC_GET_TRNG_RAW_RANDOM_SIZE() \
 	(((IPECC_GET_REG(IPECC_R_DBG_CAPABILITIES_2)) \
 		>> IPECC_R_DBG_CAPABILITIES_2_RAW_RAMSZ_POS) & IPECC_R_DBG_CAPABILITIES_2_RAW_RAMSZ_MSK)
 
-/* Actions involving register R_DBG_STATUS */
+/* To get the bitwidth of TRNG internal random numbers served to the logic implementing the
+ * shuffling countermeasure (shuffling of the memory of large numbers).
+ */
+#define IPECC_GET_TRNG_IRN_SHF_BITWIDTH() \
+	(((IPECC_GET_REG(IPECC_R_DBG_CAPABILITIES_2)) \
+		>> IPECC_R_DBG_CAPABILITIES_2_IRN_SHF_WIDTH_POS) & IPECC_R_DBG_CAPABILITIES_2_IRN_SHF_WIDTH_MSK)
+
+/* Actions involving register R_DBG_STATUS
+ * ***************************************
+ */
 
 /* Is IP currently halted? (on a breakpoint hit, or after having been asked to run a certain
  * nb of microcode opcodes) */
@@ -1049,15 +1167,24 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 #define IPECC_GET_FSM_STATE() \
 	(((IPECC_GET_REG(R_DBG_STATUS)) >> IPECC_R_DBG_STATUS_STATE_POS) & IPECC_R_DBG_STATUS_STATE_MSK)
 
-/* Actions involving register R_DBG_TIME.
+/* Actions involving register R_DBG_TIME
+ * *************************************
+ */
+
+/* To get value of point-operation counter.
  *
  * Each time a point-based operation is started (including [k]P computation) an internal counter
  * is started and incremented at each cycle of the main clock. Reading this counter allows to
- * measure computation duration of point operations. */
+ * measure computation duration of point operations.
+ */
 #define IPECC_GET_PT_OP_TIME() \
 	(((IPECC_GET_REG(R_DBG_TIME)) >> IPECC_R_DBG_TIME_POS) & IPECC_R_DBG_TIME_MSK)
 
-/* Actions involving register R_DBG_RAWDUR.
+/* Actions involving register R_DBG_RAWDUR
+ * ***************************************
+ */
+
+/* To get the duration it took to fill-up the TRNG raw random FIFO.
  *
  * In debug mode, after each hard/soft/debug reset, an internal counter is started and
  * incrememted at each cycle of the main clock. It is then stopped as soon as the TRNG
@@ -1074,9 +1201,14 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 #define IPECC_GET_TRNG_RAW_FIFO_FILLUP_TIME() \
 	(((IPECC_GET_REG(R_DBG_RAWDUR)) >> IPECC_R_DBG_RAWDUR_POS) & IPECC_R_DBG_RAWDUR_MSK)
 
-/* Actions involving register R_DBG_FLAGS */  /* Obsolete, will be removed */
+/* Actions involving register R_DBG_FLAGS
+ * ***************************************/
+/* Obsolete, will be removed */
 
-/* Actions involving register R_DBG_TRNG_STATUS */
+
+/* Actions involving register R_DBG_TRNG_STATUS
+ * ********************************************
+ */
 
 /* Returns the current value of the write-pointer into the TRNG raw random FIFO
  *
@@ -1085,12 +1217,16 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
  * and IPECC_TRNG_GET_RAW_BIT) then this yields the current quantity of TRNG raw
  * random bits that have been produced since last reset. */
 #define IPECC_GET_TRNG_RAW_FIFO_WRITE_POINTER() \
-	(((IPECC_GET_REG(R_DBG_TRNG_STATUS)) >> IPECC_R_DBG_TRNG_STATUS_RAW_FIFO_OFFSET_POS) & IPECC_R_DBG_TRNG_STATUS_RAW_FIFO_OFFSET_MSK)
+	(((IPECC_GET_REG(R_DBG_TRNG_STATUS)) >> IPECC_R_DBG_TRNG_STATUS_RAW_FIFO_OFFSET_POS) \
+	 & IPECC_R_DBG_TRNG_STATUS_RAW_FIFO_OFFSET_MSK)
 
 /* Gives the FULL/not-FULL state of TRNG raw random FIFO */
-#define IPECC_IS_TRNG_RAW_FIFO_FULL() (!!(IPECC_GET_REG(R_DBG_TRNG_STATUS) & IPECC_R_DBG_TRNG_STATUS_RAW_FIFO_FULL))
+#define IPECC_IS_TRNG_RAW_FIFO_FULL() \
+	(!!(IPECC_GET_REG(R_DBG_TRNG_STATUS) & IPECC_R_DBG_TRNG_STATUS_RAW_FIFO_FULL))
 
-/* Actions involving register R_DBG_IRN_CNT_AXI */
+/* Actions involving register R_DBG_IRN_CNT_AXI
+ * ********************************************
+ */
 
 /* Returns the quantity of internal random numbers currently buffered
  * in the TRNG FIFO that serves randomness to the AXI interface.
@@ -1098,9 +1234,13 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
  * Internal random numbers served to the AXI interface are 'ww'-bit long.
  *
  * Value of 'ww' can be obtained using macro IPECC_GET_WW (c.f). */
-#define IPECC_GET_TRNG_NB_IRN_AXI()  ((IPECC_GET_REG(IPECC_R_DBG_IRN_CNT_AXI) >> IPECC_R_DBG_IRN_CNT_COUNT_POS) & IPECC_R_DBG_IRN_CNT_COUNT_MSK)
+#define IPECC_GET_TRNG_NB_IRN_AXI() \
+	((IPECC_GET_REG(IPECC_R_DBG_IRN_CNT_AXI) >> IPECC_R_DBG_IRN_CNT_COUNT_POS) \
+	 & IPECC_R_DBG_IRN_CNT_COUNT_MSK)
 
-/* Actions involving register R_DBG_IRN_CNT_EFP */
+/* Actions involving register R_DBG_IRN_CNT_EFP
+ * ********************************************
+ */
 
 /* Returns the quantity of internal random numbers currently buffered
  * in the TRNG FIFO that serves randomness to the ALU for field large
@@ -1111,9 +1251,12 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
  *
  * Value of 'ww' can be obtained using macro IPECC_GET_WW (c.f).
  */
-#define IPECC_GET_TRNG_NB_IRN_EFP()  ((IPECC_GET_REG(IPECC_R_DBG_IRN_CNT_EFP) >> IPECC_R_DBG_IRN_CNT_COUNT_POS) & IPECC_R_DBG_IRN_CNT_COUNT_MSK)
+#define IPECC_GET_TRNG_NB_IRN_EFP()  ((IPECC_GET_REG(IPECC_R_DBG_IRN_CNT_EFP) \
+			>> IPECC_R_DBG_IRN_CNT_COUNT_POS) & IPECC_R_DBG_IRN_CNT_COUNT_MSK)
 
-/* Actions involving register R_DBG_IRN_CNT_CRV */
+/* Actions involving register R_DBG_IRN_CNT_CRV
+ * ********************************************
+ */
 
 /* Returns the quantity of internal random numbers currently buffered
  * in the TRNG FIFO that serves randomness used to implement the XY-shuffling
@@ -1122,9 +1265,12 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
  * Internal random numbers used for the XY-shuffling countermeasure are made
  * of 2-bits.
  */
-#define IPECC_GET_TRNG_NB_IRN_CRV()  ((IPECC_GET_REG(IPECC_R_DBG_IRN_CNT_CRV) >> IPECC_R_DBG_IRN_CNT_COUNT_POS) & IPECC_R_DBG_IRN_CNT_COUNT_MSK)
+#define IPECC_GET_TRNG_NB_IRN_CRV()  ((IPECC_GET_REG(IPECC_R_DBG_IRN_CNT_CRV) \
+			>> IPECC_R_DBG_IRN_CNT_COUNT_POS) & IPECC_R_DBG_IRN_CNT_COUNT_MSK)
 
-/* Actions involving register R_DBG_IRN_CNT_SHF */
+/* Actions involving register R_DBG_IRN_CNT_SHF
+ * ********************************************
+ */
 
 /* Returns the quantity of internal random numbers currently buffered
  * in the TRNG FIFO that serves randomness to logic implementing the
@@ -1133,22 +1279,55 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
  * Internal random numbers used for the memory shuffling countermeasure
  * have a bitwidth which depends on the type of algorithm used to randomly
  * permutate the memory. Three methods are available in the IP HDL source
- * code but only one has been synthesized in the IP (if any - it is also
- * possible that the IP was synthesized without the shuffling countermeasure
- * logic.
- * 
+ * code but one at most (and possible none) has been synthesized in the IP.
+ *
+ * The bitwidth of the internal random numbers here can be obtained using
+ * macro IPECC_GET_TRNG_IRN_SHF_BITWIDTH (c.f).
  */
-#define IPECC_GET_TRNG_NB_IRN_SHF()  ((IPECC_GET_REG(IPECC_R_DBG_IRN_CNT_SHF) >> IPECC_R_DBG_IRN_CNT_COUNT_POS) & IPECC_R_DBG_IRN_CNT_COUNT_MSK)
+#define IPECC_GET_TRNG_NB_IRN_SHF()  ((IPECC_GET_REG(IPECC_R_DBG_IRN_CNT_SHF) \
+			>> IPECC_R_DBG_IRN_CNT_COUNT_POS) & IPECC_R_DBG_IRN_CNT_COUNT_MSK)
 
-/* Actions involving register R_DBG_TRNG_DIAG_0 */
-/* Actions involving register R_DBG_TRNG_DIAG_1 */
-/* Actions involving register R_DBG_TRNG_DIAG_2 */
-/* Actions involving register R_DBG_TRNG_DIAG_3 */
-/* Actions involving register R_DBG_TRNG_DIAG_4 */
-/* Actions involving register R_DBG_TRNG_DIAG_5 */
-/* Actions involving register R_DBG_TRNG_DIAG_6 */
-/* Actions involving register R_DBG_TRNG_DIAG_7 */
-/* Actions involving register R_DBG_TRNG_DIAG_8 */
+/* Actions involving register R_DBG_TRNG_DIAG_0
+ * ********************************************
+ */
+
+/* Actions involving register R_DBG_TRNG_DIAG_1 - R_DBG_TRNG_DIAG_8
+ * ****************************************************************
+ */
+/* In debug mode, for each of the 4 entropy clients in the IP, the TRNG maintains
+ * a counter that is incremented at each clock cycle where the client is requiring
+ * a fresh internal random number without the TRNG being able to provide it.
+ *
+ * Similarly, a second counter is incremented in each clock cycle where the client
+ * is requiring a new IRN and the TRNG actually satisfies it, providing a fresh random.
+ *
+ * In the simple ASCII waveform, the 2 signals of the hangsa
+ *                           ______     _
+ *    client REQUEST    ____|xxxxyy|___|y|_______
+ *                                ________
+ *    TRNG ACKNOWLedge  _________|yy     y|_______
+ */
+/* Actions involving register R_DBG_TRNG_DIAG_2
+ * ********************************************
+ */
+/* Actions involving register R_DBG_TRNG_DIAG_3
+ * ********************************************
+ */
+/* Actions involving register R_DBG_TRNG_DIAG_4
+ * ********************************************
+ */
+/* Actions involving register R_DBG_TRNG_DIAG_5
+ * ********************************************
+ */
+/* Actions involving register R_DBG_TRNG_DIAG_6
+ * ********************************************
+ */
+/* Actions involving register R_DBG_TRNG_DIAG_7
+ * ********************************************
+ */
+/* Actions involving register R_DBG_TRNG_DIAG_8
+ * ********************************************
+ */
 
 /****** DEBUG ************/
 /* TRNG handling */
