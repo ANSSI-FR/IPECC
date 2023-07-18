@@ -528,79 +528,83 @@ begin
 
 	-- (s35), see (s31)
 	assert(log2(nn) <= C_S_AXI_DATA_WIDTH)
-		report "ecc_axi.vhd: value of nn too large"
+		report "Value of nn too large."
 			severity FAILURE;
 
 	-- (s44), see (s45)
 	assert(ww >= 4)
-		report "ecc_axi.vhd: value of ww too small (must be greater or equal to 4)"
+		report "Value of ww too small (must be greater or equal to 4)."
 			severity FAILURE;
 
 	-- (s51), see (s50)
 	assert((debug and C_S_AXI_DATA_WIDTH > ww) or (not debug))
-		report "ecc_axi.vhd: in debug mode, ww must be smaller "
-			   & "than C_S_AXI_DATA_WIDTH"
+		report "In debug mode, ww must be smaller than C_S_AXI_DATA_WIDTH."
 			severity FAILURE;
 
 	-- (s77), see (s76) & (s78)
 	assert (16 + FP_ADDR_MSB - 1 < 32)
-		report "ecc_axi.vhd: large numbers' address too large to fit in W_CTRL reg"
+		report "Large numbers' address too large to fit in W_CTRL reg."
 			severity FAILURE;
 
 	-- (s79), see (s80) & (s81)
 	assert (LARGE_NB_R_ADDR < 2**(FP_ADDR_MSB))
-		report "ecc_axi.vhd: constant R address is incompatible "
-		     & "w/ ecc_fp_dram size"
+		report "Constant R address is incompatible with ecc_fp_dram size."
 			severity FAILURE;
 
 	-- (s83), see (s84) & (s85)
 	assert ( (debug and (OPCODE_SZ <= 2 * C_S_AXI_DATA_WIDTH)) or (not debug))
-		report "value of parameter nblargenb incompatible w/ size "
-		     & "of ecc_curve_iram in debug mode"
+		report "Value of parameter nblargenb incompatible w/ size "
+		     & "of ecc_curve_iram in debug mode."
 			severity FAILURE;
 
 	-- (s87), see (s88)
 	assert ( ( debug and (IRAM_ADDR_SZ <= 13)) or (not debug))
-		report "value of parameter nbopcodes too large to be compatible "
+		report "Value of parameter nbopcodes too large to be compatible "
 		     & "w/ debug mode (value of Program Counter read by SW in "
-				 & "register R_DBG_STATUS wouldn't be correct)"
+				 & "register R_DBG_STATUS wouldn't be correct)."
 			severity FAILURE;
 
 	-- (s195), see (s194)
 	assert (axi32or64 = 32 or axi32or64 = 64)
-		report "wrong value of parameter axi32or64 in ecc_customize.vhd "
-		     & " (must be 32 or 64)"
+		report "Wrong value of parameter axi32or64 in ecc_customize.vhd "
+		     & " (must be 32 or 64)."
 			severity FAILURE;
 
 	-- (s144), see (s145)
 	assert ( (not debug) or ww <= C_S_AXI_DATA_WIDTH )
-		report "in debug mode ww must be smaller than or equal to "
-		     & "C_S_AXI_DATA_WIDTH"
+		report "In debug mode ww must be smaller than or equal to "
+		     & "C_S_AXI_DATA_WIDTH."
 			severity FAILURE;
 
 	-- (s146), see (s147)
-	assert (nbopcodes <= 2**16)
-		report "in debug mode nbopcodes must be smaller than or equal to 65536"
+	assert (nbopcodes <= 2**DBG_CAP_SPLIT)
+		report "In debug mode nbopcodes must be smaller than or equal to 65536."
+			severity FAILURE;
+
+	-- (s148), see (s149)
+	assert ((not debug) or (log2(OPCODE_SZ) <= 32 - DBG_CAP_SPLIT))
+		report "In debug mode OPCODE_SZ must be less than or equal to 2**"
+		     & integer'image(32 - DBG_CAP_SPLIT) & "."
 			severity FAILURE;
 
 	-- (s150), see (s151)
-	assert (log2(raw_ram_size) <= C_S_AXI_DATA_WIDTH)
-		report "in debug mode bit-width of parameter raw_ram_size must not "
-		     & "exceed C_S_AXI_DATA_WIDTH"
+	assert (log2(raw_ram_size) <= DBG_CAP_SPLIT)
+		report "In debug mode bit-width of parameter raw_ram_size must not "
+		     & "exceed " & integer'image(DBG_CAP_SPLIT) & "."
 			severity FAILURE;
 
 	-- (s152), see (s153)
 	assert (dbgdecodepc'length <= 12)
-		report "in debug mode address of instructions is limited to 12 bits "
+		report "In debug mode address of instructions is limited to 12 bits "
 				 & "(which means nbopcodes must be smaller than or equal to 4096 "
-				 & "in ecc_customize.vhd)"
+				 & "in ecc_customize.vhd)."
 			severity FAILURE;
 
 	-- (s155), see (s156)
 	assert ( ( debug and (4 + IRAM_ADDR_SZ - 1 < 16)) or (not debug))
 		report "value of parameter nbopcodes too large to be compatible "
 		     & "w/ debug mode (address of SW breakpoints set in register "
-				 & "W_DBG_BKPT wouldn't all be sampled by hardware)"
+				 & "W_DBG_BKPT wouldn't all be sampled by hardware)."
 			severity FAILURE;
 
 	-- (s234), see (s235)
@@ -617,6 +621,12 @@ begin
 		report "The TRNG raw random FIFO is too large for its size to fit in register"
 	       & "W_DBG_TRNG_CTRL. Access to raw random data will be impacted (address "
 				 & "will be truncated)."
+			severity WARNING;
+
+	-- (s264), see (s263)
+	assert ((not debug) or log2(irn_width_sh) <= 32 - DBG_CAP_SPLIT)
+		report "In debug mode bit-width of parameter irn_width_sh must not "
+		     & "exceed " & integer'image(32 - DBG_CAP_SPLIT) & "."
 			severity WARNING;
 
 	-- combinational logic
@@ -3094,7 +3104,8 @@ begin
 				dw := (others => '0');
 				dw(log2(nbopcodes) - 1 downto 0) := -- (s147), see (s146)
 					std_logic_vector(to_unsigned(nbopcodes, log2(nbopcodes)));
-				dw(16 + log2(OPCODE_SZ) - 1 downto 16) := -- (s149), see (s148)
+				dw(DBG_CAP_SPLIT + log2(OPCODE_SZ) - 1 downto DBG_CAP_SPLIT) :=
+					-- (s149), see (s148)
 					std_logic_vector(to_unsigned(OPCODE_SZ, log2(OPCODE_SZ)));
 				v.axi.rdatax := dw;
 				v.axi.rvalid := '1'; -- (s5)
@@ -3107,6 +3118,9 @@ begin
 				dw := (others => '0');
 				dw(log2(raw_ram_size) - 1 downto 0) := -- (s151), see (s150)
 					std_logic_vector(to_unsigned(raw_ram_size, log2(raw_ram_size)));
+				dw(DBG_CAP_SPLIT + log2(irn_width_sh) - 1 downto DBG_CAP_SPLIT) :=
+					-- (s263), see (s264)
+					std_logic_vector(to_unsigned(irn_width_sh, log2(irn_width_sh)));
 				v.axi.rdatax := dw;
 				v.axi.rvalid := '1'; -- (s5)
 			-- --------------------------------------

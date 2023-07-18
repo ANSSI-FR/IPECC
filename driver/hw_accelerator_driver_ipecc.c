@@ -534,11 +534,9 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 
 /*
  * Actions involving registers W_PRIME_SIZE & R_PRIME_SIZE
+ *
+ * NN size (static and dynamic) handling.
  */
-
-/* NN size (static and dynamic) handling */
-#define IPECC_GET_NN_MAX_SIZE() ((IPECC_GET_REG(IPECC_R_CAPABILITIES) >> IPECC_R_CAPABILITIES_NNMAX_POS) \
-				& IPECC_R_CAPABILITIES_NNMAX_MSK)
 
 /* IPECC_GET_NN_SIZE - to get the value of 'nn' the IP is currently set with
  *                     (or what is the static value if hardware was not synthesized
@@ -701,6 +699,16 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 #define IPECC_IS_DYNAMIC_NN_SUPPORTED()     (!!((IPECC_GET_REG(IPECC_R_CAPABILITIES) & IPECC_R_CAPABILITIES_NNDYN)))
 #define IPECC_IS_SHUFFLING_SUPPORTED()    (!!((IPECC_GET_REG(IPECC_R_CAPABILITIES) & IPECC_R_CAPABILITIES_SHF)))
 #define IPECC_IS_W64()      (!!((IPECC_GET_REG(IPECC_R_CAPABILITIES) & IPECC_R_CAPABILITIES_W64)))
+
+/* Returns the maximum (and default) value allowed for 'nn' parameter (if the IP was
+ * synthesized with the 'nn modifiable at runtime' option) or simply the static,
+ * unique value of 'nn' the IP supports (otherwise).
+ */
+#define IPECC_GET_NN_MAX_SIZE() ((IPECC_GET_REG(IPECC_R_CAPABILITIES) >> IPECC_R_CAPABILITIES_NNMAX_POS) \
+				& IPECC_R_CAPABILITIES_NNMAX_MSK)
+
+/* To know if the IP was synthesized in debug (unsecure-)mode or in production (secure-)mode. */
+#define IPECC_IS_DEBUG_OR_PROD()  (!!(IPECC_GET_REG(IPECC_R_CAPABILITIES) & IPECC_R_CAPABILITIES_DBG_N_PROD))
 
 /* Actions using register R_HW_VERSION */
 
@@ -1084,16 +1092,55 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 
 /* Actions involving register R_DBG_IRN_CNT_AXI */
 
-/* Returns the quantity of internal random numbers currently buffered in the TRNG FIFO
- * to service randomness to the AXI interface.
+/* Returns the quantity of internal random numbers currently buffered
+ * in the TRNG FIFO that serves randomness to the AXI interface.
  *
- * Internal random numbers servied to the AXI interface are 'ww'-bit long.
+ * Internal random numbers served to the AXI interface are 'ww'-bit long.
  *
  * Value of 'ww' can be obtained using macro IPECC_GET_WW (c.f). */
+#define IPECC_GET_TRNG_NB_IRN_AXI()  ((IPECC_GET_REG(IPECC_R_DBG_IRN_CNT_AXI) >> IPECC_R_DBG_IRN_CNT_COUNT_POS) & IPECC_R_DBG_IRN_CNT_COUNT_MSK)
 
 /* Actions involving register R_DBG_IRN_CNT_EFP */
+
+/* Returns the quantity of internal random numbers currently buffered
+ * in the TRNG FIFO that serves randomness to the ALU for field large
+ * numbers (these random are used to implement instruction NNRND (c.f
+ * IP documentation).
+ *
+ * Internal random numbers served to the F_p ALU are 'ww'-bit long.
+ *
+ * Value of 'ww' can be obtained using macro IPECC_GET_WW (c.f).
+ */
+#define IPECC_GET_TRNG_NB_IRN_EFP()  ((IPECC_GET_REG(IPECC_R_DBG_IRN_CNT_EFP) >> IPECC_R_DBG_IRN_CNT_COUNT_POS) & IPECC_R_DBG_IRN_CNT_COUNT_MSK)
+
 /* Actions involving register R_DBG_IRN_CNT_CRV */
-/* Actions involving register R_DBG_IRN_CNT_SHF */ /* Actions involving register R_DBG_TRNG_DIAG_0 */
+
+/* Returns the quantity of internal random numbers currently buffered
+ * in the TRNG FIFO that serves randomness used to implement the XY-shuffling
+ * of the coordinates of R0 & R1 sensitive points.
+ *
+ * Internal random numbers used for the XY-shuffling countermeasure are made
+ * of 2-bits.
+ */
+#define IPECC_GET_TRNG_NB_IRN_CRV()  ((IPECC_GET_REG(IPECC_R_DBG_IRN_CNT_CRV) >> IPECC_R_DBG_IRN_CNT_COUNT_POS) & IPECC_R_DBG_IRN_CNT_COUNT_MSK)
+
+/* Actions involving register R_DBG_IRN_CNT_SHF */
+
+/* Returns the quantity of internal random numbers currently buffered
+ * in the TRNG FIFO that serves randomness to logic implementing the
+ * shuffling of the memory of large numbers.
+ *
+ * Internal random numbers used for the memory shuffling countermeasure
+ * have a bitwidth which depends on the type of algorithm used to randomly
+ * permutate the memory. Three methods are available in the IP HDL source
+ * code but only one has been synthesized in the IP (if any - it is also
+ * possible that the IP was synthesized without the shuffling countermeasure
+ * logic.
+ * 
+ */
+#define IPECC_GET_TRNG_NB_IRN_SHF()  ((IPECC_GET_REG(IPECC_R_DBG_IRN_CNT_SHF) >> IPECC_R_DBG_IRN_CNT_COUNT_POS) & IPECC_R_DBG_IRN_CNT_COUNT_MSK)
+
+/* Actions involving register R_DBG_TRNG_DIAG_0 */
 /* Actions involving register R_DBG_TRNG_DIAG_1 */
 /* Actions involving register R_DBG_TRNG_DIAG_2 */
 /* Actions involving register R_DBG_TRNG_DIAG_3 */

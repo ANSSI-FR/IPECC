@@ -254,6 +254,9 @@ package ecc_software is
 	-- bit positions in R_PRIME_SIZE
 	--   (same definitions as for W_PRIME_SIZE register, see above)
 
+	-- bit positions in R_DBG_CAPABILITIES_1 & R_DBG_CAPABILITIES_2
+	constant DBG_CAP_SPLIT : natural := 16;
+
 	-- bit positions in R_DBG_STATUS register
 	constant DBG_STATUS_HALTED : natural := 0;
 	constant DBG_STATUS_BKID_LSB : natural := 1;
