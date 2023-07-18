@@ -258,7 +258,7 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 /* Complete bypass of the TRNG (1) or not (0) */
 #define IPECC_W_DBG_TRNG_CTRL_TRNG_BYPASS			((uint32_t)0x1 << 29)
 /* Deterministic bit value produced when complete bypass is on */
-#define IPECC_W_DBG_TRNG_CTRL_TRNG_BYPASS_BIT		((uint32_t)0x1 << 30)
+#define IPECC_W_DBG_TRNG_CTRL_TRNG_BYPASS_VAL_POS		(30)
 
 /* Fields for W_DBG_TRNG_CFG */
 /* Von Neumann debiaser activate (1) / deactivate (0) */
@@ -661,7 +661,6 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
  * (error detection & acknowlegment)
  * *********************************
  */
-
 /* Definition of error bits.
  *
  * Exact same bit positions exist both in R_STATUS register and in W_ERR_ACK register.
@@ -672,10 +671,11 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
  * register.
  *
  * Note however that following bit positions start at 0 and hence are relative: correspon-
- * ding real bit positions are actually shifted by IPECC_R_STATUS_ERRID_POS (both in R_STATUS
- * and W_ERR_ACK register), however higher-level of the software does not need to bother with
- * these details as they are masked by macros IPECC_GET_ERROR() & IPECC_ACK_ERROR() below,
- * which perform the actual bit-shift of IPECC_R_STATUS_ERRID_POS positions */
+ * ding real bit positions are actually shifted by a qty IPECC_R_STATUS_ERRID_POS (both in
+ * R_STATUS and W_ERR_ACK register), however higher-level of the software does not need to
+ * bother with these details as they are masked by macros IPECC_GET_ERROR() & IPECC_ACK_ERROR()
+ * below, which perform the actual bit-shift of IPECC_R_STATUS_ERRID_POS positions.
+ */
 #define IPECC_ERR_IN_PT_NOT_ON_CURVE	((uint32_t)0x1 << 0)
 #define IPECC_ERR_OUT_PT_NOT_ON_CURVE	((uint32_t)0x1 << 1)
 #define IPECC_ERR_COMP			((uint32_t)0x1 << 2)
@@ -690,6 +690,7 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 #define IPECC_ERR_SHUFFLE   ((uint32_t)0x1 << 11)
 #define IPECC_ERR_ZREMASK		((uint32_t)0x1 << 12)
 #define IPECC_ERR_WK_NOT_ENOUGH_RANDOM  ((uint32_t)0x1 << 13)
+#define IPECC_ERR_RREG_FBD 		((uint32_t)0x1 << 14)
 
 /* Get the complete error field.
  */
@@ -698,44 +699,37 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 	 & IPECC_R_STATUS_ERRID_MSK)
 
 /* To identify 'Computation' error */
-#define IPECC_ERROR_IS_COMP() \
-	(!!(IPECC_GET_ERROR() & IPECC_ERR_COMP))
+#define IPECC_ERROR_IS_COMP()			(!!(IPECC_GET_ERROR() & IPECC_ERR_COMP))
 
-/* To identify 'Forbidden register access' error */
-#define IPECC_ERROR_IS_WREG_FBD() \
-	(!!(IPECC_GET_ERROR() & IPECC_ERR_WREG_FBD))
+/* To identify 'Forbidden register-write' error */
+#define IPECC_ERROR_IS_WREG_FBD()		(!!(IPECC_GET_ERROR() & IPECC_ERR_WREG_FBD))
+
+/* To identify 'Forbidden register-read' error */
+#define IPECC_ERROR_IS_RREG_FBD()		(!!(IPECC_GET_ERROR() & IPECC_ERR_RREG_FBD))
 
 /* To identify '[k]P computation not possible' error */
-#define IPECC_ERROR_IS_KP_FBD()	\
-	(!!(IPECC_GET_ERROR() & IPECC_ERR_KP_FBD))
+#define IPECC_ERROR_IS_KP_FBD()			(!!(IPECC_GET_ERROR() & IPECC_ERR_KP_FBD))
 
 /* To identify 'nn value not in authorized range' error */
-#define IPECC_ERROR_IS_NNDYN() \
-	(!!(IPECC_GET_ERROR() & IPECC_ERR_NNDYN))
+#define IPECC_ERROR_IS_NNDYN()			(!!(IPECC_GET_ERROR() & IPECC_ERR_NNDYN))
 
 /* To identify 'Point operation (other than [k]P) not possible' error */
-#define IPECC_ERROR_IS_POP_FBD() \
-	(!!(IPECC_GET_ERROR() & IPECC_ERR_POP_FBD))
+#define IPECC_ERROR_IS_POP_FBD()		(!!(IPECC_GET_ERROR() & IPECC_ERR_POP_FBD))
 
 /* To identify 'Read large number command cannot be satisfied' error */
-#define IPECC_ERROR_IS_RDNB_FBD() \
-	(!!(IPECC_GET_ERROR() & IPECC_ERR_RDNB_FBD))
+#define IPECC_ERROR_IS_RDNB_FBD()		(!!(IPECC_GET_ERROR() & IPECC_ERR_RDNB_FBD))
 
 /* To identify 'Blinding configuration' error */
-#define IPECC_ERROR_IS_BLN() \
-	(!!(IPECC_GET_ERROR() & IPECC_ERR_BLN))
+#define IPECC_ERROR_IS_BLN()			(!!(IPECC_GET_ERROR() & IPECC_ERR_BLN))
 
 /* To identify 'Unknown register' error */
-#define IPECC_ERROR_IS_UNKOWN_REG() \
-	(!!(IPECC_GET_ERROR() & IPECC_ERR_UNKOWN_REG))
+#define IPECC_ERROR_IS_UNKOWN_REG()		(!!(IPECC_GET_ERROR() & IPECC_ERR_UNKOWN_REG))
 
 /* To identify 'Input point is not on curve' error */
-#define IPECC_ERROR_IS_IN_PT_NOT_ON_CURVE() \
-	(!!(IPECC_GET_ERROR() & IPECC_ERR_IN_PT_NOT_ON_CURVE))
+#define IPECC_ERROR_IS_IN_PT_NOT_ON_CURVE 	(!!(IPECC_GET_ERROR() & IPECC_ERR_IN_PT_NOT_ON_CURVE))
 
 /* To identify 'Output point is not on curve' error */
-#define IPECC_ERROR_IS_OUT_PT_NOT_ON_CURVE() \
-	(!!(IPECC_GET_ERROR() & IPECC_ERR_OUT_PT_NOT_ON_CURVE))
+#define IPECC_ERROR_IS_OUT_PT_NOT_ON_CURVE 	(!!(IPECC_GET_ERROR() & IPECC_ERR_OUT_PT_NOT_ON_CURVE))
 
 /* To acknowledge error(s) to the IP.
  */
@@ -923,27 +917,36 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 /* Empty the FIFO buffering raw random bits of the TRNG
  * and reset associated logic. */
 #define IPECC_TRNG_RESET_EMPTY_RAW_FIFO() do { \
-	IPECC_SET_REG(W_DBG_TRNG_CTRL, IPECC_W_DBG_TRNG_CTRL_RESET_FIFO_RAW); \
+	IPECC_SET_REG(IPECC_W_DBG_TRNG_CTRL, IPECC_W_DBG_TRNG_CTRL_RESET_FIFO_RAW); \
 } while (0)
 
 /* Empty the FIFOs buffering internal random bits of the TRNG
  * (all channels) and reset associated logic. */
 #define IPECC_TRNG_RESET_EMPTY_IRN_FIFOS() do { \
-	IPECC_SET_REG(W_DBG_TRNG_CTRL, IPECC_W_DBG_TRNG_CTRL_RESET_FIFO_IRN); \
+	IPECC_SET_REG(IPECC_W_DBG_TRNG_CTRL, IPECC_W_DBG_TRNG_CTRL_RESET_FIFO_IRN); \
 } while (0)
 
 /* Set address in the TRNG raw FIFO memory array where to read
  * a raw random bit from, and fetch the corresponding bit.
  * (see also IPECC_TRNG_GET_RAW_BIT).
  */
-#define IPECC_TRNG_SET_RAW_BIT_ADDR(bitaddr) do { \
-	IPECC_SET_REG(W_DBG_TRNG_CTRL, IPECC_W_DBG_TRNG_CTRL_READ_FIFO_RAW \
-			| ((bitaddr) & IPECC_W_DBG_TRNG_CTRL_FIFO_ADDR_MSK) << IPECC_W_DBG_TRNG_CTRL_FIFO_ADDR_POS); \
+#define IPECC_TRNG_SET_RAW_BIT_ADDR(addr) do { \
+	ip_ecc_word val = 0; \
+	val |= IPECC_W_DBG_TRNG_CTRL_READ_FIFO_RAW; \
+	val |= (((addr) & IPECC_W_DBG_TRNG_CTRL_FIFO_ADDR_MSK) \
+			<< IPECC_W_DBG_TRNG_CTRL_FIFO_ADDR_POS); \
+	IPECC_SET_REG(IPECC_W_DBG_TRNG_CTRL, val); \
 } while (0)
 
-/* Get the raw random bit fetched by IPECC_TRNG_SET_RAW_BIT_READ_ADDR (c.f that macro) */
+/* Get the raw random bit fetched by IPECC_TRNG_SET_RAW_BIT_READ_ADDR
+ * (c.f that macro just above).
+ * Note that for each read, first setting the address w/ IPECC_TRNG_SET_RAW_BIT_ADDR()
+ * is mandatory, even if the read targets the same address, otherwise error 'ERR_RREG_FBD'
+ * is raised in R_STATUS register.
+ */
 #define IPECC_TRNG_GET_RAW_BIT() do { \
-	(((IPECC_GET_REG(W_DBG_TRNG_CTRL)) >> IPECC_R_DBG_TRNG_RAW_DATA_POS) & IPECC_R_DBG_TRNG_RAW_DATA_MSK) \
+	(((IPECC_GET_REG(IPECC_W_DBG_TRNG_CTRL)) >> IPECC_R_DBG_TRNG_RAW_DATA_POS) \
+	 & IPECC_R_DBG_TRNG_RAW_DATA_MSK) \
 } while (0)
 
 /* Disable the post-processing logic that produces internal random numbers
@@ -952,7 +955,7 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
  * the 'complete bypass' bit.
  */
 #define IPECC_TRNG_DISABLE_POSTPROC() do { \
-	IPECC_SET_REG(W_DBG_TRNG_CTRL, IPECC_W_DBG_TRNG_CTRL_DISABLE_PP); \
+	IPECC_SET_REG(IPECC_W_DBG_TRNG_CTRL, IPECC_W_DBG_TRNG_CTRL_DISABLE_PP); \
 } while (0)
 
 /* Re-enable the post-processing logic that produces internal random numbers
@@ -961,17 +964,24 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
  * the 'complete bypass' bit.
  */
 #define IPECC_TRNG_ENABLE_POSTPROC() do { \
-	IPECC_SET_REG(W_DBG_TRNG_CTRL, 0); \
+	IPECC_SET_REG(IPECC_W_DBG_TRNG_CTRL, 0); \
 } while (0)
 
-/* Completely turn-off the TRNG function as regard to random clients.
- * 'bit' sets the deterministic value (0 or 1) that internal random
- * numbers will get (instead of random) when the complete bypass is turned
- * on.
+/* Completely bypass the TRNG physical source.
+ *
+ * It does not mean that the physical TRNG stops working and producing random
+ * bits, it means that its output is ignored as well as the post-processing
+ * function's one, and that internal random numbers become deterministic
+ * constants, made of constantly the same bit value.
+ *
+ * Because null values are not always desired for the numbers served to
+ * some of the random clients, software can choose the value, 0 or 1, that
+ * internal random numbers will be made of when the physical true entropy
+ * source is bypassed.
  */
 #define IPECC_TRNG_COMPLETE_BYPASS(bit) do { \
-	IPECC_SET_REG(W_DBG_TRNG_CTRL, IPECC_W_DBG_TRNG_CTRL_TRNG_BYPASS \
-			| ((bit) & 0x1) << IPECC_W_DBG_TRNG_CTRL_TRNG_BYPASS_BIT); \
+	IPECC_SET_REG(IPECC_W_DBG_TRNG_CTRL, IPECC_W_DBG_TRNG_CTRL_TRNG_BYPASS \
+			| (((bit) & 0x1) << IPECC_W_DBG_TRNG_CTRL_TRNG_BYPASS_VAL_POS)); \
 } while (0)
 
 /* Undo the action of IPECC_TRNG_COMPLETE_BYPASS().
@@ -979,7 +989,7 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
  * by deasserting 'post-proc disable' bit.
  */
 #define IPECC_TRNG_UNDO_COMPLETE_BYPASS() do { \
-	IPECC_SET_REG(W_DBG_TRNG_CTRL, 0); \
+	IPECC_SET_REG(IPECC_W_DBG_TRNG_CTRL, 0); \
 } while (0)
 
 /* Actions involving register W_DBG_TRNG_CFG
@@ -994,7 +1004,7 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 	} \
 	val |= ((ta) & IPECC_W_DBG_TRNG_CFG_TA_MSK) << IPECC_W_DBG_TRNG_CFG_TA_POS; \
 	val |= ((idlenb) & IPECC_W_DBG_TRNG_CFG_TRNG_IDLE_MSK) << IPECC_W_DBG_TRNG_CFG_TRNG_IDLE_POS; \
-	IPECC_SET_REG(W_DBG_TRNG_CFG, val); \
+	IPECC_SET_REG(IPECC_W_DBG_TRNG_CFG, val); \
 } while (0)
 
 /* Actions involving registers W_DBG_FP_WADDR & W_DBG_FP_WDATA
@@ -1146,12 +1156,14 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
  * ***********************************************
  */
 /* To get the size (in bits) of the TRNG FIFO buffering raw random numbers. */
-#define IPECC_GET_TRNG_RAW_RANDOM_SIZE() \
+#define IPECC_GET_TRNG_RAW_SZ() \
 	(((IPECC_GET_REG(IPECC_R_DBG_CAPABILITIES_2)) \
 		>> IPECC_R_DBG_CAPABILITIES_2_RAW_RAMSZ_POS) & IPECC_R_DBG_CAPABILITIES_2_RAW_RAMSZ_MSK)
 
 /* To get the bitwidth of TRNG internal random numbers served to the logic implementing the
  * shuffling countermeasure (shuffling of the memory of large numbers).
+ *
+ * The bitwidth is static and depends on the algorithm/method used to shuffle the memory.
  */
 #define IPECC_GET_TRNG_IRN_SHF_BITWIDTH() \
 	(((IPECC_GET_REG(IPECC_R_DBG_CAPABILITIES_2)) \
@@ -1173,21 +1185,21 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
  * then this field gives the ID of that breakpoint.
  */
 #define IPECC_GET_BKPT_ID_IP_IS_HALTED_ON() \
-	(((IPECC_GET_REG(R_DBG_STATUS)) >> IPECC_R_DBG_STATUS_BKID_POS) & IPECC_R_DBG_STATUS_BKID_MSK)
+	(((IPECC_GET_REG(IPECC_R_DBG_STATUS)) >> IPECC_R_DBG_STATUS_BKID_POS) & IPECC_R_DBG_STATUS_BKID_MSK)
 
 /* Get the current value of PC (program counter).
  * This is the value of the decode stage of the pipeline; hance the opcode that address is pointing
  * to has not been executed yet.
  */
 #define IPECC_GET_PC() \
-	(((IPECC_GET_REG(R_DBG_STATUS)) >> IPECC_R_DBG_STATUS_PC_POS) & IPECC_R_DBG_STATUS_PC_MSK)
+	(((IPECC_GET_REG(IPECC_R_DBG_STATUS)) >> IPECC_R_DBG_STATUS_PC_POS) & IPECC_R_DBG_STATUS_PC_MSK)
 
 /* Get the ID of the state the main FSM is currently in.
  * (see also macros related to register W_DBG_BKPT, namely
  * IPECC_SET_BKPT & IPECC_SET_BREAKPOINT).
  */
 #define IPECC_GET_FSM_STATE() \
-	(((IPECC_GET_REG(R_DBG_STATUS)) >> IPECC_R_DBG_STATUS_STATE_POS) & IPECC_R_DBG_STATUS_STATE_MSK)
+	(((IPECC_GET_REG(IPECC_R_DBG_STATUS)) >> IPECC_R_DBG_STATUS_STATE_POS) & IPECC_R_DBG_STATUS_STATE_MSK)
 
 /* Actions involving register R_DBG_TIME
  * *************************************
@@ -1200,7 +1212,7 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
  * measure computation duration of point operations.
  */
 #define IPECC_GET_PT_OP_TIME() \
-	(((IPECC_GET_REG(R_DBG_TIME)) >> IPECC_R_DBG_TIME_POS) & IPECC_R_DBG_TIME_MSK)
+	(((IPECC_GET_REG(IPECC_R_DBG_TIME)) >> IPECC_R_DBG_TIME_POS) & IPECC_R_DBG_TIME_MSK)
 
 /* Actions involving register R_DBG_RAWDUR
  * ***************************************
@@ -1221,7 +1233,7 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
  * (c.f that macro).
  */
 #define IPECC_GET_TRNG_RAW_FIFO_FILLUP_TIME() \
-	(((IPECC_GET_REG(R_DBG_RAWDUR)) >> IPECC_R_DBG_RAWDUR_POS) & IPECC_R_DBG_RAWDUR_MSK)
+	(((IPECC_GET_REG(IPECC_R_DBG_RAWDUR)) >> IPECC_R_DBG_RAWDUR_POS) & IPECC_R_DBG_RAWDUR_MSK)
 
 /* Actions involving register R_DBG_FLAGS
  * ***************************************/
@@ -1239,12 +1251,12 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
  * and IPECC_TRNG_GET_RAW_BIT) then this yields the current quantity of TRNG raw
  * random bits that have been produced since last reset. */
 #define IPECC_GET_TRNG_RAW_FIFO_WRITE_POINTER() \
-	(((IPECC_GET_REG(R_DBG_TRNG_STATUS)) >> IPECC_R_DBG_TRNG_STATUS_RAW_FIFO_OFFSET_POS) \
+	(((IPECC_GET_REG(IPECC_R_DBG_TRNG_STATUS)) >> IPECC_R_DBG_TRNG_STATUS_RAW_FIFO_OFFSET_POS) \
 	 & IPECC_R_DBG_TRNG_STATUS_RAW_FIFO_OFFSET_MSK)
 
 /* Gives the FULL/not-FULL state of TRNG raw random FIFO */
 #define IPECC_IS_TRNG_RAW_FIFO_FULL() \
-	(!!(IPECC_GET_REG(R_DBG_TRNG_STATUS) & IPECC_R_DBG_TRNG_STATUS_RAW_FIFO_FULL))
+	(!!(IPECC_GET_REG(IPECC_R_DBG_TRNG_STATUS) & IPECC_R_DBG_TRNG_STATUS_RAW_FIFO_FULL))
 
 /* Actions involving register R_DBG_IRN_CNT_AXI
  * ********************************************
@@ -1313,8 +1325,8 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
  * ********************************************
  */
 
-/* Actions involving register R_DBG_TRNG_DIAG_1 - R_DBG_TRNG_DIAG_8
- * ****************************************************************
+/* Actions involving registers R_DBG_TRNG_DIAG_1 - R_DBG_TRNG_DIAG_8
+ * *****************************************************************
  */
 /* In debug mode, for each of the 4 entropy clients in the IP, the TRNG maintains
  * a counter that is incremented at each clock cycle where the client is requiring
@@ -1340,63 +1352,61 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 /* TRNG channel "AXI interface"
  */
 #define IPECC_GET_TRNG_AXI_OK() \
-	((IPECC_GET_REG(R_DBG_TRNG_DIAG_1) >> IPECC_R_DBG_TRNG_DIAG_CNT_OK_POS) \
+	((IPECC_GET_REG(IPECC_R_DBG_TRNG_DIAG_1) >> IPECC_R_DBG_TRNG_DIAG_CNT_OK_POS) \
 	& IPECC_R_DBG_TRNG_DIAG_CNT_OK_MSK)
 #define IPECC_GET_TRNG_AXI_STARV() \
-	((IPECC_GET_REG(R_DBG_TRNG_DIAG_2) >> IPECC_R_DBG_TRNG_DIAG_CNT_STARV_POS) \
+	((IPECC_GET_REG(IPECC_R_DBG_TRNG_DIAG_2) >> IPECC_R_DBG_TRNG_DIAG_CNT_STARV_POS) \
 	 & IPECC_R_DBG_TRNG_DIAG_CNT_STARV_MSK)
 
 /* TRNG channel "NNRND instruction"
  */
 #define IPECC_GET_TRNG_EFP_OK() \
-	((IPECC_GET_REG(R_DBG_TRNG_DIAG_3) >> IPECC_R_DBG_TRNG_DIAG_CNT_OK_POS) \
+	((IPECC_GET_REG(IPECC_R_DBG_TRNG_DIAG_3) >> IPECC_R_DBG_TRNG_DIAG_CNT_OK_POS) \
 	 & IPECC_R_DBG_TRNG_DIAG_CNT_OK_MSK)
 #define IPECC_GET_TRNG_EFP_STARV() \
-	((IPECC_GET_REG(R_DBG_TRNG_DIAG_4) >> IPECC_R_DBG_TRNG_DIAG_CNT_STARV_POS) \
+	((IPECC_GET_REG(IPECC_R_DBG_TRNG_DIAG_4) >> IPECC_R_DBG_TRNG_DIAG_CNT_STARV_POS) \
 	 & IPECC_R_DBG_TRNG_DIAG_CNT_STARV_MSK)
 
 /* TRNG channel "XY-shuffle countermeasure"
  */
 #define IPECC_GET_TRNG_CRV_OK() \
-	((IPECC_GET_REG(R_DBG_TRNG_DIAG_5) >> IPECC_R_DBG_TRNG_DIAG_CNT_OK_POS) \
+	((IPECC_GET_REG(IPECC_R_DBG_TRNG_DIAG_5) >> IPECC_R_DBG_TRNG_DIAG_CNT_OK_POS) \
 	 & IPECC_R_DBG_TRNG_DIAG_CNT_OK_MSK)
 #define IPECC_GET_TRNG_CRV_STARV() \
-	((IPECC_GET_REG(R_DBG_TRNG_DIAG_6) >> IPECC_R_DBG_TRNG_DIAG_CNT_STARV_POS) \
+	((IPECC_GET_REG(IPECC_R_DBG_TRNG_DIAG_6) >> IPECC_R_DBG_TRNG_DIAG_CNT_STARV_POS) \
 	 & IPECC_R_DBG_TRNG_DIAG_CNT_STARV_MSK)
 
 /* TRNG channel "Shuffling of memory of large numbers countermeasure"
  */
 #define IPECC_GET_TRNG_SHF_OK() \
-	((IPECC_GET_REG(R_DBG_TRNG_DIAG_7) >> IPECC_R_DBG_TRNG_DIAG_CNT_OK_POS) \
+	((IPECC_GET_REG(IPECC_R_DBG_TRNG_DIAG_7) >> IPECC_R_DBG_TRNG_DIAG_CNT_OK_POS) \
 	 & IPECC_R_DBG_TRNG_DIAG_CNT_OK_MSK)
 #define IPECC_GET_TRNG_SHF_STARV() \
-	((IPECC_GET_REG(R_DBG_TRNG_DIAG_8) >> IPECC_R_DBG_TRNG_DIAG_CNT_STARV_POS) \
+	((IPECC_GET_REG(IPECC_R_DBG_TRNG_DIAG_8) >> IPECC_R_DBG_TRNG_DIAG_CNT_STARV_POS) \
 	 & IPECC_R_DBG_TRNG_DIAG_CNT_STARV_MSK)
+
+/********************************************
+ * A step higher - middle-level action macros
+ *
+ * Sorted by category/function.
+ ********************************************/
 
 /****** DEBUG ************/
 /* TRNG handling */
-/* Reset the raw FIFO */
-#define IPECC_TRNG_RESET_FIFO_RAW() IPECC_SET_REG(IPECC_W_DBG_TRNG_CTRL, IPECC_W_DBG_TRNG_CTRL_RESET_FIFO_RAW)
+
 /* Read the FIFOs at an offset */
 #define IPECC_TRNG_READ_FIFO_RAW(addr, a) do { \
-	ip_ecc_word val = 0; \
-	val |= IPECC_W_DBG_TRNG_CTRL_READ_FIFO_RAW; \
-	val |= ((addr & IPECC_W_DBG_TRNG_CTRL_FIFO_ADDR_MSK) << IPECC_W_DBG_TRNG_CTRL_FIFO_ADDR_POS); \
-	IPECC_SET_REG(IPECC_W_DBG_TRNG_CTRL, val); \
-	(*(a)) = IPECC_GET_REG(IPECC_R_DBG_TRNG_DATA); \
+	IPECC_TRNG_SET_RAW_BIT_ADDR(addr); \
+	(*(a)) = IPECC_TRNG_GET_RAW_BIT(); \
 } while(0)
-/* Get the RAW FIFO size in bits */
-#define IPECC_TRNG_RAW_FIFO_SZ() 32000 /* XXX */
-/* Get the current status (FIFO full), reading or writing offset in the RAW FIFO */
-#define IPECC_TRNG_RAW_FIFO_ISFULL() (!!(IPECC_GET_REG(IPECC_R_DBG_TRNG_STAT) & IPECC_R_DBG_TRNG_STAT_RAW_FIFO_FULL))
+
+/* Poll until the TRNG ran random FIFO is full.
+ */
 #define IPECC_TRNG_RAW_FIFO_FULL_BUSY_WAIT() do { \
-        while(!IPECC_TRNG_RAW_FIFO_ISFULL()){}; \
+        while(!IPECC_IS_TRNG_RAW_FIFO_FULL()){}; \
 } while(0)
-#define IPECC_TRNG_RAW_FIFO_ADDR() ((IPECC_GET_REG(IPECC_R_DBG_TRNG_STAT) >> IPECC_R_DBG_TRNG_STAT_RAW_FIFO_OFFSET_POS) & IPECC_R_DBG_TRNG_STAT_RAW_FIFO_OFFSET_MSK)
-/* Configure elements for random generation */
-/* Deactivate the Post-Processing */
-//#define IPECC_TRNG_DEACTIVATE_PP() (IPECC_SET_REG(IPECC_W_DBG_TRNG_CTRL, IPECC_W_DBG_TRNG_CTRL_DEACTIVATE_PP))
-/* Set options for the TRNG */
+
+/* TRNG Config */
 #if 0
 #define IPECC_TRNG_SET_OPTIONS(debias, ta, latency, bypass) do { \
 	ip_ecc_word val = IPECC_GET_REG(IPECC_W_DBG_TRNG_CFG); \
@@ -1681,7 +1691,7 @@ err:
 	return -1;
 }
 
-/* Set the NN size privided in bits */
+/* Set the NN size provided in bits */
 static inline int ip_ecc_set_nn_bit_size(unsigned int bit_sz)
 {
 	/* Wait until the IP is not busy */
@@ -2045,20 +2055,83 @@ err:
 
 /**** TRNG debug ******/
 /* The following function configures the TRNG */
-static inline int ip_ecc_configure_trng(int debias, uint32_t ta, uint32_t cycles, int bypass, int pp)
+static inline int ip_ecc_configure_trng(int debias, uint32_t ta, uint32_t cycles)
 {
 	/* Wait until the IP is not busy */
 	IPECC_BUSY_WAIT();
 
-	if(pp){
-		/* Deactivate the Post-Processing if asked to */
-		//IPECC_TRNG_DEACTIVATE_PP();
-		/* Wait until the IP is not busy */
-		IPECC_BUSY_WAIT();
-	}
-	
-	/* Set other options */
-	//IPECC_TRNG_SET_OPTIONS(debias, ta, cycles, bypass);
+	IPECC_TRNG_CONFIG(debias, ta, cycles);
+
+	/* Wait until the IP is not busy */
+	IPECC_BUSY_WAIT();
+
+	return 0;
+}
+
+/* TRNG complete bypass */
+static inline int ip_ecc_bypass_full_trng(uint32_t instead_bit)
+{
+	if ((instead_bit != 0) && (instead_bit != 1))
+		goto err;
+
+	/* Wait until the IP is not busy */
+	IPECC_BUSY_WAIT();
+
+	/* Activate the TRNG complete bypass, specifying deterministic
+	 * value to use instead of random bits. */
+	IPECC_TRNG_COMPLETE_BYPASS(instead_bit);
+
+	/* Wait until the IP is not busy */
+	IPECC_BUSY_WAIT();
+
+	return 0;
+
+err:
+	return -1;
+}
+
+/* TRNG exit bypass and return to normal generation
+ * (also implicitly re-enable the post-processing function) */
+static inline int ip_ecc_dont_bypass_trng(void)
+{
+	/* Wait until the IP is not busy */
+	IPECC_BUSY_WAIT();
+
+	/* Transmit action to low-level routine */
+	IPECC_TRNG_UNDO_COMPLETE_BYPASS();
+
+	/* Wait until the IP is not busy */
+	IPECC_BUSY_WAIT();
+
+	return 0;
+}
+
+/* TRNG post-processing bypass */
+static inline int ip_ecc_bypass_trng_postproc(void)
+{
+	/* Wait until the IP is not busy */
+	IPECC_BUSY_WAIT();
+
+	/* Deactivate the Post-Processing */
+	IPECC_TRNG_DISABLE_POSTPROC();
+
+	/* Wait until the IP is not busy */
+	IPECC_BUSY_WAIT();
+
+	return 0;
+}
+
+/* TRNG stop bypassing the post-processing function
+ * (also implicitly re-activate the TRNG in case it was in a complete bypass state,
+ * just as routine ip_ecc_dont_bypass_trng() would) */
+static inline int ip_ecc_dont_bypass_trng_postproc(void)
+{
+	/* Wait until the IP is not busy */
+	IPECC_BUSY_WAIT();
+
+	/* Deactivate the Post-Processing */
+	IPECC_TRNG_ENABLE_POSTPROC();
+
 	/* Wait until the IP is not busy */
 	IPECC_BUSY_WAIT();
 
@@ -2082,7 +2155,7 @@ static inline int ip_ecc_get_random(unsigned char *out, unsigned int out_sz)
 		IPECC_TRNG_RAW_FIFO_FULL_BUSY_WAIT();
 		/* Read all our data */
 		addr = 0;
-		for(i = 0; i < IPECC_TRNG_RAW_FIFO_SZ(); i++){
+		for(i = 0; i < IPECC_GET_TRNG_RAW_SZ(); i++){
 			IPECC_TRNG_READ_FIFO_RAW(addr, &bit);
 			if((read % 8) == 0){
 				out[(read / 8)] = 0;
