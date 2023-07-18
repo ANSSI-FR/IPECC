@@ -1,4 +1,4 @@
-# IPECC, an open-source VHDL IP for generic elliptic curve cryptography over finite field
+# IPECC, an open-source VHDL IP for generic elliptic curve cryptography over finite field with an emphasis on side-channel resistance
 
 Copyright (C) 2023
 
@@ -21,7 +21,7 @@ Scalar multiplication is guaranteed to be **constant-time** as long as no except
 
 IPECC architecture is very simple and allows for partial reprogrammation, as it is partially based on microcode execution of embedded software routines which can be easily edited if one wants to implement a new countermeasure or test a new attack scenario.
 
-IPECC is written in fully synthesizable VHDL. A high-level description approach has been adopted, with no explicit instanciation of any vendor dependent hardware macro, with the sole exception of multiplier-accumulators which use black-box instanciations of FPGA so-called *DSP blocks*.
+IPECC is written in fully synthesizable VHDL. A high-level description approach has been adopted, with no explicit instanciation of any vendor dependent hardware macro, with the sole exception of multiplier-accumulators which use black-box instanciations of FPGAs' so-called *DSP blocks*.
 
 IPECC comes wrapped up as an AXI-lite interface (both 32-bit/64-bit compatible) allowing easy plug-&-play integration inside any ARM or RISC-V ecosystem, e.g in SoC-FPGA designs or for ASIC prototyping. It is easily programmed through a small set of control and status registers plus optional asynchronous interrupt generation. Pre-computations involved in Montgomery representation are automatically performed by hardware upon transmission of a new value of the field prime $p$, and do not involve further operation whatsoever from software.
 
