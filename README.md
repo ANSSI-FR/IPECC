@@ -49,7 +49,7 @@ The main features of IPECC are:
 
         4. Coordinates masking (Z-masking)
 
-        5. Constant time if no exception met
+        5. Constant time (if no exception met)
 
     2. Optional
 
