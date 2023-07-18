@@ -58,8 +58,12 @@
 #include <stdio.h>
 #define log_print(...) printf(__VA_ARGS__)
 #else
+#if defined(WITH_EC_HW_STANDALONE) && defined(WITH_EC_HW_STANDALONE_XIL_ZYNQ)
+#define log_print(...) xil_printf(__VA_ARGS__)
+#else
 #define log_print(...)
 #endif
+#endif /* WITH_EC_HW_DEBUG */
 
 /* Setup the driver depending on the environment,
  * and set the base address of the driver mapping.
