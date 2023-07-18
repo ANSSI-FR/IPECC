@@ -693,41 +693,54 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 
 /* Get the complete error field.
  */
-#define IPECC_GET_ERROR() ((IPECC_GET_REG(IPECC_R_STATUS) >> IPECC_R_STATUS_ERRID_POS) & IPECC_R_STATUS_ERRID_MSK)
+#define IPECC_GET_ERROR() \
+	((IPECC_GET_REG(IPECC_R_STATUS) >> IPECC_R_STATUS_ERRID_POS) \
+	 & IPECC_R_STATUS_ERRID_MSK)
 
 /* To identify 'Computation' error */
-#define IPECC_ERROR_IS_COMP()			(!!(IPECC_GET_ERROR() & IPECC_ERR_COMP))
+#define IPECC_ERROR_IS_COMP() \
+	(!!(IPECC_GET_ERROR() & IPECC_ERR_COMP))
 
 /* To identify 'Forbidden register access' error */
-#define IPECC_ERROR_IS_WREG_FBD()		(!!(IPECC_GET_ERROR() & IPECC_ERR_WREG_FBD))
+#define IPECC_ERROR_IS_WREG_FBD() \
+	(!!(IPECC_GET_ERROR() & IPECC_ERR_WREG_FBD))
 
 /* To identify '[k]P computation not possible' error */
-#define IPECC_ERROR_IS_KP_FBD()			(!!(IPECC_GET_ERROR() & IPECC_ERR_KP_FBD))
+#define IPECC_ERROR_IS_KP_FBD()	\
+	(!!(IPECC_GET_ERROR() & IPECC_ERR_KP_FBD))
 
 /* To identify 'nn value not in authorized range' error */
-#define IPECC_ERROR_IS_NNDYN()			(!!(IPECC_GET_ERROR() & IPECC_ERR_NNDYN))
+#define IPECC_ERROR_IS_NNDYN() \
+	(!!(IPECC_GET_ERROR() & IPECC_ERR_NNDYN))
 
 /* To identify 'Point operation (other than [k]P) not possible' error */
-#define IPECC_ERROR_IS_POP_FBD()		(!!(IPECC_GET_ERROR() & IPECC_ERR_POP_FBD))
+#define IPECC_ERROR_IS_POP_FBD() \
+	(!!(IPECC_GET_ERROR() & IPECC_ERR_POP_FBD))
 
 /* To identify 'Read large number command cannot be satisfied' error */
-#define IPECC_ERROR_IS_RDNB_FBD()		(!!(IPECC_GET_ERROR() & IPECC_ERR_RDNB_FBD))
+#define IPECC_ERROR_IS_RDNB_FBD() \
+	(!!(IPECC_GET_ERROR() & IPECC_ERR_RDNB_FBD))
 
 /* To identify 'Blinding configuration' error */
-#define IPECC_ERROR_IS_BLN()			(!!(IPECC_GET_ERROR() & IPECC_ERR_BLN))
+#define IPECC_ERROR_IS_BLN() \
+	(!!(IPECC_GET_ERROR() & IPECC_ERR_BLN))
 
 /* To identify 'Unknown register' error */
-#define IPECC_ERROR_IS_UNKOWN_REG()		(!!(IPECC_GET_ERROR() & IPECC_ERR_UNKOWN_REG))
+#define IPECC_ERROR_IS_UNKOWN_REG() \
+	(!!(IPECC_GET_ERROR() & IPECC_ERR_UNKOWN_REG))
 
 /* To identify 'Input point is not on curve' error */
-#define IPECC_ERROR_IS_IN_PT_NOT_ON_CURVE 	(!!(IPECC_GET_ERROR() & IPECC_ERR_IN_PT_NOT_ON_CURVE))
+#define IPECC_ERROR_IS_IN_PT_NOT_ON_CURVE() \
+	(!!(IPECC_GET_ERROR() & IPECC_ERR_IN_PT_NOT_ON_CURVE))
 
 /* To identify 'Output point is not on curve' error */
-#define IPECC_ERROR_IS_OUT_PT_NOT_ON_CURVE 	(!!(IPECC_GET_ERROR() & IPECC_ERR_OUT_PT_NOT_ON_CURVE))
+#define IPECC_ERROR_IS_OUT_PT_NOT_ON_CURVE() \
+	(!!(IPECC_GET_ERROR() & IPECC_ERR_OUT_PT_NOT_ON_CURVE))
 
 /* To acknowledge error(s) to the IP.
  */
-#define IPECC_ACK_ERROR(err) (IPECC_SET_REG(IPECC_W_ERR_ACK, (((err) & IPECC_R_STATUS_ERRID_MSK) << IPECC_R_STATUS_ERRID_POS)))
+#define IPECC_ACK_ERROR(err) \
+	(IPECC_SET_REG(IPECC_W_ERR_ACK, (((err) & IPECC_R_STATUS_ERRID_MSK) << IPECC_R_STATUS_ERRID_POS)))
 
 /*
  * Actions using register W_SMALL_SCALAR
@@ -757,25 +770,30 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
  */
 /* To know if the IP hardware was synthesized with 
  * the option 'nn modifiable at runtime' */
-#define IPECC_IS_DYNAMIC_NN_SUPPORTED()     (!!((IPECC_GET_REG(IPECC_R_CAPABILITIES) & IPECC_R_CAPABILITIES_NNDYN)))
+#define IPECC_IS_DYNAMIC_NN_SUPPORTED() \
+	(!!((IPECC_GET_REG(IPECC_R_CAPABILITIES) & IPECC_R_CAPABILITIES_NNDYN)))
 
 /* To know if the IP hardware was synthesized with
  * the 'shuffling memory of large numbers' countermeasure.
  */
-#define IPECC_IS_SHUFFLING_SUPPORTED()    (!!((IPECC_GET_REG(IPECC_R_CAPABILITIES) & IPECC_R_CAPABILITIES_SHF)))
-#define IPECC_IS_W64()      (!!((IPECC_GET_REG(IPECC_R_CAPABILITIES) & IPECC_R_CAPABILITIES_W64)))
+#define IPECC_IS_SHUFFLING_SUPPORTED() \
+	(!!((IPECC_GET_REG(IPECC_R_CAPABILITIES) & IPECC_R_CAPABILITIES_SHF)))
+#define IPECC_IS_W64() \
+	(!!((IPECC_GET_REG(IPECC_R_CAPABILITIES) & IPECC_R_CAPABILITIES_W64)))
 
 /* Returns the maximum (and default) value allowed for 'nn' parameter (if the IP was
  * synthesized with the 'nn modifiable at runtime' option) or simply the static,
  * unique value of 'nn' the IP supports (otherwise).
  */
-#define IPECC_GET_NN_MAX_SIZE() ((IPECC_GET_REG(IPECC_R_CAPABILITIES) >> IPECC_R_CAPABILITIES_NNMAX_POS) \
-				& IPECC_R_CAPABILITIES_NNMAX_MSK)
+#define IPECC_GET_NN_MAX_SIZE() \
+	((IPECC_GET_REG(IPECC_R_CAPABILITIES) >> IPECC_R_CAPABILITIES_NNMAX_POS) \
+	 & IPECC_R_CAPABILITIES_NNMAX_MSK)
 
 /* To know if the IP was synthesized in debug (unsecure-)mode
  * or in production (secure-)mode.
  */
-#define IPECC_IS_DEBUG_OR_PROD()  (!!(IPECC_GET_REG(IPECC_R_CAPABILITIES) & IPECC_R_CAPABILITIES_DBG_N_PROD))
+#define IPECC_IS_DEBUG_OR_PROD() \
+	(!!(IPECC_GET_REG(IPECC_R_CAPABILITIES) & IPECC_R_CAPABILITIES_DBG_N_PROD))
 
 /* Actions using register R_HW_VERSION
  * ***********************************
@@ -783,8 +801,12 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 
 /* This register exists in hardware only if the IP was synthesized in DEBUG (unsecure-)mode
  * (as opposed to prodution (secure-)mode. */
-#define IPECC_GET_MAJOR_VERSION()  ((IPECC_GET_REG(IPECC_R_HW_VERSION) >> IPECC_R_HW_VERSION_MAJOR_POS) & IPECC_R_HW_VERSION_MAJOR_MSK)
-#define IPECC_GET_MINOR_VERSION()  ((IPECC_GET_REG(IPECC_R_HW_VERSION) >> IPECC_R_HW_VERSION_MINOR_POS) & IPECC_R_HW_VERSION_MINOR_MSK)
+#define IPECC_GET_MAJOR_VERSION() \
+	((IPECC_GET_REG(IPECC_R_HW_VERSION) >> IPECC_R_HW_VERSION_MAJOR_POS) \
+	 & IPECC_R_HW_VERSION_MAJOR_MSK)
+#define IPECC_GET_MINOR_VERSION() \
+	((IPECC_GET_REG(IPECC_R_HW_VERSION) >> IPECC_R_HW_VERSION_MINOR_POS) \
+	 & IPECC_R_HW_VERSION_MINOR_MSK)
 
 /* Actions involving register W_DBG_HALT
  * *************************************
@@ -1296,38 +1318,60 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
  */
 /* In debug mode, for each of the 4 entropy clients in the IP, the TRNG maintains
  * a counter that is incremented at each clock cycle where the client is requiring
- * a fresh internal random number without the TRNG being able to provide it.
+ * a fresh internal random number and the TRNG actually satisfies it, providing a
+ * fresh random.
  *
  * Similarly, a second counter is incremented in each clock cycle where the client
- * is requiring a new IRN and the TRNG actually satisfies it, providing a fresh random.
+ * is requiring a fresh IRN without the TRNG being able to provide it.
  *
- * In the simple ASCII waveform, the 2 signals of the hangsa
- *                           ______     _
- *    client REQUEST    ____|xxxxyy|___|y|_______
- *                                ________
- *    TRNG ACKNOWLedge  _________|yy     y|_______
+ * Macro R_DBG_TRNG_DIAG_1 (resp. 3, 5 and 7) yields the value of the first counter
+ * (satisfied requests) for the TRNG channel "AXI interface" (resp. for "NNRND instruction",
+ * "XY-shuffling countermeasure" & "memory of large nb shuffling" countermeasure).
+ *
+ * Macro R_DBG_TRNG_DIAG_2 (resp. 4, 6 and 8) yeilds the value of the second counter
+ * (starvation cycles) for the TRNG channel "AXI interface" (resp. for "NNRND instruction",
+ * "XY-shuffling countermeasure" & "memory of large nb shuffling" countermeasure).
+ *
+ * Thus by computing for instance of ratio  (R_DBG_TRNG_DIAG_2 / R_DBG_TRNG_DIAG_1 + R_DBG_TRNG_DIAG_2)
+ * the software driver can evaluate the percentage of clock cycles where the AXI interface client
+ * was requesting a fresh random without the TRNG actually having one at disposal to serve to it.
  */
-/* Actions involving register R_DBG_TRNG_DIAG_2
- * ********************************************
+
+/* TRNG channel "AXI interface"
  */
-/* Actions involving register R_DBG_TRNG_DIAG_3
- * ********************************************
+#define IPECC_GET_TRNG_AXI_OK() \
+	((IPECC_GET_REG(R_DBG_TRNG_DIAG_1) >> IPECC_R_DBG_TRNG_DIAG_CNT_OK_POS) \
+	& IPECC_R_DBG_TRNG_DIAG_CNT_OK_MSK)
+#define IPECC_GET_TRNG_AXI_STARV() \
+	((IPECC_GET_REG(R_DBG_TRNG_DIAG_2) >> IPECC_R_DBG_TRNG_DIAG_CNT_STARV_POS) \
+	 & IPECC_R_DBG_TRNG_DIAG_CNT_STARV_MSK)
+
+/* TRNG channel "NNRND instruction"
  */
-/* Actions involving register R_DBG_TRNG_DIAG_4
- * ********************************************
+#define IPECC_GET_TRNG_EFP_OK() \
+	((IPECC_GET_REG(R_DBG_TRNG_DIAG_3) >> IPECC_R_DBG_TRNG_DIAG_CNT_OK_POS) \
+	 & IPECC_R_DBG_TRNG_DIAG_CNT_OK_MSK)
+#define IPECC_GET_TRNG_EFP_STARV() \
+	((IPECC_GET_REG(R_DBG_TRNG_DIAG_4) >> IPECC_R_DBG_TRNG_DIAG_CNT_STARV_POS) \
+	 & IPECC_R_DBG_TRNG_DIAG_CNT_STARV_MSK)
+
+/* TRNG channel "XY-shuffle countermeasure"
  */
-/* Actions involving register R_DBG_TRNG_DIAG_5
- * ********************************************
+#define IPECC_GET_TRNG_CRV_OK() \
+	((IPECC_GET_REG(R_DBG_TRNG_DIAG_5) >> IPECC_R_DBG_TRNG_DIAG_CNT_OK_POS) \
+	 & IPECC_R_DBG_TRNG_DIAG_CNT_OK_MSK)
+#define IPECC_GET_TRNG_CRV_STARV() \
+	((IPECC_GET_REG(R_DBG_TRNG_DIAG_6) >> IPECC_R_DBG_TRNG_DIAG_CNT_STARV_POS) \
+	 & IPECC_R_DBG_TRNG_DIAG_CNT_STARV_MSK)
+
+/* TRNG channel "Shuffling of memory of large numbers countermeasure"
  */
-/* Actions involving register R_DBG_TRNG_DIAG_6
- * ********************************************
- */
-/* Actions involving register R_DBG_TRNG_DIAG_7
- * ********************************************
- */
-/* Actions involving register R_DBG_TRNG_DIAG_8
- * ********************************************
- */
+#define IPECC_GET_TRNG_SHF_OK() \
+	((IPECC_GET_REG(R_DBG_TRNG_DIAG_7) >> IPECC_R_DBG_TRNG_DIAG_CNT_OK_POS) \
+	 & IPECC_R_DBG_TRNG_DIAG_CNT_OK_MSK)
+#define IPECC_GET_TRNG_SHF_STARV() \
+	((IPECC_GET_REG(R_DBG_TRNG_DIAG_8) >> IPECC_R_DBG_TRNG_DIAG_CNT_STARV_POS) \
+	 & IPECC_R_DBG_TRNG_DIAG_CNT_STARV_MSK)
 
 /****** DEBUG ************/
 /* TRNG handling */
