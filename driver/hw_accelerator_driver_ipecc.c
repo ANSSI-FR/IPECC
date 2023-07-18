@@ -124,14 +124,14 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 #define IPECC_R_DBG_TIME       (ipecc_baddr + IPECC_ALIGNED(0x120))
 /* Time to fill the RNG raw FIFO in cycles */
 #define IPECC_R_DBG_RAWDUR      (ipecc_baddr + IPECC_ALIGNED(0x128))
-#define IPECC_R_DBG_FLAGS      (ipecc_baddr + IPECC_ALIGNED(0x130))
+#define IPECC_R_DBG_FLAGS      (ipecc_baddr + IPECC_ALIGNED(0x130))  /* Obsolete, will be removed */
 #define IPECC_R_DBG_TRNG_STATUS     (ipecc_baddr + IPECC_ALIGNED(0x138))
 /* Read TRNG data */
 #define IPECC_R_DBG_TRNG_RAW_DATA   (ipecc_baddr + IPECC_ALIGNED(0x140))
 #define IPECC_R_DBG_FP_RDATA  		 (ipecc_baddr + IPECC_ALIGNED(0x148))
 #define IPECC_R_DBG_IRN_CNT_AXI  		(ipecc_baddr + IPECC_ALIGNED(0x150))
 #define IPECC_R_DBG_IRN_CNT_EFP  		(ipecc_baddr + IPECC_ALIGNED(0x158))
-#define IPECC_R_DBG_IRN_CNT_CUR  		(ipecc_baddr + IPECC_ALIGNED(0x160))
+#define IPECC_R_DBG_IRN_CNT_CRV  		(ipecc_baddr + IPECC_ALIGNED(0x160))
 #define IPECC_R_DBG_IRN_CNT_SHF  		(ipecc_baddr + IPECC_ALIGNED(0x168))
 #define IPECC_R_DBG_FP_RDATA_RDY    (ipecc_baddr + IPECC_ALIGNED(0x170))
 #define IPECC_R_DBG_TRNG_DIAG_0  		(ipecc_baddr + IPECC_ALIGNED(0x178))
@@ -360,7 +360,7 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 #define IPECC_R_DBG_RAWDUR_POS     (0)
 #define IPECC_R_DBG_RAWDUR_MSK     (0xffffffff)
 
-/* Fields for R_DBG_FLAGS */
+/* Fields for R_DBG_FLAGS */  /* Obsolete, will be removed */
 #define IPECC_R_DBG_FLAGS_P_NOT_SET		((uint32_t)0x1 << 0)
 #define IPECC_R_DBG_FLAGS_P_NOT_SET_MTY	((uint32_t)0x1 << 1)
 #define IPECC_R_DBG_FLAGS_A_NOT_SET		((uint32_t)0x1 << 2)
@@ -380,7 +380,7 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 #define  IPECC_R_DBG_TRNG_RAW_DATA_MSK    (0x1)
 
 /* Fields for R_DBG_IRN_CNT_AXI, R_DBG_IRN_CNT_EFP,
- * R_DBG_IRN_CNT_CUR & R_DBG_IRN_CNT_SHF */
+ * R_DBG_IRN_CNTV_CRV & R_DBG_IRN_CNT_SHF */
 #define  IPECC_R_DBG_IRN_CNT_COUNT_POS    (0)
 #define  IPECC_R_DBG_IRN_CNT_COUNT_MSK    (0xffffffff)
 
@@ -838,16 +838,16 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
  * Watchout: implicitly activate the TRNG raw random source by deasserting
  * the 'complete bypass' bit.
  */
-#define IPECC_TRNG_ENABLE_POSTPROC() do { \
+#define IPECC_TRNG_DISABLE_POSTPROC() do { \
 	IPECC_SET_REG(W_DBG_TRNG_CTRL, IPECC_W_DBG_TRNG_CTRL_DISABLE_PP); \
 } while (0)
 
-/* Disable the post-processing logic that produces internal random numbers
+/* Re-enable the post-processing logic that produces internal random numbers
  * from raw random bits.
  * Watchout: implicitly activate the TRNG raw random source by deasserting
  * the 'complete bypass' bit.
  */
-#define IPECC_TRNG_DISABLE_POSTPROC() do { \
+#define IPECC_TRNG_ENABLE_POSTPROC() do { \
 	IPECC_SET_REG(W_DBG_TRNG_CTRL, 0); \
 } while (0)
 
@@ -899,7 +899,7 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 	IPECC_SET_REG(IPECC_W_DBG_FP_WDATA, ((limb) & IPECC_W_DBG_FP_DATA_MSK) << IPECC_W_DBG_FP_DATA_POS); \
 } while (0)
 
-/* Actions involving register W_DBG_FP_RADDR & IPECC_R_DBG_FP_RDATA */
+/* Actions involving register W_DBG_FP_RADDR, IPECC_R_DBG_FP_RDATA & IPECC_R_DBG_FP_RDATA_RDY */
 
 /* Set the address in the memory of large numbers at which a data word is to be read.
  * The data itself can be subsequently obtained using IPECC_DBG_GET_FP_READ_DATA().
@@ -907,6 +907,12 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 #define IPECC_DBG_SET_FP_READ_ADDR(addr) do { \
 	IPECC_SET_REG(IPECC_W_DBG_FP_RADDR, ((addr) & IPECC_W_DBG_FP_RADDR_MSK) << IPECC_W_DBG_FP_RADDR_POS); \
 } while (0)
+
+/* Polling macro to know when the data word to fecth from the memory of large numbers
+ * (using previous macro IPECC_DBG_SET_FP_READ_ADDR) was actually read and hence if
+ * the data can now be read, using the following macro IPECC_DBG_GET_FP_READ_DATA,
+ * see below. */
+#define IPECC_DBG_IS_FP_READ_DATA_AVAIL()  (!!(IPECC_GET_REG(IPECC_R_DBG_FP_RDATA_RDY) & IPECC_R_DBG_FP_RDATA_RDY_IS_READY))
 
 /* Obtain the data word from memory of large numbers whose address
  * was previously set using IPECC_DBG_SET_FP_READ_ADDR().
@@ -963,9 +969,13 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 	IPECC_SET_REG(IPECC_W_DBG_CFG_TOKEN, IPECC_W_DBG_CFG_TOKEN_DIS); \
 } while (0)
 
-/* Actions involving register W_DBG_RESET_TRNG_CNT */
-/* Reset the diagnostic counters that software driver can access through
- * registers R_DBG_TRNG_DIAG_1 to R_DBG_TRNG_DIAG_8 */
+/* Actions involving register W_DBG_RESET_TRNG_CNT.
+ *
+ * Reset the diagnostic counters that software driver can access through
+ * registers R_DBG_TRNG_DIAG_1 to R_DBG_TRNG_DIAG_8.
+ *
+ * It is advised to reset the counters before any new [k]P computation
+ * to avoid their overflow. */
 #define IPECC_RESET_TRNG_DIAGNOSTIC_COUNTERS() do { \
 	IPECC_SET_REG(IPECC_W_DBG_RESET_TRNG_CNT, 1); /* written value actually is indifferent */ \
 } while (0)
@@ -1025,25 +1035,65 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 	(((IPECC_GET_REG(R_DBG_STATUS)) >> IPECC_R_DBG_STATUS_PC_POS) & IPECC_R_DBG_STATUS_PC_MSK)
 
 /* Get the ID of the state the main FSM is currently in.
- *
- * (see also macros related to register W_DBG_BKPT, namely IPECC_SET_BKPT & IPECC_SET_BREAKPOINT). */
+ * (see also macros related to register W_DBG_BKPT, namely
+ * IPECC_SET_BKPT & IPECC_SET_BREAKPOINT).
+ */
 #define IPECC_GET_FSM_STATE() \
 	(((IPECC_GET_REG(R_DBG_STATUS)) >> IPECC_R_DBG_STATUS_STATE_POS) & IPECC_R_DBG_STATUS_STATE_MSK)
 
+/* Actions involving register R_DBG_TIME.
+ *
+ * Each time a point-based operation is started (including [k]P computation) an internal counter
+ * is started and incremented at each cycle of the main clock. Reading this counter allows to
+ * measure computation duration of point operations. */
+#define IPECC_GET_PT_OP_TIME() \
+	(((IPECC_GET_REG(R_DBG_TIME)) >> IPECC_R_DBG_TIME_POS) & IPECC_R_DBG_TIME_MSK)
 
+/* Actions involving register R_DBG_RAWDUR.
+ *
+ * In debug mode, after each hard/soft/debug reset, an internal counter is started and
+ * incrememted at each cycle of the main clock. It is then stopped as soon as the TRNG
+ * raw random FIFO becomes FULL.
+ *
+ * This allows any debug software driver to know the time it took to completely fill up
+ * the FIFO, and hence to estimate the random production throughput of the TRNG main
+ * entropy source.
+ *
+ * Warning: this requires to first disable the post-processing logic in the TRNG
+ * (which otherwise constantly empties the raw random FIFO) using macro IPECC_TRNG_DISABLE_POSTPROC()
+ * (c.f that macro).
+ */
+#define IPECC_GET_TRNG_RAW_FIFO_FILLUP_TIME() \
+	(((IPECC_GET_REG(R_DBG_RAWDUR)) >> IPECC_R_DBG_RAWDUR_POS) & IPECC_R_DBG_RAWDUR_MSK)
 
+/* Actions involving register R_DBG_FLAGS */  /* Obsolete, will be removed */
 
-/* Actions involving register R_DBG_TIME */
-/* Actions involving register R_DBG_RAWDUR */
-/* Actions involving register R_DBG_FLAGS */
 /* Actions involving register R_DBG_TRNG_STATUS */
-/* Actions involving register R_DBG_FP_RDATA */
+
+/* Returns the current value of the write-pointer into the TRNG raw random FIFO
+ *
+ * If post-processing is disabled (see macro IPECC_TRNG_DISABLE_POSTPROC)
+ * and no TRNG raw random bits were read (using macros IPECC_TRNG_SET_RAW_BIT_ADDR
+ * and IPECC_TRNG_GET_RAW_BIT) then this yields the current quantity of TRNG raw
+ * random bits that have been produced since last reset. */
+#define IPECC_GET_TRNG_RAW_FIFO_WRITE_POINTER() \
+	(((IPECC_GET_REG(R_DBG_TRNG_STATUS)) >> IPECC_R_DBG_TRNG_STATUS_RAW_FIFO_OFFSET_POS) & IPECC_R_DBG_TRNG_STATUS_RAW_FIFO_OFFSET_MSK)
+
+/* Gives the FULL/not-FULL state of TRNG raw random FIFO */
+#define IPECC_IS_TRNG_RAW_FIFO_FULL() (!!(IPECC_GET_REG(R_DBG_TRNG_STATUS) & IPECC_R_DBG_TRNG_STATUS_RAW_FIFO_FULL))
+
 /* Actions involving register R_DBG_IRN_CNT_AXI */
+
+/* Returns the quantity of internal random numbers currently buffered in the TRNG FIFO
+ * to service randomness to the AXI interface.
+ *
+ * Internal random numbers servied to the AXI interface are 'ww'-bit long.
+ *
+ * Value of 'ww' can be obtained using macro IPECC_GET_WW (c.f). */
+
 /* Actions involving register R_DBG_IRN_CNT_EFP */
-/* Actions involving register R_DBG_IRN_CNT_CUR */
-/* Actions involving register R_DBG_IRN_CNT_SHF */
-/* Actions involving register R_DBG_FP_RDATA_RDY */
-/* Actions involving register R_DBG_TRNG_DIAG_0 */
+/* Actions involving register R_DBG_IRN_CNT_CRV */
+/* Actions involving register R_DBG_IRN_CNT_SHF */ /* Actions involving register R_DBG_TRNG_DIAG_0 */
 /* Actions involving register R_DBG_TRNG_DIAG_1 */
 /* Actions involving register R_DBG_TRNG_DIAG_2 */
 /* Actions involving register R_DBG_TRNG_DIAG_3 */

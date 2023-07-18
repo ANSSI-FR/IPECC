@@ -90,7 +90,7 @@ package ecc_software is
 	constant R_DBG_FP_RDATA : rat := std_nat(41, ADB);       -- 0x148
 	constant R_DBG_IRN_CNT_AXI : rat := std_nat(42, ADB);    -- 0x150
 	constant R_DBG_IRN_CNT_EFP : rat := std_nat(43, ADB);    -- 0x158
-	constant R_DBG_IRN_CNT_CUR : rat := std_nat(44, ADB);    -- 0x160
+	constant R_DBG_IRN_CNT_CRV : rat := std_nat(44, ADB);    -- 0x160
 	constant R_DBG_IRN_CNT_SHF : rat := std_nat(45, ADB);    -- 0x168
 	constant R_DBG_FP_RDATA_RDY : rat := std_nat(46, ADB);   -- 0x170
 	constant R_DBG_TRNG_DIAG_0 : rat := std_nat(47, ADB);    -- 0x178

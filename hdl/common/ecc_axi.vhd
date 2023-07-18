@@ -3232,10 +3232,10 @@ begin
 					std_logic_vector(resize(unsigned(trngefpirncount), 32));
 				v.axi.rvalid := '1'; -- (s5)
 			-- -------------------------------------------
-			-- decoding read of R_DBG_IRN_CNT_CUR register
+			-- decoding read of R_DBG_IRN_CNT_CRV register
 			-- -------------------------------------------
 			elsif debug -- statically resolved by synthesizer
-			  and s_axi_araddr(ADB + 2 downto 3) = R_DBG_IRN_CNT_CUR
+			  and s_axi_araddr(ADB + 2 downto 3) = R_DBG_IRN_CNT_CRV
 			then
 				v.axi.rdatax(31 downto 0) :=
 					std_logic_vector(resize(unsigned(trngcurirncount), 32));
