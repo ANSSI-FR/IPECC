@@ -307,7 +307,7 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 #define IPECC_R_STATUS_R_OR_W		((uint32_t)0x1 << 8)
 #define IPECC_R_STATUS_INIT		((uint32_t)0x1 << 9)
 #define IPECC_R_STATUS_NNDYNACT		((uint32_t)0x1 << 10)
-#define IPECC_R_WK_STATUS_ENOUGH_RND	((uint32_t)0x1 << 11)
+#define IPECC_R_STATUS_ENOUGH_RND_WK	((uint32_t)0x1 << 11)
 #define IPECC_R_STATUS_YES		((uint32_t)0x1 << 13)
 #define IPECC_R_STATUS_R0_IS_NULL	((uint32_t)0x1 << 14)
 #define IPECC_R_STATUS_R1_IS_NULL	((uint32_t)0x1 << 15)
@@ -462,9 +462,9 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
  *
  * Software must first check that this bit is active (1) before writing a new scalar
  * (otherwise data written by software when transmitting the scalar will be ignored
- * and error flag 'WK_NOT_ENOUGH_RANDOM' will be set in register R_STATUS).
+ * and error flag 'NOT_ENOUGH_RANDOM_WK' will be set in register R_STATUS).
  */
-#define IPECC_IS_ENOUGH_RND_WRITE_SCALAR() 	(!!(IPECC_GET_REG(IPECC_R_STATUS) & IPECC_R_WK_STATUS_ENOUGH_RND))
+#define IPECC_IS_ENOUGH_RND_WRITE_SCALAR() 	(!!(IPECC_GET_REG(IPECC_R_STATUS) & IPECC_R_STATUS_ENOUGH_RND_WK))
 
 /* Commands execution
  */
@@ -689,7 +689,7 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 #define IPECC_ERR_TOKEN		((uint32_t)0x1 << 10)
 #define IPECC_ERR_SHUFFLE   ((uint32_t)0x1 << 11)
 #define IPECC_ERR_ZREMASK		((uint32_t)0x1 << 12)
-#define IPECC_ERR_WK_NOT_ENOUGH_RANDOM  ((uint32_t)0x1 << 13)
+#define IPECC_ERR_NOT_ENOUGH_RANDOM_WK  ((uint32_t)0x1 << 13)
 #define IPECC_ERR_RREG_FBD 		((uint32_t)0x1 << 14)
 
 /* Get the complete error field.
@@ -1385,11 +1385,11 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 	((IPECC_GET_REG(IPECC_R_DBG_TRNG_DIAG_8) >> IPECC_R_DBG_TRNG_DIAG_CNT_STARV_POS) \
 	 & IPECC_R_DBG_TRNG_DIAG_CNT_STARV_MSK)
 
-/********************************************
- * A step higher - middle-level action macros
+/**********************************************
+ * One step higher - middle-level action macros
  *
  * Sorted by category/function.
- ********************************************/
+ **********************************************/
 
 /****** DEBUG ************/
 /* TRNG handling */
@@ -1406,18 +1406,6 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
         while(!IPECC_IS_TRNG_RAW_FIFO_FULL()){}; \
 } while(0)
 
-/* TRNG Config */
-#if 0
-#define IPECC_TRNG_SET_OPTIONS(debias, ta, latency, bypass) do { \
-	ip_ecc_word val = IPECC_GET_REG(IPECC_W_DBG_TRNG_CFG); \
-	val |= ((debias) ? IPECC_W_DBG_TRNG_CFG_ACTIVE_DEBIAS : 0); \
-	val |= ((ta) & IPECC_W_DBG_TRNG_CFG_TA_MSK) << IPECC_W_DBG_TRNG_CFG_TA_POS; \
-	val |= ((latency) & IPECC_W_DBG_TRNG_CFG_TRNG_IDLE_MSK) << IPECC_W_DBG_TRNG_CFG_TRNG_IDLE_POS; \
-	val |= ((bypass) ? IPECC_W_DBG_TRNG_CFG_TRNG_BYPASS : 0); \
-	IPECC_SET_REG(IPECC_W_DBG_TRNG_CFG, val); \
-} while(0)
-#endif
-
 typedef enum {
 	EC_HW_REG_A      = 0,
 	EC_HW_REG_B      = 1,
@@ -1428,6 +1416,7 @@ typedef enum {
 	EC_HW_REG_R1_X   = 6,
 	EC_HW_REG_R1_Y   = 7,
 	EC_HW_REG_SCALAR = 8,
+	EC_HW_REG_TOKEN  = 9,
 } ip_ecc_register;
 
 typedef enum {
@@ -1439,18 +1428,23 @@ typedef uint32_t ip_ecc_error;
 
 #if defined(WITH_EC_HW_DEBUG)
 static const char *ip_ecc_error_strings[] = {
+	"EC_HW_STATUS_ERR_IN_PT_NOT_ON_CURVE",
+	"EC_HW_STATUS_ERR_OUT_PT_NOT_ON_CURVE",
 	"EC_HW_STATUS_ERR_COMP",
 	"EC_HW_STATUS_ERR_WREG_FBD",
 	"EC_HW_STATUS_ERR_KP_FBD",
 	"EC_HW_STATUS_ERR_NNDYN",
 	"EC_HW_STATUS_ERR_POP_FBD",
-	"EC_HW_STATUS_ERR_BLN",
 	"EC_HW_STATUS_ERR_RDNB_FBD",
 	"EC_HW_STATUS_ERR_BLN",
 	"EC_HW_STATUS_ERR_UNKOWN_REG",
-	"EC_HW_STATUS_ERR_IN_PT_NOT_ON_CURVE",
-	"EC_HW_STATUS_ERR_OUT_PT_NOT_ON_CURVE",
+	"EC_HW_STATUS_ERR_TOKEN",
+	"EC_HW_STATUS_ERR_SHUFFLE",
+	"EC_HW_STATUS_ERR_ZREMASK",
+	"EC_HW_STATUS_ERR_NOT_ENOUGH_RANDOM_WK",
+	"EC_HW_STATUS_ERR_RREG_FBD",
 };
+
 static inline void ip_ecc_errors_print(ip_ecc_error err)
 {
 	unsigned int i;
@@ -1484,7 +1478,7 @@ static inline void ip_ecc_log(const char *s)
 	(void)s;
 	return;
 }
-#endif
+#endif /* WITH_EC_HW_DEBUG */
 
 /* Helper to compute word size of a big number given in bytes */
 static inline unsigned int ip_ecc_nn_words_from_bytes_sz(unsigned int sz)

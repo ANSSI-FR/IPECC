@@ -1488,10 +1488,10 @@ begin
 								v.write.rnd.bitsww := to_unsigned(ww - 1, log2(ww - 1));
 								v.write.rnd.carry := 0;
 								-- remove any previous possible error
-								v.ctrl.ierrid(STATUS_ERR_I_WK_NOT_ENOUGH_RANDOM) := '0';
+								v.ctrl.ierrid(STATUS_ERR_I_NOT_ENOUGH_RANDOM_WK) := '0';
 							else -- not enough random
 								v_writebn_accepted := FALSE; -- (s55), see (s56)
-								v.ctrl.ierrid(STATUS_ERR_I_WK_NOT_ENOUGH_RANDOM) := '1';
+								v.ctrl.ierrid(STATUS_ERR_I_NOT_ENOUGH_RANDOM_WK) := '1';
 							end if;
 						else
 							v.ctrl.wk := '0';
@@ -2964,6 +2964,7 @@ begin
 					R_STATUS(ADB - 2 downto 0))
 			then
 				dw := (others => '0');
+				-- Informational bits
 				if v_busy then -- (s160), see (s30)
 					dw(STATUS_BUSY) := '1';
 				else
@@ -2976,7 +2977,7 @@ begin
 				dw(STATUS_POP) := r.ctrl.poppending;
 				dw(STATUS_R_OR_W) := r.write.busy or r.read.busy;
 				dw(STATUS_INIT) := not initdone;
-				dw(STATUS_WK_ENOUGH_RND) := not r.write.rnd.enough_random;
+				dw(STATUS_ENOUGH_RND_WK) := not r.write.rnd.enough_random;
 				if nn_dynamic then -- statically resolved by synthesizer
 					dw(STATUS_NNDYNACT) := r.nndyn.active;
 				else
@@ -2985,9 +2986,10 @@ begin
 				dw(STATUS_YES) := r.ctrl.yes; -- (s98), was set by (s96)
 				dw(STATUS_R0_IS_NULL) := r.ctrl.r0_is_null;
 				dw(STATUS_R1_IS_NULL) := r.ctrl.r1_is_null;
-				dw(STATUS_ERR_I_MSB downto STATUS_ERR_I_LSB) := r.ctrl.ierrid;
+				-- Error bits
 				dw(STATUS_ERR_IN_PT_NOT_ON_CURVE) := aerr_inpt_not_on_curve;
 				dw(STATUS_ERR_OUT_PT_NOT_ON_CURVE) := aerr_outpt_not_on_curve;
+				dw(STATUS_ERR_I_MSB downto STATUS_ERR_I_LSB) := r.ctrl.ierrid;
 				v.axi.rdatax := dw;
 				v.axi.rvalid := '1'; -- (s5)
 			-- -------------------------------------
