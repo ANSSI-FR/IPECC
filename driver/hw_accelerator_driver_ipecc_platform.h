@@ -26,13 +26,13 @@
  * remain fixed once this base address is known.
  */
 #if defined(WITH_EC_HW_STANDALONE) && (defined(WITH_EC_HW_UIO) || defined(WITH_EC_HW_DEVMEM))
-#error "WITH_EC_HW_STANDALONE, WITH_EC_HW_UIO and WITH_EC_HW_DEVMEM are mutually axclusive!"
+#error "WITH_EC_HW_STANDALONE, WITH_EC_HW_UIO and WITH_EC_HW_DEVMEM are mutually exclusive!"
 #endif
 #if defined(WITH_EC_HW_UIO) && (defined(WITH_EC_HW_STANDALONE) || defined(WITH_EC_HW_DEVMEM))
-#error "WITH_EC_HW_STANDALONE, WITH_EC_HW_UIO and WITH_EC_HW_DEVMEM are mutually axclusive!"
+#error "WITH_EC_HW_STANDALONE, WITH_EC_HW_UIO and WITH_EC_HW_DEVMEM are mutually exclusive!"
 #endif
 #if defined(WITH_EC_HW_DEVMEM) && (defined(WITH_EC_HW_UIO) || defined(WITH_EC_HW_STANDALONE))
-#error "WITH_EC_HW_STANDALONE, WITH_EC_HW_UIO and WITH_EC_HW_DEVMEM are mutually axclusive!"
+#error "WITH_EC_HW_STANDALONE, WITH_EC_HW_UIO and WITH_EC_HW_DEVMEM are mutually exclusive!"
 #endif
 #if !defined(WITH_EC_HW_STANDALONE) && !defined(WITH_EC_HW_UIO) && !defined(WITH_EC_HW_DEVMEM)
 #error "One of WITH_EC_HW_STANDALONE, WITH_EC_HW_UIO or WITH_EC_HW_DEVMEM must be set for the driver!"
@@ -61,11 +61,11 @@
 #define log_print(...)
 #endif
 
-/* Setup the driver depending on the environment, and
- * set the base address of the driver mapping.
+/* Setup the driver depending on the environment,
+ * and set the base address of the driver mapping.
  */
 int hw_driver_setup(volatile unsigned char **base_addr_p, volatile unsigned char **reset_base_addr_p);
 
-#endif /* !WITH_EC_HW_ACCELERATOR */
+#endif /* WITH_EC_HW_ACCELERATOR */
 
 #endif /* __HW_ACCELERATOR_DRIVER_PLATFORM_H__ */

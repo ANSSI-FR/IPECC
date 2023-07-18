@@ -55,8 +55,10 @@ typedef volatile uint64_t ip_ecc_word;
 
 #if defined(EC_HW_ACCELERATOR_WORD64)
 /* In 64 bits, reverse words endianness */
-#define IPECC_GET_REG(reg)		((*((ip_ecc_word*)((reg)))) & 0xffffffff)
-#define IPECC_SET_REG(reg, val)		((*((ip_ecc_word*)((reg)))) = (((((ip_ecc_word)(val)) & 0xffffffff) << 32) | (((ip_ecc_word)(val)) >> 32)))
+#define IPECC_GET_REG(reg)	((*((ip_ecc_word*)((reg)))) & 0xffffffff)
+#define IPECC_SET_REG(reg, val)	\
+	((*((ip_ecc_word*)((reg)))) = (((((ip_ecc_word)(val)) & 0xffffffff) << 32) \
+		| (((ip_ecc_word)(val)) >> 32)))
 #else
 #define IPECC_GET_REG(reg)		 (*((ip_ecc_word*)((reg))))
 #define IPECC_SET_REG(reg, val)		((*((ip_ecc_word*)((reg)))) = ((ip_ecc_word)(val)))
@@ -451,7 +453,8 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
  * of 'nn' main security parameter? (only with a hardware synthesized
  * with 'nn modifiable at runtime' option)
  */
-#define IPECC_IS_BUSY_NNDYNACT() (!!(IPECC_GET_REG(IPECC_R_STATUS) & IPECC_R_STATUS_NNDYNACT))
+#define IPECC_IS_BUSY_NNDYNACT() \
+	(!!(IPECC_GET_REG(IPECC_R_STATUS) & IPECC_R_STATUS_NNDYNACT))
 
 /* To know if the IP is ready to accept a new scalar (writing the scalar is a
  * particular case of writing a big number: the IP must first gather enough random
@@ -464,17 +467,17 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
  * (otherwise data written by software when transmitting the scalar will be ignored
  * and error flag 'NOT_ENOUGH_RANDOM_WK' will be set in register R_STATUS).
  */
-#define IPECC_IS_ENOUGH_RND_WRITE_SCALAR() 	(!!(IPECC_GET_REG(IPECC_R_STATUS) & IPECC_R_STATUS_ENOUGH_RND_WK))
+#define IPECC_IS_ENOUGH_RND_WRITE_SCALAR() \
+	(!!(IPECC_GET_REG(IPECC_R_STATUS) & IPECC_R_STATUS_ENOUGH_RND_WK))
 
-/* Commands execution
- */
+/* Commands */
+#define IPECC_EXEC_PT_KP()  (IPECC_SET_REG(IPECC_W_CTRL, IPECC_W_CTRL_PT_KP))
 #define IPECC_EXEC_PT_ADD() (IPECC_SET_REG(IPECC_W_CTRL, IPECC_W_CTRL_PT_ADD))
 #define IPECC_EXEC_PT_DBL() (IPECC_SET_REG(IPECC_W_CTRL, IPECC_W_CTRL_PT_DBL))
 #define IPECC_EXEC_PT_CHK() (IPECC_SET_REG(IPECC_W_CTRL, IPECC_W_CTRL_PT_CHK))
 #define IPECC_EXEC_PT_EQU() (IPECC_SET_REG(IPECC_W_CTRL, IPECC_W_CTRL_PT_EQU))
 #define IPECC_EXEC_PT_OPP() (IPECC_SET_REG(IPECC_W_CTRL, IPECC_W_CTRL_PT_OPP))
 #define IPECC_EXEC_PT_NEG() (IPECC_SET_REG(IPECC_W_CTRL, IPECC_W_CTRL_PT_NEG))
-#define IPECC_EXEC_PT_KP()  (IPECC_SET_REG(IPECC_W_CTRL, IPECC_W_CTRL_PT_KP))
 
 /* On curve/equality/opposition flags handling
  */
@@ -528,8 +531,10 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
  */
 /* Infinity point handling with R0/R1 NULL flags.
  */
-#define IPECC_GET_R0_INF() (!!(IPECC_GET_REG(IPECC_R_STATUS) & IPECC_R_STATUS_R0_IS_NULL))
-#define IPECC_GET_R1_INF() (!!(IPECC_GET_REG(IPECC_R_STATUS) & IPECC_R_STATUS_R1_IS_NULL))
+#define IPECC_GET_R0_INF() \
+	(!!(IPECC_GET_REG(IPECC_R_STATUS) & IPECC_R_STATUS_R0_IS_NULL))
+#define IPECC_GET_R1_INF() \
+	(!!(IPECC_GET_REG(IPECC_R_STATUS) & IPECC_R_STATUS_R1_IS_NULL))
 
 #define IPECC_CLEAR_R0_INF() do { \
 	IPECC_SET_REG(IPECC_W_R0_NULL, IPECC_W_POINT_IS_NOT_NULL); \
@@ -562,7 +567,8 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
  * with the 'nn modifiable at runtime' option).
  */
 #define IPECC_SET_NN_SIZE(sz) do { \
-	IPECC_SET_REG(IPECC_W_PRIME_SIZE, ((sz) & IPECC_W_PRIME_SIZE_MSK) << IPECC_W_PRIME_SIZE_POS); \
+	IPECC_SET_REG(IPECC_W_PRIME_SIZE, \
+			((sz) & IPECC_W_PRIME_SIZE_MSK) << IPECC_W_PRIME_SIZE_POS); \
 } while(0)
 
 /*
@@ -584,7 +590,8 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 	/* Enable blinding */ \
 	val |= IPECC_W_BLINDING_EN; \
 	/* Configure blinding */ \
-	val |= ((blinding_size & IPECC_W_BLINDING_BITS_MSK) << IPECC_W_BLINDING_BITS_POS); \
+	val |= ((blinding_size & IPECC_W_BLINDING_BITS_MSK) << \
+			IPECC_W_BLINDING_BITS_POS); \
 	IPECC_SET_REG(IPECC_W_BLINDING, val); \
 } while(0)
 
@@ -595,11 +602,11 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 
 /* Enable shuffling countermeasure.
  *
- *   - Shuffling method is set statically (at synthesis time) and cannot be
- *     modified dynamically.
+ *   - Shuffling method is set statically (at synthesis time)
+ *     and cannot be modified dynamically.
  *
- *   - Shuffling can be always be activated if a shuffling method was selected
- *     at synthesis time.
+ *   - Shuffling can be always be activated if a shuffling
+ *     method was selected at synthesis time.
  */
 #define IPECC_ENABLE_SHUFFLE() do { \
 	IPECC_SET_REG(IPECC_W_SHUFFLE, IPECC_W_SHUFFLE_EN); \
@@ -607,11 +614,12 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 
 /* Disable the shuffling countermeasure.
  *
- *   - Shuffling cannot be deactivated if it was hardware-locked at synthesis
- *     time & the IP was synthesized in production (secure-)mode.
+ *   - Shuffling cannot be deactivated if it was hardware-locked
+ *     at synthesis time & the IP was synthesized in production
+ *     (secure-)mode.
  *
- *   - If IP was synthesized in debug (unsecure-)mode, shuffling can be arbitra-
- *     rily enabled/disabled
+ *   - If IP was synthesized in debug (unsecure-)mode, shuffling
+ *     can be arbitrarily enabled/disabled.
  */
 #define IPECC_DISABLE_SHUFFLE() do { \
 	IPECC_SET_REG(IPECC_W_SHUFFLE, IPECC_W_SHUFFLE_DIS); \
@@ -628,7 +636,8 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 	/* Enable Z-remasking */ \
 	val |= IPECC_W_ZREMASK_EN; \
 	/* Configure Z-remasking */ \
-	val |= ((zremask_period & IPECC_W_ZREMASK_BITS_MSK) << IPECC_W_ZREMASK_BITS_POS); \
+	val |= ((zremask_period & IPECC_W_ZREMASK_BITS_MSK) \
+			<< IPECC_W_ZREMASK_BITS_POS); \
 	IPECC_SET_REG(IPECC_W_ZREMASK, val); \
 } while (0)
 
@@ -663,18 +672,23 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
  */
 /* Definition of error bits.
  *
- * Exact same bit positions exist both in R_STATUS register and in W_ERR_ACK register.
+ * Exact same bit positions exist both in R_STATUS register
+ * and in W_ERR_ACK register.
  *
- * Hence an error set (=1) by hardware in R_STATUS register can always be acknowledged by
- * the software driver by writing a 1 at the exact same bit position in W_ERR_ACK register,
- * thus having hardware reset back the error (=0) in the exact same bit position in R_STATUS
- * register.
+ * Hence an error set (=1) by hardware in R_STATUS register
+ * can always be acknowledged by the software driver by writing
+ * a 1 at the exact same bit position in W_ERR_ACK register,
+ * thus having hardware reset back the error (=0) in the exact
+ * same bit position in R_STATUS register.
  *
- * Note however that following bit positions start at 0 and hence are relative: correspon-
- * ding real bit positions are actually shifted by a qty IPECC_R_STATUS_ERRID_POS (both in
- * R_STATUS and W_ERR_ACK register), however higher-level of the software does not need to
- * bother with these details as they are masked by macros IPECC_GET_ERROR() & IPECC_ACK_ERROR()
- * below, which perform the actual bit-shift of IPECC_R_STATUS_ERRID_POS positions.
+ * Note however that following bit positions start at 0 and
+ * hence are relative: corresponding real bit positions are
+ * actually shifted by a qty IPECC_R_STATUS_ERRID_POS (both in
+ * R_STATUS and W_ERR_ACK register), however higher-level of
+ * the software does not need to bother with these details
+ * as they are masked by macros IPECC_GET_ERROR() &
+ * IPECC_ACK_ERROR() below, which perform the actual bit-
+ * shift of IPECC_R_STATUS_ERRID_POS positions.
  */
 #define IPECC_ERR_IN_PT_NOT_ON_CURVE	((uint32_t)0x1 << 0)
 #define IPECC_ERR_OUT_PT_NOT_ON_CURVE	((uint32_t)0x1 << 1)
@@ -699,42 +713,54 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 	 & IPECC_R_STATUS_ERRID_MSK)
 
 /* To identify 'Computation' error */
-#define IPECC_ERROR_IS_COMP()			(!!(IPECC_GET_ERROR() & IPECC_ERR_COMP))
+#define IPECC_ERROR_IS_COMP() \
+	(!!(IPECC_GET_ERROR() & IPECC_ERR_COMP))
 
 /* To identify 'Forbidden register-write' error */
-#define IPECC_ERROR_IS_WREG_FBD()		(!!(IPECC_GET_ERROR() & IPECC_ERR_WREG_FBD))
+#define IPECC_ERROR_IS_WREG_FBD() \
+	(!!(IPECC_GET_ERROR() & IPECC_ERR_WREG_FBD))
 
 /* To identify 'Forbidden register-read' error */
-#define IPECC_ERROR_IS_RREG_FBD()		(!!(IPECC_GET_ERROR() & IPECC_ERR_RREG_FBD))
+#define IPECC_ERROR_IS_RREG_FBD() \
+	(!!(IPECC_GET_ERROR() & IPECC_ERR_RREG_FBD))
 
 /* To identify '[k]P computation not possible' error */
-#define IPECC_ERROR_IS_KP_FBD()			(!!(IPECC_GET_ERROR() & IPECC_ERR_KP_FBD))
+#define IPECC_ERROR_IS_KP_FBD() \
+	(!!(IPECC_GET_ERROR() & IPECC_ERR_KP_FBD))
 
 /* To identify 'nn value not in authorized range' error */
-#define IPECC_ERROR_IS_NNDYN()			(!!(IPECC_GET_ERROR() & IPECC_ERR_NNDYN))
+#define IPECC_ERROR_IS_NNDYN() \
+	(!!(IPECC_GET_ERROR() & IPECC_ERR_NNDYN))
 
 /* To identify 'Point operation (other than [k]P) not possible' error */
-#define IPECC_ERROR_IS_POP_FBD()		(!!(IPECC_GET_ERROR() & IPECC_ERR_POP_FBD))
+#define IPECC_ERROR_IS_POP_FBD() \
+	(!!(IPECC_GET_ERROR() & IPECC_ERR_POP_FBD))
 
 /* To identify 'Read large number command cannot be satisfied' error */
-#define IPECC_ERROR_IS_RDNB_FBD()		(!!(IPECC_GET_ERROR() & IPECC_ERR_RDNB_FBD))
+#define IPECC_ERROR_IS_RDNB_FBD() \
+	(!!(IPECC_GET_ERROR() & IPECC_ERR_RDNB_FBD))
 
 /* To identify 'Blinding configuration' error */
-#define IPECC_ERROR_IS_BLN()			(!!(IPECC_GET_ERROR() & IPECC_ERR_BLN))
+#define IPECC_ERROR_IS_BLN() \
+	(!!(IPECC_GET_ERROR() & IPECC_ERR_BLN))
 
 /* To identify 'Unknown register' error */
-#define IPECC_ERROR_IS_UNKOWN_REG()		(!!(IPECC_GET_ERROR() & IPECC_ERR_UNKOWN_REG))
+#define IPECC_ERROR_IS_UNKOWN_REG() \
+	(!!(IPECC_GET_ERROR() & IPECC_ERR_UNKOWN_REG))
 
 /* To identify 'Input point is not on curve' error */
-#define IPECC_ERROR_IS_IN_PT_NOT_ON_CURVE 	(!!(IPECC_GET_ERROR() & IPECC_ERR_IN_PT_NOT_ON_CURVE))
+#define IPECC_ERROR_IS_IN_PT_NOT_ON_CURVE \
+	(!!(IPECC_GET_ERROR() & IPECC_ERR_IN_PT_NOT_ON_CURVE))
 
 /* To identify 'Output point is not on curve' error */
-#define IPECC_ERROR_IS_OUT_PT_NOT_ON_CURVE 	(!!(IPECC_GET_ERROR() & IPECC_ERR_OUT_PT_NOT_ON_CURVE))
+#define IPECC_ERROR_IS_OUT_PT_NOT_ON_CURVE() \
+	(!!(IPECC_GET_ERROR() & IPECC_ERR_OUT_PT_NOT_ON_CURVE))
 
 /* To acknowledge error(s) to the IP.
  */
 #define IPECC_ACK_ERROR(err) \
-	(IPECC_SET_REG(IPECC_W_ERR_ACK, (((err) & IPECC_R_STATUS_ERRID_MSK) << IPECC_R_STATUS_ERRID_POS)))
+	(IPECC_SET_REG(IPECC_W_ERR_ACK, \
+	  (((err) & IPECC_R_STATUS_ERRID_MSK) << IPECC_R_STATUS_ERRID_POS)))
 
 /*
  * Actions using register W_SMALL_SCALAR
@@ -827,13 +853,16 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 #define IPECC_DEBUG_STATE_ADPA  6
 #define IPECC_DEBUG_STATE_SETUP  7
 #define IPECC_DEBUG_STATE_DOUBLE  8
+/* Value 9 was tied to an obsolete state
+ * which has been removed. */
 #define IPECC_DEBUG_STATE_ITOH  10
 #define IPECC_DEBUG_STATE_ZADDU  11
 #define IPECC_DEBUG_STATE_ZADDC  12
 #define IPECC_DEBUG_STATE_SUBTRACTP  13
 #define IPECC_DEBUG_STATE_EXIT  14
 
-/* Set a breakpoint, valid in a specific state & for a specific bit-
+/*
+ * Set a breakpoint, valid in a specific state & for a specific bit-
  * position of the scalar.
  */
 #define IPECC_SET_BKPT(id, addr, nbbit, state) do { \
@@ -844,7 +873,8 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 	    | (((state) & IPECC_W_DBG_BKPT_STATE_MSK) << IPECC_W_DBG_BKPT_STATE_POS )); \
 } while (0)
 
-/* Set a breakpoint, valid for any state & for any bit of the scalar.
+/*
+ * Set a breakpoint, valid for any state & for any bit of the scalar.
  */
 #define IPECC_SET_BREAKPOINT(id, addr, nbbit, state) do { \
 	IPECC_SET_BKT((id), (addr), 0, IPECC_DEBUG_STATE_ANY_OR_IDLE); \
@@ -859,8 +889,9 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 /* Actions involving register W_DBG_STEPS
  * **************************************
  */
-/* Running part of microcode when debug halted
- * & resuming execution.
+/*
+ * Running part of the microcode when IP is debug-halted
+ * or resuming execution.
  */
 #define IPECC_RUN_OPCODES(nb) do { \
 	IPECC_SET_REG(IPECC_W_DBG_STEPS_RUN_NB_OP \
@@ -874,39 +905,50 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 /* Actions involving register W_DBG_TRIG_ACT
  * *****************************************
  */
-/* Arming both signal rising-edge & falling-edge triggers.
+/*
+ * Arming both signal rising-edge & falling-edge triggers.
  */
 #define IPECC_ARM_TRIGGER() do { \
 	IPECC_SET_REG(IPECC_W_DBG_TRIG_ACT, IPECC_W_DBG_TRIG_ACT_EN); \
 } while (0)
 
-/* Actions involving register W_DBG_TRIG_UP
- * ****************************************
+/* Actions involving register W_DBG_TRIG_UP & W_DBG_TRIG_DOWN
+ * **********************************************************
  */
-/* ('time' is expressed in multiple of the clock cycles starting from
- * the begining of [k]P computation). */
+/*
+ * To set the time at which the trigger output signal must be raised.
+ *
+ * Parameter 'time' is expressed in multiple of the clock cycles starting from
+ * the begining of [k]P computation.
+ */
 #define IPECC_SET_TRIGGER_UP(time) do { \
-	IPECC_SET_REG(IPECC_W_DBG_TRIG_UP, ((time) & IPECC_W_DBG_TRIG_MSK) << IPECC_W_DBG_TRIG_POS); \
+	IPECC_SET_REG(IPECC_W_DBG_TRIG_UP, ((time) & IPECC_W_DBG_TRIG_MSK) \
+			<< IPECC_W_DBG_TRIG_POS); \
 } while (0)
 
-/* Actions involving register W_DBG_TRIG_DOWN
- * (same as for IPECC_SET_TRIGGER_UP). */
+/*
+ * To set the time at which the trigger output signal must be lowered back.
+ * (same remark as for IPECC_SET_TRIGGER_UP).
+ */
 #define IPECC_SET_TRIGGER_DOWN() do { \
-	IPECC_SET_REG(IPECC_W_DBG_TRIG_DOWN, ((time) & IPECC_W_DBG_TRIG_MSK) << IPECC_W_DBG_TRIG_POS); \
+	IPECC_SET_REG(IPECC_W_DBG_TRIG_DOWN, ((time) & IPECC_W_DBG_TRIG_MSK) \
+			<< IPECC_W_DBG_TRIG_POS); \
 } while (0)
 
 /* Actions involving register W_DBG_OP_WADDR
  * *****************************************
  */
 #define IPECC_SET_OPCODE_WRITE_ADDRES(addr) do { \
-	IPECC_SET_REG(IPECC_W_DBG_OP_WADDR, ((addr) & IPECC_W_DBG_OP_WADDR_MSK) << IPECC_W_DBG_OP_WADDR_POS); \
+	IPECC_SET_REG(IPECC_W_DBG_OP_WADDR, ((addr) & IPECC_W_DBG_OP_WADDR_MSK) \
+			<< IPECC_W_DBG_OP_WADDR_POS); \
 } while (0)
 
 /* Actions involving register W_DBG_OPCODE
  * ***************************************
  */
 #define IPECC_SET_OPCODE_TO_WRITE(opcode) do { \
-	IPECC_SET_REG(IPECC_W_DBG_OPCODE, ((addr) & IPECC_W_DBG_OPCODE_MSK) << IPECC_W_DBG_OPCODE_POS); \
+	IPECC_SET_REG(IPECC_W_DBG_OPCODE, ((addr) & IPECC_W_DBG_OPCODE_MSK) \
+			<< IPECC_W_DBG_OPCODE_POS); \
 } while (0)
 
 /* Actions involving register W_DBG_TRNG_CTRL
@@ -1002,8 +1044,10 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 	if (debias) { \
 		val |= IPECC_W_DBG_TRNG_CFG_ACTIVE_DEBIAS ; \
 	} \
-	val |= ((ta) & IPECC_W_DBG_TRNG_CFG_TA_MSK) << IPECC_W_DBG_TRNG_CFG_TA_POS; \
-	val |= ((idlenb) & IPECC_W_DBG_TRNG_CFG_TRNG_IDLE_MSK) << IPECC_W_DBG_TRNG_CFG_TRNG_IDLE_POS; \
+	val |= ((ta) & IPECC_W_DBG_TRNG_CFG_TA_MSK) \
+	  << IPECC_W_DBG_TRNG_CFG_TA_POS; \
+	val |= ((idlenb) & IPECC_W_DBG_TRNG_CFG_TRNG_IDLE_MSK) \
+	  << IPECC_W_DBG_TRNG_CFG_TRNG_IDLE_POS; \
 	IPECC_SET_REG(IPECC_W_DBG_TRNG_CFG, val); \
 } while (0)
 
@@ -1015,7 +1059,8 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
  * The data itself can be subsequently transmitted using IPECC_DBG_SET_FP_WRITE_DATA().
  */
 #define IPECC_DBG_SET_FP_WRITE_ADDR(addr) do { \
-	IPECC_SET_REG(IPECC_W_DBG_FP_WADDR, ((addr) & IPECC_W_DBG_FP_WADDR_MSK) << IPECC_W_DBG_FP_WADDR_POS); \
+	IPECC_SET_REG(IPECC_W_DBG_FP_WADDR, ((addr) & IPECC_W_DBG_FP_WADDR_MSK) \
+			<< IPECC_W_DBG_FP_WADDR_POS); \
 } while (0)
 
 /* Set the data to be written in memory of large numbers, at the address previously
@@ -1023,7 +1068,8 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
  * This is a ww-bit word which is a limb of a larger large-number.
  */
 #define IPECC_DBG_SET_FP_WRITE_DATA(limb) do { \
-	IPECC_SET_REG(IPECC_W_DBG_FP_WDATA, ((limb) & IPECC_W_DBG_FP_DATA_MSK) << IPECC_W_DBG_FP_DATA_POS); \
+	IPECC_SET_REG(IPECC_W_DBG_FP_WDATA, ((limb) & IPECC_W_DBG_FP_DATA_MSK) \
+			<< IPECC_W_DBG_FP_DATA_POS); \
 } while (0)
 
 /* Actions involving register W_DBG_FP_RADDR, IPECC_R_DBG_FP_RDATA &
@@ -1035,20 +1081,23 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
  * The data itself can be subsequently obtained using IPECC_DBG_GET_FP_READ_DATA().
  */
 #define IPECC_DBG_SET_FP_READ_ADDR(addr) do { \
-	IPECC_SET_REG(IPECC_W_DBG_FP_RADDR, ((addr) & IPECC_W_DBG_FP_RADDR_MSK) << IPECC_W_DBG_FP_RADDR_POS); \
+	IPECC_SET_REG(IPECC_W_DBG_FP_RADDR, ((addr) & IPECC_W_DBG_FP_RADDR_MSK) \
+			<< IPECC_W_DBG_FP_RADDR_POS); \
 } while (0)
 
 /* Polling macro to know when the data word to fecth from the memory of large numbers
  * (using previous macro IPECC_DBG_SET_FP_READ_ADDR) was actually read and hence if
  * the data can now be read, using the following macro IPECC_DBG_GET_FP_READ_DATA,
  * see below. */
-#define IPECC_DBG_IS_FP_READ_DATA_AVAIL()  (!!(IPECC_GET_REG(IPECC_R_DBG_FP_RDATA_RDY) & IPECC_R_DBG_FP_RDATA_RDY_IS_READY))
+#define IPECC_DBG_IS_FP_READ_DATA_AVAIL()  (!!(IPECC_GET_REG(IPECC_R_DBG_FP_RDATA_RDY) \
+			& IPECC_R_DBG_FP_RDATA_RDY_IS_READY))
 
 /* Obtain the data word from memory of large numbers whose address
  * was previously set using IPECC_DBG_SET_FP_READ_ADDR().
  */ 
 #define IPECC_DBG_GET_FP_READ_DATA() \
-	(((IPECC_GET_REG(IPECC_R_DBG_FP_RDATA)) >> IPECC_W_DBG_FP_DATA_MSK) & IPECC_W_DBG_FP_DATA_POS)
+	(((IPECC_GET_REG(IPECC_R_DBG_FP_RDATA)) >> IPECC_W_DBG_FP_DATA_MSK) \
+	 & IPECC_W_DBG_FP_DATA_POS)
 
 /* Actions involving register W_DBG_CFG_XYSHUF
  * *******************************************
@@ -1145,12 +1194,14 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
  */
 #define IPECC_GET_NBOPCODES() \
 	(((IPECC_GET_REG(IPECC_R_DBG_CAPABILITIES_1)) \
-		>> IPECC_R_DBG_CAPABILITIES_1_NBOPCODES_POS) & IPECC_R_DBG_CAPABILITIES_1_NBOPCODES_MSK)
+		>> IPECC_R_DBG_CAPABILITIES_1_NBOPCODES_POS) \
+		& IPECC_R_DBG_CAPABILITIES_1_NBOPCODES_MSK)
 
 /* To get the bitwidth of opcode words. */
 #define IPECC_GET_OPCODE_SIZE() \
 	(((IPECC_GET_REG(IPECC_R_DBG_CAPABILITIES_1)) \
-		>> IPECC_R_DBG_CAPABILITIES_1_OPCODE_SZ_POS) & IPECC_R_DBG_CAPABILITIES_1_OPCODE_SZ_MSK)
+		>> IPECC_R_DBG_CAPABILITIES_1_OPCODE_SZ_POS) \
+		& IPECC_R_DBG_CAPABILITIES_1_OPCODE_SZ_MSK)
 
 /* Actions involving register R_DBG_CAPABILITIES_2
  * ***********************************************
@@ -1158,16 +1209,20 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 /* To get the size (in bits) of the TRNG FIFO buffering raw random numbers. */
 #define IPECC_GET_TRNG_RAW_SZ() \
 	(((IPECC_GET_REG(IPECC_R_DBG_CAPABILITIES_2)) \
-		>> IPECC_R_DBG_CAPABILITIES_2_RAW_RAMSZ_POS) & IPECC_R_DBG_CAPABILITIES_2_RAW_RAMSZ_MSK)
+		>> IPECC_R_DBG_CAPABILITIES_2_RAW_RAMSZ_POS) \
+		& IPECC_R_DBG_CAPABILITIES_2_RAW_RAMSZ_MSK)
 
-/* To get the bitwidth of TRNG internal random numbers served to the logic implementing the
- * shuffling countermeasure (shuffling of the memory of large numbers).
+/* To get the bitwidth of TRNG internal random numbers
+ * served to the logic implementing the shuffling counter-
+ * measure (shuffling of the memory of large numbers).
  *
- * The bitwidth is static and depends on the algorithm/method used to shuffle the memory.
+ * The bitwidth is static and depends on the algorithm/
+ * method used to shuffle the memory.
  */
 #define IPECC_GET_TRNG_IRN_SHF_BITWIDTH() \
 	(((IPECC_GET_REG(IPECC_R_DBG_CAPABILITIES_2)) \
-		>> IPECC_R_DBG_CAPABILITIES_2_IRN_SHF_WIDTH_POS) & IPECC_R_DBG_CAPABILITIES_2_IRN_SHF_WIDTH_MSK)
+		>> IPECC_R_DBG_CAPABILITIES_2_IRN_SHF_WIDTH_POS) \
+		& IPECC_R_DBG_CAPABILITIES_2_IRN_SHF_WIDTH_MSK)
 
 /* Actions involving register R_DBG_STATUS
  * ***************************************
@@ -1175,31 +1230,38 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 
 /* Is IP currently halted? (on a breakpoint hit, or after having been asked to run a certain
  * nb of microcode opcodes) */
-#define IPECC_IS_IP_HALTED()    (!!(IPECC_GET_REG(IPECC_R_DBG_STATUS) & IPECC_R_DBG_STATUS_HALTED))
+#define IPECC_IS_IP_HALTED() \
+	(!!(IPECC_GET_REG(IPECC_R_DBG_STATUS) & IPECC_R_DBG_STATUS_HALTED))
 
 /* Did IP was halted on a breakpoint hit? */
-#define IPECC_IS_IP_HALTED_ON_BKPT_HIT()  (!!(IPECC_GET_REG(IPECC_R_DBG_STATUS) & IPECC_R_DBG_STATUS_BK_HIT))
+#define IPECC_IS_IP_HALTED_ON_BKPT_HIT() \
+	(!!(IPECC_GET_REG(IPECC_R_DBG_STATUS) & IPECC_R_DBG_STATUS_BK_HIT))
 
 /* Get the 'breakpoint ID' field in R_DBG_STATUS register.
- * If IPECC_IS_IP_HALTED_ON_BKPT_HIT() confirms that the IP is halted due to a breakpoint hit,
- * then this field gives the ID of that breakpoint.
+ * If IPECC_IS_IP_HALTED_ON_BKPT_HIT() confirms that the IP
+ * is halted due to a breakpoint hit, then this field gives
+ * the ID of that breakpoint.
  */
 #define IPECC_GET_BKPT_ID_IP_IS_HALTED_ON() \
-	(((IPECC_GET_REG(IPECC_R_DBG_STATUS)) >> IPECC_R_DBG_STATUS_BKID_POS) & IPECC_R_DBG_STATUS_BKID_MSK)
+	(((IPECC_GET_REG(IPECC_R_DBG_STATUS)) \
+		>> IPECC_R_DBG_STATUS_BKID_POS) & IPECC_R_DBG_STATUS_BKID_MSK)
 
 /* Get the current value of PC (program counter).
- * This is the value of the decode stage of the pipeline; hance the opcode that address is pointing
- * to has not been executed yet.
+ * This is the value of the decode stage of the pipeline;
+ * hence the opcode that address is pointing to has not
+ * been executed yet.
  */
 #define IPECC_GET_PC() \
-	(((IPECC_GET_REG(IPECC_R_DBG_STATUS)) >> IPECC_R_DBG_STATUS_PC_POS) & IPECC_R_DBG_STATUS_PC_MSK)
+	(((IPECC_GET_REG(IPECC_R_DBG_STATUS)) \
+		>> IPECC_R_DBG_STATUS_PC_POS) & IPECC_R_DBG_STATUS_PC_MSK)
 
 /* Get the ID of the state the main FSM is currently in.
  * (see also macros related to register W_DBG_BKPT, namely
  * IPECC_SET_BKPT & IPECC_SET_BREAKPOINT).
  */
 #define IPECC_GET_FSM_STATE() \
-	(((IPECC_GET_REG(IPECC_R_DBG_STATUS)) >> IPECC_R_DBG_STATUS_STATE_POS) & IPECC_R_DBG_STATUS_STATE_MSK)
+	(((IPECC_GET_REG(IPECC_R_DBG_STATUS)) >> \
+		IPECC_R_DBG_STATUS_STATE_POS) & IPECC_R_DBG_STATUS_STATE_MSK)
 
 /* Actions involving register R_DBG_TIME
  * *************************************
@@ -1450,7 +1512,7 @@ static inline void ip_ecc_errors_print(ip_ecc_error err)
 	unsigned int i;
 
 	if(err){
-		for(i = 0; i < 7; i++){
+		for(i = 0; i < 15; i++){
 			if(((err >> i) & 1)){
 				log_print("%s |", ip_ecc_error_strings[i]);
 			}
