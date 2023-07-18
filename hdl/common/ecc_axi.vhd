@@ -1304,7 +1304,7 @@ begin
 					-- (so use with care)
 					-- Decode content of W_CTRL register. Since sevaral actions can
 					-- be triggered by software here, we need to prioritize them,
-					-- which is done below (action 1 has the highest priority, action 5
+					-- which is done below (action 1 has the highest priority, action 4
 					-- has the lowest)
 					--   1. software wants to write a large number, see (s186)
 					--   2. software wants to read a large number, see (s187)
@@ -1314,7 +1314,7 @@ begin
 					-- In any other case, error flag STATUS_ERR_I_WREG_FBD is raised in
 					-- R_STATUS register. Note that no error flag is raised in case
 					-- several actions are asked for in the same W_CTRL write, instead
-					-- priorities described above simply are applied
+					-- priorities described above simply are applied.
 					-- (TODO: multicycle constraints are possible on a few paths below)
 					if r.axi.wdatax(CTRL_WRITE_NB) = '1' then
 						-- ----------------------------------------------------------
@@ -2997,22 +2997,23 @@ begin
 				or ((not debug) and s_axi_araddr(ADB + 1 downto 3) =
 					R_READ_DATA(ADB - 2 downto 0))
 			then
-				-- actually there is nothing to do here: s_axi_rvalid will be asserted
+				-- Actually there is nothing to do here: s_axi_rvalid will be asserted
 				-- (along with data on the AXI read-data channel) once available data
 				-- is collected from ecc_fp_dram.
 				-- We just assert r.read.arpending so that the handshake logic for data
 				-- read channel (see (s7) below) is now aware that the current read
-				-- access is targeting the DATA register (and therefore can trigger
-				-- a new 'ww'-bit word read from ecc_fp_dram as soon as the read has
-				-- actually taken place on the data-read channel)
-				-- r.read.arpending is used as a flag to differenciate AXI read acces-
-				-- ses targeting the DATA register (r.read.arpending = 1) from AXI read
-				-- accesses targeting other registers
+				-- access is targeting the R_READ_DATA register (and therefore can
+				-- trigger a new 'ww'-bit word read from ecc_fp_dram as soon as the
+				-- read has actually taken place on the data-read channel).
+				-- Register r.read.arpending is used as a flag to differenciate AXI
+				-- read accesses targeting the R_READ_DATA register (r.read.arpending
+				-- = 1) from AXI read accesses targeting other registers (= 0).
 				if r.ctrl.state = readln then
 					v.read.arpending := '1';
 				else
 					v.axi.rvalid := '1'; -- (s5)
 					v.axi.rdatax := (others => '1'); -- 0xFFF...FF
+					v.ctrl.ierrid(STATUS_ERR_I_RREG_FBD) := '1';
 				end if;
 			-- ----------------------------------------
 			-- decoding read of R_CAPABILITIES register
@@ -3216,6 +3217,7 @@ begin
 				else
 					v.axi.rvalid := '1'; -- (s5)
 					v.axi.rdatax := (others => '1'); -- 0xFFF...FF
+					v.ctrl.ierrid(STATUS_ERR_I_RREG_FBD) := '1';
 				end if;
 			-- ----------------------------------------
 			-- decoding read of R_DBG_FP_RDATA register

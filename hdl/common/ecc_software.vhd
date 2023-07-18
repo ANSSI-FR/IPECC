@@ -238,6 +238,7 @@ package ecc_software is
 	constant STATUS_ERR_I_SHUFFLE : natural := STATUS_ERR_LSB + 11;
 	constant STATUS_ERR_I_ZREMASK : natural := STATUS_ERR_LSB + 12;
 	constant STATUS_ERR_I_WK_NOT_ENOUGH_RANDOM : natural := STATUS_ERR_LSB + 13;
+	constant STATUS_ERR_I_RREG_FBD : natural := STATUS_ERR_LSB + 14;
 	constant STATUS_ERR_MSB : natural := 31;
 	-- range of field .ierrid in ecc_axi.vhd
 	constant STATUS_ERR_I_LSB : natural := STATUS_ERR_LSB + 2;
