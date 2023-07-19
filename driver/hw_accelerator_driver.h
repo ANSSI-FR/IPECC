@@ -19,6 +19,7 @@
 #if defined(WITH_EC_HW_ACCELERATOR)
 
 /* Hardware/external accelerator driver abstraction
+ *
  * NOTE: big numbers are in BIG ENDIAN format, and their size is in bytes. No particular
  * hypothesis must be taken on the address or size alignment of the buffers, or on the zero padding.
  *

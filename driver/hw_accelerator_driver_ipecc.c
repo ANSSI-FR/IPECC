@@ -44,6 +44,8 @@ typedef volatile uint64_t ip_ecc_word;
 #define IPECC_WORD_FMT "%016x"
 #endif
 
+
+
 /****************************/
 /* IPECC register addresses */
 /****************************/
@@ -73,7 +75,7 @@ typedef volatile uint64_t ip_ecc_word;
  * specific routines.
  */
 static volatile uint64_t *ipecc_baddr = NULL;
-static volatile uint64_t *ipecc_reset_baddr = NULL;
+static volatile uint64_t *ipecc_pseudotrng_baddr = NULL;
 
 /* NOTE: addresses in the IP are 64-bit aligned */
 #define IPECC_ALIGNED(a) ((a) / sizeof(uint64_t))
@@ -147,6 +149,22 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 #define IPECC_R_DBG_TRNG_DIAG_8  		(ipecc_baddr + IPECC_ALIGNED(0x1b8))
 /*	-- reserved                               0x1c0...0x1f8 */
 
+/* Optional device acting as "pseudo TRNG" device, which software can push
+ * some byte stream (or file) to.
+ *
+ * Using the same byte stream (or file) in the VHDL testbench of the IP hence
+ * makes it possible to get full bit-by-bit and instruction-per-instruction 
+ * omparison between VHDL simulation & real hardware.
+ *
+ * This is not "CABA" (cycle-accurate, bit-accurate) simulation yet,
+ * rather "IACA" (instruction-accurate, bit-Accurate) simulation - which,
+ * using the breakpoint & step-by-step features offered along with the
+ * IP and its driver, can provide a powerful debugging tool.
+ * */
+#define IPECC_PSEUDOTRNG_W_WRITE_DATA   (ipecc_pseudotrng_baddr + IPECC_ALIGNED(0x00))
+#define IPECC_PSEUDOTRNG_W_SOFT_RESET   (ipecc_pseudotrng_baddr + IPECC_ALIGNED(0x08))
+
+
 /*******************************************
  * Bit & fields positions in these registers
  *******************************************/
@@ -160,7 +178,7 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 #define IPECC_W_CTRL_PT_EQU		((uint32_t)0x1 << 5)
 #define IPECC_W_CTRL_PT_OPP		((uint32_t)0x1 << 6)
 /* bits 7-11 reserved */
-#define IPECC_W_CTRL_RD_TOKEN   ((uint32_t)0x1 << 12
+#define IPECC_W_CTRL_RD_TOKEN   ((uint32_t)0x1 << 12)
 #define IPECC_W_CTRL_WRITE_NB		((uint32_t)0x1 << 16)
 #define IPECC_W_CTRL_READ_NB		((uint32_t)0x1 << 17)
 #define IPECC_W_CTRL_WRITE_K		((uint32_t)0x1 << 18)
@@ -502,7 +520,7 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 	ip_ecc_word val = 0; \
 	val |= IPECC_W_CTRL_READ_NB; \
 	val |= ((token) ? IPECC_W_CTRL_RD_TOKEN : 0); \
-	val |= ((addr & IPECC_W_CTRL_NBADDR_MSK) << IPECC_W_CTRL_NBADDR_POS); \
+	val |= (((addr) & IPECC_W_CTRL_NBADDR_MSK) << IPECC_W_CTRL_NBADDR_POS); \
 	IPECC_SET_REG(IPECC_W_CTRL, val); \
 } while(0)
 
@@ -1467,14 +1485,30 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 	((IPECC_GET_REG(IPECC_R_DBG_TRNG_DIAG_8) >> IPECC_R_DBG_TRNG_DIAG_CNT_STARV_POS) \
 	 & IPECC_R_DBG_TRNG_DIAG_CNT_STARV_MSK)
 
+/*
+ * The pseudo TRNG device (debug mode only)
+ */
+
+/* Actions using register IPECC_PSEUDOTRNG_W_SOFT_RESET
+ * **************************************************
+ */
+/* Perform a software reset */
+#define IPECC_PSEUDOTRNG_SOFT_RESET() do { \
+	(IPECC_SET_REG(IPECC_PSEUDOTRNG_W_SOFT_RESET, 1)); /* written value actually is indifferent */ \
+} while (0)
+
+/* Push a data word into the FIFO of the pseudo TRNG device */
+#define IPECC_PSEUDOTRNG_PUSH_DATA(data) do { \
+	(IPECC_SET_REG(IPECC_PSEUDOTRNG_W_WRITE_DATA, (data))); \
+} while (0)
 
 
 
-/*******************************************************
- * One layer up - Middle-level action macros & functions
+/********************************************************
+ * One layer up - Middle-level actions macros & functions
  *
  * Sorted by category/function.
- *******************************************************/
+ ********************************************************/
 
 /* TRNG handling */
 /* Read the FIFOs at an offset */
@@ -2011,7 +2045,8 @@ static inline int ip_ecc_get_r1_inf(int *iszero)
  * and these coordinates actually define R0.
  *
  * Note that pushing coordinates to the IP for point R0 automatically makes
- * R0 a not-null point for the IP.
+ * R0 a not-null point for the IP. Hence function ip_ecc_set_r0_inf()'s
+ * purpose is mainly to set R0 as the null point.
  */
 static inline int ip_ecc_set_r0_inf(int val)
 {
@@ -2287,23 +2322,21 @@ err:
 }
 #endif
 
-
-
-/***********************************************
- * Top layer - Exported functions (driver API) *
- ***********************************************/
-
 static volatile unsigned char hw_driver_setup_state = 0;
 
 static inline int driver_setup(void)
 {
 	if(!hw_driver_setup_state){
 		/* Ask the lower layer for a setup */
-		if(hw_driver_setup((volatile unsigned char**)&ipecc_baddr, (volatile unsigned char**)&ipecc_reset_baddr)){
+		if(hw_driver_setup((volatile unsigned char**)&ipecc_baddr, (volatile unsigned char**)&ipecc_pseudotrng_baddr)){
 			goto err;
 		}
 		/* Reset the IP for a clean state */
 		IPECC_SOFT_RESET();
+
+		/* Reset the pseudo TRNG device to empty its FIFO of pseudo raw random bytes */
+		IPECC_PSEUDOTRNG_SOFT_RESET();
+
 		/* We are in the initialized state */
 		hw_driver_setup_state = 1;
 	}
@@ -2312,6 +2345,12 @@ static inline int driver_setup(void)
 err:
 	return -1;
 }
+
+
+
+/************************************************
+ *   Driver API (top-layer exported functions)
+ ************************************************/
 
 /* Reset the hardware */
 int hw_driver_reset(void)
@@ -2322,15 +2361,34 @@ int hw_driver_reset(void)
 	return 0;
 }
 
-/* Set the curve parameters a, b, p and q */
+/* Set the curve parameters a, b, p and q.
+ *
+ * All size parameters (*_sz) must be given in bytes.
+ *
+ * Please read and take into consideration the NOTE mentionned
+ * at the top of the prototype file <hw_accelerator_driver.h>
+ * about the formatting and size of large numbers.
+ *
+ * Note: if software does not intend to later use the blinding
+ * countermeasure, then the order 'q' of the curve is not mandatory
+ * (using e.g an arbitrary number for argument 'q' and setting 'q_sz'
+ * the same as 'p_sz').
+ *
+ * Note however that the IP could have been synthesized with an
+ * active hardware-locked blinding countermeasure, which, if the IP
+ * was further synthesized in production (secure) mode, won't be
+ * disengageable by software. In this situation, since every scalar
+ * multiplication will be run with active blinding, parameters 'q'
+ * and 'q_sz' should be rigorously set.
+ */
 int hw_driver_set_curve(const unsigned char *a, unsigned int a_sz, const unsigned char *b, unsigned int b_sz,
        		        const unsigned char *p, unsigned int p_sz, const unsigned char *q, unsigned int q_sz)
 {
 	if(driver_setup()){
 		goto err;
 	}
-	/* We set the dynamic NN size value to be the max of P and
-	 * Q size
+	/* We set the dynamic NN size value to be the max
+	 * of P and Q size
 	 */
 	if(p_sz > q_sz){
 		if(ip_ecc_set_nn_bit_size(8 * p_sz)){
@@ -2378,7 +2436,11 @@ err:
 	return -1;
 }
 
-/* Check if an affine point (x, y) is on the curve that has been previously set in the hardware */
+/*
+ *  Check if an affine point (x, y) is on the curve currently defined
+ *  in the IP (this curve was previously set in the hardware using
+ *  function hw_driver_set_curve() - c.f above).
+ */
 int hw_driver_is_on_curve(const unsigned char *x, unsigned int x_sz, const unsigned char *y, unsigned int y_sz,
                      	  int *on_curve)
 {

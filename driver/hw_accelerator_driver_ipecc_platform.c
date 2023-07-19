@@ -13,7 +13,7 @@
  *  See LICENSE file at the root folder of the project.
  */
 
-#include "hw_accelerator_driver_ipecc_platform.h" 
+#include "hw_accelerator_driver_ipecc_platform.h"
 
 #if defined(WITH_EC_HW_ACCELERATOR) && !defined(WITH_EC_HW_SOCKET_EMUL)
 
@@ -22,15 +22,29 @@
  * mode or using a physical memory access (e.g. through /dev/mem).
  */
 #define IPECC_PHYS_BADDR                (0x40000000)
-#define IPECC_PHYS_RST_BADDR            (0x40001000)
+#define IPECC_PHYS_PSEUDO_TRNG_BADDR    (0x40001000)
 #define IPECC_PHYS_SZ                   (4096) /* One page size */
 
-/* Setup the driver depending on the environment */
-int hw_driver_setup(volatile unsigned char **base_addr_p, volatile unsigned char **reset_base_addr_p)
+/* Setup the driver depending on the environment.
+ *
+ * If 'pseudotrng_base_addr_p' is not NULL then the setup will also try
+ * to open a device for the pseudo TRNG function, and return the mapped
+ * address for this device in *pseudotrng_base_addr_p.
+ *
+ * Thus if the pseudo TRNG function is not needed, simply set NULL value
+ * for 'pseudotrng_base_addr_p' argument and the setup won't try to acquire
+ * nor map a corresponding hardware device.
+ *
+ * Now if the IP was synthesized in production (secure) mode, then the pseudo
+ * TRNG function naturally does NOT exist and, in case the value passed for
+ * parameter 'pseudotrng_base_addr_p' is not NULL, then *pseudotrng_base_addr_p
+ * will be set with value NULL.
+ */
+int hw_driver_setup(volatile unsigned char **base_addr_p, volatile unsigned char **pseudotrng_base_addr_p)
 {
 	int ret = -1;
 
-	if((base_addr_p == NULL) || (reset_base_addr_p == NULL)){
+	if (base_addr_p == NULL) {
 		ret = -1;
 		goto err;
 	}
@@ -41,24 +55,27 @@ int hw_driver_setup(volatile unsigned char **base_addr_p, volatile unsigned char
 		 * is the physical one.
 		 */
 		(*base_addr_p)	     = (volatile unsigned char*)IPECC_PHYS_BADDR;
-		(*reset_base_addr_p) = (volatile unsigned char*)IPECC_PHYS_RST_BADDR;
+		if (pseudotrng_base_addr_p != NULL) {
+			(*pseudotrng_base_addr_p) = (volatile unsigned char*)IPECC_PHYS_PSEUDO_TRNG_BADDR;
+		}
 	}							
-#elif defined(WITH_EC_HW_UIO)    
+#elif defined(WITH_EC_HW_UIO)
 	{						
 		int uio_fd0, uio_fd1;
 		unsigned int uio_size;
 		void *base_address;
 		log_print("hw_driver_setup in UIO mode\n");
+
 		/* Handle the main ECC IP */
-		/* Open our UIO device				 
-		 * NOTE: O_SYNC here to avoid caching	    
+		/* Open our UIO device
+		 * NOTE: O_SYNC here to avoid caching
 		 */
 		uio_fd0 = open("/dev/uio0", O_RDWR | O_SYNC);
 		if(uio_fd0 == -1){
 			printf("Error when opening /dev/uio0\n");
 			perror("open uio");
 			ret = -1;
-			goto err;			      
+			goto err;
 		}
 		uio_size = IPECC_PHYS_SZ;
 		base_address = mmap(NULL, uio_size, PROT_READ | PROT_WRITE, MAP_SHARED, uio_fd0, 0);
@@ -69,26 +86,35 @@ int hw_driver_setup(volatile unsigned char **base_addr_p, volatile unsigned char
 			goto err;
 		}
 		(*base_addr_p) = base_address;
-		/* Handle the reset IP */
-		/* Open our UIO device				 
-		 * NOTE: O_SYNC here to avoid caching	    
-		 */
-		uio_fd1 = open("/dev/uio1", O_RDWR | O_SYNC);
-		if(uio_fd1 == -1){
-			printf("Error when opening /dev/uio1\n");
-			perror("open uio1");
-			ret = -1;
-			goto err;			      
+
+		if (pseudotrng_base_addr_p != NULL) {
+
+			/* Now handle the pseudo-TRNG device. If the device does not exist (e.g the IP
+			 * was not synthesized in debug mode, then the device simply won't exist, in which
+			 * case we set *pseudotrng_base_addr_p = NULL.
+			 */
+			/* Open our UIO device
+			 * NOTE: O_SYNC here to avoid caching
+			 */
+			uio_fd1 = open("/dev/uio1", O_RDWR | O_SYNC);
+			if(uio_fd1 == -1){
+				printf("Error when opening /dev/uio1\n");
+				perror("open uio1");
+				*pseudotrng_base_addr_p = NULL;
+				ret = -1;
+				goto err;
+			}
+			uio_size = IPECC_PHYS_SZ;
+			base_address = mmap(NULL, uio_size, PROT_READ | PROT_WRITE, MAP_SHARED, uio_fd1, 0);
+			if(base_address == MAP_FAILED){
+				printf("Error during mmap!\n");
+				perror("mmap uio");
+				*pseudotrng_base_addr_p = NULL;
+				ret = -1;
+				goto err;
+			}
+			(*pseudotrng_base_addr_p) = base_address;
 		}
-		uio_size = IPECC_PHYS_SZ;
-		base_address = mmap(NULL, uio_size, PROT_READ | PROT_WRITE, MAP_SHARED, uio_fd1, 0);
-		if(base_address == MAP_FAILED){
-			printf("Error during mmap!\n");
-			perror("mmap uio");
-			ret = -1;
-			goto err;
-		}
-		(*reset_base_addr_p) = base_address;
 	}
 #elif defined(WITH_EC_HW_DEVMEM)
 	{
@@ -116,20 +142,33 @@ int hw_driver_setup(volatile unsigned char **base_addr_p, volatile unsigned char
 			goto err;
 		}
 		(*base_addr_p) = base_address;
-		devmem_size = IPECC_PHYS_SZ;
-		/* Map the reset IP */
-		base_address = mmap(NULL, devmem_size, PROT_READ | PROT_WRITE, MAP_SHARED, devmem_fd, IPECC_PHYS_RST_BADDR);
-		if(base_address == MAP_FAILED){
-			printf("Error during reset IP mmap!\n");
-			perror("mmap devmem reset IP");
-			ret = -1;
-			goto err;
+
+		if (pseudotrng_base_addr_p != NULL) {
+
+			/* Now handle the pseudo-TRNG device. If the device does not exist (e.g the IP
+			 * was not synthesized in debug mode, then the device simply won't exist, in which
+			 * case we set *pseudotrng_base_addr_p = NULL.
+			 */
+			devmem_size = IPECC_PHYS_SZ;
+			/* Map the pseudo TRNG source device */
+			base_address = mmap(NULL, devmem_size, PROT_READ | PROT_WRITE, MAP_SHARED, devmem_fd, IPECC_PHYS_PSEUDO_TRNG_BADDR);
+			if(base_address == MAP_FAILED){
+				printf("Error during pseudo TRNG device mmap!\n");
+				perror("mmap devmem pseudo TRNG dev");
+				*pseudotrng_base_addr_p = NULL;
+				ret = -1;
+				goto err;
+			}
+			(*pseudotrng_base_addr_p) = base_address;
 		}
-		(*reset_base_addr_p) = base_address;
 	}
 #endif
 	/* Log print in case of success */
-	log_print("OK, loaded IP @%p and RESET @%p\n", (*base_addr_p), (*reset_base_addr_p));
+	if ( (*pseudotrng_base_addr_p) != NULL ) {
+		log_print("OK, loaded IP @%p and Pseudo TRNG source @%p\n", (*base_addr_p), (*pseudotrng_base_addr_p));
+	} else {
+		log_print("OK, loaded IP @%p\n", (*base_addr_p));
+	}
 
 	ret = 0;
 err:

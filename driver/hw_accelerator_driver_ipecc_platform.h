@@ -68,7 +68,7 @@
 /* Setup the driver depending on the environment,
  * and set the base address of the driver mapping.
  */
-int hw_driver_setup(volatile unsigned char **base_addr_p, volatile unsigned char **reset_base_addr_p);
+int hw_driver_setup(volatile unsigned char **base_addr_p, volatile unsigned char **pseudotrng_base_addr_p);
 
 #endif /* WITH_EC_HW_ACCELERATOR */
 
