@@ -403,12 +403,14 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 #define IPECC_R_DBG_TRNG_DIAG_CNT_STARV_POS     (0)
 #define IPECC_R_DBG_TRNG_DIAG_CNT_STARV_MSK     (0xffffffff)
 
+
+
 /*************************************************************
  * Low-level action macros: actions involving a direct write
  * or read to/from an IP register, along with related helper
  * macros.
  *
- * Sorted by target register.
+ * Sorted by their target register.
  *************************************************************/
 /*
  * Actions involving registers R_STATUS & W_CTRL
@@ -491,9 +493,15 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
  */
 /* Addresses and data handling.
  */
-#define IPECC_SET_READ_ADDR(addr) do { \
+/* Write in register W_CTRL the address of the big number to read
+ * and assert the read-command bit.
+ *
+ * Also assert the specific bit if the number to read is the token.
+ */
+#define IPECC_SET_READ_ADDR(addr, token) do { \
 	ip_ecc_word val = 0; \
 	val |= IPECC_W_CTRL_READ_NB; \
+	val |= ((token) ? IPECC_W_CTRL_RD_TOKEN : 0); \
 	val |= ((addr & IPECC_W_CTRL_NBADDR_MSK) << IPECC_W_CTRL_NBADDR_POS); \
 	IPECC_SET_REG(IPECC_W_CTRL, val); \
 } while(0)
@@ -513,6 +521,11 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 
 #define IPECC_READ_DATA() (IPECC_GET_REG(IPECC_R_READ_DATA))
 
+/* Write in register W_CTRL the address of the big number to write
+ * and assert the write-command bit.
+ *
+ * Also assert the specific bit if the number to write is the scalar.
+ */
 #define IPECC_SET_WRITE_ADDR(addr, scal) do { \
 	ip_ecc_word val = 0; \
 	val |= IPECC_W_CTRL_WRITE_NB; \
@@ -556,7 +569,7 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
  * NN size (static and dynamic) handling.
  */
 /* To get the value of 'nn' the IP is currently set with
- * (or what is the static value if hardware was not synthesized
+ * (or the static value if hardware was not synthesized
  * with the 'nn modifiable at runtime' option).
  */
 #define IPECC_GET_NN_SIZE() \
@@ -602,11 +615,14 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 
 /* Enable shuffling countermeasure.
  *
- *   - Shuffling method is set statically (at synthesis time)
+ *   - Shuffling method/algo is set statically (at synthesis time)
  *     and cannot be modified dynamically.
  *
- *   - Shuffling can be always be activated if a shuffling
- *     method was selected at synthesis time.
+ *   - Shuffling can always be activated if a shuffling method/algo
+ *     was selected at synthesis time (even without the synthesis
+ *     constraining the systematic use of shuffle).
+ *     The important thing is that actions can only increase the
+ *     security.
  */
 #define IPECC_ENABLE_SHUFFLE() do { \
 	IPECC_SET_REG(IPECC_W_SHUFFLE, IPECC_W_SHUFFLE_EN); \
@@ -616,9 +632,9 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
  *
  *   - Shuffling cannot be deactivated if it was hardware-locked
  *     at synthesis time & the IP was synthesized in production
- *     (secure-)mode.
+ *     (secure) mode.
  *
- *   - If IP was synthesized in debug (unsecure-)mode, shuffling
+ *   - If IP was synthesized in debug (unsecure) mode, shuffling
  *     can be arbitrarily enabled/disabled.
  */
 #define IPECC_DISABLE_SHUFFLE() do { \
@@ -666,9 +682,9 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 } while (0)
 
 /*
- * Actions using register W_ERR_ACK
+ * Actions using register R_STATUS & W_ERR_ACK
  * (error detection & acknowlegment)
- * *********************************
+ * *******************************************
  */
 /* Definition of error bits.
  *
@@ -706,7 +722,7 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 #define IPECC_ERR_NOT_ENOUGH_RANDOM_WK  ((uint32_t)0x1 << 13)
 #define IPECC_ERR_RREG_FBD 		((uint32_t)0x1 << 14)
 
-/* Get the complete error field.
+/* Get the complete error field of R_STATUS
  */
 #define IPECC_GET_ERROR() \
 	((IPECC_GET_REG(IPECC_R_STATUS) >> IPECC_R_STATUS_ERRID_POS) \
@@ -788,7 +804,7 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
  * (Capabilities handling)
  * *************************************
  */
-/* To know if the IP hardware was synthesized with 
+/* To know if the IP hardware was synthesized with
  * the option 'nn modifiable at runtime' */
 #define IPECC_IS_DYNAMIC_NN_SUPPORTED() \
 	(!!((IPECC_GET_REG(IPECC_R_CAPABILITIES) & IPECC_R_CAPABILITIES_NNDYN)))
@@ -809,8 +825,8 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 	((IPECC_GET_REG(IPECC_R_CAPABILITIES) >> IPECC_R_CAPABILITIES_NNMAX_POS) \
 	 & IPECC_R_CAPABILITIES_NNMAX_MSK)
 
-/* To know if the IP was synthesized in debug (unsecure-)mode
- * or in production (secure-)mode.
+/* To know if the IP was synthesized in debug (unsecure) mode
+ * or in production (secure) mode.
  */
 #define IPECC_IS_DEBUG_OR_PROD() \
 	(!!(IPECC_GET_REG(IPECC_R_CAPABILITIES) & IPECC_R_CAPABILITIES_DBG_N_PROD))
@@ -819,8 +835,8 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
  * ***********************************
  */
 
-/* This register exists in hardware only if the IP was synthesized in DEBUG (unsecure-)mode
- * (as opposed to prodution (secure-)mode. */
+/* This register exists in hardware only if the IP was synthesized in DEBUG (unsecure) mode
+ * (as opposed to prodution (secure) mode. */
 #define IPECC_GET_MAJOR_VERSION() \
 	((IPECC_GET_REG(IPECC_R_HW_VERSION) >> IPECC_R_HW_VERSION_MAJOR_POS) \
 	 & IPECC_R_HW_VERSION_MAJOR_MSK)
@@ -1094,7 +1110,7 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 
 /* Obtain the data word from memory of large numbers whose address
  * was previously set using IPECC_DBG_SET_FP_READ_ADDR().
- */ 
+ */
 #define IPECC_DBG_GET_FP_READ_DATA() \
 	(((IPECC_GET_REG(IPECC_R_DBG_FP_RDATA)) >> IPECC_W_DBG_FP_DATA_MSK) \
 	 & IPECC_W_DBG_FP_DATA_POS)
@@ -1110,7 +1126,7 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 } while (0)
 
 /* Disable the XY-coords shuffling or R0 & R1 sensitive points
- * (can only by done in debug (unsecure-)mode).
+ * (can only by done in debug (unsecure) mode).
  */
 #define IPECC_DBG_DISABLE_XYSHUF() do { \
 	IPECC_SET_REG(IPECC_W_DBG_CFG_XYSHUF, IPECC_W_DBG_CFG_XYSHUF_DIS); \
@@ -1128,7 +1144,7 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 
 /* Disable on-the-fly masking of the scalar by the AXI interface along its
  * writting in memory of large numbers.
- * (can only by done in debug (unsecure-)mode).
+ * (can only by done in debug (unsecure) mode).
  */
 #define IPECC_DBG_DISABLE_AXIMSK() do { \
 	IPECC_SET_REG(IPECC_W_DBG_CFG_AXIMSK, IPECC_W_DBG_CFG_AXIMSK_DIS); \
@@ -1147,7 +1163,7 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 } while (0)
 
 /* Disale token feature.
- * (can only by done in debug (unsecure-)mode).
+ * (can only by done in debug (unsecure) mode).
  */
 #define IPECC_DBG_DISABLE_TOKEN() do { \
 	IPECC_SET_REG(IPECC_W_DBG_CFG_TOKEN, IPECC_W_DBG_CFG_TOKEN_DIS); \
@@ -1228,8 +1244,9 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
  * ***************************************
  */
 
-/* Is IP currently halted? (on a breakpoint hit, or after having been asked to run a certain
- * nb of microcode opcodes) */
+/* Is IP currently halted? (on a breakpoint hit, or after having
+ * been asked to run a certain nb of microcode opcodes).
+ */
 #define IPECC_IS_IP_HALTED() \
 	(!!(IPECC_GET_REG(IPECC_R_DBG_STATUS) & IPECC_R_DBG_STATUS_HALTED))
 
@@ -1267,10 +1284,11 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
  * *************************************
  */
 
-/* To get value of point-operation counter.
+/* To get value of point-operation time counter.
  *
- * Each time a point-based operation is started (including [k]P computation) an internal counter
- * is started and incremented at each cycle of the main clock. Reading this counter allows to
+ * Each time a point-based operation is started (including [k]P
+ * computation) an internal counter is started and incremented at
+ * each cycle of the main clock. Reading this counter allows to
  * measure computation duration of point operations.
  */
 #define IPECC_GET_PT_OP_TIME() \
@@ -1282,17 +1300,19 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 
 /* To get the duration it took to fill-up the TRNG raw random FIFO.
  *
- * In debug mode, after each hard/soft/debug reset, an internal counter is started and
- * incrememted at each cycle of the main clock. It is then stopped as soon as the TRNG
- * raw random FIFO becomes FULL.
+ * In debug mode, after each hard/soft/debug reset, an internal
+ * counter is started and incrememted at each cycle of the main
+ * clock. It is then stopped as soon as the TRNG raw random FIFO
+ * becomes FULL.
  *
- * This allows any debug software driver to know the time it took to completely fill up
- * the FIFO, and hence to estimate the random production throughput of the TRNG main
- * entropy source.
+ * This allows any debug software driver to know the time it took
+ * to completely fill up the FIFO, and hence to estimate the random
+ * production throughput of the TRNG main entropy source.
  *
- * Warning: this requires to first disable the post-processing logic in the TRNG
- * (which otherwise constantly empties the raw random FIFO) using macro IPECC_TRNG_DISABLE_POSTPROC()
- * (c.f that macro).
+ * Warning: this requires to first disable the post-processing
+ * logic in the TRNG (which otherwise constantly empties the raw
+ * random FIFO) using macro IPECC_TRNG_DISABLE_POSTPROC() (c.f
+ * that macro).
  */
 #define IPECC_GET_TRNG_RAW_FIFO_FILLUP_TIME() \
 	(((IPECC_GET_REG(IPECC_R_DBG_RAWDUR)) >> IPECC_R_DBG_RAWDUR_POS) & IPECC_R_DBG_RAWDUR_MSK)
@@ -1406,7 +1426,7 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
  * (starvation cycles) for the TRNG channel "AXI interface" (resp. for "NNRND instruction",
  * "XY-shuffling countermeasure" & "memory of large nb shuffling" countermeasure).
  *
- * Thus by computing for instance of ratio  (R_DBG_TRNG_DIAG_2 / R_DBG_TRNG_DIAG_1 + R_DBG_TRNG_DIAG_2)
+ * Thus by computing for instance of ratio (R_DBG_TRNG_DIAG_2 / R_DBG_TRNG_DIAG_1 + R_DBG_TRNG_DIAG_2)
  * the software driver can evaluate the percentage of clock cycles where the AXI interface client
  * was requesting a fresh random without the TRNG actually having one at disposal to serve to it.
  */
@@ -1447,23 +1467,23 @@ static volatile uint64_t *ipecc_reset_baddr = NULL;
 	((IPECC_GET_REG(IPECC_R_DBG_TRNG_DIAG_8) >> IPECC_R_DBG_TRNG_DIAG_CNT_STARV_POS) \
 	 & IPECC_R_DBG_TRNG_DIAG_CNT_STARV_MSK)
 
-/**********************************************
- * One step higher - middle-level action macros
+
+
+
+/*******************************************************
+ * One layer up - Middle-level action macros & functions
  *
  * Sorted by category/function.
- **********************************************/
+ *******************************************************/
 
-/****** DEBUG ************/
 /* TRNG handling */
-
 /* Read the FIFOs at an offset */
 #define IPECC_TRNG_READ_FIFO_RAW(addr, a) do { \
 	IPECC_TRNG_SET_RAW_BIT_ADDR(addr); \
 	(*(a)) = IPECC_TRNG_GET_RAW_BIT(); \
 } while(0)
 
-/* Poll until the TRNG ran random FIFO is full.
- */
+/* Poll until the TRNG ran random FIFO is full */
 #define IPECC_TRNG_RAW_FIFO_FULL_BUSY_WAIT() do { \
         while(!IPECC_IS_TRNG_RAW_FIFO_FULL()){}; \
 } while(0)
@@ -1542,7 +1562,8 @@ static inline void ip_ecc_log(const char *s)
 }
 #endif /* WITH_EC_HW_DEBUG */
 
-/* Helper to compute word size of a big number given in bytes */
+/* Helper function to compute the size, in nb of words, of a big number given its size in bytes.
+ */
 static inline unsigned int ip_ecc_nn_words_from_bytes_sz(unsigned int sz)
 {
 	unsigned int curr_word_sz = (sz / sizeof(ip_ecc_word));
@@ -1551,7 +1572,8 @@ static inline unsigned int ip_ecc_nn_words_from_bytes_sz(unsigned int sz)
 	return curr_word_sz;
 }
 
-/* Helper to compute bytes size of a big number given in bits */
+/* Helper function to compute the size in bytes of a big number given its size in bits.
+ */
 static inline unsigned int ip_ecc_nn_bytes_from_bits_sz(unsigned int sz)
 {
 	unsigned int curr_bytes_sz = (sz / 8);
@@ -1585,14 +1607,10 @@ static inline int ip_ecc_check_error(ip_ecc_error *out)
 	return ret;
 }
 
-
 /* Select a register for R/W */
 static inline int ip_ecc_select_reg(ip_ecc_register r, ip_ecc_register_mode rw)
 {
-	uint32_t addr = 0, scal = 0;
-
-	/* Wait until the IP is not busy */
-	IPECC_BUSY_WAIT();
+	uint32_t addr = 0, scal = 0, token = 0;
 
 	switch(r){
 		case EC_HW_REG_A:{
@@ -1632,22 +1650,26 @@ static inline int ip_ecc_select_reg(ip_ecc_register r, ip_ecc_register_mode rw)
 			scal = 1;
 			break;
 		}
+		case EC_HW_REG_TOKEN:{
+			addr = 0; /* value actually does not matter */
+			token = 1;
+			break;
+		}
 		default:{
 			goto err;
 		}
 	}
 
+	/* Wait until the IP is not busy */
+	IPECC_BUSY_WAIT();
+
 	switch(rw){
 		case EC_HW_REG_READ:{
-			ip_ecc_log("IPECC_SET_READ_ADDR before\n");
-			IPECC_SET_READ_ADDR(addr);
-			ip_ecc_log("IPECC_SET_READ_ADDR after\n");
+			IPECC_SET_READ_ADDR(addr, token);
 			break;
 		}
 		case EC_HW_REG_WRITE:{
-			ip_ecc_log("IPECC_SET_WRITE_ADDR before\n");
 			IPECC_SET_WRITE_ADDR(addr, scal);
-			ip_ecc_log("IPECC_SET_WRITE_ADDR after\n");
 			break;
 		}
 		default:{
@@ -1677,9 +1699,7 @@ static inline int ip_ecc_push_word(const ip_ecc_word *w)
 	/* Wait until the IP is not busy */
 	IPECC_BUSY_WAIT();
 
-	ip_ecc_log("IPECC_WRITE_DATA before\n");
 	IPECC_WRITE_DATA((*w));
-	ip_ecc_log("IPECC_WRITE_DATA after\n");
 
 	/* Wait until the IP is not busy */
 	IPECC_BUSY_WAIT();
@@ -1703,9 +1723,7 @@ static inline int ip_ecc_pop_word(ip_ecc_word *w)
 	/* Wait until the IP is not busy */
 	IPECC_BUSY_WAIT();
 
-	ip_ecc_log("IPECC_READ_DATA before\n");
 	(*w) = IPECC_READ_DATA();
-	ip_ecc_log("IPECC_READ_DATA after\n");
 
 	/* Wait until the IP is not busy */
 	IPECC_BUSY_WAIT();
@@ -1726,7 +1744,7 @@ static inline int ip_ecc_activate_shuffling(void)
 	/* Wait until the IP is not busy */
 	IPECC_BUSY_WAIT();
 
-	/* We also activate the shuffling if supported */
+	/* We activate the shuffling only if it is supported */
 	if(IPECC_IS_SHUFFLING_SUPPORTED()){
 		IPECC_ENABLE_SHUFFLE();
 
@@ -1750,14 +1768,15 @@ err:
 /* Set the NN size provided in bits */
 static inline int ip_ecc_set_nn_bit_size(unsigned int bit_sz)
 {
-	/* Wait until the IP is not busy */
-	IPECC_BUSY_WAIT();
-
 	/* Get the maximum NN size and check the asked size */
 	if(bit_sz > IPECC_GET_NN_MAX_SIZE()){
 		/* If we overflow, this is an error */
 		goto err;
 	}
+
+	/* Wait until the IP is not busy */
+	IPECC_BUSY_WAIT();
+
 	/* NOTE: when NN dynamic is not supported we leave
 	 * our inherent maximum size.
 	 */
@@ -1775,13 +1794,6 @@ static inline int ip_ecc_set_nn_bit_size(unsigned int bit_sz)
 		}
 	}
 
-	/* 
-	 * Activate shuffling.
-	 * NOTE: we ignore the possible error when
-	 * shuffling is not supported
-	 */
-	ip_ecc_activate_shuffling();
-
 	return 0;
 err:
 	return -1;
@@ -1790,27 +1802,36 @@ err:
 /* Get the current dynamic NN size in bits */
 static inline unsigned int ip_ecc_get_nn_bit_size(void)
 {
-	/* Size is in bits, we return number of words */
+	/* Size is in bits */
 	if(IPECC_IS_DYNAMIC_NN_SUPPORTED()){
 		return (unsigned int)IPECC_GET_NN_SIZE();
 	}
 	else{
 		return (unsigned int)IPECC_GET_NN_MAX_SIZE();
 	}
+	/*
+	 * Note: a sole use of IPECC_GET_NN_SIZE() could also work as this
+	 * macro also returns the NN_MAX size when the 'dynamic nn' feature is
+	 * not supported.
+	 */
 }
 
-/* Set the blinding size */
+/* Set the blinding size.
+ *
+ * A value of 0 for input parameter 'blinding_size' means disabling
+ * the blinding.
+ */
 static inline int ip_ecc_set_blinding_size(unsigned int blinding_size)
 {
 	/* Wait until the IP is not busy */
 	IPECC_BUSY_WAIT();
 
 	if(blinding_size == 0){
-		/* Clear the blinding as a size of 0 means that */
+		/* Clear the blinding as a size of 0 means we d */
 		IPECC_DISABLE_BLINDING();
 	}
 	else{
-		/* Set the bliding size and enable it */
+		/* Set the blinding size and enable the countermeasure. */
 		IPECC_SET_BLINDING_SIZE(blinding_size);
 	}
 
@@ -1827,11 +1848,12 @@ err:
 	return -1;
 }
 
-/* Write a big number in the ECC IP:
- *   The input big number is in big endian format, and it is sent to the IP in the
- *   expected endianness.
- *   The numbers are little endian in words (of 32 or 64 bits), and big endian for the
- *   bytes inside words as well as for the bits inside bytes.
+/* Write a big number to the IP
+ *
+ *   The input big number is in big-endian format, and it is sent to the IP in the
+ *   endianness it expects, meaning: the numbers are little-endian in words (of 32
+ *   or 64 bits) and big-endian for the bytes inside words as well as for the bits
+ *   inside bytes.
  */
 static inline int ip_ecc_write_bignum(const unsigned char *a, unsigned int a_sz, ip_ecc_register reg)
 {
@@ -1845,7 +1867,7 @@ static inline int ip_ecc_write_bignum(const unsigned char *a, unsigned int a_sz,
 		return 0;
 	}
 
-	/* Get the current size we will have to send */
+	/* Get the current nb of words we need to send to the IP */
 	nn_size = ip_ecc_nn_words_from_bytes_sz(ip_ecc_nn_bytes_from_bits_sz(ip_ecc_get_nn_bit_size()));
 	/* Compute our current word size */
 	curr_word_sz = ip_ecc_nn_words_from_bytes_sz(a_sz);
@@ -1889,11 +1911,12 @@ err:
 	return -1;
 }
 
-/* Read a big number from the ECC IP:
- *   The output big number is in big endian format, and it is sent to the IP in the
- *   expected endianness.
- *   The numbers are little endian in words (of 32 or 64 bits), and big endian for the
- *   bytes inside words as well as for the bits inside bytes.
+/* Read a big number from the IP
+ *
+ *   The output big number is in big-endian format, and it is read from the IP in the
+ *   endianness it expects, meaning: the numbers are little-endian in words (of 32
+ *   or 64 bits) and big-endian for the bytes inside words as well as for the bits
+ *   inside bytes.
  */
 static inline int ip_ecc_read_bignum(unsigned char *a, unsigned int a_sz, ip_ecc_register reg)
 {
@@ -1907,7 +1930,7 @@ static inline int ip_ecc_read_bignum(unsigned char *a, unsigned int a_sz, ip_ecc
 		return 0;
 	}
 
-	/* Get the current size we will have to send */
+	/* Get the current size we need to read from the IP */
 	nn_size = ip_ecc_nn_words_from_bytes_sz(ip_ecc_nn_bytes_from_bits_sz(ip_ecc_get_nn_bit_size()));
 	/* Compute our current word size */
 	curr_word_sz = ip_ecc_nn_words_from_bytes_sz(a_sz);
@@ -1950,6 +1973,9 @@ err:
 	return -1;
 }
 
+/*
+ * To know if R0 is currently the null point (aka point at infinity)
+ */
 static inline int ip_ecc_get_r0_inf(int *iszero)
 {
 	/* Wait until the IP is not busy */
@@ -1960,6 +1986,9 @@ static inline int ip_ecc_get_r0_inf(int *iszero)
 	return 0;
 }
 
+/*
+ * To know if R1 is currently the null point (aka point at infinity)
+ */
 static inline int ip_ecc_get_r1_inf(int *iszero)
 {
 	/* Wait until the IP is not busy */
@@ -1970,6 +1999,20 @@ static inline int ip_ecc_get_r1_inf(int *iszero)
 	return 0;
 }
 
+/*
+ * To set R0 as being or not being the null point (aka point at infinity).
+ *
+ * When R0 is set as the null point, the coordinates the IP was previously
+ * holding for R0 (as e.g resulting from a previous computation) become invalid
+ * and are ignored by the IP henceforth.
+ *
+ * The null point does not have affine coordinates, so either R0 is null and
+ * the coordinates buffered in the IP for it are meaningless, or it isn't null
+ * and these coordinates actually define R0.
+ *
+ * Note that pushing coordinates to the IP for point R0 automatically makes
+ * R0 a not-null point for the IP.
+ */
 static inline int ip_ecc_set_r0_inf(int val)
 {
 	/* Wait until the IP is not busy */
@@ -2002,6 +2045,12 @@ err:
 	return -1;
 }
 
+/*
+ * To set R1 as being or not being the null point (aka point at infinity).
+ *
+ * Every remark made about point R0 in function ip_ecc_set_r0_inf() (see above)
+ * is also valid and apply here identically to point R1.
+ */
 static inline int ip_ecc_set_r1_inf(int val)
 {
 	/* Wait until the IP is not busy */
@@ -2034,7 +2083,9 @@ err:
 	return -1;
 }
 
-/**** Commands execution ******/
+/*
+ * Commands execution (point operation)
+ */
 static inline int ip_ecc_exec_command(ip_ecc_command cmd, int *flag)
 {
 	/* Wait until the IP is not busy */
@@ -2109,7 +2160,9 @@ err:
 	return -1;
 }
 
-/**** TRNG debug ******/
+/*
+ * *** TRNG debug ***
+ */
 /* The following function configures the TRNG */
 static inline int ip_ecc_configure_trng(int debias, uint32_t ta, uint32_t cycles)
 {
@@ -2146,7 +2199,7 @@ err:
 	return -1;
 }
 
-/* TRNG exit bypass and return to normal generation
+/* TRNG leave bypass state and return to normal generation
  * (also implicitly re-enable the post-processing function) */
 static inline int ip_ecc_dont_bypass_trng(void)
 {
@@ -2162,7 +2215,10 @@ static inline int ip_ecc_dont_bypass_trng(void)
 	return 0;
 }
 
-/* TRNG post-processing bypass */
+/* TRNG post-processing bypass
+ * (also implicitly take out the TRNG from its bypass state if it was
+ * actually bypassed - see function ip_ecc_bypass_full_trng() - just as routine
+ * ip_ecc_dont_bypass_trng() would). */
 static inline int ip_ecc_bypass_trng_postproc(void)
 {
 	/* Wait until the IP is not busy */
@@ -2231,8 +2287,12 @@ err:
 }
 #endif
 
-/*********** Exported functions *********************************/
-/****************************************************************/
+
+
+/***********************************************
+ * Top layer - Exported functions (driver API) *
+ ***********************************************/
+
 static volatile unsigned char hw_driver_setup_state = 0;
 
 static inline int driver_setup(void)

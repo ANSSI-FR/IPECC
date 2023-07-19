@@ -177,7 +177,7 @@ begin
 					dbgtrngidletime => dbgtrngidletime
 				);
 		end generate;
-		-- all es_trng_aggreg instances but the (i,j)=(0,0) (the most upstream one)
+		-- all es_trng_aggreg instances but the (i,j)=(0,0) one (the most upstream)
 		ag: for i in 0 to nbtrng - 2 generate
 			a: es_trng_aggreg
 				port map(
