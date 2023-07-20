@@ -952,7 +952,7 @@ static volatile uint64_t *ipecc_pseudotrng_baddr = NULL;
 /*
  * To set the time at which the trigger output signal must be raised.
  *
- * Parameter 'time' is expressed in multiple of the clock cycles starting from
+ * Argument 'time' is expressed in multiple of the clock cycles starting from
  * the begining of [k]P computation.
  */
 #define IPECC_SET_TRIGGER_UP(time) do { \
@@ -1852,8 +1852,8 @@ static inline unsigned int ip_ecc_get_nn_bit_size(void)
 
 /* Set the blinding size.
  *
- * A value of 0 for input parameter 'blinding_size' means disabling
- * the blinding.
+ * A value of 0 for input argument 'blinding_size' means disabling
+ * the blinding countermeasure.
  */
 static inline int ip_ecc_set_blinding_size(unsigned int blinding_size)
 {
@@ -2363,7 +2363,7 @@ int hw_driver_reset(void)
 
 /* Set the curve parameters a, b, p and q.
  *
- * All size parameters (*_sz) must be given in bytes.
+ * All size arguments (*_sz) must be given in bytes.
  *
  * Please read and take into consideration the NOTE mentionned
  * at the top of the prototype file <hw_accelerator_driver.h>
@@ -2378,8 +2378,8 @@ int hw_driver_reset(void)
  * active hardware-locked blinding countermeasure, which, if the IP
  * was further synthesized in production (secure) mode, won't be
  * disengageable by software. In this situation, since every scalar
- * multiplication will be run with active blinding, parameters 'q'
- * and 'q_sz' should be rigorously set.
+ * multiplication will be run by the IP with active blinding, 'q'
+ * and 'q_sz' arguments should be rigorously set.
  */
 int hw_driver_set_curve(const unsigned char *a, unsigned int a_sz, const unsigned char *b, unsigned int b_sz,
        		        const unsigned char *p, unsigned int p_sz, const unsigned char *q, unsigned int q_sz)
@@ -2420,7 +2420,14 @@ err:
 	return -1;
 }
 
-/* Activate the blinding for scalar multiplication */
+/* Activate the blinding for scalar multiplication.
+ *
+ * Argument 'blinding_size' must be given in bits, and must be
+ * strictly less than the value of 'nn' currently set in the
+ * hardware (hance 'nn' - 1 is the largest authorized value).
+ *
+ * Otherwise error 'ERR_BLN' is raised in R_STATUS register.
+ */
 int hw_driver_set_blinding(unsigned int blinding_size)
 {
 	if(driver_setup()){
@@ -2436,10 +2443,15 @@ err:
 	return -1;
 }
 
-/*
- *  Check if an affine point (x, y) is on the curve currently defined
- *  in the IP (this curve was previously set in the hardware using
- *  function hw_driver_set_curve() - c.f above).
+/* Check if an affine point (x, y) is on the curve currently defined
+ * in the IP (this curve was previously set in the hardware using
+ * function hw_driver_set_curve() - c.f above).
+ *
+ * All size arguments (*_sz) must be given in bytes.
+ *
+ * Please read and take into consideration the NOTE mentionned
+ * at the top of the prototype file <hw_accelerator_driver.h>
+ * about the formatting and size of large numbers.
  */
 int hw_driver_is_on_curve(const unsigned char *x, unsigned int x_sz, const unsigned char *y, unsigned int y_sz,
                      	  int *on_curve)
@@ -2484,7 +2496,14 @@ err:
 	return -1;
 }
 
-/* Check if affine points (x1, y1) and (x2, y2) are equal */
+/* Check if affine points (x1, y1) and (x2, y2) are equal.
+ *
+ * All size arguments (*_sz) must be given in bytes.
+ *
+ * Please read and take into consideration the NOTE mentionned
+ * at the top of the prototype file <hw_accelerator_driver.h>
+ * about the formatting and size of large numbers.
+ */
 int hw_driver_eq(const unsigned char *x1, unsigned int x1_sz, const unsigned char *y1, unsigned int y1_sz,
        	    	 const unsigned char *x2, unsigned int x2_sz, const unsigned char *y2, unsigned int y2_sz,
                  int *is_eq)
@@ -2536,7 +2555,14 @@ err:
 	return -1;
 }
 
-/* Check if affine points (x1, y1) and (x2, y2) are opposite */
+/* Check if affine points (x1, y1) and (x2, y2) are opposite.
+ *
+ * All size arguments (*_sz) must be given in bytes.
+ *
+ * Please read and take into consideration the NOTE mentionned
+ * at the top of the prototype file <hw_accelerator_driver.h>
+ * about the formatting and size of large numbers.
+ */
 int hw_driver_opp(const unsigned char *x1, unsigned int x1_sz, const unsigned char *y1, unsigned int y1_sz,
                   const unsigned char *x2, unsigned int x2_sz, const unsigned char *y2, unsigned int y2_sz,
                	  int *is_opp)
@@ -2590,7 +2616,10 @@ err:
 }
 
 /* Check if the infinity point flag is set in the hardware for
- * point at index idx
+ * point at index idx.
+ *
+ * Argument 'index' must be either 0, identifying point R0, or 1,
+ * identifying point R1.
  */
 int hw_driver_point_iszero(unsigned char idx, int *iszero)
 {
@@ -2624,8 +2653,16 @@ err:
 	return -1;
 }
 
-/* Set the infinity point flag in the hardware for
- * point at index idx
+/* Set the infinity point flag in the hardware for point
+ * at index idx. This tells hardware to hold the corresponding
+ * point (R0 or R1) as being the null point (aka point at infinity).
+ *
+ * Any values of the affine coordinates the hardware was currently
+ * holding for that point will become irrelevant, either they were
+ * resulting from a previous computation or transmitted by software.
+ *
+ * Argument 'index' must be either 0, identifying point R0, or 1,
+ * identifying point R1.
  */
 int hw_driver_point_zero(unsigned char idx)
 {
@@ -2660,7 +2697,20 @@ err:
 }
 
 /* Unset the infinity point flag in the hardware for
- * point at index idx
+ * point at index idx. This tells hardware to hold the corresponding
+ * point (R0 or R1) as NOT being the null point (aka point at infinity).
+ *
+ * The affine coordinates the hardware was currently holding for that
+ * point will then become relevant, either they were resulting from a
+ * previous computation or transmitted by software.
+ *
+ * Further note that transmitting coordinates to the hardware for one
+ * of particular points R0 or R1 (using ip_ecc_write_bignum()) automatically
+ * set that point as being not null, just as hw_driver_point_unzero()
+ * would do.
+ *
+ * Argument 'index' must be either 0, identifying point R0, or 1,
+ * identifying point R1.
  */
 int hw_driver_point_unzero(unsigned char idx)
 {
@@ -2694,7 +2744,15 @@ err:
 	return -1;
 }
 
-/* Return (out_x, out_y) = -(x, y) */
+/* Return (out_x, out_y) = -(x, y) i.e the opposite of the
+ * intput point.
+ *
+ * All size arguments (*_sz) must be given in bytes.
+ *
+ * Please read and take into consideration the NOTE mentionned
+ * at the top of the prototype file <hw_accelerator_driver.h>
+ * about the formatting and size of large numbers.
+ */
 int hw_driver_neg(const unsigned char *x, unsigned int x_sz, const unsigned char *y, unsigned int y_sz,
                   unsigned char *out_x, unsigned int *out_x_sz, unsigned char *out_y, unsigned int *out_y_sz)
 {
@@ -2752,7 +2810,15 @@ err:
 	return -1;
 }
 
-/* Return (out_x, out_y) = 2 * (x, y) */
+/* Return (out_x, out_y) = 2 * (x, y), i.e the double of the
+ * input point.
+ *
+ * All size arguments (*_sz) must be given in bytes.
+ *
+ * Please read and take into consideration the NOTE mentionned
+ * at the top of the prototype file <hw_accelerator_driver.h>
+ * about the formatting and size of large numbers.
+ */
 int hw_driver_dbl(const unsigned char *x, unsigned int x_sz, const unsigned char *y, unsigned int y_sz,
                   unsigned char *out_x, unsigned int *out_x_sz, unsigned char *out_y, unsigned int *out_y_sz)
 {
@@ -2811,7 +2877,15 @@ err:
 }
 
 
-/* Return (out_x, out_y) = (x1, y1) + (x2, y2) */
+/* Return (out_x, out_y) = (x1, y1) + (x2, y2), i.e perform addition
+ * of the two input points.
+ *
+ * All size arguments (*_sz) must be given in bytes.
+ *
+ * Please read and take into consideration the NOTE mentionned
+ * at the top of the prototype file <hw_accelerator_driver.h>
+ * about the formatting and size of large numbers.
+ */
 int hw_driver_add(const unsigned char *x1, unsigned int x1_sz, const unsigned char *y1, unsigned int y1_sz,
                   const unsigned char *x2, unsigned int x2_sz, const unsigned char *y2, unsigned int y2_sz,
                   unsigned char *out_x, unsigned int *out_x_sz, unsigned char *out_y, unsigned int *out_y_sz)
@@ -2877,7 +2951,15 @@ err:
 	return -1;
 }
 
-/* Return (out_x, out_y) = scalar * (x, y) */
+/* Return (out_x, out_y) = scalar * (x, y), i.e perform the scalar 
+ * multiplication of the input point by the input scalar.
+ *
+ * All size arguments (*_sz) must be given in bytes.
+ *
+ * Please read and take into consideration the NOTE mentionned
+ * at the top of the prototype file <hw_accelerator_driver.h>
+ * about the formatting and size of large numbers.
+ */
 int hw_driver_mul(const unsigned char *x, unsigned int x_sz, const unsigned char *y, unsigned int y_sz,
                   const unsigned char *scalar, unsigned int scalar_sz,
                   unsigned char *out_x, unsigned int *out_x_sz, unsigned char *out_y, unsigned int *out_y_sz)
@@ -2940,7 +3022,21 @@ err:
 	return -1;
 }
 
-/* Set the small scalar size in the hardware */
+/* Set the small scalar size in the hardware.
+ *
+ * The 'small scalar size' feature is provided by the IP in order
+ * to provide a computation speed-up for really small scalar.
+ *
+ * This is a "one shot" feature, meaning the 'nn' parameter is
+ * still recorded by the IP and will become applicable again
+ * as soon as the scalar multiplication following the call to
+ * function hw_driver_set_small_scalar_size() is done.
+ *
+ * Hence hw_driver_set_small_scalar_size() must be called
+ * each time the feature is needed.
+ *
+ * Obviously this feature only concerns the scalar multiplication.
+ * */
 int hw_driver_set_small_scalar_size(unsigned int bit_sz)
 {
 	/* NOTE: sanity check on this size should be performed by
