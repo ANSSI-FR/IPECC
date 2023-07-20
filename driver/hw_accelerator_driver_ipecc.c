@@ -3039,12 +3039,18 @@ err:
  * */
 int hw_driver_set_small_scalar_size(unsigned int bit_sz)
 {
+	if(driver_setup()){
+		goto err;
+	}
+
 	/* NOTE: sanity check on this size should be performed by
 	 * the hardware (e.g. is this size exceeds the nn size, and
 	 * so on). So no need to sanity check anything here. */
 	IPECC_SET_SMALL_SCALAR_SIZE(bit_sz);
 
 	return 0;
+err:
+	return -1;
 }
 
 /**********************************************************/
