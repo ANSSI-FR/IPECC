@@ -27,7 +27,7 @@ use work.ecc_trng_pkg.all;
 use std.textio.all;
 -- pragma translate_on
 
-entity es_trng_stub is
+entity es_trng_sim is
 	port(
 		clk : in std_logic;
 		rstn : in std_logic;
@@ -48,9 +48,9 @@ entity es_trng_stub is
 		dbgtrngvonneuman : in std_logic;
 		dbgtrngidletime : in unsigned(3 downto 0)
 	);
-end entity es_trng_stub;
+end entity es_trng_sim;
 
-architecture struct of es_trng_stub is
+architecture struct of es_trng_sim is
 
 	signal r_valid_t : std_logic;
 	signal r_oor : std_logic;

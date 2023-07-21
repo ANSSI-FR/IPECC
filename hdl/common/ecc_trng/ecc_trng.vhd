@@ -102,7 +102,7 @@ architecture rtl of ecc_trng is
 	end component es_trng;
 
 	-- pragma translate_off
-	component es_trng_stub is
+	component es_trng_sim is
 		port(
 			clk : in std_logic;
 			rstn : in std_logic;
@@ -123,7 +123,7 @@ architecture rtl of ecc_trng is
 			dbgtrngvonneuman : in std_logic;
 			dbgtrngidletime : in unsigned(3 downto 0)
 		);
-	end component es_trng_stub;
+	end component es_trng_sim;
 	-- pragma translate_on
 
 	component ecc_trng_pp is
@@ -223,9 +223,9 @@ begin
 
 	-- pragma translate_off
 	t1: if notrng = TRUE generate
-		-- es_trng_stub reads randomness from local file
+		-- es_trng_sim reads randomness from local file
 		-- and provide them to ecc_trng_pp
-		t0: es_trng_stub
+		t0: es_trng_sim
 			port map(
 				clk => clk,
 				rstn => rstn,
