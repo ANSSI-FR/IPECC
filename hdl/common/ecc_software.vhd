@@ -19,6 +19,7 @@ use ieee.numeric_std.all;
 
 use work.ecc_customize.all;
 use work.ecc_utils.all;
+use work.ecc_log.all;
 use work.ecc_pkg.all;
 use work.ecc_trng_pkg.all;
 
@@ -104,6 +105,13 @@ package ecc_software is
 	constant R_DBG_TRNG_DIAG_8 : rat := std_nat(55, ADB);    -- 0x1b8
 	-- reserved                                              -- 0x1c0...0x1f8
 
+	-- Register bank of pseudo TRNG device (external to the IP), if any.
+	-- Write-only registers
+	constant PSEUDOTRNG_W_SOFT_RESET : std_logic := '0';     -- 0x00
+	constant PSEUDOTRNG_W_WRITE_DATA : std_logic := '1';     -- 0x08
+	-- Read-only register
+	constant PSEUDOTRNG_R_FIFO_COUNT : std_logic := '0';     -- 0x00
+
 	-- ----------------------------------------------
 	-- bit positions / fields in write registers
 	-- ----------------------------------------------
@@ -182,22 +190,27 @@ package ecc_software is
 	constant TRIG_MSB : natural := 31;
 
 	-- bit positions in W_DBG_TRNG_CTRL register
-	constant DBG_TRNG_RAW_RESET : natural := 0;
-	constant DBG_TRNG_IRN_RESET : natural := 1;
+	-- In debug mode software must clear bit 'RAW_PULL_PP_DISABLE'
+	-- to enable random generation.
+	constant DBG_TRNG_RAW_PULL_PP_DISABLE : natural := 0;
+	constant DBG_TRNG_RAW_RESET : natural := 1;
+	constant DBG_TRNG_IRN_RESET : natural := 2;
 	constant DBG_TRNG_RAW_READ : natural := 4;
 	constant DBG_TRNG_RAW_ADDR_LSB : natural := 8;
-	constant DBG_TRNG_RAW_ADDR_MSB : natural :=
-		DBG_TRNG_RAW_ADDR_LSB + log2(raw_ram_size - 1) - 1;
-	constant DBG_TRNG_PP_DISABLE : natural := 28;
+	constant DBG_TRNG_RAW_ADDR_MSB : natural := 27;
+	-- to allow software to read the content of raw random FIFO
+	constant DBG_TRNG_RAW_FIFO_READ_DISABLE : natural := 28;
 	constant DBG_TRNG_COMPLETE_BYPASS : natural := 29;
 	constant DBG_TRNG_COMPLETE_BYPASS_BIT : natural := 30;
+	constant DBG_TRNG_NNRND_DETERMINISTIC : natural := 31;
 
 	-- bit positions in W_DBG_TRNG_CFG register
 	constant DBG_TRNG_VONM : natural := 0;
 	constant DBG_TRNG_TA_LSB : natural := 4;
-	constant DBG_TRNG_TA_MSB : natural := 23;
-	constant DBG_TRNG_IDLE_LSB : natural := 24;
-	constant DBG_TRNG_IDLE_MSB : natural := 27;
+	constant DBG_TRNG_TA_MSB : natural := 19;
+	constant DBG_TRNG_IDLE_LSB : natural := 20;
+	constant DBG_TRNG_IDLE_MSB : natural := 23;
+	constant DBG_TRNG_USE_PSEUDO : natural := 24;
 
 	-- bit positions in W_DBG_CFG_XYSHUF register
 	constant XYSHF_EN : natural := 0;

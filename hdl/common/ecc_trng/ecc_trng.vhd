@@ -18,6 +18,7 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
 use work.ecc_customize.all; -- for notrng
+use work.ecc_log.all;
 use work.ecc_utils.all;
 use work.ecc_pkg.all;
 use work.ecc_trng_pkg.all;
@@ -54,18 +55,24 @@ entity ecc_trng is
 		data3 : out std_logic_vector(irn_width_sh - 1 downto 0);
 		irncount3 : out std_logic_vector(log2(irn_fifo_size_sh) - 1 downto 0);
 		-- interface with ecc_axi (only usable in debug mode)
-		dbgtrngta : in unsigned(19 downto 0);
+		dbgtrngta : in unsigned(15 downto 0);
 		dbgtrngrawreset : in std_logic;
 		dbgtrngrawfull : out std_logic;
 		dbgtrngrawwaddr : out std_logic_vector(log2(raw_ram_size-1) - 1 downto 0);
 		dbgtrngrawraddr : in std_logic_vector(log2(raw_ram_size-1) - 1 downto 0);
 		dbgtrngrawdata : out std_logic;
-		dbgtrngppdeact : in std_logic;
+		dbgtrngrawfiforeaddis : in std_logic;
 		dbgtrngcompletebypass : in std_logic;
 		dbgtrngcompletebypassbit : in std_logic;
 		dbgtrngrawduration : out unsigned(31 downto 0);
 		dbgtrngvonneuman : in std_logic;
-		dbgtrngidletime : in unsigned(3 downto 0)
+		dbgtrngidletime : in unsigned(3 downto 0);
+		dbgtrngusepseudosource : in std_logic;
+		dbgtrngrawpullppdis : in std_logic;
+		-- interface with the external pseudo TRNG component
+		dbgpseudotrngdata : in std_logic_vector(7 downto 0);
+		dbgpseudotrngvalid : in std_logic;
+		dbgpseudotrngrdy : out std_logic
 	);
 end entity ecc_trng;
 
@@ -81,13 +88,13 @@ architecture rtl of ecc_trng is
 			valid_t : out std_logic;
 			rdy_t : in std_logic;
 			-- following signals are for debug & statistics
-			dbgtrngta : in unsigned(19 downto 0);
+			dbgtrngta : in unsigned(15 downto 0);
 			dbgtrngrawreset : in std_logic;
 			dbgtrngrawfull : out std_logic;
 			dbgtrngrawwaddr : out std_logic_vector(log2(raw_ram_size-1) - 1 downto 0);
 			dbgtrngrawraddr : in std_logic_vector(log2(raw_ram_size-1) - 1 downto 0);
 			dbgtrngrawdata : out std_logic;
-			dbgtrngppdeact : in std_logic;
+			dbgtrngrawfiforeaddis : in std_logic;
 			dbgtrngrawduration : out unsigned(31 downto 0);
 			dbgtrngvonneuman : in std_logic;
 			dbgtrngidletime : in unsigned(3 downto 0)
@@ -105,13 +112,13 @@ architecture rtl of ecc_trng is
 			valid_t : out std_logic;
 			rdy_t : in std_logic;
 			-- following signals are for debug & statistics
-			dbgtrngta : in unsigned(19 downto 0);
+			dbgtrngta : in unsigned(15 downto 0);
 			dbgtrngrawreset : in std_logic;
 			dbgtrngrawfull : out std_logic;
 			dbgtrngrawwaddr : out std_logic_vector(log2(raw_ram_size-1) - 1 downto 0);
 			dbgtrngrawraddr : in std_logic_vector(log2(raw_ram_size-1) - 1 downto 0);
 			dbgtrngrawdata : out std_logic;
-			dbgtrngppdeact : in std_logic;
+			dbgtrngrawfiforeaddis : in std_logic;
 			dbgtrngrawduration : out unsigned(31 downto 0);
 			dbgtrngvonneuman : in std_logic;
 			dbgtrngidletime : in unsigned(3 downto 0)
@@ -124,6 +131,8 @@ architecture rtl of ecc_trng is
 			clk : in std_logic;
 			rstn : in std_logic;
 			swrst : in std_logic;
+			-- interface with ecc_scalar
+			irn_reset : in std_logic;
 			-- interface with es_trng
 			data_t : in std_logic_vector(7 downto 0);
 			valid_t : in std_logic;
@@ -131,7 +140,13 @@ architecture rtl of ecc_trng is
 			-- interface with ecc_trng_srv
 			data_s : out std_logic_vector(pp_irn_width - 1 downto 0);
 			valid_s : out std_logic;
-			rdy_s : in std_logic
+			rdy_s : in std_logic;
+			dbgtrngusepseudosource : in std_logic;
+			dbgtrngrawpullppdis : in std_logic;
+			-- interface with the external pseudo TRNG component
+			dbgpseudotrngdata : in std_logic_vector(7 downto 0);
+			dbgpseudotrngvalid : in std_logic;
+			dbgpseudotrngrdy : out std_logic
 		);
 	end component ecc_trng_pp;
 
@@ -199,7 +214,7 @@ begin
 				dbgtrngrawwaddr => dbgtrngrawwaddr,
 				dbgtrngrawraddr => dbgtrngrawraddr,
 				dbgtrngrawdata => dbgtrngrawdata,
-				dbgtrngppdeact => dbgtrngppdeact,
+				dbgtrngrawfiforeaddis => dbgtrngrawfiforeaddis,
 				dbgtrngrawduration => dbgtrngrawduration,
 				dbgtrngvonneuman => dbgtrngvonneuman,
 				dbgtrngidletime => dbgtrngidletime
@@ -224,7 +239,7 @@ begin
 				dbgtrngrawwaddr => dbgtrngrawwaddr,
 				dbgtrngrawraddr => dbgtrngrawraddr,
 				dbgtrngrawdata => dbgtrngrawdata,
-				dbgtrngppdeact => dbgtrngppdeact,
+				dbgtrngrawfiforeaddis => dbgtrngrawfiforeaddis,
 				dbgtrngrawduration => dbgtrngrawduration,
 				dbgtrngvonneuman => dbgtrngvonneuman,
 				dbgtrngidletime => dbgtrngidletime
@@ -238,12 +253,19 @@ begin
 			clk => clk,
 			rstn => rstn,
 			swrst => swrst,
+			irn_reset => irn_reset,
 			data_t => data_t,
 			valid_t => valid_t,
 			rdy_t => rdy_t,
 			data_s => data_s,
 			valid_s => valid_s,
-			rdy_s => rdy_s
+			rdy_s => rdy_s,
+			dbgtrngusepseudosource => dbgtrngusepseudosource,
+			dbgtrngrawpullppdis => dbgtrngrawpullppdis,
+			-- interface with the external pseudo TRNG component
+			dbgpseudotrngdata => dbgpseudotrngdata,
+			dbgpseudotrngvalid => dbgpseudotrngvalid,
+			dbgpseudotrngrdy => dbgpseudotrngrdy
 		);
 
 	-- unit serving internal random numbers

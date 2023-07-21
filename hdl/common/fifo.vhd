@@ -17,14 +17,13 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
-use work.ecc_utils.all; -- for log2()
-use work.ecc_pkg.all; -- for syncram_sdp
-use work.ecc_customize.all; -- for 'debug'
+use work.ecc_log.all; -- for log2()
 
 entity fifo is
 	generic(
 		datawidth : natural range 1 to integer'high;
-		datadepth : natural range 1 to integer'high);
+		datadepth : natural range 1 to integer'high;
+		debug : boolean := FALSE);
 	port(
 		clk : in std_logic;
 		rstn : in std_logic;
@@ -51,7 +50,7 @@ entity fifo is
 		-- array takes back the value it was holding at the time 'dbgdeact'
 		-- was asserted, and the read interface into the FIFO becomes available
 		-- again.
-		-- The debug feature does not modify the behiavour of the write
+		-- The debug feature does not modify the behaviour of the write
 		-- side interface of the FIFO
 		dbgdeact : in std_logic;
 		dbgwaddr : out std_logic_vector(log2(datadepth - 1) - 1 downto 0);
@@ -61,6 +60,24 @@ entity fifo is
 end entity fifo;
 
 architecture syn of fifo is
+
+	component syncram_sdp is
+		generic(
+			rdlat : positive range 1 to 2;
+			datawidth : natural range 1 to integer'high;
+			datadepth : natural range 1 to integer'high);
+		port(
+			clk : in std_logic;
+			-- port A (write-only)
+			addra : in std_logic_vector(log2(datadepth - 1) - 1 downto 0);
+			wea : in std_logic;
+			dia : in std_logic_vector(datawidth - 1 downto 0);
+			-- port B (read-only)
+			addrb : in std_logic_vector(log2(datadepth - 1) - 1 downto 0);
+			reb : in std_logic;
+			dob : out std_logic_vector(datawidth - 1 downto 0)
+		);
+	end component syncram_sdp;
 
 	type reg_type is record
 		we : std_logic;

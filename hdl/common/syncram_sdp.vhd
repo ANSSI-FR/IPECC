@@ -17,9 +17,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
-use work.ecc_utils.all; -- for log2()
-use work.ecc_pkg.all;
-use work.ecc_customize.all; -- for techno
+use work.ecc_log.all;
 
 -- code below conforms to Xilinx's synthesis recommandations for
 -- VHDL coding style of a simple dual-port BRAM with common clock

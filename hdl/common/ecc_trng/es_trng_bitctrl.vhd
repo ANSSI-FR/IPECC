@@ -32,7 +32,7 @@ entity es_trng_bitctrl is
 		rdy : in std_logic;
 		-- following signals are for debug & statistics
 		dbgtrngrawreset : in std_logic;
-		dbgtrngta : in unsigned(19 downto 0);
+		dbgtrngta : in unsigned(15 downto 0);
 		dbgtrngvonneuman : in std_logic;
 		dbgtrngidletime : in unsigned(3 downto 0)
 	);
@@ -66,7 +66,7 @@ architecture rtl of es_trng_bitctrl is
 		state : state_type;
 		ro1en : std_logic;
 		ro2en : std_logic;
-		tacnt : unsigned(19 downto 0);
+		tacnt : unsigned(15 downto 0);
 		validin0, validin1, validin : std_logic;
 		rawin0, rawin1, rawin : std_logic;
 		von, vonbit : std_logic;
@@ -113,7 +113,8 @@ begin
 		if r.state = ro1 then
 			-- 'ro1' denotes the state where only RO1 oscillator is free & running
 			v.tacnt := r.tacnt - 1;
-			if r.tacnt(19) = '0' and v.tacnt(19) = '1' then
+			if r.tacnt(r.tacnt'length - 1) = '0' and v.tacnt(r.tacnt'length - 1) = '1'
+			then
 				v.ro2en := '1';
 				v.state := ro1ro2;
 			end if;
@@ -167,7 +168,7 @@ begin
 				if debug then
 					v.tacnt := dbgtrngta;
 				else
-					v.tacnt := to_unsigned(trngta, 20); -- trngta defined in ecc_customize
+					v.tacnt := to_unsigned(trngta, 16); -- trngta defined in ecc_customize
 				end if;
 			end if;
 		end if;

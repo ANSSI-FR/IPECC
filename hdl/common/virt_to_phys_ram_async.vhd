@@ -17,7 +17,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
-use work.ecc_utils.all; -- for log2()
+use work.ecc_log.all;
 use work.ecc_pkg.all;
 use work.ecc_customize.all; -- for techno
 use work.ecc_shuffle_pkg.all; -- for techno

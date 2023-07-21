@@ -18,6 +18,7 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
 use work.ecc_pkg.all; -- for std_logic2 & hex_write()
+use work.ecc_log.all;
 use work.ecc_customize.all; -- for nbtrng
 use work.ecc_utils.all; -- for log2() & ge_pow_of_2()
 use work.ecc_trng_pkg.all;
@@ -141,7 +142,9 @@ begin
 
 	-- IRN fifo for ecc_axi random data
 	f0: fifo
-		generic map(datawidth => ww, datadepth => irn_fifo_size_axi)
+		generic map(
+			datawidth => ww, datadepth => irn_fifo_size_axi,
+			debug => debug)
 		port map(
 			clk => clk,
 			rstn => rstn,
@@ -164,7 +167,9 @@ begin
 
 	-- IRN fifo for ecc_fp random data
 	f1: fifo
-		generic map(datawidth => ww, datadepth => irn_fifo_size_fp)
+		generic map(
+			datawidth => ww, datadepth => irn_fifo_size_fp,
+			debug => debug)
 		port map(
 			clk => clk,
 			rstn => rstn,
@@ -187,7 +192,9 @@ begin
 
 	-- IRN fifo for ecc_curve random data
 	f2: fifo
-		generic map(datawidth => 2, datadepth => irn_fifo_size_curve)
+		generic map(
+			datawidth => 2, datadepth => irn_fifo_size_curve,
+			debug => debug)
 		port map(
 			clk => clk,
 			rstn => rstn,
@@ -211,8 +218,8 @@ begin
 	-- IRN fifo for ecc_fp_dram_sh random data
 	f3: fifo
 		generic map(
-			datawidth => irn_width_sh,
-			datadepth => irn_fifo_size_sh)
+			datawidth => irn_width_sh, datadepth => irn_fifo_size_sh,
+			debug => debug)
 		port map(
 			clk => clk,
 			rstn => rstn,

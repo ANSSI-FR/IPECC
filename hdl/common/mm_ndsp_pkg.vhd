@@ -20,6 +20,7 @@ use ieee.numeric_std.all;
 use work.ecc_customize.all;
 use work.ecc_utils.all;
 use work.ecc_pkg.all;
+use work.ecc_log.all;
 
 package mm_ndsp_pkg is
 

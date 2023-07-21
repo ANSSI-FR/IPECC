@@ -9,6 +9,7 @@ use std.textio.all;
 
 use work.ecc_pkg.all;
 use work.ecc_utils.all;
+use work.ecc_log.all;
 use work.ecc_customize.all; -- for nblargenb
 use work.ecc_trng_pkg.irn_width_sh;
 use work.ecc_shuffle_pkg.all;

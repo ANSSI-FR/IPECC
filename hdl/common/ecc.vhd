@@ -19,6 +19,7 @@ use ieee.numeric_std.all;
 
 use work.ecc_customize.all;
 use work.ecc_utils.all;
+use work.ecc_log.all;
 use work.ecc_pkg.all;
 use work.mm_ndsp_pkg.all;
 use work.ecc_trng_pkg.all;
@@ -68,12 +69,16 @@ entity ecc is
 		clkmm : in std_logic;
 		-- interrupt
 		irq : out std_logic;
-		irqo : out std_logic;
 		-- busy signal for [k]P computation
 		busy : out std_logic;
-		-- debug feature (off-chip trigger)
+		-- debug features
+		--   off-chip trigger
 		dbgtrigger : out std_logic;
-		dbghalted : out std_logic
+		dbghalted : out std_logic;
+		--   pseudo-trng port
+		dbgptdata : in std_logic_vector(7 downto 0);
+		dbgptvalid : in std_logic;
+		dbgptrdy : out std_logic
 	);
 end entity ecc;
 
@@ -224,21 +229,23 @@ architecture struct of ecc is
 			dbgiwdata : out std_logic_vector(OPCODE_SZ - 1 downto 0);
 			dbgiwe : out std_logic;
 			-- debug features (interface with ecc_fp)
-			dbgtrnguse : out std_logic;
+			dbgtrngnnrnddet : out std_logic;
 			-- debug features (interface with ecc_trng)
-			dbgtrngta : out unsigned(19 downto 0);
+			dbgtrngta : out unsigned(15 downto 0);
 			dbgtrngrawreset : out std_logic;
 			dbgtrngirnreset : out std_logic;
 			dbgtrngrawfull : in std_logic;
 			dbgtrngrawwaddr : in std_logic_vector(log2(raw_ram_size-1) - 1 downto 0);
 			dbgtrngrawraddr : out std_logic_vector(log2(raw_ram_size-1) - 1 downto 0);
 			dbgtrngrawdata : in std_logic;
-			dbgtrngppdeact : out std_logic;
+			dbgtrngrawfiforeaddis : out std_logic;
 			dbgtrngcompletebypass : out std_logic;
 			dbgtrngcompletebypassbit : out std_logic;
 			dbgtrngrawduration : in unsigned(31 downto 0);
 			dbgtrngvonneuman : out std_logic;
 			dbgtrngidletime : out unsigned(3 downto 0);
+			dbgtrngusepseudosource : out std_logic;
+			dbgtrngrawpullppdis : out std_logic;
 			-- handshake signals between entropy server ecc_trng
 			-- and the different clients (for debug diagnostics)
 			dbgtrngaxirdy : in std_logic;
@@ -514,7 +521,7 @@ architecture struct of ecc is
 			comppop : in std_logic;
 			token_generating : in std_logic;
 			-- debug features (interface with ecc_axi)
-			dbgtrnguse : in std_logic;
+			dbgtrngnnrnddet : in std_logic;
 			-- debug feature (ecc_scalar)
 			dbghalted : in std_logic
 			-- pragma translate_off
@@ -583,18 +590,24 @@ architecture struct of ecc is
 			data3 : out std_logic_vector(irn_width_sh - 1 downto 0);
 			irncount3 : out std_logic_vector(log2(irn_fifo_size_sh) - 1 downto 0);
 			-- interface with ecc_axi (only usable in debug mode)
-			dbgtrngta : in unsigned(19 downto 0);
+			dbgtrngta : in unsigned(15 downto 0);
 			dbgtrngrawreset : in std_logic;
 			dbgtrngrawfull : out std_logic;
 			dbgtrngrawwaddr : out std_logic_vector(log2(raw_ram_size-1) - 1 downto 0);
 			dbgtrngrawraddr : in std_logic_vector(log2(raw_ram_size-1) - 1 downto 0);
 			dbgtrngrawdata : out std_logic;
-			dbgtrngppdeact : in std_logic;
+			dbgtrngrawfiforeaddis : in std_logic;
 			dbgtrngcompletebypass : in std_logic;
 			dbgtrngcompletebypassbit : in std_logic;
 			dbgtrngrawduration : out unsigned(31 downto 0);
 			dbgtrngvonneuman : in std_logic;
-			dbgtrngidletime : in unsigned(3 downto 0)
+			dbgtrngidletime : in unsigned(3 downto 0);
+			dbgtrngusepseudosource : in std_logic;
+			dbgtrngrawpullppdis : in std_logic;
+			-- interface with the external pseudo TRNG component
+			dbgpseudotrngdata : in std_logic_vector(7 downto 0);
+			dbgpseudotrngvalid : in std_logic;
+			dbgpseudotrngrdy : out std_logic
 		);
 	end component ecc_trng;
 
@@ -802,8 +815,6 @@ architecture struct of ecc is
 	signal ar1zo : std_logic;
 	-- signals between ecc_axi & ecc_curve
 	signal masklsb : std_logic;
-	-- signals from ecc_axi to top-level
-	signal irq_s : std_logic;
 	-- signals between ecc_axi & mm_ndsp(s)
 	signal pen : std_logic;
 	signal nndyn_mask : std_logic_vector(ww - 1 downto 0);
@@ -936,21 +947,22 @@ architecture struct of ecc is
 	signal dbgdecodepc : std_logic_vector(IRAM_ADDR_SZ - 1 downto 0);
 	signal dbgbreakpointid : std_logic_vector(1 downto 0);
 	signal dbgbreakpointhit : std_logic;
-	-- debug features (signals between ecc_axi & ecc_fp)
-	signal dbgtrnguse : std_logic;
 	-- debug features (signals between ecc_axi & ecc_trng)
-	signal dbgtrngta : unsigned(19 downto 0);
+	signal dbgtrngnnrnddet : std_logic;
+	signal dbgtrngta : unsigned(15 downto 0);
 	signal dbgtrngrawreset : std_logic;
 	signal dbgtrngirnreset : std_logic;
 	signal dbgtrngrawfull : std_logic;
 	signal dbgtrngrawwaddr : std_logic_vector(log2(raw_ram_size-1) - 1 downto 0);
 	signal dbgtrngrawraddr : std_logic_vector(log2(raw_ram_size-1) - 1 downto 0);
 	signal dbgtrngrawdata : std_logic;
-	signal dbgtrngppdeact : std_logic;
+	signal dbgtrngrawfiforeaddis : std_logic;
 	signal dbgtrngcompletebypass, dbgtrngcompletebypassbit : std_logic;
 	signal dbgtrngrawduration : unsigned(31 downto 0);
 	signal dbgtrngvonneuman : std_logic;
 	signal dbgtrngidletime : unsigned(3 downto 0);
+	signal dbgtrngusepseudosource : std_logic;
+	signal dbgtrngrawpullppdis : std_logic;
 
 	-- pragma translate_off
 	-- signals between ecc_scalar & ecc_fp (simu only)
@@ -1035,7 +1047,7 @@ begin
 			s_axi_rvalid => s_axi_rvalid,
 			s_axi_rready => s_axi_rready,
 			-- interrupt
-			irq => irq_s,
+			irq => irq,
 			-- interface with ecc_scalar
 			--   general
 			initdone => initdone,
@@ -1135,9 +1147,8 @@ begin
 			dbgiwaddr => dbgiwaddr,
 			dbgiwdata => dbgiwdata,
 			dbgiwe => dbgiwe,
-			-- debug features (interface with ecc_fp)
-			dbgtrnguse => dbgtrnguse,
 			-- debug features (interface with ecc_trng)
+			dbgtrngnnrnddet => dbgtrngnnrnddet,
 			dbgtrngta => dbgtrngta,
 			dbgtrngrawreset => dbgtrngrawreset,
 			dbgtrngirnreset => dbgtrngirnreset,
@@ -1145,12 +1156,14 @@ begin
 			dbgtrngrawwaddr => dbgtrngrawwaddr,
 			dbgtrngrawraddr => dbgtrngrawraddr,
 			dbgtrngrawdata => dbgtrngrawdata,
-			dbgtrngppdeact => dbgtrngppdeact,
+			dbgtrngrawfiforeaddis => dbgtrngrawfiforeaddis,
 			dbgtrngcompletebypass => dbgtrngcompletebypass,
 			dbgtrngcompletebypassbit => dbgtrngcompletebypassbit,
 			dbgtrngrawduration => dbgtrngrawduration,
 			dbgtrngvonneuman => dbgtrngvonneuman,
 			dbgtrngidletime => dbgtrngidletime,
+			dbgtrngusepseudosource => dbgtrngusepseudosource,
+			dbgtrngrawpullppdis => dbgtrngrawpullppdis,
 			-- handshake signals between entropy server ecc_trng
 			-- and the different clients (for debug diagnostics)
 			dbgtrngaxirdy => trng_rdy_axi,
@@ -1164,10 +1177,6 @@ begin
 			-- debug feature (off-chip trigger)
 			dbgtrigger => dbgtrigger
 		); -- ecc_axi
-
-	-- drive output irq
-	irq <= irq_s;
-	irqo <= irq_s;
 
 	-- scalar arithmetic block
 	s0: ecc_scalar
@@ -1419,8 +1428,8 @@ begin
 			compcstmty => compcstmty,
 			comppop => comppop,
 			token_generating => token_generating,
-			-- debug feature (interface with ecc_axi)
-			dbgtrnguse => dbgtrnguse,
+			-- debug feature (ecc_axi)
+			dbgtrngnnrnddet => dbgtrngnnrnddet,
 			-- debug feature (ecc_scalar)
 			dbghalted => dbghalted_s
 			-- pragma translate_off
@@ -1494,12 +1503,18 @@ begin
 			dbgtrngrawwaddr => dbgtrngrawwaddr,
 			dbgtrngrawraddr => dbgtrngrawraddr,
 			dbgtrngrawdata => dbgtrngrawdata,
-			dbgtrngppdeact => dbgtrngppdeact,
+			dbgtrngrawfiforeaddis => dbgtrngrawfiforeaddis,
 			dbgtrngcompletebypass => dbgtrngcompletebypass,
 			dbgtrngcompletebypassbit => dbgtrngcompletebypassbit,
 			dbgtrngrawduration => dbgtrngrawduration,
 			dbgtrngvonneuman => dbgtrngvonneuman,
-			dbgtrngidletime => dbgtrngidletime
+			dbgtrngidletime => dbgtrngidletime,
+			dbgtrngusepseudosource => dbgtrngusepseudosource,
+			dbgtrngrawpullppdis => dbgtrngrawpullppdis,
+			-- interface with the external pseudo TRNG component
+			dbgpseudotrngdata => dbgptdata,
+			dbgpseudotrngvalid => dbgptvalid,
+			dbgpseudotrngrdy => dbgptrdy
 		); -- ecc_trng
 
 	-- static-memory storing temporary variables read-&-written

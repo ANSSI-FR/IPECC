@@ -20,6 +20,7 @@ use ieee.numeric_std.all;
 use work.ecc_customize.all;
 use work.ecc_utils.all;
 use work.ecc_vars.all;
+use work.ecc_log.all;
 
 -- pragma translate_off
 use std.textio.all;
@@ -320,7 +321,8 @@ package ecc_pkg is
 	component fifo is
 		generic(
 			datawidth : natural range 1 to integer'high;
-			datadepth : natural range 1 to integer'high);
+			datadepth : natural range 1 to integer'high;
+			debug : boolean := FALSE);
 		port(
 			clk : in std_logic;
 			rstn : in std_logic;

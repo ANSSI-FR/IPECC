@@ -12,6 +12,7 @@ use work.ecc_utils.all;
 use work.ecc_customize.all;
 use work.ecc_trng_pkg.irn_width_sh;
 use work.ecc_shuffle_pkg.all;
+use work.ecc_log.all;
 
 entity ecc_fp_dram_sh_fishy_nb is
 	generic(

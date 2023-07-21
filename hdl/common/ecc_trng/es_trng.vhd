@@ -19,8 +19,9 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
 use work.ecc_pkg.all; -- for 'std_logic2'
+use work.ecc_log.all;
 use work.ecc_customize.all; -- for 'nbtrng'
-use work.ecc_utils.all; -- for log2() & ge_pow_of_2()
+use work.ecc_utils.all; -- for ge_pow_of_2()
 use work.ecc_trng_pkg.all;
 
 -- pragma translate_off
@@ -37,13 +38,13 @@ entity es_trng is
 		valid_t : out std_logic;
 		rdy_t : in std_logic;
 		-- following signals are for debug & statistics
-		dbgtrngta : in unsigned(19 downto 0);
+		dbgtrngta : in unsigned(15 downto 0);
 		dbgtrngrawreset : in std_logic;
 		dbgtrngrawfull : out std_logic;
 		dbgtrngrawwaddr : out std_logic_vector(log2(raw_ram_size-1) - 1 downto 0);
 		dbgtrngrawraddr : in std_logic_vector(log2(raw_ram_size-1) - 1 downto 0);
 		dbgtrngrawdata : out std_logic;
-		dbgtrngppdeact : in std_logic;
+		dbgtrngrawfiforeaddis : in std_logic;
 		dbgtrngrawduration : out unsigned(31 downto 0);
 		dbgtrngvonneuman : in std_logic;
 		dbgtrngidletime : in unsigned(3 downto 0)
@@ -64,7 +65,7 @@ architecture struct of es_trng is
 			rdy : in std_logic;
 			-- following signals are for debug & statistics
 			dbgtrngrawreset : in std_logic;
-			dbgtrngta : in unsigned(19 downto 0);
+			dbgtrngta : in unsigned(15 downto 0);
 			dbgtrngvonneuman : in std_logic;
 			dbgtrngidletime : in unsigned(3 downto 0)
 		);
@@ -211,8 +212,11 @@ begin
 
 	r_rawi(0) <= r.rawi;
 
+	-- This is the raw random FIFO.
 	f0: fifo
-		generic map(datawidth => 1, datadepth => raw_ram_size)
+		generic map(
+			datawidth => 1, datadepth => raw_ram_size,
+			debug => debug)
 		port map(
 			clk => clk,
 			rstn => rstn,
@@ -227,14 +231,14 @@ begin
 			rerr => open,
 			count => count,
 			-- debug feature
-			dbgdeact => dbgtrngppdeact,
+			dbgdeact => dbgtrngrawfiforeaddis,
 			dbgwaddr => dbgtrngrawwaddr,
 			dbgraddr => dbgtrngrawraddr,
 			dbgrst => dbgtrngrawreset
 		);
 
 	comb: process(r, rstn, rawi, validi, rawout, full, empty, count, rdy_t,
-		            dbgtrngppdeact, dbgtrngrawreset, swrst)
+		            dbgtrngrawfiforeaddis, dbgtrngrawreset, swrst)
 		variable v : reg_type;
 	begin
 		v := r;
@@ -243,8 +247,8 @@ begin
 		-- WRITE-into-the-FIFO logic
 		-- -------------------------
 
-		-- continuously fill the FIFO with raw random bits as long as it does
-		-- not show a FULL state
+		-- Continuously fill the FIFO with raw random bits as long as it does
+		-- not show a FULL state;
 
 		v.we := '0';
 
@@ -253,14 +257,14 @@ begin
 			v.we := '1';
 		end if;
 
-		-- deassertion of r.rdyi
+		-- Deassertion of r.rdyi
 		if r.we = '1' and count = std_logic_vector(
 			to_unsigned(raw_ram_size - 2, log2(raw_ram_size)))
 		then
 			v.rdyi := '0';
 		end if;
 
-		-- reassertion of r.rdyi
+		-- Reassertion of r.rdyi
 		if full = '0' then
 			v.rdyi := '1';
 		end if;
@@ -269,16 +273,17 @@ begin
 		-- READ-from-the-FIFO-logic
 		-- ------------------------
 
-		-- continuously empty the bits from the FIFO as long as it does not
+		-- Continuously empty the bits from the FIFO as long as it does not
 		-- show an EMPTY state (and as long as we're not in debug deactivation
-		-- mode (which is indicated by input port 'dbgtrngppdeact' asserted high)
+		-- mode (which is indicated by input port 'dbgtrngrawfiforeaddis'
+		-- asserted high).
 
 		v.re := '0';
 
-		-- condition dbgtrngppdeact = '0' below ensures that r.re will stay
-		-- low whenever dbgtrngppdeact = 1
+		-- Condition dbgtrngrawfiforeaddis = '0' below ensures that r.re will stay
+		-- low whenever dbgtrngrawfiforeaddis = 1.
 		if empty = '0' and r.recnt /= to_unsigned(8, 4) and r.react = '1'
-			and ((not debug) or dbgtrngppdeact = '0')
+			and ((not debug) or dbgtrngrawfiforeaddis = '0')
 		then
 			v.re := '1';
 		end if;
@@ -298,7 +303,7 @@ begin
 		v.shre0 := r.re;
 		v.shre1 := r.shre0;
 
-		-- shift-register
+		-- Shift-register
 		if r.shre1 = '1' then
 			v.shbyte := rawout(0) & r.shbyte(7 downto 1);
 			v.shcnt := r.shcnt + 1;
@@ -307,7 +312,7 @@ begin
 			end if;
 		end if;
 
-		-- hansdhake valid_t/rdy_t
+		-- Hansdhake valid_t/rdy_t
 		if r.valid_t = '1' and rdy_t = '1' then
 			v.valid_t := '0';
 			v.react := '1';
@@ -318,19 +323,19 @@ begin
 			v.fifotime := r.fifotime + 1;
 		end if;
 
-		-- as soon as the FIFO becomes FULL for the first time following last
+		-- As soon as the FIFO becomes FULL for the first time following last
 		-- reset, we stop counting cycles.
 		-- This allows any debug software to know the time it took to
 		-- completely fill the FIFO, and hence to estimate the random
 		-- production throughput of es_trng.
 		-- Of course this requires to first set the FIFO into debug
-		-- deactivation mode (by asserting 'dbgtrngppdeact' high) so that the
-		-- FIFO can no longer be accessed (emptied) by ecc_trng_pp component
+		-- deactivation mode (by asserting 'dbgtrngrawfiforeaddis' high) so that the
+		-- FIFO can no longer be accessed (emptied) by ecc_trng_pp component.
 		if full = '1' then
 			v.fifodocnt := '0';
 		end if;
 
-		-- synchronous reset
+		-- Synchronous reset
 		if rstn = '0' or dbgtrngrawreset = '1' or swrst = '1' then
 			v.we := '0';
 			v.rdyi := '1';
@@ -355,7 +360,7 @@ begin
 		end if;
 	end process regs;
 
-	-- drive outputs
+	-- Drive outputs
 	data_t <= r.shbyte;
 	valid_t <= r.valid_t;
 	dbgtrngrawfull <= full;

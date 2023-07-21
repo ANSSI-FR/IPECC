@@ -23,6 +23,7 @@ use std.textio.all;
 
 use work.ecc_customize.all;
 use work.ecc_utils.all;
+use work.ecc_log.all;
 use work.ecc_pkg.all; -- for 'ww' & others
 use work.mm_ndsp_pkg.all; -- for 'ndsp'
 

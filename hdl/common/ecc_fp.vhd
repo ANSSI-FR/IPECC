@@ -19,6 +19,7 @@ use ieee.numeric_std.all;
 
 use work.ecc_customize.all;
 use work.ecc_utils.all;
+use work.ecc_log.all;
 use work.ecc_pkg.all;
 use work.ecc_vars.all; -- for LARGE_NB_x constants (& only for simu, see s(142))
 use work.ecc_shuffle_pkg.all;
@@ -71,8 +72,8 @@ entity ecc_fp is
 		compcstmty : in std_logic;
 		comppop : in std_logic;
 		token_generating : in std_logic;
-		-- debug features (interface with ecc_axi)
-		dbgtrnguse : in std_logic;
+		-- debug feature (ecc_axi)
+		dbgtrngnnrnddet : in std_logic;
 		-- debug feature (ecc_scalar)
 		dbghalted : in std_logic
 		-- pragma translate_off
@@ -587,7 +588,7 @@ begin
 	comb : process(r, rstn,
 	               opi, mmo, fprdata, xwe, xaddr, xwdata, xre, initkp,
 	               compkp, compcstmty, comppop, trngdata, trngvalid,
-	               dbgtrnguse, dbghalted,
+	               dbgtrngnnrnddet, dbghalted,
 	               nndyn_nnrnd_mask, nndyn_nnrnd_zerowm1, nndyn_wm1,
 								 nndyn_2wm1, swrst, token_generating)
 		variable v : reg_type;
@@ -1765,7 +1766,7 @@ begin
 		v.rnd.write := '0'; -- (s116)
 		if r.rnd.busy = '1' then
 			if r.rnd.trngrdy = '1' -- (s107)
-			  and (trngvalid = '1' or (debug and dbgtrnguse = '0'))
+				and (trngvalid = '1' or (debug and dbgtrngnnrnddet = '1'))
 			then
 				v.rnd.write := '1';
 				if r.rnd.masked = '0' then
@@ -1781,9 +1782,9 @@ begin
 							v.rnd.data := (others => '0');
 						elsif nndyn_nnrnd_zerowm1 = '0' then
 							-- last ww-bit word must be masked w/ nndyn_nnrnd_mask
-							if dbgtrnguse = '1' then
+							if dbgtrngnnrnddet = '0' then
 								v.rnd.data := trngdata(ww - 1 downto 0) and nndyn_nnrnd_mask;
-							elsif dbgtrnguse = '0' then
+							elsif dbgtrngnnrnddet = '1' then
 								v.rnd.data := CST_REPLACE_TRNG_BY_ONES and
 									nndyn_nnrnd_mask; -- set 1 where mask bits are 1
 							end if;
@@ -1795,9 +1796,9 @@ begin
 							-- (s102) if most significant ww-bit word must be set to 0
 							-- (see (s101) above) then it means mask 'nndyn_nnrnd_mask'
 							-- is to be applied to the one before the last, i.e now
-							if dbgtrnguse = '1' then
+							if dbgtrngnnrnddet = '0' then
 								v.rnd.data := trngdata(ww - 1 downto 0) and nndyn_nnrnd_mask;
-							elsif dbgtrnguse = '0' then
+							elsif dbgtrngnnrnddet = '1' then
 								v.rnd.data := CST_REPLACE_TRNG_BY_ONES and
 									nndyn_nnrnd_mask; -- set 1 where mask bits are 1
 							end if;
@@ -1805,11 +1806,19 @@ begin
 							-- if last word is not to be set to 0 (see (s101) above)
 							-- then the next-to-the-last word is to be handled as any
 							-- other one (i.e no mask, as in the nominal case)
-							v.rnd.data := trngdata(ww - 1 downto 0);
+							if dbgtrngnnrnddet = '0' then
+								v.rnd.data := trngdata(ww - 1 downto 0);
+							elsif dbgtrngnnrnddet = '1' then
+								v.rnd.data := CST_REPLACE_TRNG_BY_ONES;
+							end if;
 						end if;
 					else
 						-- nominal case (r.rnd.opccnt modulo w is neither 0 nor 1)
-						v.rnd.data := trngdata(ww - 1 downto 0);
+						if dbgtrngnnrnddet = '0' then
+							v.rnd.data := trngdata(ww - 1 downto 0);
+						elsif dbgtrngnnrnddet = '1' then
+							v.rnd.data := CST_REPLACE_TRNG_BY_ONES;
+						end if;
 					end if; -- r.rnd.opccnt
 				end if; -- r.rnd.masked
 				-- if we're dealing w/ an NNRNDs instruction (or an NNRNDf one)

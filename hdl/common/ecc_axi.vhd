@@ -19,6 +19,7 @@ use ieee.numeric_std.all;
 
 use work.ecc_customize.all;
 use work.ecc_utils.all;
+use work.ecc_log.all;
 use work.ecc_pkg.all;
 use work.ecc_vars.all; -- for LARGE_NB_R_ADDR - see (s79), (s80) & (s81)
 use work.ecc_software.all;
@@ -166,21 +167,23 @@ entity ecc_axi is
 		dbgiwdata : out std_logic_vector(OPCODE_SZ - 1 downto 0);
 		dbgiwe : out std_logic;
 		-- debug features (interface with ecc_fp)
-		dbgtrnguse : out std_logic;
+		dbgtrngnnrnddet : out std_logic;
 		-- debug features (interface with ecc_trng)
-		dbgtrngta : out unsigned(19 downto 0);
+		dbgtrngta : out unsigned(15 downto 0);
 		dbgtrngrawreset : out std_logic;
 		dbgtrngirnreset : out std_logic;
 		dbgtrngrawfull : in std_logic;
 		dbgtrngrawwaddr : in std_logic_vector(log2(raw_ram_size-1) - 1 downto 0);
 		dbgtrngrawraddr : out std_logic_vector(log2(raw_ram_size-1) - 1 downto 0);
 		dbgtrngrawdata : in std_logic;
-		dbgtrngppdeact : out std_logic;
+		dbgtrngrawfiforeaddis : out std_logic;
 		dbgtrngcompletebypass : out std_logic;
 		dbgtrngcompletebypassbit : out std_logic;
 		dbgtrngrawduration : in unsigned(31 downto 0);
 		dbgtrngvonneuman : out std_logic;
 		dbgtrngidletime : out unsigned(3 downto 0);
+		dbgtrngusepseudosource : out std_logic;
+		dbgtrngrawpullppdis : out std_logic;
 		-- handshake signals between entropy server ecc_trng
 		-- and the different clients (for debug diagnostics)
 		dbgtrngaxirdy : in std_logic;
@@ -434,16 +437,19 @@ architecture rtl of ecc_axi is
 	end record;
 
 	type trng_reg_type is record
-		ta : unsigned(19 downto 0);
+		ta : unsigned(15 downto 0);
 		using : std_logic;
 		rawreset : std_logic;
 		irnreset : std_logic;
 		raw : raw_reg_type;
-		ppdeact : std_logic;
+		rawfiforeaddis : std_logic;
 		completebypass : std_logic;
 		completebypassbit : std_logic;
+		nnrnddeterm : std_logic;
 		vonneuman : std_logic;
 		idletime : unsigned(3 downto 0);
+		usepseudo : std_logic;
+		rawpullppdis : std_logic;
 	end record;
 
 	-- debug features
@@ -618,9 +624,9 @@ begin
 	-- (s262), see (s261)
 	assert ((not debug) or
 			(log2(raw_ram_size) <= (DBG_TRNG_RAW_ADDR_MSB - DBG_TRNG_RAW_ADDR_LSB + 1)))
-		report "The TRNG raw random FIFO is too large for its size to fit in register"
-	       & "W_DBG_TRNG_CTRL. Access to raw random data will be impacted (address "
-				 & "will be truncated)."
+		report "The TRNG raw random FIFO is too large for its size to fit in "
+	       & "register W_DBG_TRNG_CTRL. Access to raw random data will be "
+				 & "impacted (address will be truncated)."
 			severity WARNING;
 
 	-- (s264), see (s263)
@@ -2167,7 +2173,12 @@ begin
 					--   log2(raw_ram_size-1))
 					if r.ctrl.state = idle then
 						v.debug.trng.raw.raddr := -- (s261), see (s262)
-							r.axi.wdatax(DBG_TRNG_RAW_ADDR_MSB downto DBG_TRNG_RAW_ADDR_LSB);
+							-- Note that next line explicitly implies truncation (according
+							-- to the definition of function resize() of numeric_std package)
+							-- in case (s262) is not satisfied.
+							std_logic_vector(resize(unsigned(r.axi.wdatax(
+								DBG_TRNG_RAW_ADDR_MSB downto DBG_TRNG_RAW_ADDR_LSB)), 
+								log2(raw_ram_size - 1)));
 						v.ctrl.state := readraw;
 						-- deassertion r.axi.rvalid by (s26) (drives output s_axi_rvalid)
 						-- means no valid read data are available from us yet on AXI read
@@ -2175,22 +2186,36 @@ begin
 						v.axi.rvalid := '0'; -- (s26) - will be asserted by (s27)
 						v.read.trngreading := '1';
 					end if;
-				elsif r.axi.wdatax(DBG_TRNG_RAW_RESET) = '1' then
+				end if;
+				if r.axi.wdatax(DBG_TRNG_RAW_RESET) = '1' then
 					-- ----------------------------------------------------------
 					--       debug software is asking for a TRNG raw reset
 					-- ----------------------------------------------------------
 					v.debug.trng.rawreset := '1'; -- stays asserted 1 cycle thx to (s58)
-				elsif r.axi.wdatax(DBG_TRNG_IRN_RESET) = '1' then
+				end if;
+				if r.axi.wdatax(DBG_TRNG_IRN_RESET) = '1' then
 					-- ----------------------------------------------------------
 					--       debug software is asking for a TRNG irn reset
 					-- ----------------------------------------------------------
 					v.debug.trng.irnreset := '1'; -- stays asserted 1 cycle thx to (s59)
 				end if;
-				-- activation/disabling of TRNG post-processing
-				v.debug.trng.ppdeact := r.axi.wdatax(DBG_TRNG_PP_DISABLE);
+				-- This inhibits the read function on the raw random FIFO internal
+				-- to the IP (the purpose here being to allow software to read its
+				-- whole content, wo/ the post-processing getting some part of the
+				-- bits without software seeing them pass through).
+				v.debug.trng.rawfiforeaddis := r.axi.wdatax(
+					DBG_TRNG_RAW_FIFO_READ_DISABLE);
+				-- This inhibits ecc_trng_pp from demanding bytes to the raw random
+				-- source, whether that source is currently the real one (as for
+				-- '.rawfiforeaddis' signal/'DBG_TRNG_RAW_FIFO_READ_DISABLE' bit,
+				-- see just above) or if it's the pseudo external one.
+				v.debug.trng.rawpullppdis := r.axi.wdatax(DBG_TRNG_RAW_PULL_PP_DISABLE);
+				-- Complete bypass
 				v.debug.trng.completebypass := r.axi.wdatax(DBG_TRNG_COMPLETE_BYPASS);
 				v.debug.trng.completebypassbit := r.axi.wdatax(
 					DBG_TRNG_COMPLETE_BYPASS_BIT);
+				-- Instruction NNRND becomes deterministic (with all bits at 1)
+				v.debug.trng.nnrnddeterm := r.axi.wdatax(DBG_TRNG_NNRND_DETERMINISTIC);
 			-- --------------------------------------------------------------
 			-- decoding write to W_DBG_TRNG_CFG register
 			-- --------------------------------------------------------------
@@ -2200,6 +2225,7 @@ begin
 					unsigned(r.axi.wdatax(DBG_TRNG_TA_MSB downto DBG_TRNG_TA_LSB));
 				v.debug.trng.idletime :=
 					unsigned(r.axi.wdatax(DBG_TRNG_IDLE_MSB downto DBG_TRNG_IDLE_LSB));
+				v.debug.trng.usepseudo := r.axi.wdatax(DBG_TRNG_USE_PSEUDO);
 				-- assert both AWREADY & WREADY signals to allow a new AXI data-beat
 				-- to happen again
 				v.axi.awready := '1';
@@ -2944,12 +2970,12 @@ begin
 			-- s_axi_arready) in (s143) below, we're telling AXI fabric that
 			-- we're not ready to accept a new read address again, not until...
 			--   - [in the case of a read targeting the R_READ_DATA register]
-			--     not until we have a 32-bit data available that has been gathered
-			--     from different reads & shifts from ecc_fp_dram ;
+			--     ... not until we have a 32-bit data available that has been
+			--     gathered from different reads & shifts from ecc_fp_dram ;
 			--   - [in the case of a read targeting any of the registers that
 			--     does not require further processing and for which read payload
-			--     can be directly driven back to initiator, like R_STATUS] ...
-			--     not until the AXI fabric actually reads the content of the
+			--     can be directly driven back to initiator, like R_STATUS]
+			--     ... not until the AXI fabric actually reads the content of the
 			--     register on the AXI data-read channel - that's the reason why
 			--     we immediately assert r.axi.rvalid in this case (which directly
 			--     drives s_axi_rvalid) - see all cases tagged (s5) down below.
@@ -3076,7 +3102,7 @@ begin
 			then
 				-- version number, we use the first 32 bits of git commit checksum
 				dw := (others => '0');
-				dw(31 downto 0) := x"0001" & x"0002"; -- version 1.2
+				dw(31 downto 0) := x"0000" & x"0016"; -- version 0.22
 				v.axi.rdatax := dw;
 				v.axi.rvalid := '1'; -- (s5)
 			-- ------------------------------
@@ -4209,7 +4235,7 @@ begin
 				v.nndyn.valwerr := '0';
 				v.nndyn.valnnp1 := to_unsigned(nn + 1, log2(nn + 1));
 				v.nndyn.valnnm3 := to_unsigned(nn - 3, log2(nn));
-			end if;
+			end if; -- nn_dynamic
 			v.nndyn.active := '0';
 			-- debug feature
 			if debug then
@@ -4222,16 +4248,18 @@ begin
 				v.debug.dosomeopcodes := '0';
 				v.debug.resume := '0';
 				v.debug.nbopcodes := (others => '0');
-				v.debug.trng.using := '1';
+				v.debug.trng.nnrnddeterm := '0';
 				--TODO: add reset of dbgtrngxxx etc...
-				v.debug.trng.ta := to_unsigned(trngta, 20); -- defined in ecc_customize
+				v.debug.trng.ta := -- 'trngta' defined in ecc_customize
+					to_unsigned(trngta, DBG_TRNG_TA_MSB - DBG_TRNG_TA_LSB + 1);
 				v.debug.trng.completebypass := '0';
 				--no need to reset r.debug.trng.completebypassbit
+				v.debug.trng.nnrnddeterm := '0';
 				v.debug.trng.vonneuman := '1';
 				-- by default, es_trng_byte will stay only 1 clock cyle into
 				-- idle state (see es_trng_byte.vhd)
 				v.debug.trng.idletime := (r.debug.trng.idletime'range => '0');
-				v.debug.trng.ppdeact := '0';
+				v.debug.trng.rawfiforeaddis := '0';
 				-- no need to reset r.debug.i[rw]datacnt
 				v.debug.halt := '0';
 				-- no need to reset r.debug.readsh
@@ -4246,8 +4274,14 @@ begin
 				v.debug.trngcrvok := (others => '0');
 				v.debug.trngshstarv := (others => '0');
 				v.debug.trngshok := (others => '0');
+				-- upon rese (in debug mode) we use the real TRNG entropy source
+				v.debug.trng.usepseudo := '0';
+				-- upon reset (in debug mode) we inhibit ecc_trng_pp from reading
+				-- any raw random bytes. Thus software must activate this, by using
+				-- register W_DBG_TRNG_CTRL.
+				v.debug.trng.rawpullppdis := '1';
 			else
-				v.debug.trng.using := '1'; -- present also when debug=FALSE, see (s38)
+				v.debug.trng.nnrnddeterm := '0'; -- present also when debug=FALSE, see (s38)
 			end if;
 		end if; -- if s_axi_aresetn (synchronous reset)
 
@@ -4428,17 +4462,19 @@ begin
 	dbgnoxyshuf <= r.debug.noxyshuf;
 
 	-- debug features (to trng)
-	dbgtrnguse <= r.debug.trng.using; -- (s38)
+	dbgtrngnnrnddet <= r.debug.trng.nnrnddeterm; -- (s38)
 	dbgtrngta <= r.debug.trng.ta;
 	dbgtrngrawreset <= r.debug.trng.rawreset;
 	dbgtrngirnreset <= r.debug.trng.irnreset;
 	dbgtrngrawraddr <= r.debug.trng.raw.raddr;
-	dbgtrngppdeact <= r.debug.trng.ppdeact;
+	dbgtrngrawfiforeaddis <= r.debug.trng.rawfiforeaddis;
 	dbgtrngcompletebypass <= r.debug.trng.completebypass;
 	dbgtrngcompletebypassbit <= r.debug.trng.completebypassbit;
 	dbgtrngvonneuman <= '1' when not debug -- statically resolved at synthesis
 	                    else r.debug.trng.vonneuman;
 	dbgtrngidletime <= r.debug.trng.idletime;
+	dbgtrngusepseudosource <= r.debug.trng.usepseudo;
+	dbgtrngrawpullppdis  <= r.debug.trng.rawpullppdis;
 
 	-- pragma translate_off
 	-- Simulation process to log on simulator console the random value used by
