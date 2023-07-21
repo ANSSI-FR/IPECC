@@ -219,10 +219,11 @@ package ecc_software is
 	constant STATUS_R_OR_W : natural := 7;
 	constant STATUS_INIT : natural := 8;
 	constant STATUS_NNDYNACT : natural := 9;
-	constant STATUS_WK_ENOUGH_RND : natural := 10;
+	constant STATUS_ENOUGH_RND_WK : natural := 10;
 	constant STATUS_YES : natural := 11;
 	constant STATUS_R0_IS_NULL : natural := 12;
 	constant STATUS_R1_IS_NULL : natural := 13;
+	constant STATUS_TOKEN_GEN : natural := 14;
 	constant STATUS_ERR_LSB : natural := 16;
 	constant STATUS_ERR_IN_PT_NOT_ON_CURVE : natural := STATUS_ERR_LSB;
 	constant STATUS_ERR_OUT_PT_NOT_ON_CURVE : natural := STATUS_ERR_LSB + 1;

@@ -157,13 +157,16 @@ static volatile uint64_t *ipecc_pseudotrng_baddr = NULL;
  * omparison between VHDL simulation & real hardware.
  *
  * This is not "CABA" (cycle-accurate, bit-accurate) simulation yet,
- * rather "IACA" (instruction-accurate, bit-Accurate) simulation - which,
- * using the breakpoint & step-by-step features offered along with the
- * IP and its driver, can provide a powerful debugging tool.
+ * rather "IACA" (instruction-accurate, bit-accurate) simulation - which,
+ * using the breakpoint & the step-by-step features provided with the IP
+ * and its driver, can be a powerful debugging tool.
  * */
-#define IPECC_PSEUDOTRNG_W_WRITE_DATA   (ipecc_pseudotrng_baddr + IPECC_ALIGNED(0x00))
-#define IPECC_PSEUDOTRNG_W_SOFT_RESET   (ipecc_pseudotrng_baddr + IPECC_ALIGNED(0x08))
+/* write-only registers */
+#define IPECC_PSEUDOTRNG_W_SOFT_RESET   (ipecc_pseudotrng_baddr + IPECC_ALIGNED(0x00))
+#define IPECC_PSEUDOTRNG_W_WRITE_DATA   (ipecc_pseudotrng_baddr + IPECC_ALIGNED(0x08))
 
+/* read-only registers */
+#define IPECC_PSEUDOTRNG_R_FIFO_COUNT   (ipecc_pseudotrng_baddr + IPECC_ALIGNED(0x00))
 
 /*******************************************
  * Bit & fields positions in these registers
@@ -265,31 +268,39 @@ static volatile uint64_t *ipecc_pseudotrng_baddr = NULL;
 #define IPECC_W_DBG_OPCODE_MSK   (0xffffffff)
 
 /* Fields for W_DBG_TRNG_CTRL */
-/* Reset the raw FIFO (1) */
-#define IPECC_W_DBG_TRNG_CTRL_RESET_FIFO_RAW		((uint32_t)0x1 << 0)
-#define IPECC_W_DBG_TRNG_CTRL_RESET_FIFO_IRN		((uint32_t)0x1 << 1)
-/* Activate raw FIFO reading (1) */
+/* Disable the TRNG post processing logic that pulls bytes
+ * from the raw random source */
+#define IPECC_W_DBG_TRNG_CTRL_RAW_PULL_PP_DISABLE_POS  (0)
+/* Reset the raw FIFO */
+#define IPECC_W_DBG_TRNG_CTRL_RESET_FIFO_RAW		((uint32_t)0x1 << 1)
+/* Reset the internal random numbers FIFOs */
+#define IPECC_W_DBG_TRNG_CTRL_RESET_FIFO_IRN		((uint32_t)0x1 << 2)
+/* Read one bit from raw FIFO */
 #define IPECC_W_DBG_TRNG_CTRL_READ_FIFO_RAW		((uint32_t)0x1 << 4)
 /* Reading offset in bits inside the FIFO on 20 bits */
 #define IPECC_W_DBG_TRNG_CTRL_FIFO_ADDR_MSK		(0xfffff)
-#define IPECC_W_DBG_TRNG_CTRL_FIFO_ADDR_POS		(12)
-/* Deactivate RNG Post-Processing (1) */
-#define IPECC_W_DBG_TRNG_CTRL_DISABLE_PP		((uint32_t)0x1 << 28)
+#define IPECC_W_DBG_TRNG_CTRL_FIFO_ADDR_POS		(8)
+/* Disable the read function of the raw random FIFO
+ * (to allow debug software to read & statistically analyze
+ * the raw random bits). */
+#define IPECC_W_DBG_TRNG_CTRL_RAW_FIFO_READ_DISABLE_POS   (28)
 /* Complete bypass of the TRNG (1) or not (0) */
 #define IPECC_W_DBG_TRNG_CTRL_TRNG_BYPASS			((uint32_t)0x1 << 29)
 /* Deterministic bit value produced when complete bypass is on */
 #define IPECC_W_DBG_TRNG_CTRL_TRNG_BYPASS_VAL_POS		(30)
+#define IPECC_W_DBG_TRNG_CTRL_NNRND_DETERMINISTIC   (31)
 
 /* Fields for W_DBG_TRNG_CFG */
-/* Von Neumann debiaser activate (1) / deactivate (0) */
+/* Von Neumann debiaser activate */
 #define IPECC_W_DBG_TRNG_CFG_ACTIVE_DEBIAS		((uint32_t)0x1 << 0)
 /* TA value (in nb of system clock cycles) */
 #define IPECC_W_DBG_TRNG_CFG_TA_POS			(4)
-#define IPECC_W_DBG_TRNG_CFG_TA_MSK			(0xfffff)
+#define IPECC_W_DBG_TRNG_CFG_TA_MSK			(0xffff)
 /* latency (in nb of system clock cycles) between each phase of
    one-bit generation in the TRNG */
-#define IPECC_W_DBG_TRNG_CFG_TRNG_IDLE_POS		(24)
+#define IPECC_W_DBG_TRNG_CFG_TRNG_IDLE_POS		(20)
 #define IPECC_W_DBG_TRNG_CFG_TRNG_IDLE_MSK		(0xf)
+#define IPECC_W_DBG_TRNG_CFG_USE_PSEUDO   ((uint32_t)0x1 << 31)
 
 /* Fields for IPECC_W_DBG_FP_WADDR */
 #define IPECC_W_DBG_FP_WADDR_POS     (0)
@@ -324,13 +335,14 @@ static volatile uint64_t *ipecc_pseudotrng_baddr = NULL;
 #define IPECC_R_STATUS_KP		((uint32_t)0x1 << 4)
 #define IPECC_R_STATUS_MTY		((uint32_t)0x1 << 5)
 #define IPECC_R_STATUS_POP		((uint32_t)0x1 << 6)
-#define IPECC_R_STATUS_R_OR_W		((uint32_t)0x1 << 8)
-#define IPECC_R_STATUS_INIT		((uint32_t)0x1 << 9)
-#define IPECC_R_STATUS_NNDYNACT		((uint32_t)0x1 << 10)
-#define IPECC_R_STATUS_ENOUGH_RND_WK	((uint32_t)0x1 << 11)
-#define IPECC_R_STATUS_YES		((uint32_t)0x1 << 13)
-#define IPECC_R_STATUS_R0_IS_NULL	((uint32_t)0x1 << 14)
-#define IPECC_R_STATUS_R1_IS_NULL	((uint32_t)0x1 << 15)
+#define IPECC_R_STATUS_R_OR_W		((uint32_t)0x1 << 7)
+#define IPECC_R_STATUS_INIT   ((uint32_t)0x1 << 8)
+#define IPECC_R_STATUS_NNDYNACT		((uint32_t)0x1 << 9)
+#define IPECC_R_STATUS_ENOUGH_RND_WK	((uint32_t)0x1 << 10)
+#define IPECC_R_STATUS_YES		((uint32_t)0x1 << 11)
+#define IPECC_R_STATUS_R0_IS_NULL	((uint32_t)0x1 << 12)
+#define IPECC_R_STATUS_R1_IS_NULL	((uint32_t)0x1 << 13)
+#define IPECC_R_STATUS_TOKEN_GEN    ((uint32_t)0x1 << 14)
 #define IPECC_R_STATUS_ERRID_MSK	(0xffff)
 #define IPECC_R_STATUS_ERRID_POS	(16)
 
@@ -478,17 +490,26 @@ static volatile uint64_t *ipecc_pseudotrng_baddr = NULL;
 
 /* To know if the IP is ready to accept a new scalar (writing the scalar is a
  * particular case of writing a big number: the IP must first gather enough random
- * to mask it).
+ * to mask it on-the-fly during its transfer into the IP's memory of large numbers).
  *
  * This bit is not part of the "busy" state, meaning the IP won't show a high
- * STATUS_BUSY bit just because there is not enough random to mask the scalar (yet).
+ * 'STATUS_BUSY' bit just because there is not enough random to mask the scalar (yet).
  *
  * Software must first check that this bit is active (1) before writing a new scalar
- * (otherwise data written by software when transmitting the scalar will be ignored
- * and error flag 'NOT_ENOUGH_RANDOM_WK' will be set in register R_STATUS).
+ * (otherwise data written by software when transmitting the scalar will be ignored,
+ * and error flag 'NOT_ENOUGH_RANDOM_WK' will be set in register 'R_STATUS').
  */
 #define IPECC_IS_ENOUGH_RND_WRITE_SCALAR() \
 	(!!(IPECC_GET_REG(IPECC_R_STATUS) & IPECC_R_STATUS_ENOUGH_RND_WK))
+
+#define IPECC_ENOUGH_WK_RANDOM_WAIT() do { \
+	while(IPECC_GET_REG(IPECC_R_STATUS) & IPECC_R_STATUS_ENOUGH_RND_WK){}; \
+} while(0)
+
+/* Is the IP busy generating the random token?
+ */
+#define IPECC_IS_BUSY_GEN_TOKEN() \
+	(!!(IPECC_GET_REG(IPECC_R_STATUS) & IPECC_R_STATUS_TOKEN_GEN))
 
 /* Commands */
 #define IPECC_EXEC_PT_KP()  (IPECC_SET_REG(IPECC_W_CTRL, IPECC_W_CTRL_PT_KP))
@@ -676,7 +697,7 @@ static volatile uint64_t *ipecc_pseudotrng_baddr = NULL;
 } while (0)
 
 #define IPECC_DISABLE_ZREMASK() do { \
-	(IPECC_SET_REG(IPECC_W_Z_REMASK, IPECC_W_ZREMASK_DIS)); \
+	(IPECC_SET_REG(IPECC_W_ZREMASK, IPECC_W_ZREMASK_DIS)); \
 } while (0)
 
 /*
@@ -989,15 +1010,35 @@ static volatile uint64_t *ipecc_pseudotrng_baddr = NULL;
  * (controlling TRNG behaviour)
  * ******************************************
  */
+/* Disable the TRNG post-processing logic that pulls bytes
+ * from the raw random source.
+ * Watchout: implicitly activate the TRNG raw random source by deasserting
+ * the 'complete bypass' bit.
+ */
+#define IPECC_TRNG_DISABLE_RAW_PULL_FROM_PP() do { \
+	IPECC_SET_REG(W_DBG_TRNG_CTRL, \
+			((uint32_t)0x1 << IPECC_W_DBG_TRNG_CTRL_RAW_PULL_PP_DISABLE_POS)); \
+} while (0)
+/* (Re)enable the TRNG post-processing logic that pulls bytes
+ * from the raw random source.
+ * Watchout: implicitly activate the TRNG raw random source by deasserting
+ * the 'complete bypass' bit.
+ */
+#define IPECC_TRNG_ENABLE_RAW_PULL_FROM_PP() do { \
+	IPECC_SET_REG(W_DBG_TRNG_CTRL, \
+			((uint32_t)0x0 << IPECC_W_DBG_TRNG_CTRL_RAW_PULL_PP_DISABLE_POS)); \
+} while (0)
 
 /* Empty the FIFO buffering raw random bits of the TRNG
- * and reset associated logic. */
+ * and reset associated logic.
+ */
 #define IPECC_TRNG_RESET_EMPTY_RAW_FIFO() do { \
 	IPECC_SET_REG(IPECC_W_DBG_TRNG_CTRL, IPECC_W_DBG_TRNG_CTRL_RESET_FIFO_RAW); \
 } while (0)
 
 /* Empty the FIFOs buffering internal random bits of the TRNG
- * (all channels) and reset associated logic. */
+ * (all channels) and reset associated logic.
+ */
 #define IPECC_TRNG_RESET_EMPTY_IRN_FIFOS() do { \
 	IPECC_SET_REG(IPECC_W_DBG_TRNG_CTRL, IPECC_W_DBG_TRNG_CTRL_RESET_FIFO_IRN); \
 } while (0)
@@ -1031,16 +1072,18 @@ static volatile uint64_t *ipecc_pseudotrng_baddr = NULL;
  * the 'complete bypass' bit.
  */
 #define IPECC_TRNG_DISABLE_POSTPROC() do { \
-	IPECC_SET_REG(IPECC_W_DBG_TRNG_CTRL, IPECC_W_DBG_TRNG_CTRL_DISABLE_PP); \
+	IPECC_SET_REG(IPECC_W_DBG_TRNG_CTRL, \
+			((uint32_t)0x1 << IPECC_W_DBG_TRNG_CTRL_RAW_FIFO_READ_DISABLE_POS)); \
 } while (0)
 
-/* Re-enable the post-processing logic that produces internal random numbers
+/* (Re)enable the post-processing logic that produces internal random numbers
  * from raw random bits.
  * Watchout: implicitly activate the TRNG raw random source by deasserting
  * the 'complete bypass' bit.
  */
 #define IPECC_TRNG_ENABLE_POSTPROC() do { \
-	IPECC_SET_REG(IPECC_W_DBG_TRNG_CTRL, 0); \
+	IPECC_SET_REG(IPECC_W_DBG_TRNG_CTRL, \
+			((uint32_t)0x0 << IPECC_W_DBG_TRNG_CTRL_RAW_FIFO_READ_DISABLE_POS)); \
 } while (0)
 
 /* Completely bypass the TRNG physical source.
@@ -1062,7 +1105,9 @@ static volatile uint64_t *ipecc_pseudotrng_baddr = NULL;
 
 /* Undo the action of IPECC_TRNG_COMPLETE_BYPASS().
  * Watchout: implicitly also re-activate the post-processing logic
- * by deasserting 'post-proc disable' bit.
+ * by deasserting 'RAW_FIFO_READ_DISABLE_POS' bit, and the read function
+ * on the FIFO of raw random bits by deasserting 'RAW_PULL_PP_DISABLE_POS'
+ * bit.
  */
 #define IPECC_TRNG_UNDO_COMPLETE_BYPASS() do { \
 	IPECC_SET_REG(IPECC_W_DBG_TRNG_CTRL, 0); \
@@ -1596,7 +1641,7 @@ static inline void ip_ecc_log(const char *s)
 }
 #endif /* WITH_EC_HW_DEBUG */
 
-/* Helper function to compute the size, in nb of words, of a big number given its size in bytes.
+/* Helper function to compute the size, in nb of words, of a big number, given its size in bytes.
  */
 static inline unsigned int ip_ecc_nn_words_from_bytes_sz(unsigned int sz)
 {
@@ -1606,7 +1651,7 @@ static inline unsigned int ip_ecc_nn_words_from_bytes_sz(unsigned int sz)
 	return curr_word_sz;
 }
 
-/* Helper function to compute the size in bytes of a big number given its size in bits.
+/* Helper function to compute the size in bytes of a big number, given its size in bits.
  */
 static inline unsigned int ip_ecc_nn_bytes_from_bits_sz(unsigned int sz)
 {
@@ -1850,7 +1895,7 @@ static inline unsigned int ip_ecc_get_nn_bit_size(void)
 	 */
 }
 
-/* Set the blinding size.
+/* Set the blinding size for scalar multiplication.
  *
  * A value of 0 for input argument 'blinding_size' means disabling
  * the blinding countermeasure.
@@ -1861,13 +1906,136 @@ static inline int ip_ecc_set_blinding_size(unsigned int blinding_size)
 	IPECC_BUSY_WAIT();
 
 	if(blinding_size == 0){
-		/* Clear the blinding as a size of 0 means we d */
+		/* Clear the blinding */
 		IPECC_DISABLE_BLINDING();
 	}
 	else{
 		/* Set the blinding size and enable the countermeasure. */
 		IPECC_SET_BLINDING_SIZE(blinding_size);
 	}
+
+	/* Wait until the IP is not busy */
+	IPECC_BUSY_WAIT();
+
+	/* Check for error */
+	if(ip_ecc_check_error(NULL)){
+		goto err;
+	}
+
+	return 0;
+err:
+	return -1;
+}
+
+/* Disable the blinding for scalar multiplication.
+ */
+static inline int ip_ecc_disable_blinding(void)
+{
+	/* Wait until the IP is not busy */
+	IPECC_BUSY_WAIT();
+
+	/* Disable the blinding */
+	IPECC_DISABLE_BLINDING();
+
+	/* Wait until the IP is not busy */
+	IPECC_BUSY_WAIT();
+
+	/* Check for error */
+	if(ip_ecc_check_error(NULL)){
+		goto err;
+	}
+
+	return 0;
+err:
+	return -1;
+}
+
+/* Activate the shuffling for scalar multiplication.
+ */
+static inline int ip_ecc_set_shuffling(void)
+{
+	/* Wait until the IP is not busy */
+	IPECC_BUSY_WAIT();
+
+	/* Enable shuffling */
+	IPECC_ENABLE_SHUFFLE();
+
+	/* Wait until the IP is not busy */
+	IPECC_BUSY_WAIT();
+
+	/* Check for error */
+	if(ip_ecc_check_error(NULL)){
+		goto err;
+	}
+
+	return 0;
+err:
+	return -1;
+}
+
+/* Disable the shuffling for scalar multiplication.
+ */
+static inline int ip_ecc_disable_shuffling(void)
+{
+	/* Wait until the IP is not busy */
+	IPECC_BUSY_WAIT();
+
+	/* Disable shuffling */
+	IPECC_DISABLE_SHUFFLE();
+
+	/* Wait until the IP is not busy */
+	IPECC_BUSY_WAIT();
+
+	/* Check for error */
+	if(ip_ecc_check_error(NULL)){
+		goto err;
+	}
+
+	return 0;
+err:
+	return -1;
+}
+
+/* Set the period of the Z-remask countermeasure for scalar multiplication.
+ *
+ * A value of 0 for input argument 'period' means disabling the countermeasure.
+ */
+static inline int ip_ecc_set_zremask(unsigned int period)
+{
+	/* Wait until the IP is not busy */
+	IPECC_BUSY_WAIT();
+
+	if(period == 0){
+		/* Clear the Z-remask countermeasure */
+		IPECC_DISABLE_ZREMASK();
+	}
+	else{
+		/* Set the blinding size and enable the countermeasure. */
+		IPECC_ENABLE_ZREMASK(period);
+	}
+
+	/* Wait until the IP is not busy */
+	IPECC_BUSY_WAIT();
+
+	/* Check for error */
+	if(ip_ecc_check_error(NULL)){
+		goto err;
+	}
+
+	return 0;
+err:
+	return -1;
+}
+
+/* Disable the Z-remask countermeasure for scalar multiplication.
+ */
+static inline int ip_ecc_disable_zremask(void)
+{
+	/* Wait until the IP is not busy */
+	IPECC_BUSY_WAIT();
+
+	/* Disable the countermeasure */
+	IPECC_DISABLE_ZREMASK();
 
 	/* Wait until the IP is not busy */
 	IPECC_BUSY_WAIT();
@@ -1910,6 +2078,21 @@ static inline int ip_ecc_write_bignum(const unsigned char *a, unsigned int a_sz,
 		/* We overflow, this is an error! */
 		goto err;
 	}
+
+	/* If the number to write to the IP is the scalar, we must first check
+	 * that bit 'R_STATUS_ENOUGH_RND_WK' is actually asserted in 'R_STATUS'
+	 * register, as this means the IP has gathered enough random to mask
+	 * the scalar with during its transfer into its internal memory of
+	 * large numbers.
+	 */
+	if (reg == EC_HW_REG_SCALAR)
+	{
+		/* Hence we poll this bit until it says we can actually write the
+		 * scalar.
+		 */
+		IPECC_ENOUGH_WK_RANDOM_WAIT();
+	}
+
 	/* Select the write mode for the current register */
 	if(ip_ecc_select_reg(reg, EC_HW_REG_WRITE)){
 		goto err;
@@ -2005,6 +2188,126 @@ static inline int ip_ecc_read_bignum(unsigned char *a, unsigned int a_sz, ip_ecc
 	return 0;
 err:
 	return -1;
+}
+
+/* Ask the IP for the generation of the random one-shot token.
+ *
+ * (More info in ip_ecc_get_token() header below).
+ */
+int ip_ecc_generate_token(void)
+{
+	/* Wait until the IP is not busy */
+	IPECC_BUSY_WAIT();
+
+	/* Write to proper register for token generation. */
+	IPECC_ASK_FOR_TOKEN_GENERATION();
+	
+	/* Wait until the IP is not busy */
+	IPECC_BUSY_WAIT();
+
+	/* Check for error */
+	if(ip_ecc_check_error(NULL)){
+		goto err;
+	}
+
+	return 0;
+err:
+	return -1;
+}
+
+/* Get from the IP a unique one-shot random token that the software
+ * should later use to unmask the [k]P result of the next scalar
+ * multiplication with. At the end of the next scalar multiplication,
+ * the IP will whiten the coordinates of the [k]P result with this
+ * token (with a simple bit-by-bit XOR) and erase the token. Thus
+ * the unmasking by the software on its part will unveil the plain
+ * values of the [k]P coordinates.
+ *
+ * This emulates some kind of secret sharing between the IP and the
+ * software that only lasts the time of the scalar multiplication.
+ * Obviously the "secret" is transferred as a plaintext value on the
+ * bus/interconnect between the IP and the CPU, so the token just
+ * constitutes an extra subsidiary countermeasure in the case where
+ * the [k]P result may serve as a secret or a half-secret) e.g in
+ * an ECDH exchange. (If malevolent software/agent is trying to spy
+ * on the [k]P coordinates, she will have to intercept the transfers
+ * between the IP and the software at both the begining and the end
+ * of the scalar multiplication, given that several dozens of milli-
+ * seconds may pass by in the meantime).
+ *
+ * The token is a large number whose bit-width is given by the current
+ * value of parameter 'nn' in the IP (whether it is static or dynamic).
+ *
+ * Hence argument 'out_tok' should point to a buffer of size at least
+ * '(ceil(nn / 8)' in bytes. The call to ip_ecc_read_bignum() will
+ * enforce that the value of argument 't_sz' follows this rule.
+ */
+int ip_ecc_get_token(unsigned char* out_tok, unsigned int t_sz)
+{
+	/* Wait until the IP is not busy */
+	IPECC_BUSY_WAIT();
+
+	/* Ask the IP for the token generation */
+	if(ip_ecc_generate_token()){
+		goto err;
+	}
+
+	/* Read the "token" large number */
+	if(ip_ecc_read_bignum(out_tok, t_sz, EC_HW_REG_TOKEN)){
+		goto err;
+	}
+
+	/* Wait until the IP is not busy */
+	IPECC_BUSY_WAIT();
+
+	/* Check for error */
+	if(ip_ecc_check_error(NULL)){
+		goto err;
+	}
+
+	return 0;
+err:
+	return -1;
+}
+
+/*
+ * Unmask (XOR) the provided 'in_a' large number with the provided
+ * 'in_tok' large number. 
+ */
+int ip_ecc_unmask_with_token(const unsigned char* in_a, unsigned int a_sz, const unsigned char* in_tok,
+		                         unsigned int t_sz, unsigned char* out_b, unsigned int* out_b_sz)
+{
+	unsigned int i;
+
+	/* It doesn't make sense that input sizes not match. */
+	if (a_sz != t_sz) {
+		goto err;
+	}
+
+	for(i = 0; i < a_sz; i++){
+		/* Do a simple byte-by-byte XOR */
+		out_b[i] = in_a[i] ^ in_tok[i];
+	}
+
+	*out_b_sz = a_sz;
+
+	return 0;
+err:
+	return -1;
+}
+
+/*
+ * Clear the local copy of the token
+ */
+int ip_ecc_clear_token(unsigned char* tok, unsigned int t_sz)
+{
+	unsigned int i;
+
+	for (i = 0; i < t_sz; i++){
+		tok[i] = 0;
+	}
+
+	return 1;
 }
 
 /*
@@ -2365,7 +2668,7 @@ int hw_driver_reset(void)
  *
  * All size arguments (*_sz) must be given in bytes.
  *
- * Please read and take into consideration the NOTE mentionned
+ * Please read and take into consideration the 'NOTE:' mentionned
  * at the top of the prototype file <hw_accelerator_driver.h>
  * about the formatting and size of large numbers.
  *
@@ -2427,6 +2730,11 @@ err:
  * hardware (hance 'nn' - 1 is the largest authorized value).
  *
  * Otherwise error 'ERR_BLN' is raised in R_STATUS register.
+ *
+ * A value of 0 for input argument 'blinding_size' is counter-
+ * intuitive and will be held as meaning to disable the blinding
+ * countermeasure (consider using instead  explicit function
+ * hw_driver_disable_blinding()).
  */
 int hw_driver_set_blinding(unsigned int blinding_size)
 {
@@ -2443,13 +2751,95 @@ err:
 	return -1;
 }
 
+/* Disable the blinding for scalar multiplication.
+ */
+int hw_driver_disable_blinding(void)
+{
+	if(driver_setup()){
+		goto err;
+	}
+
+	if(ip_ecc_disable_blinding()){
+		goto err;
+	}
+
+	return 0;
+err:
+	return -1;
+}
+
+/* Activate the shuffling for scalar multiplication */
+int hw_driver_set_shuffling(void)
+{
+	if(driver_setup()){
+		goto err;
+	}
+
+	if(ip_ecc_set_shuffling()){
+		goto err;
+	}
+
+	return 0;
+err:
+	return -1;
+}
+
+/* Disable the shuffling for scalar multiplication */
+int hw_driver_disable_shuffling(void)
+{
+	if(driver_setup()){
+		goto err;
+	}
+
+	if(ip_ecc_disable_shuffling()){
+		goto err;
+	}
+
+	return 0;
+err:
+	return -1;
+}
+
+/* Activate and configure the periodic Z-remasking countermeasure
+ * (the 'period' arguement is expressed in number of bits of the scalar */
+int hw_driver_set_zremask(unsigned int period)
+{
+	if(driver_setup()){
+		goto err;
+	}
+
+	if(ip_ecc_set_zremask(period)){
+		goto err;
+	}
+
+	return 0;
+err:
+	return -1;
+}
+
+/* Disable the periodic Z-remasking countermeasure for scalar multiplication */
+int hw_driver_disable_zremask(void)
+{
+	if(driver_setup()){
+		goto err;
+	}
+
+	if(ip_ecc_disable_zremask()){
+		goto err;
+	}
+
+	return 0;
+err:
+	return -1;
+}
+
 /* Check if an affine point (x, y) is on the curve currently defined
  * in the IP (this curve was previously set in the hardware using
  * function hw_driver_set_curve() - c.f above).
  *
  * All size arguments (*_sz) must be given in bytes.
  *
- * Please read and take into consideration the NOTE mentionned
+ * Please read and take into consideration the 'NOTE:' mentionned
  * at the top of the prototype file <hw_accelerator_driver.h>
  * about the formatting and size of large numbers.
  */
@@ -2500,7 +2890,7 @@ err:
  *
  * All size arguments (*_sz) must be given in bytes.
  *
- * Please read and take into consideration the NOTE mentionned
+ * Please read and take into consideration the 'NOTE:' mentionned
  * at the top of the prototype file <hw_accelerator_driver.h>
  * about the formatting and size of large numbers.
  */
@@ -2559,7 +2949,7 @@ err:
  *
  * All size arguments (*_sz) must be given in bytes.
  *
- * Please read and take into consideration the NOTE mentionned
+ * Please read and take into consideration the 'NOTE:' mentionned
  * at the top of the prototype file <hw_accelerator_driver.h>
  * about the formatting and size of large numbers.
  */
@@ -2749,7 +3139,7 @@ err:
  *
  * All size arguments (*_sz) must be given in bytes.
  *
- * Please read and take into consideration the NOTE mentionned
+ * Please read and take into consideration the 'NOTE:' mentionned
  * at the top of the prototype file <hw_accelerator_driver.h>
  * about the formatting and size of large numbers.
  */
@@ -2815,7 +3205,7 @@ err:
  *
  * All size arguments (*_sz) must be given in bytes.
  *
- * Please read and take into consideration the NOTE mentionned
+ * Please read and take into consideration the 'NOTE:' mentionned
  * at the top of the prototype file <hw_accelerator_driver.h>
  * about the formatting and size of large numbers.
  */
@@ -2882,7 +3272,7 @@ err:
  *
  * All size arguments (*_sz) must be given in bytes.
  *
- * Please read and take into consideration the NOTE mentionned
+ * Please read and take into consideration the 'NOTE:' mentionned
  * at the top of the prototype file <hw_accelerator_driver.h>
  * about the formatting and size of large numbers.
  */
@@ -2956,7 +3346,7 @@ err:
  *
  * All size arguments (*_sz) must be given in bytes.
  *
- * Please read and take into consideration the NOTE mentionned
+ * Please read and take into consideration the 'NOTE:' mentionned
  * at the top of the prototype file <hw_accelerator_driver.h>
  * about the formatting and size of large numbers.
  */
@@ -2967,7 +3357,23 @@ int hw_driver_mul(const unsigned char *x, unsigned int x_sz, const unsigned char
 	int inf_r0, inf_r1;
 	unsigned int nn_sz;
 
+	/* 32768 bits are more than enough for any practical
+	 * use of elliptic curve cryptography.
+	 */
+	unsigned char token[4096] = {0, }; /* Heck, a whole page? */
+
 	if(driver_setup()){
+		goto err;
+	}
+
+	/* Nb of bytes corresponding to current value of 'nn' in the IP.
+	 */
+	nn_sz = ip_ecc_nn_bytes_from_bits_sz(ip_ecc_get_nn_bit_size());
+
+	/* Check that the current value of 'nn' does not exceed the size
+	 * allocated to the token on the stack.
+	 */
+	if(ip_ecc_nn_bytes_from_bits_sz(ip_ecc_get_nn_bit_size()) > 4096){
 		goto err;
 	}
 
@@ -2976,6 +3382,11 @@ int hw_driver_mul(const unsigned char *x, unsigned int x_sz, const unsigned char
 		goto err;
 	}
 	if(ip_ecc_get_r1_inf(&inf_r1)){
+		goto err;
+	}
+
+	/* Get the random one-shot token */
+	if (ip_ecc_get_token(token, nn_sz)){
 		goto err;
 	}
 
@@ -2999,13 +3410,12 @@ int hw_driver_mul(const unsigned char *x, unsigned int x_sz, const unsigned char
 		goto err;
 	}
 
-	/* Execute our KP command */
+	/* Execute our [k]P command */
 	if(ip_ecc_exec_command(PT_KP, NULL)){
 		goto err;
 	}
 
 	/* Get back the result from R1 */
-	nn_sz = ip_ecc_nn_bytes_from_bits_sz(ip_ecc_get_nn_bit_size());
 	if(((*out_x_sz) < nn_sz) || ((*out_y_sz) < nn_sz)){
 		goto err;
 	}
@@ -3016,6 +3426,17 @@ int hw_driver_mul(const unsigned char *x, unsigned int x_sz, const unsigned char
 	if(ip_ecc_read_bignum(out_y, (*out_y_sz), EC_HW_REG_R1_Y)){
 		goto err;
 	}
+
+	/* Unmask the [k]P result coordinates with the one-shot token */
+	if (ip_ecc_unmask_with_token(out_x, (*out_x_sz), token, nn_sz, out_x, out_x_sz)) {
+		goto err;
+	}
+	if (ip_ecc_unmask_with_token(out_y, (*out_y_sz), token, nn_sz, out_y, out_y_sz)) {
+		goto err;
+	};
+
+	/* Finally clear the token */
+	ip_ecc_clear_token(token, nn_sz);
 
 	return 0;
 err:

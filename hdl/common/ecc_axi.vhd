@@ -2986,6 +2986,7 @@ begin
 				dw(STATUS_YES) := r.ctrl.yes; -- (s98), was set by (s96)
 				dw(STATUS_R0_IS_NULL) := r.ctrl.r0_is_null;
 				dw(STATUS_R1_IS_NULL) := r.ctrl.r1_is_null;
+				dw(STATUS_TOKEN_GEN) := r.ctrl.tokpending or r.ctrl.gentoken;
 				-- Error bits
 				dw(STATUS_ERR_IN_PT_NOT_ON_CURVE) := aerr_inpt_not_on_curve;
 				dw(STATUS_ERR_OUT_PT_NOT_ON_CURVE) := aerr_outpt_not_on_curve;

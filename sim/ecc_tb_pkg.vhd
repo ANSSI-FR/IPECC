@@ -1055,8 +1055,8 @@ package body ecc_tb_pkg is
 		if axo.rdata(STATUS_ERR_I_ZREMASK) = '1' then
 			echol("ECC_TB: R_STATUS shows STATUS_ERR_I_ZREMASK error");
 		end if;
-		if axo.rdata(STATUS_ERR_I_WK_NOT_ENOUGH_RANDOM) = '1' then
-			echol("ECC_TB: R_STATUS shows STATUS_ERR_I_WK_NOT_ENOUGH_RANDOM error");
+		if axo.rdata(STATUS_ERR_I_NOT_ENOUGH_RANDOM_WK) = '1' then
+			echol("ECC_TB: R_STATUS shows STATUS_ERR_I_NOT_ENOUGH_RANDOM_WK error");
 		end if;
 		wait until clk'event and clk = '1';
 	end procedure;
