@@ -623,7 +623,8 @@ begin
 
 	-- (s262), see (s261)
 	assert ((not debug) or
-			(log2(raw_ram_size) <= (DBG_TRNG_RAW_ADDR_MSB - DBG_TRNG_RAW_ADDR_LSB + 1)))
+			(log2(raw_ram_size) <=
+		 			(DBG_TRNG_CTRL_RAW_ADDR_MSB - DBG_TRNG_CTRL_RAW_ADDR_LSB + 1)))
 		report "The TRNG raw random FIFO is too large for its size to fit in "
 	       & "register W_DBG_TRNG_CTRL. Access to raw random data will be "
 				 & "impacted (address will be truncated)."
@@ -2162,7 +2163,7 @@ begin
 				v.axi.arready := '1';
 				-- drive write-response to initiator
 				v.axi.bvalid := '1';
-				if r.axi.wdatax(DBG_TRNG_RAW_READ) = '1' then
+				if r.axi.wdatax(DBG_TRNG_CTRL_RAW_READ) = '1' then
 					-- ----------------------------------------------------------
 					--            start of a new TRNG READ sequence
 					--                   (for raw random bit)
@@ -2177,7 +2178,7 @@ begin
 							-- to the definition of function resize() of numeric_std package)
 							-- in case (s262) is not satisfied.
 							std_logic_vector(resize(unsigned(r.axi.wdatax(
-								DBG_TRNG_RAW_ADDR_MSB downto DBG_TRNG_RAW_ADDR_LSB)), 
+								DBG_TRNG_CTRL_RAW_ADDR_MSB downto DBG_TRNG_CTRL_RAW_ADDR_LSB)), 
 								log2(raw_ram_size - 1)));
 						v.ctrl.state := readraw;
 						-- deassertion r.axi.rvalid by (s26) (drives output s_axi_rvalid)
@@ -2187,35 +2188,37 @@ begin
 						v.read.trngreading := '1';
 					end if;
 				end if;
-				if r.axi.wdatax(DBG_TRNG_RAW_RESET) = '1' then
+				if r.axi.wdatax(DBG_TRNG_CTRL_RAW_RESET) = '1' then
 					-- ----------------------------------------------------------
 					--       debug software is asking for a TRNG raw reset
 					-- ----------------------------------------------------------
 					v.debug.trng.rawreset := '1'; -- stays asserted 1 cycle thx to (s58)
 				end if;
-				if r.axi.wdatax(DBG_TRNG_IRN_RESET) = '1' then
+				if r.axi.wdatax(DBG_TRNG_CTRL_IRN_RESET) = '1' then
 					-- ----------------------------------------------------------
 					--       debug software is asking for a TRNG irn reset
 					-- ----------------------------------------------------------
 					v.debug.trng.irnreset := '1'; -- stays asserted 1 cycle thx to (s59)
 				end if;
-				-- This inhibits the read function on the raw random FIFO internal
-				-- to the IP (the purpose here being to allow software to read its
-				-- whole content, wo/ the post-processing getting some part of the
-				-- bits without software seeing them pass through).
-				v.debug.trng.rawfiforeaddis := r.axi.wdatax(
-					DBG_TRNG_RAW_FIFO_READ_DISABLE);
 				-- This inhibits ecc_trng_pp from demanding bytes to the raw random
 				-- source, whether that source is currently the real one (as for
-				-- '.rawfiforeaddis' signal/'DBG_TRNG_RAW_FIFO_READ_DISABLE' bit,
-				-- see just above) or if it's the pseudo external one.
-				v.debug.trng.rawpullppdis := r.axi.wdatax(DBG_TRNG_RAW_PULL_PP_DISABLE);
+				-- '.rawfiforeaddis' signal/'DBG_TRNG_DISABLE_FIFO_READ_PORT' bit,
+				-- see just below) or if it's the pseudo external one.
+				v.debug.trng.rawpullppdis := r.axi.wdatax(DBG_TRNG_CTRL_POSTPROC_DISABLE);
+				-- This inhibits the read function on the raw random FIFO internal
+				-- to the IP (the purpose here being to allow software to read its
+				-- whole content and avoid the post-processing to get a subset of
+				-- of this content without software seeing them pass through).
+				v.debug.trng.rawfiforeaddis := r.axi.wdatax(
+					DBG_TRNG_CTRL_RAW_DISABLE_FIFO_READ_PORT);
 				-- Complete bypass
-				v.debug.trng.completebypass := r.axi.wdatax(DBG_TRNG_COMPLETE_BYPASS);
+				v.debug.trng.completebypass :=
+					r.axi.wdatax(DBG_TRNG_CTRL_COMPLETE_BYPASS);
 				v.debug.trng.completebypassbit := r.axi.wdatax(
-					DBG_TRNG_COMPLETE_BYPASS_BIT);
+					DBG_TRNG_CTRL_COMPLETE_BYPASS_BIT);
 				-- Instruction NNRND becomes deterministic (with all bits at 1)
-				v.debug.trng.nnrnddeterm := r.axi.wdatax(DBG_TRNG_NNRND_DETERMINISTIC);
+				v.debug.trng.nnrnddeterm :=
+					r.axi.wdatax(DBG_TRNG_CTRL_NNRND_DETERMINISTIC);
 			-- --------------------------------------------------------------
 			-- decoding write to W_DBG_TRNG_CFG register
 			-- --------------------------------------------------------------
@@ -3102,7 +3105,7 @@ begin
 			then
 				-- version number, we use the first 32 bits of git commit checksum
 				dw := (others => '0');
-				dw(31 downto 0) := x"0000" & x"0016"; -- version 0.22
+				dw(31 downto 0) := x"0001" & x"0002"; -- version 1.2
 				v.axi.rdatax := dw;
 				v.axi.rvalid := '1'; -- (s5)
 			-- ------------------------------
@@ -4274,7 +4277,7 @@ begin
 				v.debug.trngcrvok := (others => '0');
 				v.debug.trngshstarv := (others => '0');
 				v.debug.trngshok := (others => '0');
-				-- upon rese (in debug mode) we use the real TRNG entropy source
+				-- upon reset (in debug mode) we use the real TRNG entropy source
 				v.debug.trng.usepseudo := '0';
 				-- upon reset (in debug mode) we inhibit ecc_trng_pp from reading
 				-- any raw random bytes. Thus software must activate this, by using

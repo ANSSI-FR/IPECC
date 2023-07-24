@@ -192,17 +192,17 @@ package ecc_software is
 	-- bit positions in W_DBG_TRNG_CTRL register
 	-- In debug mode software must clear bit 'RAW_PULL_PP_DISABLE'
 	-- to enable random generation.
-	constant DBG_TRNG_RAW_PULL_PP_DISABLE : natural := 0;
-	constant DBG_TRNG_RAW_RESET : natural := 1;
-	constant DBG_TRNG_IRN_RESET : natural := 2;
-	constant DBG_TRNG_RAW_READ : natural := 4;
-	constant DBG_TRNG_RAW_ADDR_LSB : natural := 8;
-	constant DBG_TRNG_RAW_ADDR_MSB : natural := 27;
+	constant DBG_TRNG_CTRL_POSTPROC_DISABLE : natural := 0;
+	constant DBG_TRNG_CTRL_RAW_RESET : natural := 1;
+	constant DBG_TRNG_CTRL_IRN_RESET : natural := 2;
+	constant DBG_TRNG_CTRL_RAW_READ : natural := 4;
+	constant DBG_TRNG_CTRL_RAW_ADDR_LSB : natural := 8;
+	constant DBG_TRNG_CTRL_RAW_ADDR_MSB : natural := 27;
 	-- to allow software to read the content of raw random FIFO
-	constant DBG_TRNG_RAW_FIFO_READ_DISABLE : natural := 28;
-	constant DBG_TRNG_COMPLETE_BYPASS : natural := 29;
-	constant DBG_TRNG_COMPLETE_BYPASS_BIT : natural := 30;
-	constant DBG_TRNG_NNRND_DETERMINISTIC : natural := 31;
+	constant DBG_TRNG_CTRL_RAW_DISABLE_FIFO_READ_PORT : natural := 28;
+	constant DBG_TRNG_CTRL_COMPLETE_BYPASS : natural := 29;
+	constant DBG_TRNG_CTRL_COMPLETE_BYPASS_BIT : natural := 30;
+	constant DBG_TRNG_CTRL_NNRND_DETERMINISTIC : natural := 31;
 
 	-- bit positions in W_DBG_TRNG_CFG register
 	constant DBG_TRNG_VONM : natural := 0;
