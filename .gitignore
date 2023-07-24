@@ -25,3 +25,4 @@ sim/sage/ecc_tb.sage.py
 test_devmem
 test_standalone
 test_uio
+*.tar.gz

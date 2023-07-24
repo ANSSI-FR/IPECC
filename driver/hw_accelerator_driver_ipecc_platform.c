@@ -15,9 +15,16 @@
 
 #include "hw_accelerator_driver_ipecc_platform.h"
 
+extern int hw_driver_is_debug(void);
+extern int hw_driver_get_version_major(void);
+extern int hw_driver_get_version_minor(void);
+extern unsigned char hw_driver_debug_not_prod;
+extern int hw_driver_trng_post_proc_enable(void);
+
 #if defined(WITH_EC_HW_ACCELERATOR) && !defined(WITH_EC_HW_SOCKET_EMUL)
 
 /* The IP "physical" address in RAM.
+ *
  * This address should only be used for direct access in standalone
  * mode or using a physical memory access (e.g. through /dev/mem).
  */
@@ -25,6 +32,8 @@
 #define IPECC_PHYS_PSEUDO_TRNG_BADDR    (0x40001000)
 #define IPECC_PHYS_SZ                   (4096) /* One page size */
 
+#define IPECC_DEV_UIO_IPECC             "/dev/uio4"
+#define IPECC_DEV_UIO_PSEUDOTRNG        "/dev/uio5"
 /* Setup the driver depending on the environment.
  *
  * If 'pseudotrng_base_addr_p' is not NULL then the setup will also try
@@ -43,6 +52,8 @@
 int hw_driver_setup(volatile unsigned char **base_addr_p, volatile unsigned char **pseudotrng_base_addr_p)
 {
 	int ret = -1;
+
+	log_print("Entering in hw_driver_setup.\n");
 
 	if (base_addr_p == NULL) {
 		ret = -1;
@@ -70,9 +81,9 @@ int hw_driver_setup(volatile unsigned char **base_addr_p, volatile unsigned char
 		/* Open our UIO device
 		 * NOTE: O_SYNC here to avoid caching
 		 */
-		uio_fd0 = open("/dev/uio0", O_RDWR | O_SYNC);
+		uio_fd0 = open(IPECC_DEV_UIO_IPECC, O_RDWR | O_SYNC);
 		if(uio_fd0 == -1){
-			printf("Error when opening /dev/uio0\n");
+			printf("Error when opening %s\n", IPECC_DEV_UIO_PSEUDOTRNG);
 			perror("open uio");
 			ret = -1;
 			goto err;
@@ -81,7 +92,7 @@ int hw_driver_setup(volatile unsigned char **base_addr_p, volatile unsigned char
 		base_address = mmap(NULL, uio_size, PROT_READ | PROT_WRITE, MAP_SHARED, uio_fd0, 0);
 		if(base_address == MAP_FAILED){
 			printf("Error during mmap!\n");
-			perror("mmap uio0");
+			perror("mmap uio");
 			ret = -1;
 			goto err;
 		}
@@ -96,10 +107,10 @@ int hw_driver_setup(volatile unsigned char **base_addr_p, volatile unsigned char
 			/* Open our UIO device
 			 * NOTE: O_SYNC here to avoid caching
 			 */
-			uio_fd1 = open("/dev/uio1", O_RDWR | O_SYNC);
+			uio_fd1 = open(IPECC_DEV_UIO_PSEUDOTRNG, O_RDWR | O_SYNC);
 			if(uio_fd1 == -1){
-				printf("Error when opening /dev/uio1\n");
-				perror("open uio1");
+				printf("Error when opening %s\n", IPECC_DEV_UIO_PSEUDOTRNG);
+				perror("open uio");
 				*pseudotrng_base_addr_p = NULL;
 				ret = -1;
 				goto err;
@@ -168,6 +179,18 @@ int hw_driver_setup(volatile unsigned char **base_addr_p, volatile unsigned char
 		log_print("OK, loaded IP @%p and Pseudo TRNG source @%p\n", (*base_addr_p), (*pseudotrng_base_addr_p));
 	} else {
 		log_print("OK, loaded IP @%p\n", (*base_addr_p));
+	}
+
+	/* Is it a 'debug' or a 'production' version of the IP? */
+	if (hw_driver_is_debug()) {
+		hw_driver_debug_not_prod = 1;
+		log_print("Debug mode (version %d.%d)\n", hw_driver_get_version_major(), hw_driver_get_version_minor());
+		/* We must activate in the TRNG the pulling of raw random bytes by the
+		 * post-processing function, as in debug mode it is disabled upon reset. */
+		hw_driver_trng_post_proc_enable();
+	} else {
+		hw_driver_debug_not_prod = 0;
+		log_print("Production mode.\n");
 	}
 
 	ret = 0;

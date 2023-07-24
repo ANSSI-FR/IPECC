@@ -100,6 +100,7 @@ int main(int argc, char *argv[])
 		printf("== Test %s\n", t.name);
 		/* Set the blinding if necessary */
 		if(t.blinding){
+			printf("Blinding...\n");
 			ret = hw_driver_set_blinding(t.blinding); EG(ret, "blinding");
 		}
 		szx = sizeof(Poutx);

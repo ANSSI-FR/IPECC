@@ -1025,7 +1025,7 @@ static volatile uint64_t *ipecc_pseudotrng_baddr = NULL;
  * by deasserting the 'complete bypass' bit in the same register.
  */
 #define IPECC_TRNG_DISABLE_POSTPROC() do { \
-	IPECC_SET_REG(W_DBG_TRNG_CTRL, \
+	IPECC_SET_REG(IPECC_W_DBG_TRNG_CTRL, \
 			((uint32_t)0x1 << IPECC_W_DBG_TRNG_CTRL_POSTPROC_DISABLE)); \
 } while (0)
 
@@ -1037,7 +1037,7 @@ static volatile uint64_t *ipecc_pseudotrng_baddr = NULL;
  * by deasserting the 'complete bypass' bit in the same register.
  */
 #define IPECC_TRNG_ENABLE_POSTPROC() do { \
-	IPECC_SET_REG(W_DBG_TRNG_CTRL, \
+	IPECC_SET_REG(IPECC_W_DBG_TRNG_CTRL, \
 			((uint32_t)0x0 << IPECC_W_DBG_TRNG_CTRL_POSTPROC_DISABLE)); \
 } while (0)
 
@@ -2540,7 +2540,7 @@ static inline int ip_ecc_is_debug()
 }
 
 /* Get the major version number of the IP */
-static inline int ip_ecc_get_version_maj()
+static inline int ip_ecc_get_version_major()
 {
 	unsigned int maj;
 
@@ -2557,7 +2557,7 @@ static inline int ip_ecc_get_version_maj()
 }
 
 /* Get the minor version number of the IP */
-static inline int ip_ecc_get_version_min()
+static inline int ip_ecc_get_version_minor()
 {
 	unsigned int min;
 
@@ -2745,6 +2745,8 @@ err:
 
 static volatile unsigned char hw_driver_setup_state = 0;
 
+unsigned char hw_driver_debug_not_prod;
+
 static inline int driver_setup(void)
 {
 	if(!hw_driver_setup_state){
@@ -2789,15 +2791,15 @@ int hw_driver_is_debug()
 }
 
 /* Get major version of the IP */
-int hw_driver_get_version_maj()
+int hw_driver_get_version_major()
 {
-	return ip_ecc_get_version_maj();
+	return ip_ecc_get_version_major();
 }
 
 /* Get minor version of the IP */
-int hw_driver_get_version_min()
+int hw_driver_get_version_minor()
 {
-	return ip_ecc_get_version_min();
+	return ip_ecc_get_version_minor();
 }
 
 /* Enable TRNG post-processing logic */
