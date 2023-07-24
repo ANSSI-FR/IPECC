@@ -41,6 +41,22 @@ typedef enum {
 /* Reset the hardware */
 int hw_driver_reset(void);
 
+/* To know if the IP is in 'debug' or 'production' mode */
+int hw_driver_is_debug(void);
+
+/* Get major version of the IP */
+int hw_driver_get_version_maj(void);
+
+/* Get minor version of the IP */
+int hw_driver_get_version_min(void);
+
+/* Enable TRNG post-processing logic */
+int hw_driver_trng_post_proc_enable(void);
+
+/* Enable TRNG post-processing logic */
+int hw_driver_trng_post_proc_disable(void);
+
+
 /* Set the curve parameters a, b, p and q */
 int hw_driver_set_curve(const unsigned char *a, unsigned int a_sz, const unsigned char *b, unsigned int b_sz,
 			const unsigned char *p, unsigned int p_sz, const unsigned char *q, unsigned int q_sz);

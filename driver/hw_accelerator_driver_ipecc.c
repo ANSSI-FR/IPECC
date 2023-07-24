@@ -270,7 +270,7 @@ static volatile uint64_t *ipecc_pseudotrng_baddr = NULL;
 /* Fields for W_DBG_TRNG_CTRL */
 /* Disable the TRNG post processing logic that pulls bytes
  * from the raw random source */
-#define IPECC_W_DBG_TRNG_CTRL_RAW_PULL_PP_DISABLE_POS  (0)
+#define IPECC_W_DBG_TRNG_CTRL_POSTPROC_DISABLE  (0)
 /* Reset the raw FIFO */
 #define IPECC_W_DBG_TRNG_CTRL_RESET_FIFO_RAW		((uint32_t)0x1 << 1)
 /* Reset the internal random numbers FIFOs */
@@ -283,7 +283,7 @@ static volatile uint64_t *ipecc_pseudotrng_baddr = NULL;
 /* Disable the read function of the raw random FIFO
  * (to allow debug software to read & statistically analyze
  * the raw random bits). */
-#define IPECC_W_DBG_TRNG_CTRL_RAW_FIFO_READ_DISABLE_POS   (28)
+#define IPECC_W_DBG_TRNG_CTRL_RAW_DISABLE_FIFO_READ_PORT_POS   (28)
 /* Complete bypass of the TRNG (1) or not (0) */
 #define IPECC_W_DBG_TRNG_CTRL_TRNG_BYPASS			((uint32_t)0x1 << 29)
 /* Deterministic bit value produced when complete bypass is on */
@@ -1010,23 +1010,64 @@ static volatile uint64_t *ipecc_pseudotrng_baddr = NULL;
  * (controlling TRNG behaviour)
  * ******************************************
  */
-/* Disable the TRNG post-processing logic that pulls bytes
- * from the raw random source.
- * Watchout: implicitly activate the TRNG raw random source by deasserting
- * the 'complete bypass' bit.
+/* Disable the TRNG post-processing logic that pulls bytes from the
+ * raw random source.
+ *
+ * Note: this macro does not take action on the physical raw random source
+ * which produces raw random bits into the raw random FIFO, it takes action
+ * on the post-processing function that consumes these bits, thus leading,
+ * after a while, to starving all downstream production of internal random
+ * numbers.
+ *
+ * See also macros IPECC_TRNG_RAW_FIFO_READ_PORT_[EN|DIS]ABLE().
+ *
+ * Watchout: implicitly remove a possibly pending complete bypass of the TRNG
+ * by deasserting the 'complete bypass' bit in the same register.
  */
-#define IPECC_TRNG_DISABLE_RAW_PULL_FROM_PP() do { \
+#define IPECC_TRNG_DISABLE_POSTPROC() do { \
 	IPECC_SET_REG(W_DBG_TRNG_CTRL, \
-			((uint32_t)0x1 << IPECC_W_DBG_TRNG_CTRL_RAW_PULL_PP_DISABLE_POS)); \
+			((uint32_t)0x1 << IPECC_W_DBG_TRNG_CTRL_POSTPROC_DISABLE)); \
 } while (0)
-/* (Re)enable the TRNG post-processing logic that pulls bytes
- * from the raw random source.
- * Watchout: implicitly activate the TRNG raw random source by deasserting
- * the 'complete bypass' bit.
+
+/* (Re)enable the TRNG post-processing logic that pulls bytes from the
+ * raw random source - in the IP debug mode, that logic is disabled upon reset
+ * and needs to be explicitly enabled by sofware by calling this macro.
+ *
+ * Watchout: implicitly remove a possibly pending complete bypass of the TRNG
+ * by deasserting the 'complete bypass' bit in the same register.
  */
-#define IPECC_TRNG_ENABLE_RAW_PULL_FROM_PP() do { \
+#define IPECC_TRNG_ENABLE_POSTPROC() do { \
 	IPECC_SET_REG(W_DBG_TRNG_CTRL, \
-			((uint32_t)0x0 << IPECC_W_DBG_TRNG_CTRL_RAW_PULL_PP_DISABLE_POS)); \
+			((uint32_t)0x0 << IPECC_W_DBG_TRNG_CTRL_POSTPROC_DISABLE)); \
+} while (0)
+
+/* Disable the read port of the TRNG raw random FIFO.
+ *
+ * Note: this macro does not take action on the post-processing function 
+ * that consumes bits out of the raw random FIFO, but on the raw random
+ * FIFO itself. The purpose is to inhibit the read port of the FIFO 
+ * used by the post-processing function, in order to guarantee that
+ * software becomes the only consumer of the FIFO, and that no portion
+ * of the raw data slips out of software analysis, possibly creating
+ * some bias or erronous analysis.
+ *
+ * See also macros IPECC_TRNG_[EN|DIS]ABLE_POSTPROC().
+ *
+ * Watchout: implicitly remove a possibly pending complet bypass of the TRNG
+ * by deasserting the 'complete bypass' bit in the same register.
+ */
+#define IPECC_TRNG_RAW_FIFO_READ_PORT_DISABLE() do { \
+	IPECC_SET_REG(IPECC_W_DBG_TRNG_CTRL, \
+			((uint32_t)0x1 << IPECC_W_DBG_TRNG_CTRL_RAW_DISABLE_FIFO_READ_PORT_POS)); \
+} while (0)
+
+/* (Re)enable the read port of the TRNG raw random FIFO.
+ * Watchout: implicitly remove a possibly pending complet bypass of the TRNG
+ * by deasserting the 'complete bypass' bit in the same register.
+ */
+#define IPECC_TRNG_RAW_FIFO_READ_PORT_ENABLE() do { \
+	IPECC_SET_REG(IPECC_W_DBG_TRNG_CTRL, \
+			((uint32_t)0x0 << IPECC_W_DBG_TRNG_CTRL_RAW_DISABLE_FIFO_READ_PORT_POS)); \
 } while (0)
 
 /* Empty the FIFO buffering raw random bits of the TRNG
@@ -1066,26 +1107,6 @@ static volatile uint64_t *ipecc_pseudotrng_baddr = NULL;
 	 & IPECC_R_DBG_TRNG_RAW_DATA_MSK) \
 } while (0)
 
-/* Disable the post-processing logic that produces internal random numbers
- * from raw random bits.
- * Watchout: implicitly activate the TRNG raw random source by deasserting
- * the 'complete bypass' bit.
- */
-#define IPECC_TRNG_DISABLE_POSTPROC() do { \
-	IPECC_SET_REG(IPECC_W_DBG_TRNG_CTRL, \
-			((uint32_t)0x1 << IPECC_W_DBG_TRNG_CTRL_RAW_FIFO_READ_DISABLE_POS)); \
-} while (0)
-
-/* (Re)enable the post-processing logic that produces internal random numbers
- * from raw random bits.
- * Watchout: implicitly activate the TRNG raw random source by deasserting
- * the 'complete bypass' bit.
- */
-#define IPECC_TRNG_ENABLE_POSTPROC() do { \
-	IPECC_SET_REG(IPECC_W_DBG_TRNG_CTRL, \
-			((uint32_t)0x0 << IPECC_W_DBG_TRNG_CTRL_RAW_FIFO_READ_DISABLE_POS)); \
-} while (0)
-
 /* Completely bypass the TRNG physical source.
  *
  * It does not mean that the physical TRNG stops working and producing random
@@ -1093,21 +1114,24 @@ static volatile uint64_t *ipecc_pseudotrng_baddr = NULL;
  * function's one, and that internal random numbers become deterministic
  * constants, made of constantly the same bit value.
  *
- * Because null values are not always desired for the numbers served to
- * some of the random clients, software can choose the value, 0 or 1, that
+ * Because a null value is not always desired for the large numbers served
+ * to some of the random clients, software can choose the value, 0 or 1, that
  * internal random numbers will be made of when the physical true entropy
- * source is bypassed.
+ * source is bypassed (this is the purpose of argument 'bit' of the macro,
+ * that should bet set to 0 or 1).
  */
 #define IPECC_TRNG_COMPLETE_BYPASS(bit) do { \
 	IPECC_SET_REG(IPECC_W_DBG_TRNG_CTRL, IPECC_W_DBG_TRNG_CTRL_TRNG_BYPASS \
 			| (((bit) & 0x1) << IPECC_W_DBG_TRNG_CTRL_TRNG_BYPASS_VAL_POS)); \
 } while (0)
 
-/* Undo the action of IPECC_TRNG_COMPLETE_BYPASS().
- * Watchout: implicitly also re-activate the post-processing logic
- * by deasserting 'RAW_FIFO_READ_DISABLE_POS' bit, and the read function
- * on the FIFO of raw random bits by deasserting 'RAW_PULL_PP_DISABLE_POS'
- * bit.
+/* Undo the action of IPECC_TRNG_COMPLETE_BYPASS(), restoring the
+ * unpredictable behaviour of internal random numbers.
+ *
+ * Implicitly (re)enable the TRNG read port of the FIFO by deasserting
+ * its 'RAW_FIFO_READ_DISABLE_POS' bit, and also implicitly (re)enable the
+ * consumption of data from the raw random FIFO by the TRNG post-processing
+ * logic, by deasserting its 'RAW_PULL_PP_DISABLE_POS' bit.
  */
 #define IPECC_TRNG_UNDO_COMPLETE_BYPASS() do { \
 	IPECC_SET_REG(IPECC_W_DBG_TRNG_CTRL, 0); \
@@ -2498,6 +2522,57 @@ err:
 	return -1;
 }
 
+/* Is the IP in 'debug' or 'production' mode? */
+static inline int ip_ecc_is_debug()
+{
+	int debug;
+
+	/* Wait until the IP is not busy */
+	IPECC_BUSY_WAIT();
+
+	/* Ask the IP register. */
+	debug = IPECC_IS_DEBUG_OR_PROD();
+
+	/* Wait until the IP is not busy */
+	IPECC_BUSY_WAIT();
+
+	return debug;
+}
+
+/* Get the major version number of the IP */
+static inline int ip_ecc_get_version_maj()
+{
+	unsigned int maj;
+
+	/* Wait until the IP is not busy */
+	IPECC_BUSY_WAIT();
+
+	/* Get both version numbers from IP register. */
+	maj = IPECC_GET_MAJOR_VERSION();
+
+	/* Wait until the IP is not busy */
+	IPECC_BUSY_WAIT();
+
+	return maj;
+}
+
+/* Get the minor version number of the IP */
+static inline int ip_ecc_get_version_min()
+{
+	unsigned int min;
+
+	/* Wait until the IP is not busy */
+	IPECC_BUSY_WAIT();
+
+	/* Get both version numbers from IP register. */
+	min = IPECC_GET_MINOR_VERSION();
+
+	/* Wait until the IP is not busy */
+	IPECC_BUSY_WAIT();
+
+	return min;
+}
+
 /*
  * *** TRNG debug ***
  */
@@ -2507,6 +2582,7 @@ static inline int ip_ecc_configure_trng(int debias, uint32_t ta, uint32_t cycles
 	/* Wait until the IP is not busy */
 	IPECC_BUSY_WAIT();
 
+	/* Write the TRNG configuration register */
 	IPECC_TRNG_CONFIG(debias, ta, cycles);
 
 	/* Wait until the IP is not busy */
@@ -2553,11 +2629,13 @@ static inline int ip_ecc_dont_bypass_trng(void)
 	return 0;
 }
 
-/* TRNG post-processing bypass
- * (also implicitly take out the TRNG from its bypass state if it was
- * actually bypassed - see function ip_ecc_bypass_full_trng() - just as routine
- * ip_ecc_dont_bypass_trng() would). */
-static inline int ip_ecc_bypass_trng_postproc(void)
+/* Disable the TRNG post-processing logic that pulls bytes from the
+ * raw random source.
+ *
+ * Watchout: implicitly remove a possibly pending complete bypass of the TRNG
+ * by deasserting the 'complete bypass' bit in the same register.
+ */
+static inline int ip_ecc_trng_postproc_disable(void)
 {
 	/* Wait until the IP is not busy */
 	IPECC_BUSY_WAIT();
@@ -2571,10 +2649,15 @@ static inline int ip_ecc_bypass_trng_postproc(void)
 	return 0;
 }
 
-/* TRNG stop bypassing the post-processing function
- * (also implicitly re-activate the TRNG in case it was in a complete bypass state,
- * just as routine ip_ecc_dont_bypass_trng() would) */
-static inline int ip_ecc_dont_bypass_trng_postproc(void)
+/* (Re)enable the TRNG post-processing logic that pulls bytes from the
+ * raw random source - in the debug mode of the IP, that logic is disabled
+ * upon reset and needs to be explicitly enabled by sofware by calling
+ * this macro.
+ *
+ * Watchout: implicitly remove a possibly pending complete bypass of the TRNG
+ * by deasserting the 'complete bypass' bit in the same register.
+ */
+static inline int ip_ecc_trng_postproc_enable()
 {
 	/* Wait until the IP is not busy */
 	IPECC_BUSY_WAIT();
@@ -2587,6 +2670,41 @@ static inline int ip_ecc_dont_bypass_trng_postproc(void)
 
 	return 0;
 }
+
+/* Disable the read port of the TRNG raw random FIFO,
+ * allowing complete and exclusive access by software to the raw
+ * random bits.
+ */
+static inline int ip_ecc_disable_read_port_of_raw_fifo(void)
+{
+	/* Wait until the IP is not busy */
+	IPECC_BUSY_WAIT();
+
+	/* Disable the read port of the FIFO used by the post-processing. */
+	IPECC_TRNG_RAW_FIFO_READ_PORT_DISABLE();
+
+	/* Wait until the IP is not busy */
+	IPECC_BUSY_WAIT();
+
+	return 0;
+}
+
+/* (Re)nable the read port of the TRNG raw random FIFO.
+ */
+static inline int ip_ecc_enable_read_port_of_raw_fifo()
+{
+	/* Wait until the IP is not busy */
+	IPECC_BUSY_WAIT();
+
+	/* Enable the read port of the FIFO used by the post-processing. */
+	IPECC_TRNG_RAW_FIFO_READ_PORT_ENABLE();
+
+	/* Wait until the IP is not busy */
+	IPECC_BUSY_WAIT();
+
+	return 0;
+}
+
 
 #if 0
 /* Function to get the random output of the RAW FIFO */
@@ -2651,9 +2769,9 @@ err:
 
 
 
-/************************************************
- *   Driver API (top-layer exported functions)
- ************************************************/
+/*********************************************
+ **  Driver API (top-layer exported functions)
+ *********************************************/
 
 /* Reset the hardware */
 int hw_driver_reset(void)
@@ -2662,6 +2780,36 @@ int hw_driver_reset(void)
         IPECC_SOFT_RESET();
 
 	return 0;
+}
+
+/* To know if the IP is in 'debug' or 'production' mode */
+int hw_driver_is_debug()
+{
+	return ip_ecc_is_debug();
+}
+
+/* Get major version of the IP */
+int hw_driver_get_version_maj()
+{
+	return ip_ecc_get_version_maj();
+}
+
+/* Get minor version of the IP */
+int hw_driver_get_version_min()
+{
+	return ip_ecc_get_version_min();
+}
+
+/* Enable TRNG post-processing logic */
+int hw_driver_trng_post_proc_enable()
+{
+	return ip_ecc_trng_postproc_enable();
+}
+
+/* Disable TRNG post-processing logic */
+int hw_driver_trng_post_proc_disable()
+{
+	 return ip_ecc_trng_postproc_disable();
 }
 
 /* Set the curve parameters a, b, p and q.
