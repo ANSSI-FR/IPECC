@@ -3510,7 +3510,7 @@ int hw_driver_mul(const unsigned char *x, unsigned int x_sz, const unsigned char
 	/* 32768 bits are more than enough for any practical
 	 * use of elliptic curve cryptography.
 	 */
-	unsigned char token[4096] = {0, }; /* Heck, a whole page? */
+	unsigned char token[4096] = {0, }; /* Heck, a whole page? Yes indeed. */
 
 	if(driver_setup()){
 		goto err;
@@ -3585,7 +3585,7 @@ int hw_driver_mul(const unsigned char *x, unsigned int x_sz, const unsigned char
 		goto err;
 	};
 
-	/* Finally clear the token */
+	/* Clear the token */
 	ip_ecc_clear_token(token, nn_sz);
 
 	return 0;
