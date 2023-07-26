@@ -84,29 +84,63 @@ extern bool k_valid;
 
 uint32_t w;
 
-int ip_set_pt_and_run_kp(uint32_t nn, struct point_t* pt_p,
+#if 0
+int ip_set_pt_and_run_kp(uint32_t nn, struct point_t* ptp,
 		struct point_t* pt_kp, uint32_t* nb_k, uint32_t nbbld, uint32_t* err)
+#endif
+int ip_set_pt_and_run_kp(ipecc_test_t* t)
 {
-	int ret;
+	int is_null;
 	/*
-	 * Sanity check. Verify that point P and scalar k are both set.
+	 * Sanity check.
+	 * Verify that curve is is set.
+	 * Verify that point P and scalar k are both set.
+	 * Verify that all large numbers do not exceed curve parameter 'nn' in size.
+	 * Verify that expected result of test is set.
+	 * Verify that operation type is valid.
 	 */
-	if (pt_p->valid == false) {
-		printf("%sERROR: can't program IP for [k]P computation, "
-				"point P isn't marked as valid\n%s", KERR, KNRM);
+	if (t->curve->set_in_hw == false) {
+		printf("%sError: Can't program IP for [k]P computation, assoc. curve not set in hardware.%s\n", KERR, KNRM);
+		goto err;
 	}
-	if (k_valid == false) {
-		printf("%sERROR: can't program IP for [k]P computation, "
-				"scalar k isn't marked as valid\n%s", KERR, KNRM);
+	if (t->ptp.valid == false) {
+		printf("%sError: Can't program IP for [k]P computation, input point P not set.%s\n", KERR, KNRM);
+		goto err;
 	}
-	if ((pt_p->valid == false) || (k_valid == false)) {
-		return -1;
+	if (t->k.valid == false) {
+		printf("%sError: Can't program IP for [k]P computation, scalar k not set.%s\n", KERR, KNRM);
+		goto err;
 	}
+	if (t->ptp.x.sz > NN_SZ(t->curve->nn)) {
+		printf("%sError: Can't program IP for [k]P computation, X coord. of point P larger than current curve size set in hardware.%s\n", KERR, KNRM);
+		goto err;
+	}
+	if (t->ptp.y.sz > NN_SZ(t->curve->nn)) {
+		printf("%sError: Can't program IP for [k]P computation, Y coord. of point P larger than currrent curve size set in hardware.%s\n", KERR, KNRM);
+		goto err;
+	}
+	if (t->k.sz > NN_SZ(t->curve->nn)) {
+		printf("%sError: Can't program IP for [k]P computation, scalar larger than current curve size set in hardware.%s\n", KERR, KNRM);
+		goto err;
+	}
+	if (t->blinding >= t->curve->nn) {
+		printf("%sError: Can't program IP for [k]P computation, blinding size larger than (or equal) to the current curve size set in hardware.%s\n", KERR, KNRM);
+		goto err;
+	}
+	if (t->pt_sw_res.valid == false) {
+		printf("%sError: Can't program IP for [k]P computation, missing expected result of test.%s\n", KERR, KNRM);
+		goto err;
+	}
+	if (t->op != OP_KP) {
+		printf("%sError: Can't program IP for [k]P computation, operation type mismatch.%s\n", KERR, KNRM);
+		goto err;
+	}
+
 	/*
 	 * Configure blinding
 	 */
-	if (nbbld) {
-		hw_driver_set_blinding(nbbld);
+	if (t->blinding) {
+		hw_driver_set_blinding(t->blinding);
 	} else {
 		hw_driver_disable_blinding();
 	}
@@ -114,59 +148,47 @@ int ip_set_pt_and_run_kp(uint32_t nn, struct point_t* pt_p,
 	/*
 	 * Send point info & coordinates
 	 */
-	if (pt_p->is_null == false) {
-		/* Set point R1 as being the null point
-		 * (aka point at infinity. */
-		hw_driver_point_zero(1);
+	if (t->ptp.is_null == true) {
+		/* Set point R1 as being the null point (aka point at infinity). */
+		if (hw_driver_point_zero(1)) {
+			printf("%sError: Setting base point as the infinity point on hardware triggered an error.\n", KERR, KNRM);
+			goto err;
+		}
 	} else {
-		/* Set point R1 as NOT being the null point
-		 * (aka point at infinity. */
-		hw_driver_point_unzero(1);
+		/* Set point R1 as NOT being the null point (aka point at infinity). */
+		if (hw_driver_point_unzero(1)) {
+			printf("%sError: Setting base point as not the infinity point on hardware triggered an error.\n", KERR, KNRM);
+			goto err;
+		}
+	}
+
+	/* Run [k]P command */
+	if (hw_driver_mul(t->ptp.x.val, t->ptp.x.sz, t->ptp.y.val, t->ptp->y_sz, t->k.val, t->k.sz,
+			t->pt_hw_res.x.val, &(t->pt_hw_res.x.sz), t->pt_hw_res.y.val, &(t->pt_hw_res.y.sz)))
+	{
+		printf("%sError: [k]P computation by hardware triggered an error.%s\n", KERR, KNRM);
+		goto err;
 	}
 
 	/*
-	 * run [k]P command
+	 * Is the result the null point? (aka point at infinity)
 	 */
-	ret = hw_driver_mul(pt_p->x, pt_p->x_sz, pt_p->y, pt_p->y_sz,
-	/*
-	 * read-back [k]P result coords if result is not null
-	 */
-#if 0
-	if (get_r1_null_or_not_null() == R1_NOT_NULL)
-	{
-		/*
-		 * read coordinate X
-		 */
-		read_large_number(LARGE_NB_XR1_ADDR, pt_kp->x, nn);
-		/*
-		 * read coordinate Y
-		 */
-		read_large_number(LARGE_NB_YR1_ADDR, pt_kp->y, nn);
-		/*
-		 * set result not to be null in passed pointer
-		 */
-		pt_kp->is_null = false;
-	} else {
-		/*
-		 * set result as null in passed pointer
-		 */
-		pt_kp->is_null = true;
+	if (hw_driver_point_iszero(1, &is_null)) {
+		printf("%sError: Getting status of [k]P result point (at infinity or not) from hardware triggered an error.%s\n", KERR, KNRM);
+		goto err;
 	}
-#endif
-	pt_kp->valid = true;
-	/*
-	 * set error flags in passed pointer
-	 */
-#if 0
-	*err = READ_REG(R_STATUS) & 0xffff0000;
-#endif
+	t->pt_hw_res.is_null = INT_TO_BOOLEAN(is_null);
+	t->pt_hw_res.valid = true;
+
+	return 0;
+err:
+	return -1;
 } /* ip_set_pt_and_run_kp() */
 
-
-void check_kp_result(struct curve_t* crv, struct point_t* pt_p,
-		struct point_t* hw_kp, struct point_t* sw_kp, uint32_t* nb_k,
-		uint32_t nbbld, struct stats_t* st)
+int check_kp_result(ipecc_test_t* t, stats_t* st)
 {
+	return 0;
+#if 0
 	if (sw_kp->valid == false) {
 		printf("%sERROR: can't check correctness of [k]P computation, "
 				"SW point isn't marked as valid\n%s", KERR, KNRM);
@@ -197,11 +219,11 @@ void check_kp_result(struct curve_t* crv, struct point_t* pt_p,
 			display_large_number(crv->nn, "a=0x", crv->a);
 			display_large_number(crv->nn, "b=0x", crv->b);
 			display_large_number(crv->nn, "q=0x", crv->q);
-			if (pt_p->is_null == true) {
+			if (ptp->is_null == true) {
 				printf("P=0\n");
 			} else {
-				display_large_number(crv->nn, "Px=0x", pt_p->x);
-				display_large_number(crv->nn, "Py=0x", pt_p->y);
+				display_large_number(crv->nn, "Px=0x", ptp->x);
+				display_large_number(crv->nn, "Py=0x", ptp->y);
 			}
 			display_large_number(crv->nn, "k=0x", nb_k);
 			if (nbbld) {
@@ -241,11 +263,11 @@ void check_kp_result(struct curve_t* crv, struct point_t* pt_p,
 			display_large_number(crv->nn, "a=0x", crv->a);
 			display_large_number(crv->nn, "b=0x", crv->b);
 			display_large_number(crv->nn, "q=0x", crv->q);
-			if (pt_p->is_null == true) {
+			if (ptp->is_null == true) {
 				printf("P=0\n");
 			} else {
-				display_large_number(crv->nn, "Px=0x", pt_p->x);
-				display_large_number(crv->nn, "Py=0x", pt_p->y);
+				display_large_number(crv->nn, "Px=0x", ptp->x);
+				display_large_number(crv->nn, "Py=0x", ptp->y);
 			}
 			display_large_number(crv->nn, "k=0x", nb_k);
 			if (nbbld) {
@@ -296,11 +318,11 @@ void check_kp_result(struct curve_t* crv, struct point_t* pt_p,
 				display_large_number(crv->nn, "a=0x", crv->a);
 				display_large_number(crv->nn, "b=0x", crv->b);
 				display_large_number(crv->nn, "q=0x", crv->q);
-				if (pt_p->is_null == true) {
+				if (ptp->is_null == true) {
 					printf("P=0\n");
 				} else {
-					display_large_number(crv->nn, "Px=0x", pt_p->x);
-					display_large_number(crv->nn, "Py=0x", pt_p->y);
+					display_large_number(crv->nn, "Px=0x", ptp->x);
+					display_large_number(crv->nn, "Py=0x", ptp->y);
 				}
 				display_large_number(crv->nn, "k=0x", nb_k);
 				if (nbbld) {
@@ -331,5 +353,6 @@ void check_kp_result(struct curve_t* crv, struct point_t* pt_p,
 			}
 		}
 	}
+#endif
 }
 

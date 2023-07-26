@@ -96,6 +96,7 @@ typedef struct {
 	large_number_t q;
 	uint32_t id;
 	bool valid;
+	bool set_in_hw;
 } curve_t;
 
 /*
@@ -130,8 +131,8 @@ typedef struct {
  */
 typedef struct {
 	curve_t* curve;
-	point_t pt_p;
-	point_t pt_q;
+	point_t ptp;
+	point_t ptq;
 	large_number_t k;
 	/* sw_res & hw_res are overloaded for the different
 	 * types of driver/IP operations. */
@@ -161,6 +162,7 @@ typedef struct {
 		.b = INIT_LARGE_NUMBER(), \
 		.q = INIT_LARGE_NUMBER(), \
 		.id = 0, \
+		.set_in_hw = false, \
 		.valid = false }
 
 #define INIT_PTTEST() \
@@ -175,10 +177,12 @@ typedef struct {
 } while (0)
 
 #define UNVALID_CURVE(c) do { \
+	(c).nn = 0; \
 	UNVALID_LARGE_NUMBER((c).p); \
 	UNVALID_LARGE_NUMBER((c).a); \
 	UNVALID_LARGE_NUMBER((c).b); \
 	UNVALID_LARGE_NUMBER((c).q); \
+	(c).set_in_hw = false; \
 	(c).valid = false; \
 } while (0)
 
@@ -186,7 +190,17 @@ typedef struct {
 	(t).valid = false; \
 } while (0)
 
+/*
+ * NN_SZ(nn) returns the number of bytes that a large number supposed
+ * to be of size 'nn' bits should occupy at most.
+ */
+#define NN_SZ(nn)   ((nn) % 8) ? ((nn) / 8) : (((nn) / 8) + 1)
 
+#define INT_TO_BOOLEAN(i)   ((i) ? true : false)
+
+/*
+ * printf/error formating
+ */
 #define TERM_COLORS
 
 #ifdef TERM_COLORS
