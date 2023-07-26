@@ -145,6 +145,7 @@ In order to test IPECC with libecc, please clone the repository and **checkout t
 
 ```
 $ git clone https://github.com/libecc/libecc
+$ cd libecc
 $ git checkout IPECC
 ```
 
