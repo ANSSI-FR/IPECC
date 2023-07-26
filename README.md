@@ -145,7 +145,7 @@ In order to test IPECC with libecc, please clone the repository and **checkout t
 
 ```
 $ git clone https://github.com/libecc/libecc
-$ git checkout -b IPECC
+$ git checkout IPECC
 ```
 
 Then fetch the driver (this will clone the current repository and place the IPECC drivers in
