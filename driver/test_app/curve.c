@@ -13,6 +13,7 @@
  *  See LICENSE file at the root folder of the project.
  */
 
+#include "../hw_accelerator_driver.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>

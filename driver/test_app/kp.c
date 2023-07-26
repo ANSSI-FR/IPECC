@@ -13,6 +13,7 @@
  *  See LICENSE file at the root folder of the project.
  */
 
+#include "../hw_accelerator_driver.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
@@ -151,19 +152,19 @@ int ip_set_pt_and_run_kp(ipecc_test_t* t)
 	if (t->ptp.is_null == true) {
 		/* Set point R1 as being the null point (aka point at infinity). */
 		if (hw_driver_point_zero(1)) {
-			printf("%sError: Setting base point as the infinity point on hardware triggered an error.\n", KERR, KNRM);
+			printf("%sError: Setting base point as the infinity point on hardware triggered an error.%s\n", KERR, KNRM);
 			goto err;
 		}
 	} else {
 		/* Set point R1 as NOT being the null point (aka point at infinity). */
 		if (hw_driver_point_unzero(1)) {
-			printf("%sError: Setting base point as not the infinity point on hardware triggered an error.\n", KERR, KNRM);
+			printf("%sError: Setting base point as not the infinity point on hardware triggered an error.%s\n", KERR, KNRM);
 			goto err;
 		}
 	}
 
 	/* Run [k]P command */
-	if (hw_driver_mul(t->ptp.x.val, t->ptp.x.sz, t->ptp.y.val, t->ptp->y_sz, t->k.val, t->k.sz,
+	if (hw_driver_mul(t->ptp.x.val, t->ptp.x.sz, t->ptp.y.val, t->ptp.y.sz, t->k.val, t->k.sz,
 			t->pt_hw_res.x.val, &(t->pt_hw_res.x.sz), t->pt_hw_res.y.val, &(t->pt_hw_res.y.sz)))
 	{
 		printf("%sError: [k]P computation by hardware triggered an error.%s\n", KERR, KNRM);

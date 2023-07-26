@@ -32,6 +32,7 @@
 
 //static ipecc_test test;
 
+extern int ip_set_curve(curve_t*);
 extern int ip_set_pt_and_run_kp(ipecc_test_t*);
 extern int check_kp_result(ipecc_test_t*, stats_t*);
 
@@ -186,13 +187,10 @@ static stats_t stats = {
 
 int main(int argc, char *argv[])
 {
-	int ret;
 	uint32_t i;
 	line_t line_type_expected;
 	size_t len = 0;
 	ssize_t nread;
-	uint32_t nbbld;
-	uint32_t err_flags;
 
 	(void)argc;
 	(void)argv;
@@ -315,10 +313,10 @@ int main(int argc, char *argv[])
 					test.pt_hw_res.valid = false;
 					line_type_expected = EXPECT_PX;
 					/*
-					 * Blinding will be applied only if tile test says so
+					 * Blinding will be applied only if input file/stream test says so
 					 * (otherwise default is no blinding).
 					 */
-					nbbld = 0;
+					test.blinding = 0;
 				} else if ( (strncmp(line, "P+Q #", strlen("P+Q #"))) == 0 ) {
 					/*
 					 * Extract the computation nb, after '#' character.
