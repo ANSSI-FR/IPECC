@@ -1648,7 +1648,7 @@ static inline void ip_ecc_errors_print(ip_ecc_error err)
 }
 static inline void ip_ecc_log(const char *s)
 {
-	log_print(s);
+	log_print("%s", s);
 	/* Print our current status and error */
 	log_print("Status: 0x"IPECC_WORD_FMT", Error: ", IPECC_GET_REG(IPECC_R_STATUS));
 	ip_ecc_errors_print(IPECC_GET_ERROR());

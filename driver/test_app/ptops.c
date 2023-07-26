@@ -46,7 +46,7 @@ extern uint32_t nbcurve;
 extern uint32_t nbtest;
 extern bool k_valid;
 
-void ip_set_pts_and_run_ptadd(uint32_t nn, struct point_t* pt_p,
+int ip_set_pts_and_run_ptadd(uint32_t nn, struct point_t* pt_p,
 		struct point_t* pt_q, struct point_t* pt_pplusq, uint32_t* err)
 {
 	/*
@@ -61,8 +61,7 @@ void ip_set_pts_and_run_ptadd(uint32_t nn, struct point_t* pt_p,
 				"point Q isn't marked as valid\n%s", KERR, KNRM);
 	}
 	if ((pt_p->valid == false) || (pt_q->valid == false)) {
-		printf("%sstopped on test %d.%d%s\n", KERR, nbcurve, nbtest, KNRM);
-		print_stats_and_exit();
+		return -1;
 	}
 	/*
 	 * send point P info & coordinates (into R0)
@@ -183,8 +182,7 @@ void check_ptadd_result(struct curve_t* crv, struct point_t* pt_p,
 				"HW point isn't marked as valid\n%s", KERR, KNRM);
 	}
 	if ((sw_pplusq->valid == false) || (hw_pplusq->valid == false)) {
-		printf("%sstopped on test %d.%d%s\n", KERR, nbcurve, nbtest, KNRM);
-		print_stats_and_exit();
+		return -1;
 	}
 	if (sw_pplusq->is_null == true) {
 		if (hw_pplusq->is_null == true) {

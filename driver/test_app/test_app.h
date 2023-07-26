@@ -17,46 +17,26 @@
 #define __TEST_DRIVER_H__
 
 #include <stdio.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <stdlib.h>
-#include <errno.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <string.h>
 
-#define NBMAXSZ   1024
+#if defined(WITH_EC_HW_UIO) || defined(WITH_EC_HW_DEVMEM)    
+#include <unistd.h>                               
+#include <fcntl.h>
+#include <stdlib.h>
+#include <error.h>
+#include <errno.h>
+#endif
 
-/*
- * type for curve parameters
- */
-struct curve_t
-{
-	uint32_t nn;
-	uint8_t p[NBMAXSZ];
-	uint32_t p_sz;
-	uint8_t a[NBMAXSZ];
-	uint32_t a_sz;
-	uint8_t b[NBMAXSZ];
-	uint32_t b_sz;
-	uint8_t q[NBMAXSZ];
-	uint32_t q_sz;
-	bool valid;
-};
+#if defined(WITH_EC_HW_STANDALONE)
+#include <stddef.h>
+#endif
 
 /*
- * type for point defition
+ * To help parsing the input file/stream.
  */
-struct point_t
-{
-	uint8_t x[NBMAXSZ];
-	uint32_t x_sz;
-	uint8_t y[NBMAXSZ];
-	uint32_t y_sz;
-	bool is_null;
-	bool valid;
-};
-
-enum line_type {
+typedef enum {
 	EXPECT_NONE = 0,
 	EXPECT_CURVE = 1,
 	EXPECT_NN = 2,
@@ -78,9 +58,12 @@ enum line_type {
 	EXPECT_NEGP_X = 18,
 	EXPECT_NEGP_Y = 19,
 	EXPECT_TRUE_OR_FALSE = 20
-};
+} line_t;
 
-enum operation_type {
+/*
+ * Operations on curve points supported by the driver.
+ */
+typedef enum {
 	OP_NONE = 0,
 	OP_KP = 1,
 	OP_PTADD = 2,
@@ -88,21 +71,121 @@ enum operation_type {
 	OP_PTNEG = 4,
 	OP_TST_CHK = 5,
 	OP_TST_EQU = 6,
-	OP_TST_OPP = 7
-};
+	OP_TST_OPP = 7,
+} operation_t;
 
-struct pt_test_t {
-	bool sw_answer;
-	bool sw_valid;
-	bool hw_answer;
-	bool hw_valid;
-};
+#define NBMAXSZ   1024
 
-struct stats_t {
+/*
+ * Large number type
+ */
+typedef struct {
+	uint8_t val[NBMAXSZ];
+	uint32_t sz;
+	bool valid;
+} large_number_t;
+
+/*
+ * Type for curve parameters
+ */
+typedef struct {
+	uint32_t nn;
+	large_number_t p;
+	large_number_t a;
+	large_number_t b;
+	large_number_t q;
+	uint32_t id;
+	bool valid;
+} curve_t;
+
+/*
+ * Type for point defition.
+ */
+typedef struct {
+	large_number_t x;
+	large_number_t y;
+	bool is_null;
+	bool valid;
+} point_t;
+
+/* Type for driver tests made on points
+ * (are they equal? are they opposite? are they on curve?)
+ */
+typedef struct {
+	bool answer;
+	bool valid;
+} pttest_t;
+
+/*
+ * Type for statistics on tests passed to the driver.
+ */
+typedef struct {
 	uint32_t ok;
 	uint32_t nok;
 	uint32_t total;
-};
+} stats_t;
+
+/*
+ * Gereral type for tests passed to the driver.
+ */
+typedef struct {
+	curve_t* curve;
+	point_t pt_p;
+	point_t pt_q;
+	large_number_t k;
+	/* sw_res & hw_res are overloaded for the different
+	 * types of driver/IP operations. */
+	point_t pt_sw_res;
+	point_t pt_hw_res;
+	uint32_t blinding;
+	/* sw_answer & hw_answer are overloaded for the different
+	 * types of driver/IP operations. */
+	pttest_t sw_answer;
+	pttest_t hw_answer;
+	operation_t op;
+	bool is_an_exception;
+	uint32_t id;
+} ipecc_test_t;
+
+#define INIT_LARGE_NUMBER() \
+	{ .sz = 0, .valid = false }
+
+#define INIT_POINT() \
+	{ .x = INIT_LARGE_NUMBER(), \
+		.y = INIT_LARGE_NUMBER(), \
+		.valid = false }
+
+#define INIT_CURVE() \
+	{ .p = INIT_LARGE_NUMBER(), \
+		.a = INIT_LARGE_NUMBER(), \
+		.b = INIT_LARGE_NUMBER(), \
+		.q = INIT_LARGE_NUMBER(), \
+		.id = 0, \
+		.valid = false }
+
+#define INIT_PTTEST() \
+	{ .valid = false }
+
+#define UNVALID_LARGE_NUMBER(l) do { \
+	(l).sz = 0; (l).valid = false; \
+} while (0)
+
+#define UNVALID_POINT(p)  do { \
+	UNVALID_LARGE_NUMBER((p).x); UNVALID_LARGE_NUMBER((p).y); (p).valid = false; \
+} while (0)
+
+#define UNVALID_CURVE(c) do { \
+	UNVALID_LARGE_NUMBER((c).p); \
+	UNVALID_LARGE_NUMBER((c).a); \
+	UNVALID_LARGE_NUMBER((c).b); \
+	UNVALID_LARGE_NUMBER((c).q); \
+	(c).valid = false; \
+} while (0)
+
+#define UNVALID_PTTEST(t) do { \
+	(t).valid = false; \
+} while (0)
+
 
 #define TERM_COLORS
 

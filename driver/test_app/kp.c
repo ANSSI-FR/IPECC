@@ -84,11 +84,12 @@ extern bool k_valid;
 
 uint32_t w;
 
-void ip_set_pt_and_run_kp(uint32_t nn, struct point_t* pt_p,
+int ip_set_pt_and_run_kp(uint32_t nn, struct point_t* pt_p,
 		struct point_t* pt_kp, uint32_t* nb_k, uint32_t nbbld, uint32_t* err)
 {
+	int ret;
 	/*
-	 * verify that point P is valid
+	 * Sanity check. Verify that point P and scalar k are both set.
 	 */
 	if (pt_p->valid == false) {
 		printf("%sERROR: can't program IP for [k]P computation, "
@@ -99,72 +100,34 @@ void ip_set_pt_and_run_kp(uint32_t nn, struct point_t* pt_p,
 				"scalar k isn't marked as valid\n%s", KERR, KNRM);
 	}
 	if ((pt_p->valid == false) || (k_valid == false)) {
-		printf("%sstopped on test %d.%d%s\n", KERR, nbcurve, nbtest, KNRM);
-		print_stats_and_exit();
+		return -1;
 	}
 	/*
-	 * configure blinding
+	 * Configure blinding
 	 */
 	if (nbbld) {
-#if 0
-		set_blinding(nbbld);
-#endif
+		hw_driver_set_blinding(nbbld);
 	} else {
-#if 0
-		set_no_blinding();
-#endif
+		hw_driver_disable_blinding();
 	}
-#if 0
-	poll_until_ready();
-#endif
+
 	/*
-	 * send k
-	 */
-#if 0
-	write_large_number(LARGE_NB_K_ADDR, nb_k, nn, true);
-#endif
-	/*
-	 * send point info & coordinates
+	 * Send point info & coordinates
 	 */
 	if (pt_p->is_null == false) {
-#if 0
-		/*
-		 * send Px
-		 */
-		write_large_number(LARGE_NB_XR1_ADDR, pt_p->x, nn, false);
-		/*
-		 * send Py
-		 */
-		write_large_number(LARGE_NB_YR1_ADDR, pt_p->y, nn, false);
-		/*
-		 * set R1 as a non null point
-		 */
-		set_r1_non_null();
-#endif
+		/* Set point R1 as being the null point
+		 * (aka point at infinity. */
+		hw_driver_point_zero(1);
 	} else {
-		/*
-		 * set R1 to be the null point
-		 */
-#if 0
-		set_r1_null();
-#endif
+		/* Set point R1 as NOT being the null point
+		 * (aka point at infinity. */
+		hw_driver_point_unzero(1);
 	}
 
 	/*
 	 * run [k]P command
 	 */
-#if 0
-	run_kp();
-
-	/*
-	 * poll until job's done
-	 */
-	poll_until_ready();
-	/*
-	 * print it if IP raised an error
-	 */
-	print_error_if_any();
-#endif
+	ret = hw_driver_mul(pt_p->x, pt_p->x_sz, pt_p->y, pt_p->y_sz,
 	/*
 	 * read-back [k]P result coords if result is not null
 	 */
