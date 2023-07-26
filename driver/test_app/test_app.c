@@ -423,7 +423,7 @@ int main(int argc, char *argv[])
 					test.hw_answer.valid = false;
 					line_type_expected = EXPECT_PX;
 				} else {
-					printf("%sError: could not find any of the expected commands from "
+					printf("%sError: Could not find any of the expected commands from "
 							"input file/stream.\n", KERR);
 					print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_NONE')", __LINE__);
 				}
@@ -439,7 +439,7 @@ int main(int argc, char *argv[])
 					strtol_with_err(&line[3], &curve.nn);
 					line_type_expected = EXPECT_P;
 				} else {
-					printf("%sError: could not find the expected token \"nn=\" "
+					printf("%sError: Could not find the expected token \"nn=\" "
 							"from input file/stream.\n", KERR);
 					print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_NN)'", __LINE__);
 				}
@@ -464,7 +464,7 @@ int main(int argc, char *argv[])
 					test.curve->p.valid = true;
 					line_type_expected = EXPECT_A;
 				} else {
-					printf("%sError: could not find the expected token \"p=0x\" "
+					printf("%sError: Could not find the expected token \"p=0x\" "
 							"from input file/stream.%s\n", KERR, KNRM);
 					print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_P')", __LINE__);
 				}
@@ -489,7 +489,7 @@ int main(int argc, char *argv[])
 					test.curve->a.valid = true;
 					line_type_expected = EXPECT_B;
 				} else {
-					printf("%sError: could not find the expected token \"a=0x\" "
+					printf("%sError: Could not find the expected token \"a=0x\" "
 							"from input file/stream.%s\n", KERR, KNRM);
 					print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_A')", __LINE__);
 				}
@@ -514,7 +514,7 @@ int main(int argc, char *argv[])
 					test.curve->b.valid = true;
 					line_type_expected = EXPECT_Q;
 				} else {
-					printf("%sError: could not find the expected token \"b=0x\" "
+					printf("%sError: Could not find the expected token \"b=0x\" "
 							"from input file/stream.%s\n", KERR, KNRM);
 					print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_B')", __LINE__);
 				}
@@ -538,20 +538,19 @@ int main(int argc, char *argv[])
 								"from input file/stream.%s\n", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_Q')", __LINE__);
 					}
+					test.curve->q.valid = true;
+					test.curve->valid = true;
 					/*
 					 * Transfer curve parameters to the IP.
 					 */
 					if (ip_set_curve(test.curve))
 					{
-						printf("%sError: could not transmit curve parameters to driver.%s\n", KERR, KNRM);
+						printf("%sError: Could not transmit curve parameters to driver.%s\n", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_Q')", __LINE__);
-					} else {
-						test.curve->q.valid = true;
-						test.curve->valid = true;
-						line_type_expected = EXPECT_NONE;
 					}
+					line_type_expected = EXPECT_NONE;
 				} else {
-					printf("%sError: could not find the expected token \"q=0x\" "
+					printf("%sError: Could not find the expected token \"q=0x\" "
 							"from input file/stream.%s\n", KERR, KNRM);
 					print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_B')", __LINE__);
 				}
@@ -602,7 +601,7 @@ int main(int argc, char *argv[])
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_PX')", __LINE__);
 					}
 				} else {
-					printf("%sError: could not find one of the expected tokens \"Px=0x\" "
+					printf("%sError: Could not find one of the expected tokens \"Px=0x\" "
 							"or \"P=0\" from input file/stream.%s\n", KERR, KNRM);
 					print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_PX')", __LINE__);
 				}
@@ -642,7 +641,7 @@ int main(int argc, char *argv[])
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_PY')", __LINE__);
 					}
 				} else {
-					printf("%sError: could not find the expected token \"Py=0x\" "
+					printf("%sError: Could not find the expected token \"Py=0x\" "
 								"from input file/stream.%s\n", KERR, KNRM);
 					print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_PY')", __LINE__);
 				}
@@ -687,7 +686,7 @@ int main(int argc, char *argv[])
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_QX')", __LINE__);
 					}
 				} else {
-					printf("%sError: could not find one of the expected tokens \"Qx=0x\" "
+					printf("%sError: Could not find one of the expected tokens \"Qx=0x\" "
 							"or \"Q=0\" from input file/stream.%s\n", KERR, KNRM);
 					print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_QX')", __LINE__);
 				}
@@ -723,7 +722,7 @@ int main(int argc, char *argv[])
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_QY')", __LINE__);
 					}
 				} else {
-					printf("%sError: could not find the expected token \"Qy=0x\" "
+					printf("%sError: Could not find the expected token \"Qy=0x\" "
 							"from input file/stream.%s\n", KERR, KNRM);
 					print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_QY')", __LINE__);
 				}
@@ -750,7 +749,7 @@ int main(int argc, char *argv[])
 					test.k.valid = true;
 					line_type_expected = EXPECT_KPX_OR_BLD;
 				} else {
-					printf("%sError: could not find the expected token \"k=0x\" "
+					printf("%sError: Could not find the expected token \"k=0x\" "
 							"from input file/stream.%s\n", KERR, KNRM);
 					print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_K')", __LINE__);
 				}
@@ -829,7 +828,7 @@ int main(int argc, char *argv[])
 					test.is_an_exception = false;
 #endif
 				} else {
-					printf("%sError: could not find one of the expected tokens \"nbbld=\" "
+					printf("%sError: Could not find one of the expected tokens \"nbbld=\" "
 							"or \"kPx=0x\" or \"kP=0\" in input file/stream.%s\n", KERR, KNRM);
 					print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_KPX_OR_BLD')", __LINE__);
 				}
@@ -883,7 +882,7 @@ int main(int argc, char *argv[])
 					 */
 					test_is_an_exception = false;
 				} else {
-					printf("%sError: could not find the expected token \"kPy=0x\" "
+					printf("%sError: Could not find the expected token \"kPy=0x\" "
 							"(for debug: while in state EXPECT_KPY)\n", KERR);
 					printf("Stopped on test %d.%d%s\n", nbcurve, nbtest, KNRM);
 					print_stats_and_exit(&stats);
@@ -935,7 +934,7 @@ int main(int argc, char *argv[])
 					 */
 					test_is_an_exception = false;
 				} else {
-					printf("%sError: could not find one of the expected tokens \"PplusQx=0x\" "
+					printf("%sError: Could not find one of the expected tokens \"PplusQx=0x\" "
 							"or \"(P+Q)=0\" (for debug: while in state EXPECT_P_PLUS_QX)\n", KERR);
 					printf("Stopped on test %d.%d%s\n", nbcurve, nbtest, KNRM);
 					print_stats_and_exit(&stats);
@@ -982,7 +981,7 @@ int main(int argc, char *argv[])
 					 */
 					test_is_an_exception = false;
 				} else {
-					printf("%sError: could not find the expected token \"PplusQy=0x\" "
+					printf("%sError: Could not find the expected token \"PplusQy=0x\" "
 							"(for debug: while in state EXPECT_P_PLUS_QY)\n", KERR);
 					printf("Stopped on test %d.%d%s\n", nbcurve, nbtest, KNRM);
 					print_stats_and_exit(&stats);
@@ -1034,7 +1033,7 @@ int main(int argc, char *argv[])
 					 */
 					test_is_an_exception = false;
 				} else {
-					printf("%sError: could not find one of the expected tokens \"twoPx=0x\" "
+					printf("%sError: Could not find one of the expected tokens \"twoPx=0x\" "
 							"or \"twoP=0\" (for debug: while in state EXPECT_TWOP_X)\n", KERR);
 					printf("Stopped on test %d.%d%s\n", nbcurve, nbtest, KNRM);
 					print_stats_and_exit(&stats);
@@ -1081,7 +1080,7 @@ int main(int argc, char *argv[])
 					 */
 					test_is_an_exception = false;
 				} else {
-					printf("%sError: could not find the expected token \"twoPy=0x\" "
+					printf("%sError: Could not find the expected token \"twoPy=0x\" "
 							"(for debug: while in state EXPECT_TWOP_Y)\n", KERR);
 					printf("Stopped on test %d.%d%s\n", nbcurve, nbtest, KNRM);
 					print_stats_and_exit(&stats);
@@ -1133,7 +1132,7 @@ int main(int argc, char *argv[])
 					 */
 					test_is_an_exception = false;
 				} else {
-					printf("%sError: could not find one of the expected tokens \"negPx=0x\" "
+					printf("%sError: Could not find one of the expected tokens \"negPx=0x\" "
 							"or \"negP=0\" (for debug: while in state EXPECT_NEGP_X)\n", KERR);
 					printf("Stopped on test %d.%d%s\n", nbcurve, nbtest, KNRM);
 					print_stats_and_exit(&stats);
@@ -1180,7 +1179,7 @@ int main(int argc, char *argv[])
 					 */
 					test_is_an_exception = false;
 				} else {
-					printf("%sError: could not find the expected token \"negPy=0x\" "
+					printf("%sError: Could not find the expected token \"negPy=0x\" "
 							"(for debug: while in state EXPECT_NEGP_Y)\n", KERR);
 					printf("Stopped on test %d.%d%s\n", nbcurve, nbtest, KNRM);
 					print_stats_and_exit(&stats);
@@ -1237,7 +1236,7 @@ int main(int argc, char *argv[])
 							break;
 					}
 				} else {
-					printf("%sError: could not find one of the expected tokens \"true\" "
+					printf("%sError: Could not find one of the expected tokens \"true\" "
 							"or \"false\" (for debug: while in state EXPECT_TRUE_OR_FALSE) for test %s\n", KERR,
 							( op == OP_TST_CHK ? "OP_TST_CHK" : (op == OP_TST_EQU ? "OP_TST_EQU" :
 							  (op == OP_TST_OPP ? "OP_TST_OPP" : "UNKNOWN_TEST"))));
