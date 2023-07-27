@@ -162,6 +162,35 @@ static int strtol_with_err(const char *nptr, unsigned int* nb)
 	}
 }
 
+int cmp_two_pts_coords(point_t* p0, point_t* p1, bool* res)
+{
+	uint32_t i;
+
+	/*
+	 * If four coordinates sizes do not match, that's an error
+	 * (don't even compare).
+	 */
+	if ( (p0->x.sz != p0->y.sz) || (p0->x.sz != p1->x.sz) || (p0->y.sz != p1->x.sz)
+			|| (p0->y.sz != p1->y.sz) || (p1->x.sz != p1->y.sz) )
+	{
+		printf("%sError: can't compare coord. buffers that are not of the same byte size to begin with.%s\n",
+				KERR, KNRM);
+		goto err;
+	}
+	/* Compare the X & Y coordinates one byte after the other. */
+	*res = true;
+	for (i = 0; i < p0->x.sz; i++) {
+		if ((p0->x.val[i] != p1->x.val[i]) || (p0->y.val[i] != p1->y.val[i])) {
+			*res = false;
+			break;
+		}
+	}
+	return 0;
+err:
+	return -1;
+}
+
+
 /* Curve definition */
 static curve_t curve = INIT_CURVE();
 /* Main test structure */
@@ -796,18 +825,11 @@ int main(int argc, char *argv[])
 					/*
 					 * Set and execute a [k]P computation test.
 					 */
-					ip_set_pt_and_run_kp(&test); //, &err_flags);
-					/*
-					 * analyze errors
-					 */
-#if 0
-					if (err_flags & STATUS_ERR_IN_PT_NOT_ON_CURVE) {
-						printf("Error: input point IS NOT on curve\n");
+					if (ip_set_pt_and_run_kp(&test))
+					{
+						printf("%sError: Computation of scalar multiplication on hardware triggered an error.%s\n", KERR, KNRM);
+						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_KPX_OR_BLD')", __LINE__);
 					}
-					if (err_flags & STATUS_ERR_OUT_PT_NOT_ON_CURVE) {
-						printf("Error: output point IS NOT on curve\n");
-					}
-#endif
 					/*
 					 * Check IP result against the one given by client
 					 *   (software client said k[P] should be null)

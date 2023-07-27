@@ -20,75 +20,12 @@
 #include <stdint.h>
 #include "test_app.h"
 
-#if 0
-/*
- * these functions are defined in helpers.c
- */
-extern void set_no_blinding(void);
-extern void set_blinding(uint32_t nbbld);
-extern void write_large_number(uint32_t, uint32_t*, uint32_t, bool);
-extern void set_r0_non_null(void);
-extern void set_r0_null(void);
-extern void set_r1_non_null(void);
-extern void set_r1_null(void);
-extern void run_kp(void);
-extern void poll_until_ready(void);
-extern bool get_r1_null_or_not_null(void);
-extern void read_large_number(uint32_t, uint32_t*, uint32_t);
-extern void display_large_number(uint32_t, const char*, uint32_t*);
-extern void run_pt_add(void);
-extern void run_pt_dbl(void);
-extern void run_pt_neg(void);
-extern bool print_error_if_any(void);
-extern void status_detail(void);
-extern void print_stats_and_exit();
-extern void debug_read_large_number(uint32_t, uint32_t*, uint32_t);
-extern void set_breakpoint(uint32_t, uint32_t);
-extern void unset_breakpoint(uint32_t);
-extern void resume_execution(void);
-extern void poll_until_dbghalted(void);
-extern void debug_write_opcode(uint32_t, uint32_t);
-extern void single_step(void);
-extern void clear_sw_ecc_fp_dram(uint32_t);
-extern void load_ecc_fp_dram(uint32_t);
-extern void diff_ecc_fp_dram(uint32_t);
-extern void dbgwrite_one_limb_hw_ecc_fp_dram(uint32_t, uint32_t, uint32_t, uint32_t);
-extern uint32_t dbgread_one_limb_hw_ecc_fp_dram(uint32_t, uint32_t, uint32_t);
-extern uint32_t ge_power_of_2(uint32_t);
-extern char* get_debug_str_state(uint32_t id);
-extern void write_large_number(uint32_t, uint32_t*, uint32_t, bool);
-extern void dbgread_all_limbs_hw_ecc_fp_dram(uint32_t lgnb, uint32_t* nbbuf,
-		uint32_t nmax, uint32_t w);
-extern void display_all_limbs_large_number(const char*, uint32_t* nbbuf, uint32_t w);
-extern void debug_write_large_number(uint32_t, uint32_t*, uint32_t);
-extern void dbgwrite_all_limbs_hw_ecc_fp_dram(uint32_t, uint32_t*, uint32_t, uint32_t);
-extern void dbgread_all_limbs_of_number(uint32_t, uint32_t, uint32_t*, uint32_t);
-extern void print_all_limbs_of_number(const char*, uint32_t, uint32_t*);
-extern void get_exp_flags(struct flags_t*);
-extern void read_and_display_xyr0(uint32_t, struct flags_t*);
-extern void read_and_display_xyr1(uint32_t, struct flags_t*);
-extern void read_and_display_zr01(uint32_t);
-extern void set_trng_complete_bypass(uint32_t);
-extern void unset_trng_complete_bypass(void);
-#endif
-
-#if 0
-/*
- * this function is defined in redpit.c
- */
-extern bool cmp_two_pts_coords(uint32_t, struct point_t*, struct point_t*);
-#endif
+extern int cmp_two_pts_coords(point_t*, point_t*, bool*);
 
 extern uint32_t nbcurve;
 extern uint32_t nbtest;
 extern bool k_valid;
 
-uint32_t w;
-
-#if 0
-int ip_set_pt_and_run_kp(uint32_t nn, struct point_t* ptp,
-		struct point_t* pt_kp, uint32_t* nb_k, uint32_t nbbld, uint32_t* err)
-#endif
 int ip_set_pt_and_run_kp(ipecc_test_t* t)
 {
 	int is_null;
@@ -136,7 +73,6 @@ int ip_set_pt_and_run_kp(ipecc_test_t* t)
 		printf("%sError: Can't program IP for [k]P computation, operation type mismatch.%s\n", KERR, KNRM);
 		goto err;
 	}
-
 	/*
 	 * Configure blinding
 	 */
@@ -184,35 +120,40 @@ int ip_set_pt_and_run_kp(ipecc_test_t* t)
 	return 0;
 err:
 	return -1;
-} /* ip_set_pt_and_run_kp() */
+}
 
 int check_kp_result(ipecc_test_t* t, stats_t* st)
 {
-	return 0;
-#if 0
-	if (sw_kp->valid == false) {
-		printf("%sERROR: can't check correctness of [k]P computation, "
-				"SW point isn't marked as valid\n%s", KERR, KNRM);
+	bool coords_match;
+	/*
+	 * Sanity check.
+	 * Verify that computation was actually done on hardware.
+	 */
+	if (t->pt_hw_res.valid == false)
+	{
+		printf("%sError: Can't check result of [k]P against expected one, computation didn't happen on hardware.%s\n", KERR, KNRM);
+		goto err;
 	}
-	if (hw_kp->valid == false) {
-		printf("%sERROR: can't check correctness of [k]P computation, "
-				"HW point isn't marked as valid\n%s", KERR, KNRM);
-	}
-	if ((sw_kp->valid == false) || (hw_kp->valid == false)) {
-		printf("%sstopped on test %d.%d%s\n", KERR, nbcurve, nbtest, KNRM);
-		print_stats_and_exit();
-	}
-	if (sw_kp->is_null == true) {
-		if (hw_kp->is_null == true) {
-#ifdef VERBOSE
-			printf("[k]P = 0 as expected\n");
-#endif
+
+	/*
+	 * Compare hardware result of [k]P against the expected one.
+	 */
+	if (t->pt_sw_res.is_null == true) {
+		/*
+		 * Expected result it that [k]P = 0 (aka point at infinity).
+		 */
+		if (t->pt_hw_res.is_null == true) {
+			/*
+			 * The hardware result is also the null point.
+			 */
+			PRINTF("[k]P = 0 as expected\n");
 			(st->ok)++;
 		} else {
-			printf("%s", KERR);
-			printf("---- ERROR when computing [k]P\n");
-			printf("test #%d.%d\n", nbcurve, nbtest);
-			printf("ERROR: [k]P is not 0 but should be\n");
+			/*
+			 * Mismatch error (the hardware result is not the null point).
+			 */
+			printf("%sError: [k]P mistmatch between hardware result and expected one.\n"
+						 "         [k]P is not 0 but should be.%s\n", KERR, KNRM);
 #if 0
 			status_detail();
 			printf("nn=%d (HW = %d)\n", crv->nn, READ_REG(R_PRIME_SIZE));
@@ -246,17 +187,18 @@ int check_kp_result(ipecc_test_t* t, stats_t* st)
 			WRITE_REG(W_ERR_ACK, 0xffff0000);
 #endif
 			(st->nok)++;
-#ifdef LEAVE_ON_ERROR
-			printf("%sstopped on test %d.%d%s\n", KERR, nbcurve, nbtest, KNRM);
-			print_stats_and_exit();
-#endif
+			goto err;
 		}
 	} else {
-		if (hw_kp->is_null == true) {
-			printf("%s", KERR);
-			printf("---- ERROR when computing [k]P\n");
-			printf("test #%d.%d\n", nbcurve, nbtest);
-			printf("ERROR: [k]P = 0 but shouldn't be\n");
+		/*
+		 * Expected result it that [k]P is different from the point at infinity.
+		 */
+		if (t->pt_hw_res.is_null == true) {
+			/*
+			 * Mismatch error (the hardware result is the null point).
+			 */
+			printf("%sError: [k]P mistmatch between hardware result and expected one.\n"
+						 "         [k]P is 0 but should not be.%s\n", KERR, KNRM);
 #if 0
 			status_detail();
 			printf("nn=%d (HW = %d)\n", crv->nn, READ_REG(R_PRIME_SIZE));
@@ -290,17 +232,20 @@ int check_kp_result(ipecc_test_t* t, stats_t* st)
 			WRITE_REG(W_ERR_ACK, 0xffff0000);
 #endif
 			(st->nok)++;
-#ifdef LEAVE_ON_ERROR
-			printf("%sstopped on test %d.%d%s\n", KERR, nbcurve, nbtest, KNRM);
-			print_stats_and_exit();
-#endif
+			goto err;
 		} else {
+			/*
+			 * Neither hardware result nor the expected one are null.
+			 * Compare their coordinates.
+			 */
+			if (cmp_two_pts_coords(&(t->pt_sw_res), &(t->pt_hw_res), &coords_match))
+			{
+				printf("%sError when comparing coordinates of hardware [k]P result with the expected ones.%s\n", KERR, KNRM);
+				goto err;
+			}
+			if (coords_match == true) {
+				PRINTF("[k]P results match\n");
 #if 0
-			if (cmp_two_pts_coords(crv->nn, sw_kp, hw_kp) == true) {
-#endif
-			if (true) {
-#ifdef VERBOSE
-				printf("results match\n");
 				display_large_number(crv->nn, "SW: kPx = 0x", sw_kp->x);
 				display_large_number(crv->nn, "    kPy = 0x", sw_kp->y);
 				display_large_number(crv->nn, "HW: kPx = 0x", hw_kp->x);
@@ -308,10 +253,11 @@ int check_kp_result(ipecc_test_t* t, stats_t* st)
 #endif
 				(st->ok)++;
 			} else {
-				printf("%s", KERR);
-				printf("---- ERROR when computing [k]P\n");
-				printf("test #%d.%d\n", nbcurve, nbtest);
-				printf("ERROR: HW/SW mismatch\n");
+
+				/*
+				 * Mismatch error (hardware [k]P coords & expected ones differ.
+				 */
+				printf("%sError: [k]P mistmatch between hardware coordinates and those of the expected result.%s\n", KERR, KNRM);
 #if 0
 				status_detail();
 				printf("nn=%d (HW = %d)\n", crv->nn, READ_REG(R_PRIME_SIZE));
@@ -345,15 +291,13 @@ int check_kp_result(ipecc_test_t* t, stats_t* st)
 				WRITE_REG(W_ERR_ACK, 0xffff0000);
 #endif
 				(st->nok)++;
-#ifdef LEAVE_ON_ERROR
-				printf("%sstopped on test %d.%d%s\n", KERR, nbcurve, nbtest, KNRM);
-#if 0
-				print_stats_and_exit();
-#endif
-#endif
+				goto err;
 			}
 		}
 	}
-#endif
+
+	return 0;
+err:
+	return -1;
 }
 
