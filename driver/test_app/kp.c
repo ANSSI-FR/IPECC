@@ -22,10 +22,6 @@
 
 extern int cmp_two_pts_coords(point_t*, point_t*, bool*);
 
-extern uint32_t nbcurve;
-extern uint32_t nbtest;
-extern bool k_valid;
-
 int ip_set_pt_and_run_kp(ipecc_test_t* t)
 {
 	int is_null;
@@ -109,8 +105,11 @@ int ip_set_pt_and_run_kp(ipecc_test_t* t)
 
 	/*
 	 * Is the result the null point? (aka point at infinity)
+	 * If it is not, there's nothing to do, as hw_driver_mul() already set
+	 * the coordinates of [k]P result in the appropriate buffers (namely
+	 * t->pt_hw_res.x.val and t->pt_hw_res.y.val).
 	 */
-	if (hw_driver_point_iszero(1, &is_null)) {
+	if (hw_driver_point_iszero(1, &is_null)) { /* result point is R1 */
 		printf("%sError: Getting status of [k]P result point (at infinity or not) from hardware triggered an error.%s\n", KERR, KNRM);
 		goto err;
 	}
@@ -139,7 +138,7 @@ int check_kp_result(ipecc_test_t* t, stats_t* st, bool* res)
 	 */
 	if (t->pt_sw_res.is_null == true) {
 		/*
-		 * Expected result it that [k]P = 0 (aka point at infinity).
+		 * Expected result is that [k]P = 0 (aka point at infinity).
 		 */
 		if (t->pt_hw_res.is_null == true) {
 			/*
@@ -153,7 +152,7 @@ int check_kp_result(ipecc_test_t* t, stats_t* st, bool* res)
 			 * Mismatch error (the hardware result is not the null point).
 			 */
 			printf("%sError: [k]P mistmatch between hardware result and expected one.\n"
-						 "         [k]P is not 0 but should be.%s\n", KERR, KNRM);
+						 "         [k]P is not 0 however it should be.%s\n", KERR, KNRM);
 #if 0
 			status_detail();
 			printf("nn=%d (HW = %d)\n", crv->nn, READ_REG(R_PRIME_SIZE));
@@ -199,7 +198,7 @@ int check_kp_result(ipecc_test_t* t, stats_t* st, bool* res)
 			 * Mismatch error (the hardware result is the null point).
 			 */
 			printf("%sError: [k]P mistmatch between hardware result and expected one.\n"
-						 "         [k]P is 0 but should not be.%s\n", KERR, KNRM);
+						 "         [k]P is 0 however it should not be.%s\n", KERR, KNRM);
 #if 0
 			status_detail();
 			printf("nn=%d (HW = %d)\n", crv->nn, READ_REG(R_PRIME_SIZE));
@@ -237,7 +236,7 @@ int check_kp_result(ipecc_test_t* t, stats_t* st, bool* res)
 			goto err;
 		} else {
 			/*
-			 * Neither hardware result nor the expected one are null.
+			 * Neither [k]P hardware result nor the expected one are null.
 			 * Compare their coordinates.
 			 */
 			if (cmp_two_pts_coords(&(t->pt_sw_res), &(t->pt_hw_res), res))
@@ -255,9 +254,8 @@ int check_kp_result(ipecc_test_t* t, stats_t* st, bool* res)
 #endif
 				(st->ok)++;
 			} else {
-
 				/*
-				 * Mismatch error (hardware [k]P coords & expected ones differ.
+				 * Mismatch error (hardware [k]P coords & expected ones differ).
 				 */
 				printf("%sError: [k]P mistmatch between hardware coordinates and those of the expected result.%s\n", KERR, KNRM);
 #if 0

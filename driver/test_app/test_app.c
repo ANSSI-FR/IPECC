@@ -35,6 +35,8 @@
 extern int ip_set_curve(curve_t*);
 extern int ip_set_pt_and_run_kp(ipecc_test_t*);
 extern int check_kp_result(ipecc_test_t*, stats_t*, bool*);
+extern int ip_set_pts_and_run_ptadd(ipecc_test_t*);
+extern int check_ptadd_result(ipecc_test_t*, stats_t*, bool*);
 
 char* line = NULL;
 /* scalar (k in [k]P) */
@@ -825,7 +827,7 @@ int main(int argc, char *argv[])
 					test.pt_sw_res.is_null = true;
 					test.pt_sw_res.valid = true;
 					/*
-					 * Set and execute a [k]P computation test.
+					 * Set and execute a [k]P computation test on hardware.
 					 */
 					if (ip_set_pt_and_run_kp(&test))
 					{
@@ -879,7 +881,7 @@ int main(int argc, char *argv[])
 					}
 					test.pt_sw_res.valid = true;
 					/*
-					 * Set and execute a [k]P computation test.
+					 * Set and execute a [k]P computation test on harware.
 					 */
 					if (ip_set_pt_and_run_kp(&test))
 					{
@@ -916,7 +918,6 @@ int main(int argc, char *argv[])
 				break;
 			}
 
-#if 0
 			case EXPECT_P_PLUS_QX:{
 				/*
 				 * Parse line to extract value of (P+Q).x
@@ -926,49 +927,59 @@ int main(int argc, char *argv[])
 					/*
 					 * Process the hexadecimal value of (P+Q).x for comparison with HW
 					 */
-					hex_to_large_num(
-							line + strlen("PplusQx=0x"), sw_pplusq.x, nread - strlen("PplusQx=0x"));
-					sw_pplusq.is_null = false;
+					if (hex_to_large_num(
+							line + strlen("PplusQx=0x"), test.pt_sw_res.x.val, &(test.pt_sw_res.x.sz),
+							nread - strlen("PplusQx=0x")))
+					{
+						printf("%sError: Value of point coordinate '(P+Q).x' could not be extracted "
+								"from input file/stream.%s\n", KERR, KNRM);
+						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_P_PLUS_QX')", __LINE__);
+					}
+					test.pt_sw_res.is_null = false;
 					line_type_expected = EXPECT_P_PLUS_QY;
 				} else if ( (strncmp(line, "PplusQ=0", strlen("PplusQ=0"))) == 0 ) {
 					PRINTF("%s(P+Q)=0%s\n", KWHT, KNRM);
-					sw_pplusq.is_null = true;
-					sw_pplusq.valid = true;
-					/*****************
-					 * do a PT_ADD NOW
-					 *****************/
+					test.pt_sw_res.is_null = true;
+					test.pt_sw_res.valid = true;
 					/*
-					 * transfer points to add to the IP and run PT_ADD command
+					 * Set and execute a P + Q computation test on hardware.
 					 */
-					ip_set_pts_and_run_ptadd(curve.nn, &p, &q, &hw_pplusq, &err_flags);
-					/*
-					 * analyze errors
-					 */
-					if (err_flags & 0xffff0000) {
-						printf("ERROR flags in R_STATUS: 0x%08x\n", err_flags);
+					if (ip_set_pts_and_run_ptadd(&test))
+					{
+						printf("%sError: Computation of P + Q on hardware triggered an error.%s\n", KERR, KNRM);
+						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_P_PLUS_QX')", __LINE__);
 					}
 					/*
-					 * analyze results
+					 * Check IP result against the expected one.
 					 */
-					check_ptadd_result(&curve, &p, &q, &sw_pplusq, &hw_pplusq, &stats);
+					if (check_ptadd_result(&test, &stats, &result_pts_are_equal))
+					{
+						printf("%sError: Couldn't compare P + Q hardware result w/ the expected one.%s\n", KERR, KNRM);
+						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_P_PLUS_QX')", __LINE__);
+					}
+					/*
+					 * Stats
+					 */
 					stats.total++;
 					line_type_expected = EXPECT_NONE;
 					print_stats_regularly(&stats);
+#if 0
 					/*
 					 * mark the next test to come as not being an exception (a priori)
 					 * so that [k]P duration statistics only consider [k]P computations
 					 * with no exception
 					 */
 					test_is_an_exception = false;
+#endif
 				} else {
 					printf("%sError: Could not find one of the expected tokens \"PplusQx=0x\" "
-							"or \"(P+Q)=0\" (for debug: while in state EXPECT_P_PLUS_QX)\n", KERR);
-					printf("Stopped on test %d.%d%s\n", nbcurve, nbtest, KNRM);
-					print_stats_and_exit(&stats);
+							"or \"(P+Q)=0\" in input file/stream.%s\n", KERR, KNRM);
+					print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_KPY')", __LINE__);
 				}
 				break;
 			}
 
+#if 0
 			case EXPECT_P_PLUS_QY:{
 				/*
 				 * Parse line to extract value of (P+Q).y

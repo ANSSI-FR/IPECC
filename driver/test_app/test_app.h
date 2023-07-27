@@ -199,7 +199,7 @@ typedef struct {
 #define INT_TO_BOOLEAN(i)   ((i) ? true : false)
 
 /*
- * printf/error formating
+ * Error/printf formating
  */
 #define TERM_COLORS
 

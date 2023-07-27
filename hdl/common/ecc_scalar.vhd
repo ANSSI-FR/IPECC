@@ -815,15 +815,15 @@ begin
 							v01z := r.ctrl.r1z & r.ctrl.r0z;
 							case v01z is
 								when "00" =>
-									-- neither R0 nor R1 input points were null to begin with
-									-- we need to catch if the resulting P + Q point happens to be
-									-- the null point, which can happen in two and only two cases:
-									-- if the input points were equal and this common point happe-
-									-- ned to be a 2-torsion point; and if the input points were
-									-- opposite.
+									-- Neither R0 nor R1 input points were null to begin with.
+									-- We need to catch if the resulting P + Q point happens to be
+									-- the null point, which can happen in two cases and two cases
+									-- only: if the input points were equal and this common point
+									-- happened to be a 2-torsion point; and if the input points
+									-- were opposite.
 									-- Input signals xmxz and ymyz (driven by ecc_curve) are valid
 									-- because routine .pre_zadduL was executed prior (while in
-									-- "state" r.pop.step = 0)
+									-- "state" r.pop.step = 0).
 									if xmxz = '1' and ymyz = '1' then
 										-- input points were equal, the result is null iff input
 										-- torsion2 is asserted by ecc_curve
@@ -835,25 +835,25 @@ begin
 										v.int.ar01zien := '1'; -- asserted only 1 cycle thx to (s28)
 									end if;
 								when "01" =>
-									-- R0 was null, R1 was not
-									-- patch mechanism in ecc_curve has ensured that coordinates
+									-- R0 was null, R1 was not.
+									-- Patch mechanism in ecc_curve has ensured that coordinates
 									-- XR1 & YR1 of output point R1 have in fact been overwritten,
 									-- at the end of routine .additionL, with what they were when
-									-- point addition operation was started
-									-- both points R0 & R1 stays in the same state, we don't even
-									-- assert ar01zien
+									-- point addition operation was started.
+									-- Both points R0 & R1 stays in the same state, we don't even
+									-- assert ar01zien.
 									null;
 								when "10" =>
-									-- R1 was null, R0 was not
-									-- patch mechanism in ecc_curve has ensured that coordinates
+									-- R1 was null, R0 was not.
+									-- Patch mechanism in ecc_curve has ensured that coordinates
 									-- XR1 & YR1 of output point R1 have in fact been overwritten,
 									-- at the end of routine .additionL, with values of XR0 & YR0
-									-- at the time point addition operation was started
-									-- R1 is no longer null (nor R0 but no need to set it)
+									-- at the time point addition operation was started.
+									-- R1 is no longer null (nor R0 but no need to set it).
 									v.int.ar1zi := '0';
 									v.int.ar01zien := '1'; -- stays asserted 1 cycle thx to (s28)
 								when "11" =>
-									-- both R0 & R1 were null, they stay so
+									-- Both R0 & R1 were null, they stay so.
 									null;
 								when others => null;
 							end case;
