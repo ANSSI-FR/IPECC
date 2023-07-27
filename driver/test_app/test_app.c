@@ -979,7 +979,6 @@ int main(int argc, char *argv[])
 				break;
 			}
 
-#if 0
 			case EXPECT_P_PLUS_QY:{
 				/*
 				 * Parse line to extract value of (P+Q).y
@@ -989,44 +988,54 @@ int main(int argc, char *argv[])
 					/*
 					 * Process the hexadecimal value of (P+Q).y for comparison with HW
 					 */
-					hex_to_large_num(
-							line + strlen("PplusQy=0x"), sw_pplusq.y, nread - strlen("PplusQx=0x"));
-					sw_pplusq.valid = true;
-					/*****************
-					 * do a PT_ADD NOW
-					 *****************/
+					if (hex_to_large_num(
+							line + strlen("PplusQy=0x"), test.pt_sw_res.y.val, &(test.pt_sw_res.y.sz),
+							nread - strlen("PplusQy=0x")))
+					{
+						printf("%sError: Value of point coordinate '(P+Q).y' could not be extracted "
+								"from input file/stream.%s\n", KERR, KNRM);
+						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_P_PLUS_QY')", __LINE__);
+					}
+					test.pt_sw_res.valid = true;
 					/*
-					 * transfer points to add to the IP and run PT_ADD command
+					 * Set and execute a P + Q computation test on harware.
 					 */
-					ip_set_pts_and_run_ptadd(curve.nn, &p, &q, &hw_pplusq, &err_flags);
-					/*
-					 * analyze errors
-					 */
-					if (err_flags & 0xffff0000) {
-						printf("ERROR flags in R_STATUS: 0x%08x\n", err_flags);
+					if (ip_set_pts_and_run_ptadd(&test))
+					{
+						printf("%sError: Computation of P + Q on hardware triggered an error.%s\n", KERR, KNRM);
+						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_P_PLUS_QY')", __LINE__);
 					}
 					/*
-					 * analyze results
+					 * Check IP result against the expected one.
 					 */
-					check_ptadd_result(&curve, &p, &q, &sw_pplusq, &hw_pplusq, &stats);
+					if (check_ptadd_result(&test, &stats, &result_pts_are_equal))
+					{
+						printf("%sError: Couldn't compare P + Q hardware result w/ the expected one.%s\n", KERR, KNRM);
+						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_P_PLUS_QY')", __LINE__);
+					}
+					/*
+					 * Stats
+					 */
 					stats.total++;
 					line_type_expected = EXPECT_NONE;
 					print_stats_regularly(&stats);
+#if 0
 					/*
 					 * mark the next test to come as not being an exception (a priori)
 					 * so that [k]P duration statistics only consider [k]P computations
 					 * with no exception
 					 */
 					test_is_an_exception = false;
+#endif
 				} else {
 					printf("%sError: Could not find the expected token \"PplusQy=0x\" "
-							"(for debug: while in state EXPECT_P_PLUS_QY)\n", KERR);
-					printf("Stopped on test %d.%d%s\n", nbcurve, nbtest, KNRM);
-					print_stats_and_exit(&stats);
+							"in input file/stream.%s\n", KERR, KNRM);
+					print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_P_PLUS_QY')", __LINE__);
 				}
 				break;
 			}
 
+#if 0
 			case EXPECT_TWOP_X:{
 				/*
 				 * Parse line to extract value of [2]P.x
