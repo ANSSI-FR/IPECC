@@ -82,11 +82,10 @@ int ip_set_pts_and_run_ptadd(ipecc_test_t* t)
 	} else {
 		/* Set point R0 as NOT being the null point (aka point at infinity). */
 		if (hw_driver_point_unzero(0)) {
-			printf("%sError: Setting point P as not the infinity point on hardware triggered an error.%s\n", KERR, KNRM);
+			printf("%sError: Setting point P as diff. from the infinity point on hardware triggered an error.%s\n", KERR, KNRM);
 			goto err;
 		}
 	}
-
 	/*
 	 * Send point Q info & coordinates
 	 */
@@ -99,7 +98,7 @@ int ip_set_pts_and_run_ptadd(ipecc_test_t* t)
 	} else {
 		/* Set point R1 as NOT being the null point (aka point at infinity). */
 		if (hw_driver_point_unzero(1)) {
-			printf("%sError: Setting point Q as not the infinity point on hardware triggered an error.%s\n", KERR, KNRM);
+			printf("%sError: Setting point Q as diff. from the infinity point on hardware triggered an error.%s\n", KERR, KNRM);
 			goto err;
 		}
 	}
@@ -119,7 +118,7 @@ int ip_set_pts_and_run_ptadd(ipecc_test_t* t)
 	 * the coordinates of P + Q result in the appropriate buffers (namely
 	 * t->pt_hw_res.x.val and t->pt_hw_res.y.val).
 	 */
-	if (hw_driver_point_iszero(1, &is_null)) { /* result point is R1 */
+	if (hw_driver_point_iszero(1, &is_null)) { /* result point assumed to be R1 */
 		printf("%sError: Getting status of P + Q result point (at infinity or not) from hardware triggered an error.%s\n", KERR, KNRM);
 		goto err;
 	}
@@ -142,6 +141,7 @@ int check_ptadd_result(ipecc_test_t* t, stats_t* st, bool* res)
 		printf("%sError: Can't check result of P + Q against expected one, computation didn't happen on hardware.%s\n", KERR, KNRM);
 		goto err;
 	}
+
 	if (t->pt_sw_res.is_null == true) {
 		/*
 		 * Expected result is that P + Q = 0 (aka point at infinity).
@@ -265,7 +265,7 @@ int check_ptadd_result(ipecc_test_t* t, stats_t* st, bool* res)
 				(st->ok)++;
 			} else {
 				/*
-				 * Mismatch error (hardware [k]P coords & expected ones differ).
+				 * Mismatch error (hardware P + Q coords & expected ones differ).
 				 */
 				printf("%sError: P + Q mistmatch between hardware coordinates and those of the expected result.%s\n", KERR, KNRM);
 #if 0
@@ -312,112 +312,115 @@ err:
 	return -1;
 }
 
-#if 0
-void ip_set_pt_and_run_ptdbl(uint32_t nn, struct point_t* pt_p,
-		struct point_t* pt_twop, uint32_t* err)
+int ip_set_pts_and_run_ptdbl(ipecc_test_t* t)
 {
+	int is_null;
 	/*
-	 * verify that point P is valid
+	 * Sanity check.
+	 * Verify that curve is is set.
+	 * Verify that point P is set.
+	 * Verify that all large numbers do not exceed curve parameter 'nn' in size.
+	 * Verify that expected result of test is set.
+	 * Verify that operation type is valid.
 	 */
-	if (pt_p->valid == false) {
-		printf("%sERROR: can't program IP for [2]P computation, "
-				"point P isn't marked as valid\n%s", KERR, KNRM);
-		printf("%sstopped on test %d.%d%s\n", KERR, nbcurve, nbtest, KNRM);
-		print_stats_and_exit();
+	if (t->curve->set_in_hw == false) {
+		printf("%sError: Can't program IP for [2]P computation, assoc. curve not set in hardware.%s\n", KERR, KNRM);
+		goto err;
 	}
+	if (t->ptp.valid == false) {
+		printf("%sError: Can't program IP for [2]P computation, input point P not set.%s\n", KERR, KNRM);
+		goto err;
+	}
+	if (t->ptp.x.sz > NN_SZ(t->curve->nn)) {
+		printf("%sError: Can't program IP for [2]P computation, X coord. of point P larger than current curve size set in hardware.%s\n", KERR, KNRM);
+		goto err;
+	}
+	if (t->ptp.y.sz > NN_SZ(t->curve->nn)) {
+		printf("%sError: Can't program IP for [2]P computation, Y coord. of point P larger than currrent curve size set in hardware.%s\n", KERR, KNRM);
+		goto err;
+	}
+	if (t->pt_sw_res.valid == false) {
+		printf("%sError: Can't program IP for [2]P computation, missing expected result of test.%s\n", KERR, KNRM);
+		goto err;
+	}
+	if (t->op != OP_PTDBL) {
+		printf("%sError: Can't program IP for [2]P computation, operation type mismatch.%s\n", KERR, KNRM);
+		goto err;
+	}
+
 	/*
-	 * send point P info & coordinates (into R0)
+	 * Send point P info & coordinates
 	 */
-	if (pt_p->is_null == false) {
-		/*
-		 * send Px
-		 */
-		write_large_number(LARGE_NB_XR0_ADDR, pt_p->x, nn, false);
-		/*
-		 * send Py
-		 */
-		write_large_number(LARGE_NB_YR0_ADDR, pt_p->y, nn, false);
-		/*
-		 * set R0 as a non null point
-		 */
-		set_r0_non_null();
+	if (t->ptp.is_null == true) {
+		/* Set point R0 as being the null point (aka point at infinity). */
+		if (hw_driver_point_zero(0)) { /* input point assumed to be R0 in hardware */
+			printf("%sError: Setting point P as the infinity point on hardware triggered an error.%s\n", KERR, KNRM);
+			goto err;
+		}
 	} else {
-		/*
-		 * set R0 to be the null point
-		 */
-		set_r0_null();
+		/* Set point R0 as NOT being the null point (aka point at infinity). */
+		if (hw_driver_point_unzero(0)) { /* input point assumed to be R0 in hardware */
+			printf("%sError: Setting point P as diff. from the infinity point on hardware triggered an error.%s\n", KERR, KNRM);
+			goto err;
+		}
 	}
-	/*
-	 * run [2]P (PT_DBL) command
-	 */
-	run_pt_dbl();
-	/*
-	 * poll until job's done
-	 */
-	poll_until_ready();
-	/*
-	 * print it if IP raised an error
-	 */
-	print_error_if_any();
-	/*
-	 * read-back [2]P result coords (from R1) if result is not null
-	 */
-	if (get_r1_null_or_not_null() == R1_NOT_NULL)
+
+	/* Run [2]P command */
+	if (hw_driver_dbl(t->ptp.x.val, t->ptp.x.sz, t->ptp.y.val, t->ptp.y.sz, t->pt_hw_res.x.val,
+				&(t->pt_hw_res.x.sz), t->pt_hw_res.y.val, &(t->pt_hw_res.y.sz)))
 	{
-		/*
-		 * read coordinate X
-		 */
-		read_large_number(LARGE_NB_XR1_ADDR, pt_twop->x, nn);
-		/*
-		 * read coordinate Y
-		 */
-		read_large_number(LARGE_NB_YR1_ADDR, pt_twop->y, nn);
-		/*
-		 * set result not to be null in passed pointer
-		 */
-		pt_twop->is_null = false;
-	} else {
-		/*
-		 * set result as null in passed pointer
-		 */
-		pt_twop->is_null = true;
+		printf("%sError: [2]P computation by hardware triggered an error.%s\n", KERR, KNRM);
+		goto err;
 	}
+
 	/*
-	 * mark HW resulting point as valid 
+	 * Is the result the null point? (aka point at infinity)
+	 * If it is not, there's nothing to do, as hw_driver_dbl() already set
+	 * the coordinates of [2]P result in the appropriate buffers (namely
+	 * t->pt_hw_res.x.val and t->pt_hw_res.y.val).
 	 */
-	pt_twop->valid = true;
-	/*
-	 * set error flags in passed pointer
-	 */
-	*err = READ_REG(R_STATUS) & 0xffff0000;
+	if (hw_driver_point_iszero(1, &is_null)) { /* result point assumed to be R1 */
+		printf("%sError: Getting status [2]P result point (at infinity or not) from hardware triggered an error.%s\n", KERR, KNRM);
+		goto err;
+	}
+	t->pt_hw_res.is_null = INT_TO_BOOLEAN(is_null);
+	t->pt_hw_res.valid = true;
+
+	return 0;
+err:
+	return -1;
 }
 
-void check_ptdbl_result(struct curve_t* crv, struct point_t* pt_p,
-		struct point_t* sw_twop, struct point_t* hw_twop, struct stats_t* st)
+int check_ptdbl_result(ipecc_test_t* t, stats_t* st, bool* res)
 {
-	if (sw_twop->valid == false) {
-		printf("%sERROR: can't check correctness of [2]P computation, "
-				"SW point isn't marked as valid\n%s", KERR, KNRM);
+	/*
+	 * Sanity check.
+	 * Verify that computation was actually done on hardware.
+	 */
+	if (t->pt_hw_res.valid == false)
+	{
+		printf("%sError: Can't check result of [2]P against expected one, computation didn't happen on hardware.%s\n", KERR, KNRM);
+		goto err;
 	}
-	if (hw_twop->valid == false) {
-		printf("%sERROR: can't check correctness of [2]P computation, "
-				"HW point isn't marked as valid\n%s", KERR, KNRM);
-	}
-	if ((sw_twop->valid == false) || (hw_twop->valid == false)) {
-		printf("%sstopped on test %d.%d%s\n", KERR, nbcurve, nbtest, KNRM);
-		print_stats_and_exit();
-	}
-	if (sw_twop->is_null == true) {
-		if (hw_twop->is_null == true) {
-#ifdef VERBOSE
-			printf("[2]P = 0 as expected\n");
-#endif
+
+	if (t->pt_sw_res.is_null == true) {
+		/*
+		 * Expected result is that [2]P = 0 (aka point at infinity).
+		 */
+		if (t->pt_hw_res.is_null == true) {
+			/*
+			 * The hardware result is also the null point.
+			 */
+			PRINTF("[2]P = 0 as expected\n");
+			*res = true;
 			(st->ok)++;
 		} else {
-			printf("%s", KERR);
-			printf("---- ERROR when computing [2]P\n");
-			printf("test #%d.%d\n", nbcurve, nbtest);
-			printf("ERROR: [2]P is not 0 but should be\n");
+			/*
+			 * Mismatch error (the hardware result is not the null point).
+			 */
+			printf("%sError: [2]P mistmatch between hardware result and expected one.\n"
+						 "         [2]P is not 0 however it should be.%s\n", KERR, KNRM);
+#if 0
 			status_detail();
 			printf("nn=%d (HW = %d)\n", crv->nn, READ_REG(R_PRIME_SIZE));
 			display_large_number(crv->nn, "p=0x", crv->p);
@@ -444,18 +447,22 @@ void check_ptdbl_result(struct curve_t* crv, struct point_t* pt_p,
 			}
 			printf("%s", KNRM);
 			WRITE_REG(W_ERR_ACK, 0xffff0000);
-			(st->nok)++;
-#ifdef LEAVE_ON_ERROR
-			printf("%sstopped on test %d.%d%s\n", KERR, nbcurve, nbtest, KNRM);
-			print_stats_and_exit();
 #endif
+			*res = false;
+			(st->nok)++;
+			goto err;
 		}
 	} else {
-		if (hw_twop->is_null == true) {
-			printf("%s", KERR);
-			printf("---- ERROR when computing [2]P\n");
-			printf("test #%d.%d\n", nbcurve, nbtest);
-			printf("ERROR: [2]P = 0 but shouldn't be\n");
+		/*
+		 * Expected result it that [2]P is different from the point at infinity.
+		 */
+		if (t->pt_hw_res.is_null == true) {
+			/*
+			 * Mismatch error (the hardware result is the null point).
+			 */
+			printf("%sError: [2]P mistmatch between hardware result and expected one.\n"
+						 "         [2]P is 0 however it should not be.%s\n", KERR, KNRM);
+#if 0
 			status_detail();
 			printf("nn=%d (HW = %d)\n", crv->nn, READ_REG(R_PRIME_SIZE));
 			display_large_number(crv->nn, "p=0x", crv->p);
@@ -482,14 +489,23 @@ void check_ptdbl_result(struct curve_t* crv, struct point_t* pt_p,
 			}
 			printf("%s", KNRM);
 			WRITE_REG(W_ERR_ACK, 0xffff0000);
+#endif
+			*res = false;
 			(st->nok)++;
+			goto err;
 		} else {
 			/*
-			 * compare software client & hardware IP coordinates
+			 * Neither [2]P hardware result nor the expected one are null.
+			 * Compare their coordinates.
 			 */
-			if (cmp_two_pts_coords(crv->nn, sw_twop, hw_twop) == true) {
-#ifdef VERBOSE
-				printf("results match\n");
+			if (cmp_two_pts_coords(&(t->pt_sw_res), &(t->pt_hw_res), res))
+			{
+				printf("%sError when comparing coordinates of hardware [2]P result with the expected ones.%s\n", KERR, KNRM);
+				goto err;
+			}
+			if (*res == true) {
+				PRINTF("[2]P results match\n");
+#if 0
 				display_large_number(crv->nn, "SW: [2]Px = 0x", sw_twop->x);
 				display_large_number(crv->nn, "    [2]Py = 0x", sw_twop->y);
 				display_large_number(crv->nn, "HW: [2]Px = 0x", hw_twop->x);
@@ -497,10 +513,11 @@ void check_ptdbl_result(struct curve_t* crv, struct point_t* pt_p,
 #endif
 				(st->ok)++;
 			} else {
-				printf("%s", KERR);
-				printf("---- ERROR when computing [2]P\n");
-				printf("test #%d.%d\n", nbcurve, nbtest);
-				printf("ERROR: HW/SW mismatch\n");
+				/*
+				 * Mismatch error (hardware [2]P coords & expected ones differ).
+				 */
+				printf("%sError: [2]P mistmatch between hardware coordinates and those of the expected result.%s\n", KERR, KNRM);
+#if 0
 				status_detail();
 				printf("nn=%d (HW = %d)\n", crv->nn, READ_REG(R_PRIME_SIZE));
 				display_large_number(crv->nn, "p=0x", crv->p);
@@ -513,16 +530,18 @@ void check_ptdbl_result(struct curve_t* crv, struct point_t* pt_p,
 				display_large_number(crv->nn, "    [2]Py = 0x", hw_twop->y);
 				printf("%s", KNRM);
 				WRITE_REG(W_ERR_ACK, 0xffff0000);
-				(st->nok)++;
-#ifdef LEAVE_ON_ERROR
-				printf("%sstopped on test %d.%d%s\n", KERR, nbcurve, nbtest, KNRM);
-				print_stats_and_exit();
 #endif
+				(st->nok)++;
+				goto err;
 			}
 		}
 	}
+	return 0;
+err:
+	return -1;
 }
 
+#if 0
 void ip_set_pt_and_run_ptneg(uint32_t nn, struct point_t* pt_p,
 		struct point_t* pt_negp, uint32_t* err)
 {

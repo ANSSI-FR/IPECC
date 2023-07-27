@@ -180,7 +180,7 @@ while (nbcurv < NBCURV) or (NBCURV == 0):
         # compute P + Q
         PplusQ = P + Q
         # print test informations
-        print("P+Q #%d.%d" % (nbcurv, nbtest))
+        print("== TEST P+Q #%d.%d" % (nbcurv, nbtest))
         if P == 0:
             print("P=0")
         else:
@@ -208,7 +208,7 @@ while (nbcurv < NBCURV) or (NBCURV == 0):
         # compute [2]P
         twoP = 2 * P
         # print test informations
-        print("[2]P #%d.%d" % (nbcurv, nbtest))
+        print("== TEST [2]P #%d.%d" % (nbcurv, nbtest))
         if P == 0:
             print("P=0")
         else:
@@ -231,7 +231,7 @@ while (nbcurv < NBCURV) or (NBCURV == 0):
         # compute -P
         negP = -P
         # print test informations
-        print("-P #%d.%d" % (nbcurv, nbtest))
+        print("== TEST -P #%d.%d" % (nbcurv, nbtest))
         if P == 0:
             print("P=0")
         else:
@@ -247,7 +247,7 @@ while (nbcurv < NBCURV) or (NBCURV == 0):
     # TEST : is P on curve
     #
     for i in range(0, NBCHK):
-        print("isPoncurve #%d.%d" % (nbcurv, nbtest))
+        print("== TEST isPoncurve #%d.%d" % (nbcurv, nbtest))
         if toss_a_coin() == 1:
             # generate a random point on curve
             P = EE.random_element()
@@ -277,7 +277,7 @@ while (nbcurv < NBCURV) or (NBCURV == 0):
     # TEST : P == Q
     #
     for i in range(0, NBEQU):
-        print("isP==Q #%d.%d" % (nbcurv, nbtest))
+        print("== TEST isP==Q #%d.%d" % (nbcurv, nbtest))
         if toss_a_coin() == 1:
             # generate a random point on curve
             P = EE.random_element()
@@ -322,7 +322,7 @@ while (nbcurv < NBCURV) or (NBCURV == 0):
     # TEST : P == -Q
     #
     for i in range(0, NBEQU):
-        print("isP==-Q #%d.%d" % (nbcurv, nbtest))
+        print("== TEST isP==-Q #%d.%d" % (nbcurv, nbtest))
         if toss_a_coin() == 1:
             # generate a random point on curve
             P = EE.random_element()
@@ -630,7 +630,7 @@ while (nbcurv < NBCURV) or (NBCURV == 0):
     #
     #   P = Q
     if P != 0:
-        print("P+Q #%d.%d" % (nbcurv, nbtest))
+        print("== TEST P+Q #%d.%d" % (nbcurv, nbtest))
         print("# EXCEPTION: P = Q")
         print("Px=0x%0*x" % (int(div(nn, 4)), P[0]))
         print("Py=0x%0*x" % (int(div(nn, 4)), P[1]))
@@ -646,7 +646,7 @@ while (nbcurv < NBCURV) or (NBCURV == 0):
         nbtest+=1
     #   P = -Q
     if P != 0:
-        print("P+Q #%d.%d" % (nbcurv, nbtest))
+        print("== TEST P+Q #%d.%d" % (nbcurv, nbtest))
         print("# EXCEPTION: P = -Q")
         print("Px=0x%0*x" % (int(div(nn, 4)), P[0]))
         print("Py=0x%0*x" % (int(div(nn, 4)), P[1]))
@@ -655,7 +655,7 @@ while (nbcurv < NBCURV) or (NBCURV == 0):
         print("PplusQ=0")
         nbtest+=1
     #   P = 0 (Q != 0)
-    print("P+Q #%d.%d" % (nbcurv, nbtest))
+    print("== TEST P+Q #%d.%d" % (nbcurv, nbtest))
     print("# EXCEPTION: P = 0, Q /= 0")
     print("P=0")
     print("Qx=0x%0*x" % (int(div(nn, 4)), P[0]))
@@ -664,7 +664,7 @@ while (nbcurv < NBCURV) or (NBCURV == 0):
     print("PplusQy=0x%0*x" % (int(div(nn, 4)), P[1]))
     nbtest+=1
     #   Q = 0 (P != 0)
-    print("P+Q #%d.%d" % (nbcurv, nbtest))
+    print("== TEST P+Q #%d.%d" % (nbcurv, nbtest))
     print("# EXCEPTION: Q = 0, P /= 0")
     print("Px=0x%0*x" % (int(div(nn, 4)), P[0]))
     print("Py=0x%0*x" % (int(div(nn, 4)), P[1]))
@@ -673,7 +673,7 @@ while (nbcurv < NBCURV) or (NBCURV == 0):
     print("PplusQy=0x%0*x" % (int(div(nn, 4)), P[1]))
     nbtest+=1
     #   P = Q = 0
-    print("P+Q #%d.%d" % (nbcurv, nbtest))
+    print("== TEST P+Q #%d.%d" % (nbcurv, nbtest))
     print("# EXCEPTION: P = Q = 0")
     print("P=0")
     print("Q=0")
@@ -685,7 +685,7 @@ while (nbcurv < NBCURV) or (NBCURV == 0):
     # EXCEPTIONS FOR PT_DBL ([2]P)
     #
     #   P = 0
-    print("[2]P #%d.%d" % (nbcurv, nbtest))
+    print("== TEST [2]P #%d.%d" % (nbcurv, nbtest))
     print("# EXCEPTION: P = 0")
     print("P=0")
     print("twoP=0")
@@ -708,14 +708,14 @@ while (nbcurv < NBCURV) or (NBCURV == 0):
                 fs = fs * (2 ** (fac[1] - 1))
                 # point fsP on line below is a point of order 2 (aka of 2-torsion)
                 fsP = fs * P
-                print("[2]P #%d.%d" % (nbcurv, nbtest))
+                print("== TEST [2]P #%d.%d" % (nbcurv, nbtest))
                 print("# EXCEPTION: P = 2-torsion")
                 print("Px=0x%0*x" % (int(div(nn, 4)), fsP[0]))
                 print("Py=0x%0*x" % (int(div(nn, 4)), fsP[1]))
                 print("twoP=0")
                 nbtest+=1
                 # create a second test for exception of P + Q, w/ P = Q = 2-torsion
-                print("P+Q #%d.%d" % (nbcurv, nbtest))
+                print("== TEST P+Q #%d.%d" % (nbcurv, nbtest))
                 print("# EXCEPTION: P = Q = 2-torsion")
                 print("Px=0x%0*x" % (int(div(nn, 4)), fsP[0]))
                 print("Py=0x%0*x" % (int(div(nn, 4)), fsP[1]))
@@ -724,7 +724,7 @@ while (nbcurv < NBCURV) or (NBCURV == 0):
                 print("PplusQ=0")
                 nbtest+=1
                 # create a third test for exception of isP==-Q w/ P = Q = 2-torsion
-                print("isP==-Q #%d.%d" % (nbcurv, nbtest))
+                print("== TEST isP==-Q #%d.%d" % (nbcurv, nbtest))
                 print("# EXCEPTION: P = Q = 2-torsion")
                 print("Px=0x%0*x" % (int(div(nn, 4)), fsP[0]))
                 print("Py=0x%0*x" % (int(div(nn, 4)), fsP[1]))
@@ -742,7 +742,7 @@ while (nbcurv < NBCURV) or (NBCURV == 0):
     #   (this is actually already tested above)
     #
     #   P = -Q
-    print("isP==Q #%d.%d" % (nbcurv, nbtest))
+    print("== TEST isP==Q #%d.%d" % (nbcurv, nbtest))
     print("# EXCEPTION: P = -Q")
     if P == 0:
         print("P=0")
@@ -761,7 +761,7 @@ while (nbcurv < NBCURV) or (NBCURV == 0):
     nbtest+=1
     #   P = 0 (Q != 0)
     if P != 0:
-        print("isP==Q #%d.%d" % (nbcurv, nbtest))
+        print("== TEST isP==Q #%d.%d" % (nbcurv, nbtest))
         print("# EXCEPTION: P = 0, Q != 0")
         print("P=0")
         print("Qx=0x%0*x" % (int(div(nn, 4)), P[0]))
@@ -770,7 +770,7 @@ while (nbcurv < NBCURV) or (NBCURV == 0):
         nbtest+=1
     #   Q = 0 (P != 0)
     if P != 0:
-        print("isP==Q #%d.%d" % (nbcurv, nbtest))
+        print("== TEST isP==Q #%d.%d" % (nbcurv, nbtest))
         print("# EXCEPTION: P != 0, Q = 0")
         print("Px=0x%0*x" % (int(div(nn, 4)), P[0]))
         print("Py=0x%0*x" % (int(div(nn, 4)), P[1]))
@@ -778,7 +778,7 @@ while (nbcurv < NBCURV) or (NBCURV == 0):
         print("false")
         nbtest+=1
     #   P = Q = 0
-    print("isP==Q #%d.%d" % (nbcurv, nbtest))
+    print("== TEST isP==Q #%d.%d" % (nbcurv, nbtest))
     print("# EXCEPTION: P = Q = 0")
     print("P=0")
     print("Q=0")
@@ -789,7 +789,7 @@ while (nbcurv < NBCURV) or (NBCURV == 0):
     #
     #   P = Q & P != -Q
     if P != 0 and P != -P:
-        print("isP==-Q #%d.%d" % (nbcurv, nbtest))
+        print("== TEST isP==-Q #%d.%d" % (nbcurv, nbtest))
         print("# EXCEPTION: P = Q & P != -Q")
         print("Px=0x%0*x" % (int(div(nn, 4)), P[0]))
         print("Py=0x%0*x" % (int(div(nn, 4)), P[1]))
@@ -799,7 +799,7 @@ while (nbcurv < NBCURV) or (NBCURV == 0):
         nbtest+=1
     #   P = -Q  & P != Q
     if P != 0 and P != -P:
-        print("isP==-Q #%d.%d" % (nbcurv, nbtest))
+        print("== TEST isP==-Q #%d.%d" % (nbcurv, nbtest))
         print("# EXCEPTION: P = -Q & P != Q")
         print("Px=0x%0*x" % (int(div(nn, 4)), P[0]))
         print("Py=0x%0*x" % (int(div(nn, 4)), P[1]))
@@ -812,7 +812,7 @@ while (nbcurv < NBCURV) or (NBCURV == 0):
     #
     #   P = 0 (Q != 0)
     if P != 0:
-        print("isP==-Q #%d.%d" % (nbcurv, nbtest))
+        print("== TEST isP==-Q #%d.%d" % (nbcurv, nbtest))
         print("# EXCEPTION: P = 0, Q != 0")
         print("P=0")
         print("Qx=0x%0*x" % (int(div(nn, 4)), P[0]))
@@ -821,7 +821,7 @@ while (nbcurv < NBCURV) or (NBCURV == 0):
         nbtest+=1
     #   Q = 0 (P != 0)
     if P != 0:
-        print("isP==-Q #%d.%d" % (nbcurv, nbtest))
+        print("== TEST isP==-Q #%d.%d" % (nbcurv, nbtest))
         print("# EXCEPTION: P != 0, Q = 0")
         print("Px=0x%0*x" % (int(div(nn, 4)), P[0]))
         print("Py=0x%0*x" % (int(div(nn, 4)), P[1]))
@@ -829,7 +829,7 @@ while (nbcurv < NBCURV) or (NBCURV == 0):
         print("false")
         nbtest+=1
     #   P = Q = 0
-    print("isP==-Q #%d.%d" % (nbcurv, nbtest))
+    print("== TEST isP==-Q #%d.%d" % (nbcurv, nbtest))
     print("# EXCEPTION: P = Q = 0")
     print("P=0")
     print("Q=0")
@@ -839,7 +839,7 @@ while (nbcurv < NBCURV) or (NBCURV == 0):
     # EXCEPTIONS FOR PT_NEG (-P)
     #
     #   P = 0
-    print("-P #%d.%d" % (nbcurv, nbtest))
+    print("== TEST -P #%d.%d" % (nbcurv, nbtest))
     print("# EXCEPTION: P = 0")
     print("P=0")
     print("negP=0")

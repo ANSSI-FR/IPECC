@@ -37,6 +37,8 @@ extern int ip_set_pt_and_run_kp(ipecc_test_t*);
 extern int check_kp_result(ipecc_test_t*, stats_t*, bool*);
 extern int ip_set_pts_and_run_ptadd(ipecc_test_t*);
 extern int check_ptadd_result(ipecc_test_t*, stats_t*, bool*);
+extern int ip_set_pts_and_run_ptdbl(ipecc_test_t*);
+extern int check_ptdbl_result(ipecc_test_t*, stats_t*, bool*);
 
 char* line = NULL;
 /* scalar (k in [k]P) */
@@ -350,105 +352,105 @@ int main(int argc, char *argv[])
 					 * (otherwise default is no blinding).
 					 */
 					test.blinding = 0;
-				} else if ( (strncmp(line, "P+Q #", strlen("P+Q #"))) == 0 ) {
+				} else if ( (strncmp(line, "== TEST P+Q #", strlen("== TEST P+Q #"))) == 0 ) {
 					/*
 					 * Extract the computation nb, after '#' character.
 					 */
 					/* Determine position of the dot in the line. */
 					for (i=0; ; i++) {
-						if (*(line + strlen("P+Q #") + i) == '.') {
-							*(line + strlen("P+Q #") + i) = '\0';
+						if (*(line + strlen("== TEST P+Q #") + i) == '.') {
+							*(line + strlen("== TEST P+Q #") + i) = '\0';
 							break;
 						}
 					}
-					strtol_with_err(line + strlen("P+Q #") + i + 1, &test.id);
+					strtol_with_err(line + strlen("== TEST P+Q #") + i + 1, &test.id);
 					test.op = OP_PTADD;
 					test.ptp.valid = false;
 					test.ptq.valid = false;
 					test.pt_sw_res.valid = false;
 					test.pt_hw_res.valid = false;
 					line_type_expected = EXPECT_PX;
-				} else if ( (strncmp(line, "[2]P #", strlen("[2]P #"))) == 0 ) {
+				} else if ( (strncmp(line, "== TEST [2]P #", strlen("== TEST [2]P #"))) == 0 ) {
 					/*
 					 * Extract the computation nb, after '#' character.
 					 */
 					/* Determine position of the dot in the line. */
 					for (i=0; ; i++) {
-						if (*(line + strlen("[2]P #") + i) == '.') {
-							*(line + strlen("[2]P #") + i) = '\0';
+						if (*(line + strlen("== TEST [2]P #") + i) == '.') {
+							*(line + strlen("== TEST [2]P #") + i) = '\0';
 							break;
 						}
 					}
-					strtol_with_err(line + strlen("[2]P #") + i + 1, &test.id);
+					strtol_with_err(line + strlen("== TEST [2]P #") + i + 1, &test.id);
 					test.op = OP_PTDBL;
 					test.ptp.valid = false;
 					test.pt_sw_res.valid = false;
 					test.pt_hw_res.valid = false;
 					line_type_expected = EXPECT_PX;
-				} else if ( (strncmp(line, "-P #", strlen("-P #"))) == 0 ) {
+				} else if ( (strncmp(line, "== TEST -P #", strlen("== TEST -P #"))) == 0 ) {
 					/*
 					 * Extract the computation nb, after '#' character.
 					 */
 					/* Determine position of the dot in the line. */
 					for (i=0; ; i++) {
-						if (*(line + strlen("-P #") + i) == '.') {
-							*(line + strlen("-P #") + i) = '\0';
+						if (*(line + strlen("== TEST -P #") + i) == '.') {
+							*(line + strlen("== TEST -P #") + i) = '\0';
 							break;
 						}
 					}
-					strtol_with_err(line + strlen("-P #") + i + 1, &test.id);
+					strtol_with_err(line + strlen("== TEST -P #") + i + 1, &test.id);
 					test.op = OP_PTNEG;
 					test.ptp.valid = false;
 					test.pt_sw_res.valid = false;
 					test.pt_hw_res.valid = false;
 					line_type_expected = EXPECT_PX;
-				} else if ( (strncmp(line, "isPoncurve #", strlen("isPoncurve #"))) == 0 ) {
+				} else if ( (strncmp(line, "== TEST isPoncurve #", strlen("== TEST isPoncurve #"))) == 0 ) {
 					/*
 					 * Extract the computation nb, after '#' character.
 					 */
 					/* Determine position of the dot in the line. */
 					for (i=0; ; i++) {
-						if (*(line + strlen("isPoncurve #") + i) == '.') {
-							*(line + strlen("isPoncurve #") + i) = '\0';
+						if (*(line + strlen("== TEST isPoncurve #") + i) == '.') {
+							*(line + strlen("== TEST isPoncurve #") + i) = '\0';
 							break;
 						}
 					}
-					strtol_with_err(line + strlen("isPoncurve #") + i + 1, &test.id);
+					strtol_with_err(line + strlen("== TEST isPoncurve #") + i + 1, &test.id);
 					test.op = OP_TST_CHK;
 					test.ptp.valid = false;
 					test.sw_answer.valid = false;
 					test.hw_answer.valid = false;
 					line_type_expected = EXPECT_PX;
-				} else if ( (strncmp(line, "isP==Q #", strlen("isP==Q #"))) == 0 ) {
+				} else if ( (strncmp(line, "== TEST isP==Q #", strlen("== TEST isP==Q #"))) == 0 ) {
 					/*
 					 * Extract the computation nb, after '#' character.
 					 */
 					/* Determine position of the dot in the line. */
 					for (i=0; ; i++) {
-						if (*(line + strlen("isP==Q #") + i) == '.') {
-							*(line + strlen("isP==Q #") + i) = '\0';
+						if (*(line + strlen("== TEST isP==Q #") + i) == '.') {
+							*(line + strlen("== TEST isP==Q #") + i) = '\0';
 							break;
 						}
 					}
-					strtol_with_err(line + strlen("isP==Q #") + i + 1, &test.id);
+					strtol_with_err(line + strlen("== TEST isP==Q #") + i + 1, &test.id);
 					test.op = OP_TST_EQU;
 					test.ptp.valid = false;
 					test.ptq.valid = false;
 					test.sw_answer.valid = false;
 					test.hw_answer.valid = false;
 					line_type_expected = EXPECT_PX;
-				} else if ( (strncmp(line, "isP==-Q #", strlen("isP==-Q #"))) == 0 ) {
+				} else if ( (strncmp(line, "== TEST isP==-Q #", strlen("== TEST isP==-Q #"))) == 0 ) {
 					/*
 					 * Extract the computation nb, after '#' character.
 					 */
 					/* Determine position of the dot in the line. */
 					for (i=0; ; i++) {
-						if (*(line + strlen("isP==-Q #") + i) == '.') {
-							*(line + strlen("isP==-Q #") + i) = '\0';
+						if (*(line + strlen("== TEST isP==-Q #") + i) == '.') {
+							*(line + strlen("== TEST isP==-Q #") + i) = '\0';
 							break;
 						}
 					}
-					strtol_with_err(line + strlen("isP==-Q #") + i + 1, &test.id);
+					strtol_with_err(line + strlen("== TEST isP==-Q #") + i + 1, &test.id);
 					test.op = OP_TST_OPP;
 					test.ptp.valid = false;
 					test.ptq.valid = false;
@@ -1035,7 +1037,6 @@ int main(int argc, char *argv[])
 				break;
 			}
 
-#if 0
 			case EXPECT_TWOP_X:{
 				/*
 				 * Parse line to extract value of [2]P.x
@@ -1045,49 +1046,59 @@ int main(int argc, char *argv[])
 					/*
 					 * Process the hexadecimal value of [2]P.x for comparison with HW
 					 */
-					hex_to_large_num(
-							line + strlen("twoPx=0x"), sw_twop.x, nread - strlen("twoPx=0x"));
-					sw_twop.is_null = false;
+					if (hex_to_large_num(
+							line + strlen("twoPx=0x"), test.pt_sw_res.x.val, &(test.pt_sw_res.x.sz),
+							nread - strlen("twoPx=0x")))
+					{
+						printf("%sError: Value of point coordinate '[2]P.x' could not be extracted "
+								"from input file/stream.%s\n", KERR, KNRM);
+						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_TWOP_X')", __LINE__);
+					}
+					test.pt_sw_res.is_null = false;
 					line_type_expected = EXPECT_TWOP_Y;
 				} else if ( (strncmp(line, "twoP=0", strlen("twoP=0"))) == 0 ) {
 					PRINTF("%s[2]P=0%s\n", KWHT, KNRM);
-					sw_twop.is_null = true;
-					sw_twop.valid = true;
-					/*****************
-					 * do a PT_DBL NOW
-					 *****************/
+					test.pt_sw_res.is_null = true;
+					test.pt_sw_res.valid = true;
 					/*
-					 * transfer point to double to the IP and run PT_DBL command
+					 * Set and execute a [2]P computation test on hardware.
 					 */
-					ip_set_pt_and_run_ptdbl(curve.nn, &p, &hw_twop, &err_flags);
-					/*
-					 * analyze errors
-					 */
-					if (err_flags & 0xffff0000) {
-						printf("ERROR flags in R_STATUS: 0x%08x\n", err_flags);
+					if (ip_set_pts_and_run_ptdbl(&test))
+					{
+						printf("%sError: Computation of [2]P on hardware triggered an error.%s\n", KERR, KNRM);
+						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_TWOP_X')", __LINE__);
 					}
 					/*
-					 * analyze results
+					 * Check IP result against the expected one.
 					 */
-					check_ptdbl_result(&curve, &p, &sw_twop, &hw_twop, &stats);
+					if (check_ptdbl_result(&test, &stats, &result_pts_are_equal))
+					{
+						printf("%sError: Couldn't compare [2]P hardware result w/ the expected one.%s\n", KERR, KNRM);
+						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_TWOP_X')", __LINE__);
+					}
+					/*
+					 * Stats
+					 */
 					stats.total++;
 					line_type_expected = EXPECT_NONE;
 					print_stats_regularly(&stats);
+#if 0
 					/*
 					 * mark the next test to come as not being an exception (a priori)
 					 * so that [k]P duration statistics only consider [k]P computations
 					 * with no exception
 					 */
 					test_is_an_exception = false;
+#endif
 				} else {
 					printf("%sError: Could not find one of the expected tokens \"twoPx=0x\" "
-							"or \"twoP=0\" (for debug: while in state EXPECT_TWOP_X)\n", KERR);
-					printf("Stopped on test %d.%d%s\n", nbcurve, nbtest, KNRM);
-					print_stats_and_exit(&stats);
+							"or \"twoP=0\" from input file/stream.%s\n", KERR, KNRM);
+					print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_TWOP_X')", __LINE__);
 				}
 				break;
 			}
 
+#if 0
 			case EXPECT_TWOP_Y:{
 				/*
 				 * Parse line to extract value of [2]P.y
