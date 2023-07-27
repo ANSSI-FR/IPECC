@@ -1418,33 +1418,22 @@ int main(int argc, char *argv[])
 			}
 		} /* switch type of line */
 
-#if 0
 		if (line_type_expected == EXPECT_NONE) {
 			/*
-			 * reset a certain num of flags
+			 * Reset a certain number of flags.
 			 */
-			p.valid = false;
-			q.valid = false;
-			sw_pplusq.valid = false;
-			hw_pplusq.valid = false;
-			sw_kp.valid = false;
-			hw_kp.valid = false;
-			sw_twop.valid = false;
-			hw_twop.valid = false;
-			sw_negp.valid = false;
-			hw_negp.valid = false;
-			tst_chk.sw_valid = false;
-			tst_chk.hw_valid = false;
-			tst_equ.sw_valid = false;
-			tst_equ.hw_valid = false;
-			tst_opp.sw_valid = false;
-			tst_opp.hw_valid = false;
-			k_valid = false;
-			op = OP_NONE;
-			nnbld = 0; /* new addition */
-			is_an_exception = 0; /* new addition */
+			test.ptp.valid = false;
+			test.ptq.valid = false;
+			test.pt_sw_res.valid = false;
+			test.pt_hw_res.valid = false;
+			test.sw_answer.valid = false;
+			test.hw_answer.valid = false;
+			test.k.valid = false;
+			test.op = OP_NONE;
+			test.blinding = 0;
+			test.is_an_exception = false;
 		}
-#endif
+
 	} /* while nread */
 
 	return EXIT_SUCCESS;
