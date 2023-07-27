@@ -18,6 +18,7 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
 use work.ecc_customize.all;
+use work.ecc_log.all;
 use work.ecc_utils.all;
 use work.ecc_pkg.all;
 use work.ecc_vars.all;
@@ -544,6 +545,9 @@ package ecc_tb_pkg is
 		constant valnn : in positive;
 		constant lgnb : in natural range 0 to n - 1);
 
+	-- emulate software driver reading one ww-bit limb of a large number
+	-- from ecc_fp_dram
+	-- (assumes IP is already halted in debug mode)
 	procedure dbgread_one_limb_from_ecc_fp_dram(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
@@ -553,16 +557,21 @@ package ecc_tb_pkg is
 		constant limb: in natural range 0 to n - 1;
 		variable val : inout std_logic_ww);
 
-	procedure debug_enable_token(
-		signal clk: in std_logic;
-		signal axi: out axi_in_type;
-		signal axo: in axi_out_type);
-
+	-- emulate software driver disabling the token feature
+	-- (only possible in debug mode)
 	procedure debug_disable_token(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
 		signal axo: in axi_out_type);
 
+	-- emulate software driver enabling again the token feature
+	procedure debug_enable_token(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type);
+
+	-- emulate software driver asking for generation of a random token
+	-- and reading it back
 	procedure get_token(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
@@ -570,7 +579,56 @@ package ecc_tb_pkg is
 		constant valnn : in positive;
 		variable vtoken : inout std_logic512);
 
+	-- emulate software resetting the counters used for TRNG diagnostic
+	-- "starving ratio" counters
+	-- (only possible in debug mode)
 	procedure debug_reset_trng_diagnostic_counters(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type);
+
+	-- emulate software driver setting the IP to use the pseudo TRNG feed
+	-- as the random source instead of the real one
+	-- (only possible in debug mode)
+	procedure debug_trng_use_pseudo(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type);
+
+	-- emulate software driver setting the IP to use the real TRNG internal
+	-- component as the random source instead of the pseudo one
+	-- (only possible in debug mode)
+	procedure debug_trng_use_real(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type);
+
+	-- emulate software driver disabling TRNG post-processing unit from pulling
+	-- bytes out of the raw random source (whether it is currently the real
+	-- internal source or the pseudo external one).
+	-- (only possible in debug mode)
+	procedure debug_trng_pp_stop_pulling_raw(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type);
+
+	-- emulate software driver (re)enaling TRNG post-processing unit from pulling
+	-- bytes out of the raw random source (whether it is currently the real
+	-- internal source or the pseudo external one).
+	-- (only possible in debug mode)
+	procedure debug_trng_pp_start_pulling_raw(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type);
+
+	-- emulate software driver resetting the TRNG raw random generation logic
+	procedure debug_trng_reset_raw(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type);
+
+	-- emulate software driver resetting the TRNG irn random generation logic
+	procedure debug_trng_reset_irn(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
 		signal axo: in axi_out_type);
@@ -2406,27 +2464,6 @@ package body ecc_tb_pkg is
 		wait until clk'event and clk = '1';
 	end procedure dbgread_one_limb_from_ecc_fp_dram;
 
-	procedure debug_enable_token(
-		signal clk: in std_logic;
-		signal axi: out axi_in_type;
-		signal axo: in axi_out_type)
-	is
-		variable dw : std_logic_vector(AXIDW - 1 downto 0);
-	begin
-		wait until clk'event and clk = '1';
-		-- write register W_DBG_CFG_TOKEN with bit TOK_EN set to 1
-		axi.awaddr <= W_DBG_CFG_TOKEN & "000"; axi.awvalid <= '1';
-		wait until clk'event and clk = '1' and axo.awready = '1';
-		axi.awaddr <= (others => 'X'); axi.awvalid <= '0';
-		dw := (others => '0');
-		dw(TOK_EN) := '1';
-		axi.wdata <= dw;
-		axi.wvalid <= '1';
-		wait until clk'event and clk = '1' and axo.wready = '1';
-		axi.wdata <= (others => 'X'); axi.wvalid <= '0';
-		wait until clk'event and clk = '1';
-	end procedure debug_enable_token;
-
 	procedure debug_disable_token(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
@@ -2447,6 +2484,27 @@ package body ecc_tb_pkg is
 		axi.wdata <= (others => 'X'); axi.wvalid <= '0';
 		wait until clk'event and clk = '1';
 	end procedure debug_disable_token;
+
+	procedure debug_enable_token(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type)
+	is
+		variable dw : std_logic_vector(AXIDW - 1 downto 0);
+	begin
+		wait until clk'event and clk = '1';
+		-- write register W_DBG_CFG_TOKEN with bit TOK_EN set to 1
+		axi.awaddr <= W_DBG_CFG_TOKEN & "000"; axi.awvalid <= '1';
+		wait until clk'event and clk = '1' and axo.awready = '1';
+		axi.awaddr <= (others => 'X'); axi.awvalid <= '0';
+		dw := (others => '0');
+		dw(TOK_EN) := '1';
+		axi.wdata <= dw;
+		axi.wvalid <= '1';
+		wait until clk'event and clk = '1' and axo.wready = '1';
+		axi.wdata <= (others => 'X'); axi.wvalid <= '0';
+		wait until clk'event and clk = '1';
+	end procedure debug_enable_token;
 
 	procedure get_token(
 		signal clk: in std_logic;
@@ -2525,5 +2583,159 @@ package body ecc_tb_pkg is
 		axi.wdata <= (others => 'X'); axi.wvalid <= '0';
 		wait until clk'event and clk = '1';
 	end procedure debug_reset_trng_diagnostic_counters;
+
+	procedure debug_trng_use_pseudo(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type)
+	is
+		variable dw : std_logic_vector(AXIDW - 1 downto 0);
+	begin
+		wait until clk'event and clk = '1';
+		-- write W_DBG_TRNG_CFG register
+		axi.awaddr <= W_DBG_TRNG_CFG & "000";
+		axi.awvalid <= '1';
+		wait until clk'event and clk = '1' and axo.awready = '1';
+		axi.awaddr <= (others => 'X');
+		axi.awvalid <= '0';
+		dw := (others => '0');
+		dw(DBG_TRNG_USE_PSEUDO) := '1';
+		axi.wdata <= dw;
+		axi.wvalid <= '1';
+		wait until clk'event and clk = '1' and axo.wready = '1';
+		axi.wdata <= (others => 'X');
+		axi.wvalid <= '0';
+		wait until clk'event and clk = '1';
+	end procedure debug_trng_use_pseudo;
+
+	procedure debug_trng_use_real(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type)
+	is
+		variable dw : std_logic_vector(AXIDW - 1 downto 0);
+	begin
+		wait until clk'event and clk = '1';
+		-- Write W_DBG_TRNG_CFG register.
+		axi.awaddr <= W_DBG_TRNG_CFG & "000";
+		axi.awvalid <= '1';
+		wait until clk'event and clk = '1' and axo.awready = '1';
+		axi.awaddr <= (others => 'X');
+		axi.awvalid <= '0';
+		dw := (others => '0');
+		-- Not only do we write bit 'DBG_TRNG_USE_PSEUDO', we must also
+		-- set again the other parameters belonging to the real TRNG.
+		dw(DBG_TRNG_USE_PSEUDO) := '0';
+		dw(DBG_TRNG_VONM) := '1';
+		dw(DBG_TRNG_TA_MSB downto DBG_TRNG_TA_LSB) :=
+			std_logic_vector(to_unsigned(trngta, 16));
+		dw(DBG_TRNG_IDLE_MSB downto DBG_TRNG_IDLE_LSB) := (others => '0');
+		axi.wdata <= dw;
+		axi.wvalid <= '1';
+		wait until clk'event and clk = '1' and axo.wready = '1';
+		axi.wdata <= (others => 'X');
+		axi.wvalid <= '0';
+		wait until clk'event and clk = '1';
+	end procedure debug_trng_use_real;
+
+	procedure debug_trng_pp_stop_pulling_raw(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type)
+	is
+		variable dw : std_logic_vector(AXIDW - 1 downto 0);
+	begin
+		wait until clk'event and clk = '1';
+		-- Write W_DBG_TRNG_CTRL register.
+		axi.awaddr <= W_DBG_TRNG_CTRL & "000";
+		axi.awvalid <= '1';
+		wait until clk'event and clk = '1' and axo.awready = '1';
+		axi.awaddr <= (others => 'X');
+		axi.awvalid <= '0';
+		dw := (others => '0');
+		-- Assert the DBG_TRNG_CTRL_RAW_PULL_PP_DISABLE bit.
+		dw(DBG_TRNG_CTRL_POSTPROC_DISABLE) := '1';
+		axi.wdata <= dw;
+		axi.wvalid <= '1';
+		wait until clk'event and clk = '1' and axo.wready = '1';
+		axi.wdata <= (others => 'X');
+		axi.wvalid <= '0';
+		wait until clk'event and clk = '1';
+	end procedure debug_trng_pp_stop_pulling_raw;
+
+	procedure debug_trng_pp_start_pulling_raw(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type)
+	is
+		variable dw : std_logic_vector(AXIDW - 1 downto 0);
+	begin
+		wait until clk'event and clk = '1';
+		-- Write W_DBG_TRNG_CTRL register.
+		axi.awaddr <= W_DBG_TRNG_CTRL & "000";
+		axi.awvalid <= '1';
+		wait until clk'event and clk = '1' and axo.awready = '1';
+		axi.awaddr <= (others => 'X');
+		axi.awvalid <= '0';
+		dw := (others => '0');
+		-- Deassert the DBG_TRNG_CTRL_RAW_PULL_PP_DISABLE bit.
+		dw(DBG_TRNG_CTRL_POSTPROC_DISABLE) := '0';
+		axi.wdata <= dw;
+		axi.wvalid <= '1';
+		wait until clk'event and clk = '1' and axo.wready = '1';
+		axi.wdata <= (others => 'X');
+		axi.wvalid <= '0';
+		wait until clk'event and clk = '1';
+	end procedure debug_trng_pp_start_pulling_raw;
+
+	procedure debug_trng_reset_raw(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type)
+	is
+		variable dw : std_logic_vector(AXIDW - 1 downto 0);
+	begin
+		wait until clk'event and clk = '1';
+		-- Write W_DBG_TRNG_CTRL register.
+		axi.awaddr <= W_DBG_TRNG_CTRL & "000";
+		axi.awvalid <= '1';
+		wait until clk'event and clk = '1' and axo.awready = '1';
+		axi.awaddr <= (others => 'X');
+		axi.awvalid <= '0';
+		dw := (others => '0');
+		-- Assert the DBG_TRNG_CTRL_RAW_RESET bit.
+		dw(DBG_TRNG_CTRL_RAW_RESET) := '1';
+		axi.wdata <= dw;
+		axi.wvalid <= '1';
+		wait until clk'event and clk = '1' and axo.wready = '1';
+		axi.wdata <= (others => 'X');
+		axi.wvalid <= '0';
+		wait until clk'event and clk = '1';
+	end procedure debug_trng_reset_raw;
+
+	procedure debug_trng_reset_irn(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type)
+	is
+		variable dw : std_logic_vector(AXIDW - 1 downto 0);
+	begin
+		wait until clk'event and clk = '1';
+		-- Write W_DBG_TRNG_CTRL register.
+		axi.awaddr <= W_DBG_TRNG_CTRL & "000";
+		axi.awvalid <= '1';
+		wait until clk'event and clk = '1' and axo.awready = '1';
+		axi.awaddr <= (others => 'X');
+		axi.awvalid <= '0';
+		dw := (others => '0');
+		-- Assert the DBG_TRNG_CTRL_IRN_RESET bit.
+		dw(DBG_TRNG_CTRL_IRN_RESET) := '1';
+		axi.wdata <= dw;
+		axi.wvalid <= '1';
+		wait until clk'event and clk = '1' and axo.wready = '1';
+		axi.wdata <= (others => 'X');
+		axi.wvalid <= '0';
+		wait until clk'event and clk = '1';
+	end procedure debug_trng_reset_irn;
 
 end package body;

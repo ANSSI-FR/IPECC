@@ -7,9 +7,7 @@ C_EMUL_FILES = hw_accelerator_driver_socket_emul.c test_driver.c
 
 all:
 	$(ARM_CC) $(CFLAGS) -DWITH_EC_HW_ACCELERATOR -DWITH_EC_HW_UIO $(C_FILES) -o test_uio
-
-#$(ARM_CC) $(CFLAGS) -DWITH_EC_HW_ACCELERATOR -DWITH_EC_HW_STANDALONE $(C_FILES) -o test_standalone
-#$(ARM_CC) $(CFLAGS) -DWITH_EC_HW_ACCELERATOR -DWITH_EC_HW_DEVMEM $(C_FILES) -o test_devmem
+	$(ARM_CC) $(CFLAGS) -DWITH_EC_HW_ACCELERATOR -DWITH_EC_HW_DEVMEM $(C_FILES) -o test_devmem
 
 emulator:
 	$(CC) -DWITH_EC_HW_ACCELERATOR -DWITH_EC_HW_SOCKET_EMUL $(C_EMUL_FILES) -o test_emul
