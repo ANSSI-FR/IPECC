@@ -122,9 +122,8 @@ err:
 	return -1;
 }
 
-int check_kp_result(ipecc_test_t* t, stats_t* st)
+int check_kp_result(ipecc_test_t* t, stats_t* st, bool* res)
 {
-	bool coords_match;
 	/*
 	 * Sanity check.
 	 * Verify that computation was actually done on hardware.
@@ -147,6 +146,7 @@ int check_kp_result(ipecc_test_t* t, stats_t* st)
 			 * The hardware result is also the null point.
 			 */
 			PRINTF("[k]P = 0 as expected\n");
+			*res = true;
 			(st->ok)++;
 		} else {
 			/*
@@ -186,6 +186,7 @@ int check_kp_result(ipecc_test_t* t, stats_t* st)
 			printf("%s", KNRM);
 			WRITE_REG(W_ERR_ACK, 0xffff0000);
 #endif
+			*res = false;
 			(st->nok)++;
 			goto err;
 		}
@@ -231,6 +232,7 @@ int check_kp_result(ipecc_test_t* t, stats_t* st)
 			printf("%s", KNRM);
 			WRITE_REG(W_ERR_ACK, 0xffff0000);
 #endif
+			*res = false;
 			(st->nok)++;
 			goto err;
 		} else {
@@ -238,12 +240,12 @@ int check_kp_result(ipecc_test_t* t, stats_t* st)
 			 * Neither hardware result nor the expected one are null.
 			 * Compare their coordinates.
 			 */
-			if (cmp_two_pts_coords(&(t->pt_sw_res), &(t->pt_hw_res), &coords_match))
+			if (cmp_two_pts_coords(&(t->pt_sw_res), &(t->pt_hw_res), res))
 			{
 				printf("%sError when comparing coordinates of hardware [k]P result with the expected ones.%s\n", KERR, KNRM);
 				goto err;
 			}
-			if (coords_match == true) {
+			if (*res == true) {
 				PRINTF("[k]P results match\n");
 #if 0
 				display_large_number(crv->nn, "SW: kPx = 0x", sw_kp->x);

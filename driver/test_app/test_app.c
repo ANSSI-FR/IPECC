@@ -34,7 +34,7 @@
 
 extern int ip_set_curve(curve_t*);
 extern int ip_set_pt_and_run_kp(ipecc_test_t*);
-extern int check_kp_result(ipecc_test_t*, stats_t*);
+extern int check_kp_result(ipecc_test_t*, stats_t*, bool*);
 
 char* line = NULL;
 /* scalar (k in [k]P) */
@@ -223,6 +223,8 @@ int main(int argc, char *argv[])
 
 	(void)argc;
 	(void)argv;
+
+	bool result_pts_are_equal;
 
 #if 0
 	/* Intput points coords & scalar (part of input test vector) */
@@ -831,10 +833,13 @@ int main(int argc, char *argv[])
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_KPX_OR_BLD')", __LINE__);
 					}
 					/*
-					 * Check IP result against the one given by client
-					 *   (software client said k[P] should be null)
+					 * Check IP result against the expected one (which is the point at infinity)
 					 */
-					check_kp_result(&test, &stats);
+					if (check_kp_result(&test, &stats, &result_pts_are_equal))
+					{
+						printf("%sError: Couldn't compare [k]P hardware result w/ the expected one.%s\n", KERR, KNRM);
+						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_KPX_OR_BLD')", __LINE__);
+					}
 					/*
 					 * Stats
 					 */
@@ -857,7 +862,6 @@ int main(int argc, char *argv[])
 				break;
 			}
 
-#if 0
 			case EXPECT_KPY:{
 				/* Parse line to extract value of [k]Py (y of result) */
 				if ( (strncmp(line, "kPy=0x", strlen("kPy=0x"))) == 0 ) {
@@ -865,53 +869,54 @@ int main(int argc, char *argv[])
 					/*
 					 * Process the hexadecimal value of kPy for comparison with HW
 					 */
-					hex_to_large_num(
-							line + strlen("kPy=0x"), sw_kp.y, nread - strlen("kPy=0x"));
-					sw_kp.valid = true;
-					/***************************
-					 * do a [k]P COMPUTATION NOW
-					 ***************************/
-					/*
-					 * transfer point & scalar to the IP.
-					 */
-					ip_set_pt_and_run_kp(curve.nn, &p, &hw_kp, nb_k, nbbld, &err_flags);
-					/*
-					 * analyze errors
-					 */
-					if (err_flags & STATUS_ERR_IN_PT_NOT_ON_CURVE) {
-						printf("Error: input point IS NOT on curve\n");
+					if (hex_to_large_num(
+							line + strlen("kPy=0x"), test.pt_sw_res.y.val, &(test.pt_sw_res.y.sz),
+							nread - strlen("kPy=0x")))
+					{
+						printf("%sError: Value of point coordinate 'kPy' could not be extracted "
+								"from input file/stream.%s\n", KERR, KNRM);
+						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_KPY')", __LINE__);
 					}
-					if (err_flags & STATUS_ERR_OUT_PT_NOT_ON_CURVE) {
-						printf("Error: output point IS NOT on curve\n");
-					}
-					if (err_flags & 0xffff0000) {
-						printf("ERROR flags in R_STATUS: 0x%08x\n", err_flags);
+					test.pt_sw_res.valid = true;
+					/*
+					 * Set and execute a [k]P computation test.
+					 */
+					if (ip_set_pt_and_run_kp(&test))
+					{
+						printf("%sError: Computation of scalar multiplication on hardware triggered an error.%s\n", KERR, KNRM);
+						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_KPY')", __LINE__);
 					}
 					/*
-					 * check IP result against the one given by client
+					 * Check IP result against the expected one.
 					 */
-					check_kp_result(&curve, &p, &hw_kp, &sw_kp, nb_k, nbbld, &stats);
+					if (check_kp_result(&test, &stats, &result_pts_are_equal))
+					{
+						printf("%sError: Couldn't compare [k]P hardware result w/ the expected one.%s\n", KERR, KNRM);
+						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_KPY')", __LINE__);
+					}
 					/*
-					 * stats
+					 * Stats
 					 */
 					stats.total++;
 					line_type_expected = EXPECT_NONE;
 					print_stats_regularly(&stats);
+#if 0
 					/*
 					 * mark the next test to come as not being an exception (a priori)
 					 * so that [k]P duration statistics only consider [k]P computations
 					 * with no exception
 					 */
 					test_is_an_exception = false;
+#endif
 				} else {
 					printf("%sError: Could not find the expected token \"kPy=0x\" "
-							"(for debug: while in state EXPECT_KPY)\n", KERR);
-					printf("Stopped on test %d.%d%s\n", nbcurve, nbtest, KNRM);
-					print_stats_and_exit(&stats);
+							"in input file/stream.%s\n", KERR, KNRM);
+					print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_KPY')", __LINE__);
 				}
 				break;
 			}
 
+#if 0
 			case EXPECT_P_PLUS_QX:{
 				/*
 				 * Parse line to extract value of (P+Q).x
