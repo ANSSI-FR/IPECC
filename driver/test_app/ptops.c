@@ -27,7 +27,7 @@ int ip_set_pts_and_run_ptadd(ipecc_test_t* t)
 	int is_null;
 	/*
 	 * Sanity check.
-	 * Verify that curve is is set.
+	 * Verify that curve is set.
 	 * Verify that points P and Q are both set.
 	 * Verify that all large numbers do not exceed curve parameter 'nn' in size.
 	 * Verify that expected result of test is set.
@@ -317,7 +317,7 @@ int ip_set_pt_and_run_ptdbl(ipecc_test_t* t)
 	int is_null;
 	/*
 	 * Sanity check.
-	 * Verify that curve is is set.
+	 * Verify that curve is set.
 	 * Verify that point P is set.
 	 * Verify that all large numbers do not exceed curve parameter 'nn' in size.
 	 * Verify that expected result of test is set.
@@ -546,7 +546,7 @@ int ip_set_pt_and_run_ptneg(ipecc_test_t* t)
 	int is_null;
 	/*
 	 * Sanity check.
-	 * Verify that curve is is set.
+	 * Verify that curve is set.
 	 * Verify that point P is set.
 	 * Verify that all large numbers do not exceed curve parameter 'nn' in size.
 	 * Verify that expected result of test is set.

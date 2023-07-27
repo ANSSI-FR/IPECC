@@ -28,20 +28,36 @@
 #endif
 
 
-//extern int test_unit(ipecc_test*);
-
-//static ipecc_test test;
-
+/* Helper for curve set */
 extern int ip_set_curve(curve_t*);
+/* Point operations helpers */
+/*   [k]P */
 extern int ip_set_pt_and_run_kp(ipecc_test_t*);
 extern int check_kp_result(ipecc_test_t*, stats_t*, bool*);
+/*   P + Q */
 extern int ip_set_pts_and_run_ptadd(ipecc_test_t*);
 extern int check_ptadd_result(ipecc_test_t*, stats_t*, bool*);
+/*   [2]P */
 extern int ip_set_pt_and_run_ptdbl(ipecc_test_t*);
 extern int check_ptdbl_result(ipecc_test_t*, stats_t*, bool*);
+/*   (-P) */
 extern int ip_set_pt_and_run_ptneg(ipecc_test_t*);
 extern int check_ptneg_result(ipecc_test_t*, stats_t*, bool*);
+/* Point tests helpers */
+/*   is P on curve? */
+extern int ip_set_pt_and_check_on_curve(ipecc_test_t*);
+extern int check_test_oncurve(ipecc_test_t*, stats_t*, bool* res);
+/*   are P & Q equal? */
+extern int ip_set_pts_and_test_equal(ipecc_test_t*);
+extern int check_test_equal(ipecc_test_t*, stats_t*, bool* res);
+/*   are P & Q opposite? */
+extern int ip_set_pts_and_test_oppos(ipecc_test_t*);
+extern int check_test_oppos(ipecc_test_t*, stats_t*, bool* res);
 
+/*
+ * Pointer 'line' will be allocated by getline, but freed by us,
+ * as mentionned in the man GETLINE(3) page.
+ */
 char* line = NULL;
 
 #define max(a,b) do { \
@@ -150,9 +166,10 @@ err:
 }
 
 /*
- * Same as strtol() but as mentioned in 'man (3) STRTOL', 'errno'
- * is set to 0 before the call, and then checked after to catch
- * if an error occurred.
+ * Same as strtol() but as mentioned in the man STRTOL(3) page,
+ * 'errno' is set to 0 before the call, and then checked after to
+ * catch if an error occurred (see below 'print_stats_and_exit()'
+ * function).
  */
 static int strtol_with_err(const char *nptr, unsigned int* nb)
 {
@@ -228,6 +245,7 @@ int main(int argc, char *argv[])
 	(void)argv;
 
 	bool result_pts_are_equal;
+	bool result_tests_are_identical;
 
 #if 0
 	/* Intput points coords & scalar (part of input test vector) */
@@ -909,7 +927,7 @@ int main(int argc, char *argv[])
 					 * so that [k]P duration statistics only consider [k]P computations
 					 * with no exception
 					 */
-					test_is_an_exception = false;
+					test.is_an_exception = false;
 #endif
 				} else {
 					printf("%sError: Could not find the expected token \"kPy=0x\" "
@@ -970,7 +988,7 @@ int main(int argc, char *argv[])
 					 * so that [k]P duration statistics only consider [k]P computations
 					 * with no exception
 					 */
-					test_is_an_exception = false;
+					test.is_an_exception = false;
 #endif
 				} else {
 					printf("%sError: Could not find one of the expected tokens \"PplusQx=0x\" "
@@ -1026,7 +1044,7 @@ int main(int argc, char *argv[])
 					 * so that [k]P duration statistics only consider [k]P computations
 					 * with no exception
 					 */
-					test_is_an_exception = false;
+					test.is_an_exception = false;
 #endif
 				} else {
 					printf("%sError: Could not find the expected token \"PplusQy=0x\" "
@@ -1087,7 +1105,7 @@ int main(int argc, char *argv[])
 					 * so that [k]P duration statistics only consider [k]P computations
 					 * with no exception
 					 */
-					test_is_an_exception = false;
+					test.is_an_exception = false;
 #endif
 				} else {
 					printf("%sError: Could not find one of the expected tokens \"twoPx=0x\" "
@@ -1143,7 +1161,7 @@ int main(int argc, char *argv[])
 					 * so that [k]P duration statistics only consider [k]P computations
 					 * with no exception
 					 */
-					test_is_an_exception = false;
+					test.is_an_exception = false;
 #endif
 				} else {
 					printf("%sError: Could not find the expected token \"twoPy=0x\" "
@@ -1204,7 +1222,7 @@ int main(int argc, char *argv[])
 					 * so that [k]P duration statistics only consider [k]P computations
 					 * with no exception
 					 */
-					test_is_an_exception = false;
+					test.is_an_exception = false;
 #endif
 				} else {
 					printf("%sError: Could not find one of the expected tokens \"negPx=0x\" "
@@ -1260,7 +1278,7 @@ int main(int argc, char *argv[])
 					 * so that [k]P duration statistics only consider [k]P computations
 					 * with no exception
 					 */
-					test_is_an_exception = false;
+					test.is_an_exception = false;
 #endif
 				} else {
 					printf("%sError: Could not find the expected token \"negPy=0x\" "
@@ -1270,127 +1288,131 @@ int main(int argc, char *argv[])
 				break;
 			}
 
-#if 0
 			case EXPECT_TRUE_OR_FALSE:{
 				/*
 				 * Parse line to extract test answer (true or false)
 				 */
-				if ( (strncmp(line, "true", strlen("true"))) == 0 ) {
+				if ( (strncasecmp(line, "true", strlen("true"))) == 0 ) {
 					PRINTF("%sanswer is true%s\n", KWHT, KNRM);
-					switch (op) {
+					switch (test.op) {
 						case OP_TST_CHK:
-							tst_chk.sw_answer = true;
-							tst_chk.sw_valid = true;
-							break;
 						case OP_TST_EQU:
-							tst_equ.sw_answer = true;
-							tst_equ.sw_valid = true;
-							break;
 						case OP_TST_OPP:
-							tst_opp.sw_answer = true;
-							tst_opp.sw_valid = true;
+							test.sw_answer.answer = true;
+							test.sw_answer.valid = true;
 							break;
-						default:
-							printf("%sError: test is none of OP_TST_CHK | OP_TST_EQU | OP_TST_OPP\n",
-									KERR);
-							printf("Stopped on test %d.%d%s\n", nbcurve, nbtest, KNRM);
-							print_stats_and_exit(&stats);
+						default:{
+							printf("%sError: Invalid test Id.%s\n", KERR, KNRM);
+							print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_TRUE_OR_FALSE')", __LINE__);
 							break;
+						}
 					}
-				} else if ( (strncmp(line, "false", strlen("false"))) == 0 ) {
+				} else if ( (strncasecmp(line, "false", strlen("false"))) == 0 ) {
 					PRINTF("%sanswer is false%s\n", KWHT, KNRM);
-					switch (op) {
+					switch (test.op) {
 						case OP_TST_CHK:
-							tst_chk.sw_answer = false;
-							tst_chk.sw_valid = true;
-							break;
 						case OP_TST_EQU:
-							tst_equ.sw_answer = false;
-							tst_equ.sw_valid = true;
-							break;
 						case OP_TST_OPP:
-							tst_opp.sw_answer = false;
-							tst_opp.sw_valid = true;
+							test.sw_answer.answer = false;
+							test.sw_answer.valid = true;
 							break;
 						default:
-							printf("%sError: test is none of OP_TST_CHK | OP_TST_EQU | OP_TST_OPP\n",
-									KERR);
-							printf("Stopped on test %d.%d%s\n", nbcurve, nbtest, KNRM);
-							print_stats_and_exit(&stats);
+							printf("%sError: Invalid test Id.%s\n", KERR, KNRM);
+							print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_TRUE_OR_FALSE')", __LINE__);
 							break;
 					}
 				} else {
 					printf("%sError: Could not find one of the expected tokens \"true\" "
-							"or \"false\" (for debug: while in state EXPECT_TRUE_OR_FALSE) for test %s\n", KERR,
-							( op == OP_TST_CHK ? "OP_TST_CHK" : (op == OP_TST_EQU ? "OP_TST_EQU" :
-							  (op == OP_TST_OPP ? "OP_TST_OPP" : "UNKNOWN_TEST"))));
-					printf("Stopped on test %d.%d%s\n", nbcurve, nbtest, KNRM);
-					print_stats_and_exit(&stats);
+							"or \"false\" from input file/stream for test \"%s\".%s\n", KERR, KNRM,
+							( test.op == OP_TST_CHK ? "OP_TST_CHK" : (test.op == OP_TST_EQU ? "OP_TST_EQU" :
+							  (test.op == OP_TST_OPP ? "OP_TST_OPP" : "UNKNOWN_TEST"))));
+					print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_TRUE_OR_FALSE')", __LINE__);
 				}
-				/******************
-				 * do a PT TEST NOW
-				 ******************/
 				/*
-				 * transfer one or two points on which to perform the test to the IP.
-				 * and run appropriate test command
+				 * Set and execute one or two points on which to perform the test on hardware.
 				 */
-				switch (op) {
+				switch (test.op) {
 					case OP_TST_CHK:{
-						ip_set_pt_and_check_on_curve(curve.nn, &p, &tst_chk, &err_flags);
+						if (ip_set_pt_and_check_on_curve(&test))
+						{
+							printf("%sError: Point test \"is on curve?\" on hardware triggered an error.%s\n", KERR, KNRM);
+							print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_TRUE_OR_FALSE')", __LINE__);
+						}
 						break;
 					}
 					case OP_TST_EQU:{
-						ip_set_pts_and_test_equal(curve.nn, &p, &q, &tst_equ, &err_flags);
+						if (ip_set_pts_and_test_equal(&test))
+						{
+							printf("%sError: Point test \"are pts equal?\" on hardware triggered an error.%s\n", KERR, KNRM);
+							print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_TRUE_OR_FALSE')", __LINE__);
+						}
 						break;
 					}
 					case OP_TST_OPP:{
-						ip_set_pts_and_test_oppos(curve.nn, &p, &q, &tst_opp, &err_flags);
+						if (ip_set_pts_and_test_oppos(&test))
+						{
+							printf("%sError: Point test \"are pts opposite?\" on hardware triggered an error.%s\n", KERR, KNRM);
+							print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_TRUE_OR_FALSE')", __LINE__);
+						}
 						break;
 					}
 					default:{
-						printf("%sError: test is none of OP_TST_CHK | OP_TST_EQU | OP_TST_OPP\n",
-								KERR);
-						printf("Stopped on test %d.%d%s\n", nbcurve, nbtest, KNRM);
-						print_stats_and_exit(&stats);
+						printf("%sError: Invalid test Id.%s\n", KERR, KNRM);
+						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_TRUE_OR_FALSE')", __LINE__);
 						break;
 					}
 				}
 				/*
-				 * analyze results
+				 * Check IP answer to the testagainst the expected one.
 				 */
-				switch (op) {
+				switch (test.op) {
 					case OP_TST_CHK:{
-						check_test_curve(&curve, &p, &tst_chk, &stats);
+						if (check_test_oncurve(&test, &stats, &result_tests_are_identical))
+						{
+							printf("%sError: Couldn't compare hardware result to test \"is on curve?\" "
+									"w/ the expected one.%s\n", KERR, KNRM);
+							print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_TRUE_OR_FALSE')", __LINE__);
+						}
 						break;
 					}
 					case OP_TST_EQU:{
-						check_test_equal(&curve, &p, &q, &tst_equ, &stats);
+						if (check_test_equal(&test, &stats, &result_tests_are_identical))
+						{
+							printf("%sError: Couldn't compare hardware result to test \"are pts equal?\" "
+									"w/ the expected one.%s\n", KERR, KNRM);
+							print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_TRUE_OR_FALSE')", __LINE__);
+						}
 						break;
 					}
 					case OP_TST_OPP:{
-						check_test_opposed(&curve, &p, &q, &tst_opp, &stats);
+						if (check_test_oppos(&test, &stats, &result_tests_are_identical))
+						{
+							printf("%sError: Couldn't compare hardware result to test \"are pts opposite?\" "
+									"w/ the expected one.%s\n", KERR, KNRM);
+							print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_TRUE_OR_FALSE')", __LINE__);
+						}
 						break;
 					}
 					default:{
-						printf("%sError: test is none of OP_TST_CHK | OP_TST_EQU | OP_TST_OPP\n",
-								KERR);
-						printf("Stopped on test %d.%d%s\n", nbcurve, nbtest, KNRM);
-						print_stats_and_exit(&stats);
+						printf("%sError: Invalid test Id.%s\n", KERR, KNRM);
+						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_TRUE_OR_FALSE')", __LINE__);
 						break;
 					}
 				}
 				stats.total++;
 				line_type_expected = EXPECT_NONE;
 				print_stats_regularly(&stats);
+#if 0
 				/*
 				 * Mark the next test to come as not being an exception (a priori)
 				 * so that [k]P duration statistics only consider [k]P computations
 				 * with no exception
 				 */
-				test_is_an_exception = false;
+				test.is_an_exception = false;
+#endif
 				break;
 			}
-#endif
+
 			default:{
 				break;
 			}

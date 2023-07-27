@@ -1,133 +1,128 @@
+/*
+ *  Copyright (C) 2023 - This file is part of IPECC project
+ *
+ *  Authors:
+ *      Karim KHALFALLAH <karim.khalfallah@ssi.gouv.fr>
+ *      Ryad BENADJILA <ryadbenadjila@gmail.com>
+ *
+ *  Contributors:
+ *      Adrian THILLARD
+ *      Emmanuel PROUFF
+ *
+ *  This software is licensed under GPL v2 license.
+ *  See LICENSE file at the root folder of the project.
+ */
+
+#include "../hw_accelerator_driver.h"
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include "test_app.h"
 
-#include "ipecc.h"
-#include "config.h"
-
-/*
- * these functions are defined in helpers.c
- */
-extern void write_large_number(uint32_t, uint32_t*, uint32_t, bool);
-extern void set_r0_non_null(void);
-extern void set_r0_null(void);
-extern void set_r1_non_null(void);
-extern void set_r1_null(void);
-extern void poll_until_ready(void);
-extern bool get_r1_null_or_not_null(void);
-extern void read_large_number(uint32_t, uint32_t*, uint32_t);
-extern void display_large_number(uint32_t, const char*, uint32_t*);
-extern void run_test_is_on_curve(void);
-extern void run_test_are_pts_equal(void);
-extern void run_test_are_pts_opposed(void);
-extern bool print_error_if_any(void);
-extern void status_detail(void);
-extern void print_stats_and_exit();
-/*
- * this function is defined in redpit.c
- */
-bool cmp_two_pts_coords(uint32_t, struct point_t*, struct point_t*);
-
-extern uint32_t nbcurve;
-extern uint32_t nbtest;
-extern uint32_t k_valid;
-
-/* test "is point on curve?" */
-void ip_set_pt_and_check_on_curve(uint32_t nn, struct point_t* pt_p,
-		struct test_t* tst, uint32_t* err)
+/* Test "is point on curve?" */
+int ip_set_pt_and_check_on_curve(ipecc_test_t* t)
 {
+	int hw_answer;
 	/*
-	 * verify that point P is valid
+	 * Sanity check.
+	 * Verify that curve is set.
+	 * Verify that point P is set.
+	 * Verify that all large numbers do not exceed curve parameter 'nn' in size.
+	 * Verify that expected result of test is set.
+	 * Verify that operation type is valid.
 	 */
-	if (pt_p->valid == false) {
-		printf("%sERROR: can't program IP for test \"is on curve\", "
-				"point P isn't marked as valid\n%s", KERR, KNRM);
-		print_stats_and_exit();
+	if (t->curve->set_in_hw == false) {
+		printf("%sError: Can't program IP for the \"is on curve?\" test, assoc. curve not set in hardware.%s\n", KERR, KNRM);
+		goto err;
 	}
+	if (t->ptp.valid == false) {
+		printf("%sError: Can't program IP for the \"is on curve?\" test, input point P not set.%s\n", KERR, KNRM);
+		goto err;
+	}
+	if (t->ptp.x.sz > NN_SZ(t->curve->nn)) {
+		printf("%sError: Can't program IP for the \"is on curve?\" test, X coord. of point P larger than current curve size set in hardware.%s\n", KERR, KNRM);
+		goto err;
+	}
+	if (t->ptp.y.sz > NN_SZ(t->curve->nn)) {
+		printf("%sError: Can't program IP for the \"is on curve?\" test, Y coord. of point P larger than currrent curve size set in hardware.%s\n", KERR, KNRM);
+		goto err;
+	}
+	if (t->pt_sw_res.valid == false) {
+		printf("%sError: Can't program IP for the \"is on curve?\" test, missing expected result of test.%s\n", KERR, KNRM);
+		goto err;
+	}
+	if (t->op != OP_TST_CHK) {
+		printf("%sError: Can't program IP for the \"is on curve?\" test, operation type mismatch.%s\n", KERR, KNRM);
+		goto err;
+	}
+
 	/*
-	 * send point P info & coordinates (into R0)
+	 * Send point P info & coordinates
 	 */
-	if (pt_p->is_null == false) {
-		/*
-		 * send Px
-		 */
-		write_large_number(LARGE_NB_XR0_ADDR, pt_p->x, nn, false);
-		/*
-		 * send Py
-		 */
-		write_large_number(LARGE_NB_YR0_ADDR, pt_p->y, nn, false);
-		/*
-		 * set R0 as a non null point
-		 */
-		set_r0_non_null();
+	if (t->ptp.is_null == true) {
+		/* Set point R0 as being the null point (aka point at infinity). */
+		if (hw_driver_point_zero(0)) { /* input point assumed to be R0 in hardware */
+			printf("%sError: Setting point P as the infinity point on hardware triggered an error.%s\n", KERR, KNRM);
+			goto err;
+		}
 	} else {
-		/*
-		 * set R0 to be the null point
-		 */
-		set_r0_null();
+		/* Set point R0 as NOT being the null point (aka point at infinity). */
+		if (hw_driver_point_unzero(0)) { /* input point assumed to be R0 in hardware */
+			printf("%sError: Setting point P as diff. from the infinity point on hardware triggered an error.%s\n", KERR, KNRM);
+			goto err;
+		}
 	}
+
 	/*
-	 * run test IS_ON_CURVE command
+	 * Run "is on curve?" test on hardware
 	 */
-	run_test_is_on_curve();
-	/*
-	 * poll until job's done
-	 */
-	poll_until_ready();
-	/*
-	 * print it if IP raised an error
-	 */
-	print_error_if_any();
-	/*
-	 * read-back test answer
-	 */
-	if (READ_REG(R_STATUS) & STATUS_YES) {
-		tst->hw_answer = true;
-	} else {
-		tst->hw_answer = false;
+	if (hw_driver_is_on_curve(t->ptp.x.val, t->ptp.x.sz, t->ptp.y.val, t->ptp.y.sz, &hw_answer))
+	{
+		printf("%sError: Test \"is on curve?\" by hardware triggered an error.%s\n", KERR, KNRM);
+		goto err;
 	}
-	tst->hw_valid = true;
+
 	/*
-	 * set error flags in passed pointer
+	 * Answer (true or false) to the test has been set by hw_driver_is_on_curve().
+	 * Simply mark the hardware resulting answer as valid.
 	 */
-	*err = READ_REG(R_STATUS) & 0xffff0000;
+	t->hw_answer.answer = INT_TO_BOOLEAN(hw_answer);
+	t->hw_answer.valid = true;
+
+	return 0;
+err:
+	return -1;
 }
 
-void check_test_curve(struct curve_t* crv, struct point_t* pt_p,
-		struct test_t* tst, struct stats_t* st)
+int check_test_oncurve(ipecc_test_t* t, stats_t* st, bool* res)
 {
 	/*
-	 * verify that both software client answer & hardware one
-	 * have been marked as valid
+	 * Sanity check.
+	 * Verify that point test was actually done on hardware.
 	 */
-	if (tst->sw_valid == false) {
-		printf("%sERROR: can't check correctness of test \"is on curve\", "
-				"SW answer isn't marked as valid\n%s", KERR, KNRM);
-	}
-	if (tst->hw_valid == false) {
-		printf("%sERROR: can't check correctness of test \"is on curve\", "
-				"HW answer isn't marked as valid\n%s", KERR, KNRM);
-	}
-	if ((tst->sw_valid == false) || (tst->hw_valid == false)) {
-		printf("%sstopped on test %d.%d%s\n", KERR, nbcurve, nbtest, KNRM);
-		print_stats_and_exit();
+	if (t->hw_answer.valid == false)
+	{
+		printf("%sError: Can't check result of \"is on curve?\" test against expected one, test didn't happen on hardware.%s\n", KERR, KNRM);
+		goto err;
 	}
 	/*
-	 * compare hardware answer to test with the one provided
-	 * by software client
+	 * Compare hardware answer to the test with the expected one.
 	 */
-	if (tst->sw_answer == tst->hw_answer) {
-#ifdef VERBOSE
-		printf("HW & SW answers match for test \"is on curve\" (both are %s)\n",
-				((tst->hw_answer == true) ? "true" : "false"));
-#endif
+	if (t->sw_answer.answer == t->hw_answer.answer) {
+		PRINTF("HW & SW answers match for test \"is on curve?\" (both are %s)\n",
+				((t->hw_answer.answer == true) ? "true" : "false"));
 		(st->ok)++;
 	} else {
-		printf("%s", KERR);
-		printf("---- ERROR when performing test \"is on curve\"\n");
-		printf("test #%d.%d\n", nbcurve, nbtest);
-		printf("ERROR, mismatch on answer\n");
-		printf("HW: %s\n", ((tst->hw_answer == true) ? "true" : "false"));
-		printf("SW: %s\n", ((tst->sw_answer == true) ? "true" : "false"));
+		/*
+		 * Mismatch error (the hardware answer to the test is different
+		 * from the expected one.
+		 */
+		printf("%sError: mistmatch between hardware result and expected one for \"is on curve?\" test.\n"
+					 "         Hardware says %s however it should be %s.%s\n", KERR, 
+					 (t->hw_answer.answer == true) ? "true" : "false",
+					 (t->sw_answer.answer == true) ? "true" : "false", KNRM);
+#if 0
 		status_detail();
 		display_large_number(crv->nn, "p=0x", crv->p);
 		display_large_number(crv->nn, "a=0x", crv->a);
@@ -140,144 +135,148 @@ void check_test_curve(struct curve_t* crv, struct point_t* pt_p,
 			display_large_number(crv->nn, "Py=0x", pt_p->y);
 		}
 		printf("%s", KNRM);
-		/*
-		 * acknowledge all errors
-		 */
-		WRITE_REG(W_ERR_ACK, 0xffff0000);
+#endif
+		*res = false;
 		(st->nok)++;
-#ifdef LEAVE_ON_ERROR
-		printf("%sstopped on test %d.%d%s\n", KERR, nbcurve, nbtest, KNRM);
-		print_stats_and_exit();
-#endif
+		goto err;
 	}
+	return 0;
+err:
+	return -1;
 }
 
-/* test "are points equal?" */
-void ip_set_pts_and_test_equal(uint32_t nn, struct point_t* pt_p,
-		struct point_t* pt_q, struct test_t* tst, uint32_t* err)
+/* Test "are points equal?" */
+int ip_set_pts_and_test_equal(ipecc_test_t* t)
 {
+	int hw_answer;
 	/*
-	 * verify that points P & Q have been marked as valid
+	 * Sanity check.
+	 * Verify that curve is set.
+	 * Verify that points P and Q are both set.
+	 * Verify that all large numbers do not exceed curve parameter 'nn' in size.
+	 * Verify that expected result of test is set.
+	 * Verify that operation type is valid.
 	 */
-	if (pt_p->valid == false) {
-		printf("%sERROR: can't program IP for test \"are pts equal\", "
-				"point P isn't marked as valid\n%s", KERR, KNRM);
+	if (t->curve->set_in_hw == false) {
+		printf("%sError: Can't program IP for the \"are pts equal?\" test, assoc. curve not set in hardware.%s\n", KERR, KNRM);
+		goto err;
 	}
-	if (pt_q->valid == false) {
-		printf("%sERROR: can't program IP for test \"are pts equal\", "
-				"point Q isn't marked as valid\n%s", KERR, KNRM);
+	if (t->ptp.valid == false) {
+		printf("%sError: Can't program IP for the \"are pts equal?\" test, input point P not set.%s\n", KERR, KNRM);
+		goto err;
 	}
-	if ((pt_p->valid == false) || (pt_q->valid == false)) {
-		printf("%sstopped on test %d.%d%s\n", KERR, nbcurve, nbtest, KNRM);
-		print_stats_and_exit();
+	if (t->ptq.valid == false) {
+		printf("%sError: Can't program IP for the \"are pts equal?\" test, input point Q not set.%s\n", KERR, KNRM);
+		goto err;
 	}
+	if (t->ptp.x.sz > NN_SZ(t->curve->nn)) {
+		printf("%sError: Can't program IP for the \"are pts equal?\" test, X coord. of point P larger than current curve size set in hardware.%s\n", KERR, KNRM);
+		goto err;
+	}
+	if (t->ptp.y.sz > NN_SZ(t->curve->nn)) {
+		printf("%sError: Can't program IP for the \"are pts equal?\" test, Y coord. of point P larger than currrent curve size set in hardware.%s\n", KERR, KNRM);
+		goto err;
+	}
+	if (t->ptq.x.sz > NN_SZ(t->curve->nn)) {
+		printf("%sError: Can't program IP for the \"are pts equal?\" test, X coord. of point Q larger than current curve size set in hardware.%s\n", KERR, KNRM);
+		goto err;
+	}
+	if (t->ptq.y.sz > NN_SZ(t->curve->nn)) {
+		printf("%sError: Can't program IP for the \"are pts equal?\" test, Y coord. of point Q larger than currrent curve size set in hardware.%s\n", KERR, KNRM);
+		goto err;
+	}
+	if (t->pt_sw_res.valid == false) {
+		printf("%sError: Can't program IP for the \"are pts equal?\" test, missing expected result of test.%s\n", KERR, KNRM);
+		goto err;
+	}
+	if (t->op != OP_TST_EQU) {
+		printf("%sError: Can't program IP for the \"are pts equal?\" test, operation type mismatch.%s\n", KERR, KNRM);
+		goto err;
+	}
+
 	/*
-	 * send point P info & coordinates (into R0)
+	 * Send point P info & coordinates
 	 */
-	if (pt_p->is_null == false) {
-		/*
-		 * send Px
-		 */
-		write_large_number(LARGE_NB_XR0_ADDR, pt_p->x, nn, false);
-		/*
-		 * send Py
-		 */
-		write_large_number(LARGE_NB_YR0_ADDR, pt_p->y, nn, false);
-		/*
-		 * set R0 as a non null point
-		 */
-		set_r0_non_null();
+	if (t->ptp.is_null == true) {
+		/* Set point R0 as being the null point (aka point at infinity). */
+		if (hw_driver_point_zero(0)) {
+			printf("%sError: Setting point P as the infinity point on hardware triggered an error.%s\n", KERR, KNRM);
+			goto err;
+		}
 	} else {
-		/*
-		 * set R0 to be the null point
-		 */
-		set_r0_null();
+		/* Set point R0 as NOT being the null point (aka point at infinity). */
+		if (hw_driver_point_unzero(0)) {
+			printf("%sError: Setting point P as diff. from the infinity point on hardware triggered an error.%s\n", KERR, KNRM);
+			goto err;
+		}
 	}
 	/*
-	 * send point Q info & coordinates (into R1)
+	 * Send point Q info & coordinates
 	 */
-	if (pt_q->is_null == false) {
-		/*
-		 * send Px
-		 */
-		write_large_number(LARGE_NB_XR1_ADDR, pt_q->x, nn, false);
-		/*
-		 * send Py
-		 */
-		write_large_number(LARGE_NB_YR1_ADDR, pt_q->y, nn, false);
-		/*
-		 * set R1 as a non null point
-		 */
-		set_r1_non_null();
+	if (t->ptq.is_null == true) {
+		/* Set point R1 as being the null point (aka point at infinity). */
+		if (hw_driver_point_zero(1)) {
+			printf("%sError: Setting point Q as the infinity point on hardware triggered an error.%s\n", KERR, KNRM);
+			goto err;
+		}
 	} else {
-		/*
-		 * set R1 to be the null point
-		 */
-		set_r1_null();
+		/* Set point R1 as NOT being the null point (aka point at infinity). */
+		if (hw_driver_point_unzero(1)) {
+			printf("%sError: Setting point Q as diff. from the infinity point on hardware triggered an error.%s\n", KERR, KNRM);
+			goto err;
+		}
 	}
+
 	/*
-	 * run test ARE_POINTS_EQUAL command
+	 * Run "are pts equal?" test on hardware
 	 */
-	run_test_are_pts_equal();
-	/*
-	 * poll until job's done
-	 */
-	poll_until_ready();
-	/*
-	 * print it if IP raised an error
-	 */
-	print_error_if_any();
-	/*
-	 * read-back test answer
-	 */
-	if (READ_REG(R_STATUS) & STATUS_YES) {
-		tst->hw_answer = true;
-	} else {
-		tst->hw_answer = false;
+	if (hw_driver_eq(t->ptp.x.val, t->ptp.x.sz, t->ptp.y.val, t->ptp.y.sz, t->ptq.x.val,
+				t->ptq.x.sz, t->ptq.y.val, t->ptq.y.sz, &hw_answer))
+	{
+		printf("%sError: Test \"are pts equal?\" by hardware triggered an error.%s\n", KERR, KNRM);
+		goto err;
 	}
-	tst->hw_valid = true;
+
 	/*
-	 * set error flags in passed pointer
+	 * Answer (true or false) to the test has been set by hw_driver_eq().
+	 * Simply mark the hardware resulting answer as valid.
 	 */
-	*err = READ_REG(R_STATUS) & 0xffff0000;
+	t->hw_answer.answer = INT_TO_BOOLEAN(hw_answer);
+	t->hw_answer.valid = true;
+
+	return 0;
+err:
+	return -1;
 }
 
-void check_test_equal(struct curve_t* crv, struct point_t* pt_p,
-		struct point_t* pt_q, struct test_t* tst, struct stats_t* st)
+int check_test_equal(ipecc_test_t* t, stats_t* st, bool* res)
 {
 	/*
-	 * verify that both software client answer & hardware one
-	 * have been marked as valid
+	 * Sanity check.
+	 * Verify that point test was actually done on hardware.
 	 */
-	if (tst->sw_valid == false) {
-		printf("%sERROR: can't check correctness of test \"are pts equal\", "
-				"SW answer isn't marked as valid\n%s", KERR, KNRM);
-	}
-	if (tst->hw_valid == false) {
-		printf("%sERROR: can't check correctness of test \"are pts equal\", "
-				"HW answer isn't marked as valid\n%s", KERR, KNRM);
-	}
-	if ((tst->sw_valid == false) || (tst->hw_valid == false)) {
-		printf("%sstopped on test %d.%d%s\n", KERR, nbcurve, nbtest, KNRM);
-		print_stats_and_exit();
+	if (t->hw_answer.valid == false)
+	{
+		printf("%sError: Can't check result of \"are pts equal?\" test against expected one, test didn't happen on hardware.%s\n", KERR, KNRM);
+		goto err;
 	}
 	/*
-	 * compare hardware answer to test with the one provided
-	 * by software client
+	 * Compare hardware answer to the test with the expected one.
 	 */
-	if (tst->sw_answer == tst->hw_answer) {
-#ifdef VERBOSE
-		printf("HW & SW answers match for test \"are pts equal\" (both are %s)\n",
-				((tst->hw_answer == true) ? "true" : "false"));
-#endif
+	if (t->sw_answer.answer == t->hw_answer.answer) {
+		PRINTF("HW & SW answers match for test \"are pts equal?\" (both are %s)\n",
+				((t->hw_answer.answer == true) ? "true" : "false"));
 		(st->ok)++;
 	} else {
-		printf("%s", KERR);
-		printf("---- ERROR when performing test \"are pts equal\"\n");
-		printf("test #%d.%d\n", nbcurve, nbtest);
-		printf("ERROR, mismatch on answer\n");
-		printf("HW: %s\n", ((tst->hw_answer == true) ? "true" : "false"));
-		printf("SW: %s\n", ((tst->sw_answer == true) ? "true" : "false"));
+		/*
+		 * Mismatch error (the hardware answer to the test is different
+		 * from the expected one.
+		 */
+		printf("%sError: mistmatch between hardware result and expected one for \"are pts equal?\" test.\n"
+					 "         Hardware says %s however it should be %s.%s\n", KERR, 
+					 (t->hw_answer.answer == true) ? "true" : "false",
+					 (t->sw_answer.answer == true) ? "true" : "false", KNRM);
+#if 0
 		status_detail();
 		display_large_number(crv->nn, "p=0x", crv->p);
 		display_large_number(crv->nn, "a=0x", crv->a);
@@ -300,140 +299,148 @@ void check_test_equal(struct curve_t* crv, struct point_t* pt_p,
 		 * acknowledge all errors
 		 */
 		WRITE_REG(W_ERR_ACK, 0xffff0000);
+#endif
+		*res = false;
 		(st->nok)++;
-#ifdef LEAVE_ON_ERROR
-		printf("%sstopped on test %d.%d%s\n", KERR, nbcurve, nbtest, KNRM);
-		print_stats_and_exit();
-#endif
+		goto err;
 	}
+	return 0;
+err:
+	return -1;
 }
 
-/* test "are points opposed?" */
-void ip_set_pts_and_test_oppos(uint32_t nn, struct point_t* pt_p,
-		struct point_t* pt_q, struct test_t* tst, uint32_t* err)
+/* Test "are points opposite?" */
+int ip_set_pts_and_test_oppos(ipecc_test_t* t)
 {
+	int hw_answer;
 	/*
-	 * verify that points P & Q have been marked as valid
+	 * Sanity check.
+	 * Verify that curve is set.
+	 * Verify that points P and Q are both set.
+	 * Verify that all large numbers do not exceed curve parameter 'nn' in size.
+	 * Verify that expected result of test is set.
+	 * Verify that operation type is valid.
 	 */
-	if (pt_p->valid == false) {
-		printf("%sERROR: can't program IP for test \"are pts oppos\", "
-				"point P isn't marked as valid\n%s", KERR, KNRM);
+	if (t->curve->set_in_hw == false) {
+		printf("%sError: Can't program IP for the \"are pts opposite?\" test, assoc. curve not set in hardware.%s\n", KERR, KNRM);
+		goto err;
 	}
-	if (pt_q->valid == false) {
-		printf("%sERROR: can't program IP for test \"are pts oppos\", "
-				"point Q isn't marked as valid\n%s", KERR, KNRM);
+	if (t->ptp.valid == false) {
+		printf("%sError: Can't program IP for the \"are pts opposite?\" test, input point P not set.%s\n", KERR, KNRM);
+		goto err;
 	}
-	if ((pt_p->valid == false) || (pt_q->valid == false)) {
-		printf("%sstopped on test %d.%d%s\n", KERR, nbcurve, nbtest, KNRM);
-		print_stats_and_exit();
+	if (t->ptq.valid == false) {
+		printf("%sError: Can't program IP for the \"are pts opposite?\" test, input point Q not set.%s\n", KERR, KNRM);
+		goto err;
 	}
+	if (t->ptp.x.sz > NN_SZ(t->curve->nn)) {
+		printf("%sError: Can't program IP for the \"are pts opposite?\" test, X coord. of point P larger than current curve size set in hardware.%s\n", KERR, KNRM);
+		goto err;
+	}
+	if (t->ptp.y.sz > NN_SZ(t->curve->nn)) {
+		printf("%sError: Can't program IP for the \"are pts opposite?\" test, Y coord. of point P larger than currrent curve size set in hardware.%s\n", KERR, KNRM);
+		goto err;
+	}
+	if (t->ptq.x.sz > NN_SZ(t->curve->nn)) {
+		printf("%sError: Can't program IP for the \"are pts opposite?\" test, X coord. of point Q larger than current curve size set in hardware.%s\n", KERR, KNRM);
+		goto err;
+	}
+	if (t->ptq.y.sz > NN_SZ(t->curve->nn)) {
+		printf("%sError: Can't program IP for the \"are pts opposite?\" test, Y coord. of point Q larger than currrent curve size set in hardware.%s\n", KERR, KNRM);
+		goto err;
+	}
+	if (t->pt_sw_res.valid == false) {
+		printf("%sError: Can't program IP for the \"are pts opposite?\" test, missing expected result of test.%s\n", KERR, KNRM);
+		goto err;
+	}
+	if (t->op != OP_TST_EQU) {
+		printf("%sError: Can't program IP for the \"are pts opposite?\" test, operation type mismatch.%s\n", KERR, KNRM);
+		goto err;
+	}
+
 	/*
-	 * send point P info & coordinates (into R0)
+	 * Send point P info & coordinates
 	 */
-	if (pt_p->is_null == false) {
-		/*
-		 * send Px
-		 */
-		write_large_number(LARGE_NB_XR0_ADDR, pt_p->x, nn, false);
-		/*
-		 * send Py
-		 */
-		write_large_number(LARGE_NB_YR0_ADDR, pt_p->y, nn, false);
-		/*
-		 * set R0 as a non null point
-		 */
-		set_r0_non_null();
+	if (t->ptp.is_null == true) {
+		/* Set point R0 as being the null point (aka point at infinity). */
+		if (hw_driver_point_zero(0)) {
+			printf("%sError: Setting point P as the infinity point on hardware triggered an error.%s\n", KERR, KNRM);
+			goto err;
+		}
 	} else {
-		/*
-		 * set R0 to be the null point
-		 */
-		set_r0_null();
+		/* Set point R0 as NOT being the null point (aka point at infinity). */
+		if (hw_driver_point_unzero(0)) {
+			printf("%sError: Setting point P as diff. from the infinity point on hardware triggered an error.%s\n", KERR, KNRM);
+			goto err;
+		}
 	}
 	/*
-	 * send point Q info & coordinates (into R1)
+	 * Send point Q info & coordinates
 	 */
-	if (pt_q->is_null == false) {
-		/*
-		 * send Px
-		 */
-		write_large_number(LARGE_NB_XR1_ADDR, pt_q->x, nn, false);
-		/*
-		 * send Py
-		 */
-		write_large_number(LARGE_NB_YR1_ADDR, pt_q->y, nn, false);
-		/*
-		 * set R1 as a non null point
-		 */
-		set_r1_non_null();
+	if (t->ptq.is_null == true) {
+		/* Set point R1 as being the null point (aka point at infinity). */
+		if (hw_driver_point_zero(1)) {
+			printf("%sError: Setting point Q as the infinity point on hardware triggered an error.%s\n", KERR, KNRM);
+			goto err;
+		}
 	} else {
-		/*
-		 * set R1 to be the null point
-		 */
-		set_r1_null();
+		/* Set point R1 as NOT being the null point (aka point at infinity). */
+		if (hw_driver_point_unzero(1)) {
+			printf("%sError: Setting point Q as diff. from the infinity point on hardware triggered an error.%s\n", KERR, KNRM);
+			goto err;
+		}
 	}
+
 	/*
-	 * run test ARE_POINTS_EQUAL command
+	 * Run "are pts opposite?" test on hardware
 	 */
-	run_test_are_pts_opposed();
-	/*
-	 * poll until job's done
-	 */
-	poll_until_ready();
-	/*
-	 * print it if IP raised an error
-	 */
-	print_error_if_any();
-	/*
-	 * read-back test answer
-	 */
-	if (READ_REG(R_STATUS) & STATUS_YES) {
-		tst->hw_answer = true;
-	} else {
-		tst->hw_answer = false;
+	if (hw_driver_opp(t->ptp.x.val, t->ptp.x.sz, t->ptp.y.val, t->ptp.y.sz, t->ptq.x.val,
+				t->ptq.x.sz, t->ptq.y.val, t->ptq.y.sz, &hw_answer))
+	{
+		printf("%sError: Test \"are pts opposite?\" by hardware triggered an error.%s\n", KERR, KNRM);
+		goto err;
 	}
-	tst->hw_valid = true;
+
 	/*
-	 * set error flags in passed pointer
+	 * Answer (true or false) to the test has been set by hw_driver_opp().
+	 * Simply mark the hardware resulting answer as valid.
 	 */
-	*err = READ_REG(R_STATUS) & 0xffff0000;
+	t->hw_answer.answer = INT_TO_BOOLEAN(hw_answer);
+	t->hw_answer.valid = true;
+
+	return 0;
+err:
+	return -1;
 }
 
-void check_test_opposed(struct curve_t* crv, struct point_t* pt_p,
-		struct point_t* pt_q, struct test_t* tst, struct stats_t* st)
+int check_test_oppos(ipecc_test_t* t, stats_t* st, bool* res)
 {
 	/*
-	 * verify that both software client answer & hardware one
-	 * have been marked as valid
+	 * Sanity check.
+	 * Verify that point test was actually done on hardware.
 	 */
-	if (tst->sw_valid == false) {
-		printf("%sERROR: can't check correctness of test \"are pts opposed\", "
-				"SW answer isn't marked as valid\n%s", KERR, KNRM);
-	}
-	if (tst->hw_valid == false) {
-		printf("%sERROR: can't check correctness of test \"are pts opposed\", "
-				"HW answer isn't marked as valid\n%s", KERR, KNRM);
-	}
-	if ((tst->sw_valid == false) || (tst->hw_valid == false)) {
-		printf("%sstopped on test %d.%d%s\n", KERR, nbcurve, nbtest, KNRM);
-		print_stats_and_exit();
+	if (t->hw_answer.valid == false)
+	{
+		printf("%sError: Can't check result of \"are pts opposite?\" test against expected one, test didn't happen on hardware.%s\n", KERR, KNRM);
+		goto err;
 	}
 	/*
-	 * compare hardware answer to test with the one provided
-	 * by software client
+	 * Compare hardware answer to the test with the expected one.
 	 */
-	if (tst->sw_answer == tst->hw_answer) {
-#ifdef VERBOSE
-		printf("HW & SW answers match for test \"are pts opposed\" (both are %s)\n",
-				((tst->hw_answer == true) ? "true" : "false"));
-#endif
+	if (t->sw_answer.answer == t->hw_answer.answer) {
+		PRINTF("HW & SW answers match for test \"are pts opposite?\" (both are %s)\n",
+				((t->hw_answer.answer == true) ? "true" : "false"));
 		(st->ok)++;
 	} else {
-		printf("%s", KERR);
-		printf("---- ERROR when performing test \"are pts opposed\"\n");
-		printf("test #%d.%d\n", nbcurve, nbtest);
-		printf("ERROR, mismatch on answer\n");
-		printf("HW: %s\n", ((tst->hw_answer == true) ? "true" : "false"));
-		printf("SW: %s\n", ((tst->sw_answer == true) ? "true" : "false"));
+		/*
+		 * Mismatch error (the hardware answer to the test is different
+		 * from the expected one.
+		 */
+		printf("%sError: mistmatch between hardware result and expected one for \"are pts opposite?\" test.\n"
+					 "         Hardware says %s however it should be %s.%s\n", KERR, 
+					 (t->hw_answer.answer == true) ? "true" : "false",
+					 (t->sw_answer.answer == true) ? "true" : "false", KNRM);
+#if 0
 		status_detail();
 		display_large_number(crv->nn, "p=0x", crv->p);
 		display_large_number(crv->nn, "a=0x", crv->a);
@@ -456,10 +463,12 @@ void check_test_opposed(struct curve_t* crv, struct point_t* pt_p,
 		 * acknowledge all errors
 		 */
 		WRITE_REG(W_ERR_ACK, 0xffff0000);
-		(st->nok)++;
-#ifdef LEAVE_ON_ERROR
-		printf("%sstopped on test %d.%d%s\n", KERR, nbcurve, nbtest, KNRM);
-		print_stats_and_exit();
 #endif
+		*res = false;
+		(st->nok)++;
+		goto err;
 	}
+	return 0;
+err:
+	return -1;
 }
