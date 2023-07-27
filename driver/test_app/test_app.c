@@ -37,13 +37,12 @@ extern int ip_set_pt_and_run_kp(ipecc_test_t*);
 extern int check_kp_result(ipecc_test_t*, stats_t*, bool*);
 extern int ip_set_pts_and_run_ptadd(ipecc_test_t*);
 extern int check_ptadd_result(ipecc_test_t*, stats_t*, bool*);
-extern int ip_set_pts_and_run_ptdbl(ipecc_test_t*);
+extern int ip_set_pt_and_run_ptdbl(ipecc_test_t*);
 extern int check_ptdbl_result(ipecc_test_t*, stats_t*, bool*);
+extern int ip_set_pt_and_run_ptneg(ipecc_test_t*);
+extern int check_ptneg_result(ipecc_test_t*, stats_t*, bool*);
 
 char* line = NULL;
-/* scalar (k in [k]P) */
-bool k_valid;
-uint32_t nbcurve, nbtest;
 
 #define max(a,b) do { \
    ({ __typeof__ (a) _a = (a); \
@@ -88,7 +87,7 @@ void print_stats_and_exit(ipecc_test_t* t, stats_t* s, const char* msg, unsigned
 }
 
 /*
- * convert an hexadecimal digit to integer
+ * Convert an hexadecimal digit to integer
  */
 static int hex2dec(const char c, unsigned char *nb)
 {
@@ -906,7 +905,7 @@ int main(int argc, char *argv[])
 					print_stats_regularly(&stats);
 #if 0
 					/*
-					 * mark the next test to come as not being an exception (a priori)
+					 * Mark the next test to come as not being an exception (a priori)
 					 * so that [k]P duration statistics only consider [k]P computations
 					 * with no exception
 					 */
@@ -967,7 +966,7 @@ int main(int argc, char *argv[])
 					print_stats_regularly(&stats);
 #if 0
 					/*
-					 * mark the next test to come as not being an exception (a priori)
+					 * Mark the next test to come as not being an exception (a priori)
 					 * so that [k]P duration statistics only consider [k]P computations
 					 * with no exception
 					 */
@@ -1023,7 +1022,7 @@ int main(int argc, char *argv[])
 					print_stats_regularly(&stats);
 #if 0
 					/*
-					 * mark the next test to come as not being an exception (a priori)
+					 * Mark the next test to come as not being an exception (a priori)
 					 * so that [k]P duration statistics only consider [k]P computations
 					 * with no exception
 					 */
@@ -1063,7 +1062,7 @@ int main(int argc, char *argv[])
 					/*
 					 * Set and execute a [2]P computation test on hardware.
 					 */
-					if (ip_set_pts_and_run_ptdbl(&test))
+					if (ip_set_pt_and_run_ptdbl(&test))
 					{
 						printf("%sError: Computation of [2]P on hardware triggered an error.%s\n", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_TWOP_X')", __LINE__);
@@ -1084,7 +1083,7 @@ int main(int argc, char *argv[])
 					print_stats_regularly(&stats);
 #if 0
 					/*
-					 * mark the next test to come as not being an exception (a priori)
+					 * Mark the next test to come as not being an exception (a priori)
 					 * so that [k]P duration statistics only consider [k]P computations
 					 * with no exception
 					 */
@@ -1098,7 +1097,6 @@ int main(int argc, char *argv[])
 				break;
 			}
 
-#if 0
 			case EXPECT_TWOP_Y:{
 				/*
 				 * Parse line to extract value of [2]P.y
@@ -1108,40 +1106,49 @@ int main(int argc, char *argv[])
 					/*
 					 * Process the hexadecimal value of [2]P.y for comparison with HW
 					 */
-					hex_to_large_num(
-							line + strlen("twoPy=0x"), sw_twop.y, nread - strlen("twoPy=0x"));
-					sw_twop.valid = true;
-					/*****************
-					 * do a PT_DBL NOW
-					 *****************/
+					if (hex_to_large_num(
+							line + strlen("twoPy=0x"), test.pt_sw_res.x.val, &(test.pt_sw_res.x.sz),
+							nread - strlen("twoPy=0x")))
+					{
+						printf("%sError: Value of point coordinate '[2]P.y' could not be extracted "
+								"from input file/stream.%s\n", KERR, KNRM);
+						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_TWOP_Y')", __LINE__);
+					}
+					test.pt_sw_res.valid = true;
 					/*
-					 * transfer point to double to the IP and run PT_DBL command
+					 * Set and execute a [2]P computation test on hardware.
 					 */
-					ip_set_pt_and_run_ptdbl(curve.nn, &p, &hw_twop, &err_flags);
-					/*
-					 * analyze errors
-					 */
-					if (err_flags & 0xffff0000) {
-						printf("ERROR flags in R_STATUS: 0x%08x\n", err_flags);
+					if (ip_set_pt_and_run_ptdbl(&test))
+					{
+						printf("%sError: Computation of [2]P on hardware triggered an error.%s\n", KERR, KNRM);
+						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_TWOP_Y')", __LINE__);
 					}
 					/*
-					 * analyze results
+					 * Check IP result against the expected one.
 					 */
-					check_ptdbl_result(&curve, &p, &sw_twop, &hw_twop, &stats);
+					if (check_ptdbl_result(&test, &stats, &result_pts_are_equal))
+					{
+						printf("%sError: Couldn't compare [2]P hardware result w/ the expected one.%s\n", KERR, KNRM);
+						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_TWOP_Y')", __LINE__);
+					}
+					/*
+					 * Stats
+					 */
 					stats.total++;
 					line_type_expected = EXPECT_NONE;
 					print_stats_regularly(&stats);
+#if 0
 					/*
-					 * mark the next test to come as not being an exception (a priori)
+					 * Mark the next test to come as not being an exception (a priori)
 					 * so that [k]P duration statistics only consider [k]P computations
 					 * with no exception
 					 */
 					test_is_an_exception = false;
+#endif
 				} else {
 					printf("%sError: Could not find the expected token \"twoPy=0x\" "
-							"(for debug: while in state EXPECT_TWOP_Y)\n", KERR);
-					printf("Stopped on test %d.%d%s\n", nbcurve, nbtest, KNRM);
-					print_stats_and_exit(&stats);
+							"in input file/stream.%s\n", KERR, KNRM);
+					print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_TWOP_Y')", __LINE__);
 				}
 				break;
 			}
@@ -1155,45 +1162,54 @@ int main(int argc, char *argv[])
 					/*
 					 * Process the hexadecimal value of -P.x for comparison with HW
 					 */
-					hex_to_large_num(
-							line + strlen("negPx=0x"), sw_negp.x, nread - strlen("negPx=0x"));
-					sw_negp.is_null = false;
+					if (hex_to_large_num(
+							line + strlen("negPx=0x"), test.pt_sw_res.x.val, &(test.pt_sw_res.x.sz),
+							nread - strlen("negPx=0x")))
+					{
+						printf("%sError: Value of point coordinate '(-P).x' could not be extracted "
+								"from input file/stream.%s\n", KERR, KNRM);
+						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_NEGP_X')", __LINE__);
+					}
+					test.pt_sw_res.is_null = false;
 					line_type_expected = EXPECT_NEGP_Y;
 				} else if ( (strncmp(line, "negP=0", strlen("negP=0"))) == 0 ) {
 					PRINTF("%s-P=0%s\n", KWHT, KNRM);
-					sw_negp.is_null = true;
-					sw_negp.valid = true;
-					/*****************
-					 * do a PT_NEG NOW
-					 *****************/
+					test.pt_sw_res.is_null = true;
+					test.pt_sw_res.valid = true;
 					/*
-					 * transfer point to double to the IP and run PT_NEG command
+					 * Set and execute a -P computation test on hardware.
 					 */
-					ip_set_pt_and_run_ptneg(curve.nn, &p, &hw_negp, &err_flags);
-					/*
-					 * analyze errors
-					 */
-					if (err_flags & 0xffff0000) {
-						printf("ERROR flags in R_STATUS: 0x%08x\n", err_flags);
+					if (ip_set_pt_and_run_ptneg(&test))
+					{
+						printf("%sError: Computation of -P on hardware triggered an error.%s\n", KERR, KNRM);
+						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_NEGP_X')", __LINE__);
 					}
 					/*
-					 * analyze results
+					 * Check IP result against the expected one.
 					 */
-					check_ptneg_result(&curve, &p, &sw_negp, &hw_negp, &stats);
+					if (check_ptneg_result(&test, &stats, &result_pts_are_equal))
+					{
+						printf("%sError: Couldn't compare -P hardware result w/ the expected one.%s\n", KERR, KNRM);
+						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_NEGP_X')", __LINE__);
+					}
+					/*
+					 * Stats
+					 */
 					stats.total++;
 					line_type_expected = EXPECT_NONE;
 					print_stats_regularly(&stats);
+#if 0
 					/*
-					 * mark the next test to come as not being an exception (a priori)
+					 * Mark the next test to come as not being an exception (a priori)
 					 * so that [k]P duration statistics only consider [k]P computations
 					 * with no exception
 					 */
 					test_is_an_exception = false;
+#endif
 				} else {
 					printf("%sError: Could not find one of the expected tokens \"negPx=0x\" "
-							"or \"negP=0\" (for debug: while in state EXPECT_NEGP_X)\n", KERR);
-					printf("Stopped on test %d.%d%s\n", nbcurve, nbtest, KNRM);
-					print_stats_and_exit(&stats);
+							"or \"negP=0\" in input file/stream.%s\n", KERR, KNRM);
+					print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_NEGP_X')", __LINE__);
 				}
 				break;
 			}
@@ -1207,44 +1223,54 @@ int main(int argc, char *argv[])
 					/*
 					 * Process the hexadecimal value of -P.y for comparison with HW
 					 */
-					hex_to_large_num(
-							line + strlen("negPy=0x"), sw_negp.y, nread - strlen("negPy=0x"));
-					sw_negp.valid = true;
-					/*****************
-					 * do a PT_NEG NOW
-					 *****************/
+					if (hex_to_large_num(
+							line + strlen("negPy=0x"), test.pt_sw_res.x.val, &(test.pt_sw_res.x.sz),
+							nread - strlen("negPy=0x")))
+					{
+						printf("%sError: Value of point coordinate '(-P).y' could not be extracted "
+								"from input file/stream.%s\n", KERR, KNRM);
+						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_NEGP_Y')", __LINE__);
+					}
+					test.pt_sw_res.valid = true;
 					/*
-					 * transfer point to double to the IP and run PT_DBL command
+					 * Set and execute a -P computation test on hardware.
 					 */
-					ip_set_pt_and_run_ptneg(curve.nn, &p, &hw_negp, &err_flags);
-					/*
-					 * analyze errors
-					 */
-					if (err_flags & 0xffff0000) {
-						printf("ERROR flags in R_STATUS: 0x%08x\n", err_flags);
+					if (ip_set_pt_and_run_ptneg(&test))
+					{
+						printf("%sError: Computation of -P on hardware triggered an error.%s\n", KERR, KNRM);
+						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_NEGP_Y')", __LINE__);
 					}
 					/*
-					 * analyze results
+					 * Check IP result against the expected one.
 					 */
-					check_ptneg_result(&curve, &p, &sw_negp, &hw_negp, &stats);
+					if (check_ptneg_result(&test, &stats, &result_pts_are_equal))
+					{
+						printf("%sError: Couldn't compare -P hardware result w/ the expected one.%s\n", KERR, KNRM);
+						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_NEGP_Y')", __LINE__);
+					}
+					/*
+					 * Stats
+					 */
 					stats.total++;
 					line_type_expected = EXPECT_NONE;
 					print_stats_regularly(&stats);
+#if 0
 					/*
-					 * mark the next test to come as not being an exception (a priori)
+					 * Mark the next test to come as not being an exception (a priori)
 					 * so that [k]P duration statistics only consider [k]P computations
 					 * with no exception
 					 */
 					test_is_an_exception = false;
+#endif
 				} else {
 					printf("%sError: Could not find the expected token \"negPy=0x\" "
-							"(for debug: while in state EXPECT_NEGP_Y)\n", KERR);
-					printf("Stopped on test %d.%d%s\n", nbcurve, nbtest, KNRM);
-					print_stats_and_exit(&stats);
+							"from input file/stream.%s\n", KERR, KNRM);
+					print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_NEGP_Y')", __LINE__);
 				}
 				break;
 			}
 
+#if 0
 			case EXPECT_TRUE_OR_FALSE:{
 				/*
 				 * Parse line to extract test answer (true or false)
@@ -1357,7 +1383,7 @@ int main(int argc, char *argv[])
 				line_type_expected = EXPECT_NONE;
 				print_stats_regularly(&stats);
 				/*
-				 * mark the next test to come as not being an exception (a priori)
+				 * Mark the next test to come as not being an exception (a priori)
 				 * so that [k]P duration statistics only consider [k]P computations
 				 * with no exception
 				 */
