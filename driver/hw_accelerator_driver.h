@@ -45,10 +45,10 @@ int hw_driver_reset(void);
 int hw_driver_is_debug(void);
 
 /* Get major version of the IP */
-int hw_driver_get_version_maj(void);
+int hw_driver_get_version_major(void);
 
 /* Get minor version of the IP */
-int hw_driver_get_version_min(void);
+int hw_driver_get_version_minor(void);
 
 /* Enable TRNG post-processing logic */
 int hw_driver_trng_post_proc_enable(void);

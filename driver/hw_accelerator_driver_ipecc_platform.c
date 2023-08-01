@@ -185,8 +185,8 @@ int hw_driver_setup(volatile unsigned char **base_addr_p, volatile unsigned char
 	if (hw_driver_is_debug()) {
 		hw_driver_debug_not_prod = 1;
 		log_print("Debug mode (version %d.%d)\n", hw_driver_get_version_major(), hw_driver_get_version_minor());
-		/* We must activate in the TRNG the pulling of raw random bytes by the
-		 * post-processing function, as in debug mode it is disabled upon reset. */
+		/* We must activate, in the TRNG, the pulling of raw random bytes by the
+		 * post-processing function (as in debug mode it is disabled upon reset). */
 		hw_driver_trng_post_proc_enable();
 	} else {
 		hw_driver_debug_not_prod = 0;

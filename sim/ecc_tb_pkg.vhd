@@ -68,13 +68,13 @@ package ecc_tb_pkg is
 		 2 => LARGE_NB_B_ADDR,
 		 3 => LARGE_NB_Q_ADDR);
 
-	-- emulate software driver polling the R_STATUS register until it shows ready
+	-- Emulate software driver polling the R_STATUS register until it shows ready
 	procedure poll_until_ready(
 		signal clk : in std_logic;
 		signal axi: out axi_in_type;
 		signal axo: in axi_out_type);
 
-	-- emulate software driver writing prime size (nn)
+	-- Emulate software driver writing prime size (nn)
 	--   (option nn_dynamic = TRUE in ecc_customize.vhd)
 	procedure set_nn(
 		signal clk : in std_logic;
@@ -82,7 +82,7 @@ package ecc_tb_pkg is
 		signal axo: in axi_out_type;
 		constant valnn : in positive);
 
-	-- emulate software driver writing one large number (but the scalar)
+	-- Emulate software driver writing one large number (but the scalar)
 	procedure write_big(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
@@ -102,26 +102,26 @@ package ecc_tb_pkg is
 		constant addr : in natural range 0 to nblargenb - 1;
 		constant bignb : in std_logic_vector);
 
-	-- emulate software driver activating ecc_fp_dram memory shuffle
+	-- Emulate software driver activating ecc_fp_dram memory shuffle
 	procedure enable_shuffle(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
 		signal axo: in axi_out_type);
 
-	-- emulate software driver disabling ecc_fp_dram memory shuffle
+	-- Emulate software driver disabling ecc_fp_dram memory shuffle
 	procedure disable_shuffle(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
 		signal axo: in axi_out_type);
 
-	-- emulate software driver configuring IRQ
+	-- Emulate software driver configuring IRQ
 	procedure configure_irq(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
 		signal axo: in axi_out_type;
 		constant irq : in boolean);
 
-	-- emulate software driver configuring blinding
+	-- Emulate software driver configuring blinding
 	procedure configure_blinding(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
@@ -129,7 +129,7 @@ package ecc_tb_pkg is
 		constant blind : in boolean;
 		constant blindbits : in natural);
 
-	-- emulate software driver configuring Z-remask countermeasure
+	-- Emulate software driver configuring Z-remask countermeasure
 	procedure configure_zremasking(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
@@ -137,7 +137,7 @@ package ecc_tb_pkg is
 		constant zremask : in boolean;
 		constant zremaskbits : in natural);
 
-	-- emulate software driver writing the large number of the scalar
+	-- Emulate software driver writing the large number of the scalar
 	procedure write_scalar(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
@@ -145,13 +145,13 @@ package ecc_tb_pkg is
 		constant valnn : in positive;
 		constant val : in std_logic_vector);
 
-	-- emulate software driver issuing command 'do [k]P-computation'
+	-- Emulate software driver issuing command 'do [k]P-computation'
 	procedure run_kp(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
 		signal axo: in axi_out_type);
 
-	-- emulate software driver writing base-point & scalar
+	-- Emulate software driver writing base-point & scalar
 	-- and giving [k]P computation a go
 	procedure scalar_mult(
 		signal clk: in std_logic;
@@ -163,33 +163,33 @@ package ecc_tb_pkg is
 		constant yy : in std_logic_vector;
 		constant z : in boolean);
 
-	-- emulate software driver checking if R0 is the null point
+	-- Emulate software driver checking if R0 is the null point
 	procedure check_if_r0_null(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
 		signal axo: in axi_out_type;
 		variable isnull : out boolean);
 
-	-- emulate software driver checking if R1 is the null point
+	-- Emulate software driver checking if R1 is the null point
 	procedure check_if_r1_null(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
 		signal axo: in axi_out_type;
 		variable isnull : out boolean);
 
-	-- emulate software driver checking if R0/R1 is pt 0 & display it on console
+	-- Emulate software driver checking if R0/R1 is pt 0 & display it on console
 	procedure check_and_display_if_r0_r1_null(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
 		signal axo: in axi_out_type);
 
-	-- emulate software driver checking if any error & display them on console
+	-- Emulate software driver checking if any error & display them on console
 	procedure display_errors(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
 		signal axo: in axi_out_type);
 
-	-- emulate software driver reading one large number
+	-- Emulate software driver reading one large number
 	procedure read_big(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
@@ -209,7 +209,7 @@ package ecc_tb_pkg is
 		constant addr : in natural range 0 to nblargenb - 1;
 		variable bignb: inout std_logic_vector);
 
-	-- emulate software driver reading [k]P result's coordinates
+	-- Emulate software driver reading [k]P result's coordinates
 	procedure read_and_display_kp_result(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
@@ -217,13 +217,25 @@ package ecc_tb_pkg is
 		constant valnn: in positive;
 		constant token: in std_logic512);
 
-	-- emulate software driver acknowledging all errors
+	-- Emulate software driver reading [k]P result's coordinates
+	-- and returning them as
+	procedure read_and_return_kp_result(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant valnn: in positive;
+		constant token: in std_logic512;
+		variable kpx : inout std_logic512;
+		variable kpy : inout std_logic512;
+		variable kp_is_null : out boolean);
+
+	-- Emulate software driver acknowledging all errors
 	procedure ack_all_errors(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
 		signal axo: in axi_out_type);
 
-	-- emulate software driver setting all curve parameters
+	-- Emulate software driver setting all curve parameters
 	procedure set_curve(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
@@ -231,37 +243,37 @@ package ecc_tb_pkg is
 		constant size: in positive;
 		constant curve: curve_param_type);
 
-	-- emulate software driver setting R0 to be the null point
+	-- Emulate software driver setting R0 to be the null point
 	procedure set_r0_null(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
 		signal axo: in axi_out_type);
 
-	-- emulate software driver setting R0 NOT to be the null point
+	-- Emulate software driver setting R0 NOT to be the null point
 	procedure set_r0_non_null(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
 		signal axo: in axi_out_type);
 
-	-- emulate software driver setting R1 to be the null point
+	-- Emulate software driver setting R1 to be the null point
 	procedure set_r1_null(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
 		signal axo: in axi_out_type);
 
-	-- emulate software driver setting R1 NOT to be the null point
+	-- Emulate software driver setting R1 NOT to be the null point
 	procedure set_r1_non_null(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
 		signal axo: in axi_out_type);
 
-	-- emulate software driver issuing command 'do point-addition'
+	-- Emulate software driver issuing command 'do point-addition'
 	procedure run_point_add(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
 		signal axo: in axi_out_type);
 
-	-- emulate software driver writing coords of two points to add
+	-- Emulate software driver writing coords of two points to add
 	-- and giving computation a go
 	procedure point_add(
 		signal clk: in std_logic;
@@ -275,7 +287,7 @@ package ecc_tb_pkg is
 		constant z0 : in boolean;
 		constant z1 : in boolean);
 
-	-- emulate software driver reading result coords after point-add
+	-- Emulate software driver reading result coords after point-add
 	-- & display on console
 	procedure read_and_display_ptadd_result(
 		signal clk: in std_logic;
@@ -283,13 +295,13 @@ package ecc_tb_pkg is
 		signal axo: in axi_out_type;
 		constant valnn: in positive);
 
-	-- emulate software driver issuing command 'do point-doubling'
+	-- Emulate software driver issuing command 'do point-doubling'
 	procedure run_point_double(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
 		signal axo: in axi_out_type);
 
-	-- emulate software driver writing coords of a point to double
+	-- Emulate software driver writing coords of a point to double
 	-- and giving computation a go
 	procedure point_double(
 		signal clk: in std_logic;
@@ -300,7 +312,7 @@ package ecc_tb_pkg is
 		constant y : in std_logic_vector;
 		constant z : in boolean);
 
-	-- emulate software driver running a point double computation on the
+	-- Emulate software driver running a point double computation on the
 	-- null point, and therefore without setting the coordinates of the
 	-- input points
 	procedure point_double_zero_without_coords(
@@ -309,7 +321,7 @@ package ecc_tb_pkg is
 		signal axo: in axi_out_type;
 		constant valnn : in positive);
 
-	-- emulate software driver reading result's coords after point-double
+	-- Emulate software driver reading result's coords after point-double
 	-- and display on console
 	procedure read_and_display_ptdbl_result(
 		signal clk: in std_logic;
@@ -317,13 +329,13 @@ package ecc_tb_pkg is
 		signal axo: in axi_out_type;
 		constant valnn: in positive);
 	
-	-- emulate software driver issuing command 'do point-negate'
+	-- Emulate software driver issuing command 'do point-negate'
 	procedure run_point_negate(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
 		signal axo: in axi_out_type);
 
-	-- emulate software driver writing coords of point to negate (-P)
+	-- Emulate software driver writing coords of point to negate (-P)
 	-- and give computation a go
 	procedure point_negate(
 		signal clk: in std_logic;
@@ -334,7 +346,7 @@ package ecc_tb_pkg is
 		constant y: in std_logic_vector; 
 		constant z: in boolean);
 
-	-- emulate software driver reading result coords after point-negate
+	-- Emulate software driver reading result coords after point-negate
 	-- and display on console
 	procedure read_and_display_ptneg_result(
 		signal clk: in std_logic;
@@ -342,13 +354,13 @@ package ecc_tb_pkg is
 		signal axo: in axi_out_type;
 		constant valnn: in positive);
 
-	-- emulate software driver issuing command 'do P == Q test'
+	-- Emulate software driver issuing command 'do P == Q test'
 	procedure run_point_test_equal(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
 		signal axo: in axi_out_type);
 
-	-- emulate software driver writing coords of 2 points to compare (P==Q)
+	-- Emulate software driver writing coords of 2 points to compare (P==Q)
 	-- and giving computation a go
 	procedure point_test_equal(
 		signal clk: in std_logic;
@@ -362,13 +374,13 @@ package ecc_tb_pkg is
 		constant z0 : in boolean;
 		constant z1 : in boolean);
 
-	-- emulate software driver issuing command 'do P -== Q test'
+	-- Emulate software driver issuing command 'do P -== Q test'
 	procedure run_point_test_opposite(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
 		signal axo: in axi_out_type);
 
-	-- emulate software driver writing coords of 2 points to test if points
+	-- Emulate software driver writing coords of 2 points to test if points
 	-- are opposite, and giving computation a go
 	procedure point_test_opposite(
 		signal clk: in std_logic;
@@ -382,13 +394,13 @@ package ecc_tb_pkg is
 		constant z0 : in boolean;
 		constant z1 : in boolean);
 
-	-- emulate software driver issuing command 'is P on point test'
+	-- Emulate software driver issuing command 'is P on point test'
 	procedure run_point_test_on_curve(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
 		signal axo: in axi_out_type);
 
-	-- emulate software driver writing coord of a point and test
+	-- Emulate software driver writing coord of a point and test
 	-- if it is on curve
 	procedure point_test_on_curve(
 		signal clk: in std_logic;
@@ -399,7 +411,7 @@ package ecc_tb_pkg is
 		constant yy : in std_logic_vector;
 		constant z : in boolean);
 
-	-- emulate software driver getting answer to a test it's asked on R0 and/or R1
+	-- Emulate software driver getting answer to a test it's asked on R0 and/or R1
 	procedure check_test_answer(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
@@ -414,7 +426,7 @@ package ecc_tb_pkg is
 		signal axo: in axi_out_type;
 		constant valnn: in positive);
 
-	-- emulate software driver setting a breakpoint (debug feature)
+	-- Emulate software driver setting a breakpoint (debug feature)
 	procedure set_breakpoint(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
@@ -424,34 +436,34 @@ package ecc_tb_pkg is
 		constant state: in std_logic_vector(3 downto 0);
 		constant nbbits: in natural);
 
-	-- emulate software driver unsetting a breakpoint (debug feature)
+	-- Emulate software driver unsetting a breakpoint (debug feature)
 	procedure remove_breakpoint(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
 		signal axo: in axi_out_type;
 		constant id: in natural);
 
-	-- emulate software driver polling R_DBG_STATUS until it shows
+	-- Emulate software driver polling R_DBG_STATUS until it shows
 	-- IP is halted (debug feat.)
 	procedure poll_until_debug_halted(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
 		signal axo: in axi_out_type);
 
-	-- emulate software driver read of the R_DBG_STATUS and returns the value
+	-- Emulate software driver read of the R_DBG_STATUS and returns the value
 	procedure read_debug_status(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
 		signal axo: in axi_out_type;
 		variable dbgstatus : inout std_logic_vector);
 
-	-- emulate software driver resuming execution of microcode (debug feature)
+	-- Emulate software driver resuming execution of microcode (debug feature)
 	procedure resume_execution(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
 		signal axo: in axi_out_type);
 
-	-- emulate software driver asking for execution of a specific number
+	-- Emulate software driver asking for execution of a specific number
 	-- of opcodes
 	procedure run_n_opcodes(
 		signal clk: in std_logic;
@@ -459,13 +471,13 @@ package ecc_tb_pkg is
 		signal axo: in axi_out_type;
 		constant nbop : in natural);
 
-	-- emulate software driver asking for a single-step of microcode
+	-- Emulate software driver asking for a single-step of microcode
 	procedure single_step(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
 		signal axo: in axi_out_type);
 
-	-- emulate software driver reading of one large number
+	-- Emulate software driver reading of one large number
 	-- with display on console
 	procedure read_and_display_one_large_nb(
 		signal clk: in std_logic;
@@ -484,7 +496,7 @@ package ecc_tb_pkg is
 		constant valnn: in positive;
 		constant addr: in natural range 0 to nblargenb - 1);
 
-	-- emulate software driver reading both R0 and R1 point coordinate values
+	-- Emulate software driver reading both R0 and R1 point coordinate values
 	-- (whether or not they are null according to R_STATUS)
 	procedure read_and_display_r0_and_r1_coords(
 		signal clk: in std_logic;
@@ -516,7 +528,7 @@ package ecc_tb_pkg is
 		signal axi: out axi_in_type;
 		signal axo: in axi_out_type);
 
-	-- emulate software driver modifying an opcode value in ecc_curve_iram 
+	-- Emulate software driver modifying an opcode value in ecc_curve_iram 
 	procedure modify_opcode(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
@@ -524,7 +536,7 @@ package ecc_tb_pkg is
 		constant addr: in natural range 0 to nbopcodes - 1;
 		constant val: in std_logic_vector(OPCODE_SZ - 1 downto 0));
 
-	-- emulate software driver writing a specific ww-bit word at a specific
+	-- Emulate software driver writing a specific ww-bit word at a specific
 	-- location of ecc_fp_dram
 	-- (assumes IP is already halted in debug mode)
 	procedure dbgwrite_one_limb_into_ecc_fp_dram(
@@ -536,7 +548,7 @@ package ecc_tb_pkg is
 		constant limb: in natural range 0 to n - 1;
 		constant val: in std_logic_ww);
 
-	-- emulate software driver clearing an entire large number in ecc_fp_dram
+	-- Emulate software driver clearing an entire large number in ecc_fp_dram
 	-- (assumes IP is already halted in debug mode)
 	procedure clear_one_lgnb_hw_ecc_fp_dram(
 		signal clk: in std_logic;
@@ -545,7 +557,7 @@ package ecc_tb_pkg is
 		constant valnn : in positive;
 		constant lgnb : in natural range 0 to n - 1);
 
-	-- emulate software driver reading one ww-bit limb of a large number
+	-- Emulate software driver reading one ww-bit limb of a large number
 	-- from ecc_fp_dram
 	-- (assumes IP is already halted in debug mode)
 	procedure dbgread_one_limb_from_ecc_fp_dram(
@@ -557,20 +569,20 @@ package ecc_tb_pkg is
 		constant limb: in natural range 0 to n - 1;
 		variable val : inout std_logic_ww);
 
-	-- emulate software driver disabling the token feature
+	-- Emulate software driver disabling the token feature
 	-- (only possible in debug mode)
 	procedure debug_disable_token(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
 		signal axo: in axi_out_type);
 
-	-- emulate software driver enabling again the token feature
+	-- Emulate software driver enabling again the token feature
 	procedure debug_enable_token(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
 		signal axo: in axi_out_type);
 
-	-- emulate software driver asking for generation of a random token
+	-- Emulate software driver asking for generation of a random token
 	-- and reading it back
 	procedure get_token(
 		signal clk: in std_logic;
@@ -579,7 +591,7 @@ package ecc_tb_pkg is
 		constant valnn : in positive;
 		variable vtoken : inout std_logic512);
 
-	-- emulate software resetting the counters used for TRNG diagnostic
+	-- Emulate software resetting the counters used for TRNG diagnostic
 	-- "starving ratio" counters
 	-- (only possible in debug mode)
 	procedure debug_reset_trng_diagnostic_counters(
@@ -587,7 +599,7 @@ package ecc_tb_pkg is
 		signal axi: out axi_in_type;
 		signal axo: in axi_out_type);
 
-	-- emulate software driver setting the IP to use the pseudo TRNG feed
+	-- Emulate software driver setting the IP to use the pseudo TRNG feed
 	-- as the random source instead of the real one
 	-- (only possible in debug mode)
 	procedure debug_trng_use_pseudo(
@@ -595,7 +607,7 @@ package ecc_tb_pkg is
 		signal axi: out axi_in_type;
 		signal axo: in axi_out_type);
 
-	-- emulate software driver setting the IP to use the real TRNG internal
+	-- Emulate software driver setting the IP to use the real TRNG internal
 	-- component as the random source instead of the pseudo one
 	-- (only possible in debug mode)
 	procedure debug_trng_use_real(
@@ -603,7 +615,7 @@ package ecc_tb_pkg is
 		signal axi: out axi_in_type;
 		signal axo: in axi_out_type);
 
-	-- emulate software driver disabling TRNG post-processing unit from pulling
+	-- Emulate software driver disabling TRNG post-processing unit from pulling
 	-- bytes out of the raw random source (whether it is currently the real
 	-- internal source or the pseudo external one).
 	-- (only possible in debug mode)
@@ -612,7 +624,7 @@ package ecc_tb_pkg is
 		signal axi: out axi_in_type;
 		signal axo: in axi_out_type);
 
-	-- emulate software driver (re)enaling TRNG post-processing unit from pulling
+	-- Emulate software driver (re)enaling TRNG post-processing unit from pulling
 	-- bytes out of the raw random source (whether it is currently the real
 	-- internal source or the pseudo external one).
 	-- (only possible in debug mode)
@@ -621,13 +633,13 @@ package ecc_tb_pkg is
 		signal axi: out axi_in_type;
 		signal axo: in axi_out_type);
 
-	-- emulate software driver resetting the TRNG raw random generation logic
+	-- Emulate software driver resetting the TRNG raw random generation logic
 	procedure debug_trng_reset_raw(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
 		signal axo: in axi_out_type);
 
-	-- emulate software driver resetting the TRNG irn random generation logic
+	-- Emulate software driver resetting the TRNG irn random generation logic
 	procedure debug_trng_reset_irn(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
@@ -1049,12 +1061,12 @@ package body ecc_tb_pkg is
 			vz(1) := '0';
 		end if;
 		case vz is
-			when "00" => echol("ECC_TB: (R0,R1) = (not0, not0)");
-			when "01" => echol("ECC_TB: (R0,R1) = (0, not0)");
-			when "10" => echol("ECC_TB: (R0,R1) = (not0, 0)");
-			when "11" => echol("ECC_TB: (R0,R1) = (0, 0)");
+			when "00" => echol("[     ecc_tb.vhd ]: (R0,R1) = (not0, not0)");
+			when "01" => echol("[     ecc_tb.vhd ]: (R0,R1) = (0, not0)");
+			when "10" => echol("[     ecc_tb.vhd ]: (R0,R1) = (not0, 0)");
+			when "11" => echol("[     ecc_tb.vhd ]: (R0,R1) = (0, 0)");
 			when others =>
-				echol(string'("ECC_TB: undefined state for R0 or R1" &
+				echol(string'("[     ecc_tb.vhd ]: Undefined state for R0 or R1" &
 							" in R_STATUS register"));
 		end case;
 	end procedure;
@@ -1075,46 +1087,46 @@ package body ecc_tb_pkg is
 		wait until clk'event and clk = '1' and axo.rvalid = '1';
 		axi.rready <= '0';
 		if axo.rdata(STATUS_ERR_IN_PT_NOT_ON_CURVE) = '1' then
-			echol("ECC_TB: R_STATUS shows STATUS_ERR_IN_PT_NOT_ON_CURVE error");
+			echol("[     ecc_tb.vhd ]: R_STATUS shows STATUS_ERR_IN_PT_NOT_ON_CURVE error");
 		end if;
 		if axo.rdata(STATUS_ERR_OUT_PT_NOT_ON_CURVE) = '1' then
-			echol("ECC_TB: R_STATUS shows STATUS_ERR_OUT_PT_NOT_ON_CURVE error");
+			echol("[     ecc_tb.vhd ]: R_STATUS shows STATUS_ERR_OUT_PT_NOT_ON_CURVE error");
 		end if;
 		if axo.rdata(STATUS_ERR_I_COMP) = '1' then
-			echol("ECC_TB: R_STATUS shows STATUS_ERR_I_COMP error");
+			echol("[     ecc_tb.vhd ]: R_STATUS shows STATUS_ERR_I_COMP error");
 		end if;
 		if axo.rdata(STATUS_ERR_I_WREG_FBD) = '1' then
-			echol("ECC_TB: R_STATUS shows STATUS_ERR_I_WREG_FBD error");
+			echol("[     ecc_tb.vhd ]: R_STATUS shows STATUS_ERR_I_WREG_FBD error");
 		end if;
 		if axo.rdata(STATUS_ERR_I_KP_FBD) = '1' then
-			echol("ECC_TB: R_STATUS shows STATUS_ERR_I_KP_FBD error");
+			echol("[     ecc_tb.vhd ]: R_STATUS shows STATUS_ERR_I_KP_FBD error");
 		end if;
 		if axo.rdata(STATUS_ERR_I_NNDYN) = '1' then
-			echol("ECC_TB: R_STATUS shows STATUS_ERR_I_NNDYN error");
+			echol("[     ecc_tb.vhd ]: R_STATUS shows STATUS_ERR_I_NNDYN error");
 		end if;
 		if axo.rdata(STATUS_ERR_I_POP_FBD) = '1' then
-			echol("ECC_TB: R_STATUS shows STATUS_ERR_I_POP_FBD error");
+			echol("[     ecc_tb.vhd ]: R_STATUS shows STATUS_ERR_I_POP_FBD error");
 		end if;
 		if axo.rdata(STATUS_ERR_I_RDNB_FBD) = '1' then
-			echol("ECC_TB: R_STATUS shows STATUS_ERR_I_RDNB_FBD error");
+			echol("[     ecc_tb.vhd ]: R_STATUS shows STATUS_ERR_I_RDNB_FBD error");
 		end if;
 		if axo.rdata(STATUS_ERR_I_BLN) = '1' then
-			echol("ECC_TB: R_STATUS shows STATUS_ERR_I_BLN error");
+			echol("[     ecc_tb.vhd ]: R_STATUS shows STATUS_ERR_I_BLN error");
 		end if;
 		if axo.rdata(STATUS_ERR_I_UNKNOWN_REG) = '1' then
-			echol("ECC_TB: R_STATUS shows STATUS_ERR_I_UNKNOWN_REG error");
+			echol("[     ecc_tb.vhd ]: R_STATUS shows STATUS_ERR_I_UNKNOWN_REG error");
 		end if;
 		if axo.rdata(STATUS_ERR_I_TOKEN) = '1' then
-			echol("ECC_TB: R_STATUS shows STATUS_ERR_I_TOKEN error");
+			echol("[     ecc_tb.vhd ]: R_STATUS shows STATUS_ERR_I_TOKEN error");
 		end if;
 		if axo.rdata(STATUS_ERR_I_SHUFFLE) = '1' then
-			echol("ECC_TB: R_STATUS shows STATUS_ERR_I_SHUFFLE error");
+			echol("[     ecc_tb.vhd ]: R_STATUS shows STATUS_ERR_I_SHUFFLE error");
 		end if;
 		if axo.rdata(STATUS_ERR_I_ZREMASK) = '1' then
-			echol("ECC_TB: R_STATUS shows STATUS_ERR_I_ZREMASK error");
+			echol("[     ecc_tb.vhd ]: R_STATUS shows STATUS_ERR_I_ZREMASK error");
 		end if;
 		if axo.rdata(STATUS_ERR_I_NOT_ENOUGH_RANDOM_WK) = '1' then
-			echol("ECC_TB: R_STATUS shows STATUS_ERR_I_NOT_ENOUGH_RANDOM_WK error");
+			echol("[     ecc_tb.vhd ]: R_STATUS shows STATUS_ERR_I_NOT_ENOUGH_RANDOM_WK error");
 		end if;
 		wait until clk'event and clk = '1';
 	end procedure;
@@ -1259,7 +1271,7 @@ package body ecc_tb_pkg is
 			xmsb := xmsb - 1;
 		end loop;
 		if xmsb <= 0 then
-			echol("ECC_TB: found no high bit in [k]P.x");
+			echol("[     ecc_tb.vhd ]: Found no high bit in [k]P.x");
 			xmsb := valnn;
 		end if;
 		-- find the position of the highest non-null bit in kpy
@@ -1271,7 +1283,7 @@ package body ecc_tb_pkg is
 			ymsb := ymsb - 1;
 		end loop;
 		if ymsb <= 0 then
-			echol("ECC_TB: found no high bit in [k]P.y");
+			echol("[     ecc_tb.vhd ]: Found no high bit in [k]P.y");
 			ymsb := valnn;
 		end if;
 		-- find the position of the highest non-null bit in token
@@ -1283,13 +1295,77 @@ package body ecc_tb_pkg is
 			tmsb := tmsb - 1;
 		end loop;
 		if tmsb <= 0 then
-			echol("ECC_TB: found no high bit in token");
+			echol("[     ecc_tb.vhd ]: Found no high bit in token");
 			tmsb := valnn;
 		end if;
 		dmsb := max(max(xmsb, ymsb), tmsb);
-		echo("ECC_TB: read-back on AXI interface: [k]P.x = 0x");
+		echo("[     ecc_tb.vhd ]: Read-back on AXI interface: [k]P.x = 0x");
 		hex_echol(kpx(dmsb downto 0) xor token(dmsb downto 0));
-		echo("ECC_TB: read-back on AXI interface: [k]P.y = 0x");
+		echo("[     ecc_tb.vhd ]: Read-back on AXI interface: [k]P.y = 0x");
+		hex_echol(kpy(dmsb downto 0) xor token(dmsb downto 0));
+	end procedure;
+
+	procedure read_and_return_kp_result(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant valnn: in positive;
+		constant token: in std_logic512;
+		variable kpx : inout std_logic512;
+		variable kpy : inout std_logic512;
+		variable kp_is_null : out boolean)
+	is
+		--variable kpx : std_logic512 := (others => '0');
+		--variable kpy : std_logic512 := (others => '0');
+		variable xmsb, ymsb : integer;
+		variable tmsb : integer;
+		variable dmsb : integer;
+	begin
+		wait until clk'event and clk = '1';
+		kpx := (others => '0');
+		kpy := (others => '0');
+		read_big(clk, axi, axo, valnn, LARGE_NB_XR1_ADDR, kpx);
+		read_big(clk, axi, axo, valnn, LARGE_NB_YR1_ADDR, kpy);
+		-- find the position of the highest non-null bit in kpx
+		xmsb := kpx'high;
+		for i in kpx'high downto 0 loop
+			if kpx(i) /= '0' then
+				exit;
+			end if;
+			xmsb := xmsb - 1;
+		end loop;
+		if xmsb <= 0 then
+			echol("[     ecc_tb.vhd ]: Found no high bit in [k]P.x");
+			xmsb := valnn;
+		end if;
+		-- find the position of the highest non-null bit in kpy
+		ymsb := kpy'high;
+		for i in kpy'high downto 0 loop
+			if kpy(i) /= '0' then
+				exit;
+			end if;
+			ymsb := ymsb - 1;
+		end loop;
+		if ymsb <= 0 then
+			echol("[     ecc_tb.vhd ]: Found no high bit in [k]P.y");
+			ymsb := valnn;
+		end if;
+		-- find the position of the highest non-null bit in token
+		tmsb := token'high;
+		for i in token'high downto 0 loop
+			if token(i) /= '0' then
+				exit;
+			end if;
+			tmsb := tmsb - 1;
+		end loop;
+		if tmsb <= 0 then
+			echol("[     ecc_tb.vhd ]: Found no high bit in token");
+			tmsb := valnn;
+		end if;
+		dmsb := max(max(xmsb, ymsb), tmsb);
+		echo("[     ecc_tb.vhd ]: Read-back on AXI interface: [k]P.x = 0x");
+		hex_echol(kpx(dmsb downto 0) xor token(dmsb downto 0));
+		echo("[     ecc_tb.vhd ]: Read-back on AXI interface: [k]P.y = 0x");
 		hex_echol(kpy(dmsb downto 0) xor token(dmsb downto 0));
 	end procedure;
 
@@ -1491,7 +1567,7 @@ package body ecc_tb_pkg is
 		wait until clk'event and clk = '1';
 		check_if_r1_null(clk, axi, axo, vz1);
 		if vz1 then
-			echol("ECC_TB: P+Q = 0");
+			echol("[     ecc_tb.vhd ]: P+Q = 0");
 		else
 			-- read back the coordinates of result point (R1)
 			pax := (others => '0');
@@ -1520,9 +1596,9 @@ package body ecc_tb_pkg is
 			--	report "Y-coordinate of point-addition result seems to equal 0"
 			--		severity WARNING;
 			if (ymsb <= 0) then ymsb := valnn - 1; end if;
-			echo("ECC_TB: read-back on AXI interface: (P+Q).x = 0x");
+			echo("[     ecc_tb.vhd ]: Read-back on AXI interface: (P+Q).x = 0x");
 			hex_echol(pax(max(xmsb, ymsb) downto 0));
-			echo("ECC_TB: read-back on AXI interface: (P+Q).y = 0x");
+			echo("[     ecc_tb.vhd ]: Read-back on AXI interface: (P+Q).y = 0x");
 			hex_echol(pay(max(xmsb, ymsb) downto 0));
 		end if; -- vz1
 		-- do the same thing with R0 point (must have been preserved)
@@ -1552,9 +1628,9 @@ package body ecc_tb_pkg is
 		--	report "Y-coordinate of point R0 seems to have been reset to 0"
 		--		severity WARNING;
 		if (ymsb <= 0) then ymsb := valnn - 1; end if;
-		echo("ECC_TB: read-back on AXI interface: R0.x = 0x");
+		echo("[     ecc_tb.vhd ]: Read-back on AXI interface: R0.x = 0x");
 		hex_echol(pax(max(xmsb, ymsb) downto 0));
-		echo("ECC_TB: read-back on AXI interface: R0.y = 0x");
+		echo("[     ecc_tb.vhd ]: Read-back on AXI interface: R0.y = 0x");
 		hex_echol(pay(max(xmsb, ymsb) downto 0));
 	end procedure;
 
@@ -1633,7 +1709,7 @@ package body ecc_tb_pkg is
 		wait until clk'event and clk = '1';
 		check_if_r1_null(clk, axi, axo, vz1);
 		if vz1 then
-			echol("ECC_TB: [2]P = 0");
+			echol("[     ecc_tb.vhd ]: [2]P = 0");
 		else
 			pax := (others => '0');
 			pay := (others => '0');
@@ -1661,9 +1737,9 @@ package body ecc_tb_pkg is
 			--	report "Y-coordinate of point-doubling result seems to equal 0"
 			--		severity WARNING;
 			if (ymsb <= 0) then ymsb := valnn - 1; end if;
-			echo("ECC_TB: read-back on AXI interface: [2]P.x = 0x");
+			echo("[     ecc_tb.vhd ]: Read-back on AXI interface: [2]P.x = 0x");
 			hex_echol(pax(max(xmsb, ymsb) downto 0));
-			echo("ECC_TB: read-back on AXI interface: [2]P.y = 0x");
+			echo("[     ecc_tb.vhd ]: Read-back on AXI interface: [2]P.y = 0x");
 			hex_echol(pay(max(xmsb, ymsb) downto 0));
 		end if;
 	end procedure;
@@ -1730,7 +1806,7 @@ package body ecc_tb_pkg is
 		wait until clk'event and clk = '1';
 		check_if_r1_null(clk, axi, axo, vz1);
 		if vz1 then
-			echol("ECC_TB: -P = 0");
+			echol("[     ecc_tb.vhd ]: -P = 0");
 		else
 			pax := (others => '0');
 			pay := (others => '0');
@@ -1758,9 +1834,9 @@ package body ecc_tb_pkg is
 			--	report "Y-coordinate of opposite-point result seems to equal 0"
 			--		severity WARNING;
 			if (ymsb <= 0) then ymsb := valnn - 1; end if;
-			echo("ECC_TB: read-back on AXI interface: (-P).x = 0x");
+			echo("[     ecc_tb.vhd ]: Read-back on AXI interface: (-P).x = 0x");
 			hex_echol(pax(max(xmsb, ymsb) downto 0));
-			echo("ECC_TB: read-back on AXI interface: (-P).y = 0x");
+			echo("[     ecc_tb.vhd ]: Read-back on AXI interface: (-P).y = 0x");
 			hex_echol(pay(max(xmsb, ymsb) downto 0));
 		end if;
 	end procedure;
@@ -1973,12 +2049,12 @@ package body ecc_tb_pkg is
 		check_test_answer(clk, axi, axo, yes_or_no, answer_right);
 		if answer_right then
 			if yes_or_no then
-				echol("ECC_TB: answer is YES");
+				echol("[     ecc_tb.vhd ]: Answer is YES");
 			else
-				echol("ECC_TB: answer is NO");
+				echol("[     ecc_tb.vhd ]: Answer is NO");
 			end if;
 		else
-			echol("ECC_TB: no answer :/");
+			echol("[     ecc_tb.vhd ]: No answer :/");
 		end if;
 	end procedure;
 
@@ -2065,7 +2141,7 @@ package body ecc_tb_pkg is
 			wait until clk'event and clk = '1' and axo.rvalid = '1';
 			axi.rready <= '0';
 			if axo.rdata(0) = '1' then
-				echo("ECC_TB: IP halted: PC=0x");
+				echo("[     ecc_tb.vhd ]: IP halted: PC=0x");
 				hex_echo(axo.rdata(12 downto 4));
 				echo(" [bkpt #");
 				tmp := to_integer(unsigned(axo.rdata(2 downto 1)));
@@ -2170,7 +2246,7 @@ package body ecc_tb_pkg is
 		wait until clk'event and clk = '1';
 		lgnb := (others => '0');
 		read_big(clk, axi, axo, valnn, addr, lgnb);
-		echo("ECC_TB: read-back on AXI interface: @" & integer'image(addr)
+		echo("[     ecc_tb.vhd ]: Read-back on AXI interface: @" & integer'image(addr)
 		     & " = 0x");
 		hex_echol(lgnb(valnn - 1 downto 0));
 	end procedure;
@@ -2187,7 +2263,7 @@ package body ecc_tb_pkg is
 		wait until clk'event and clk = '1';
 		lgnb := (others => '0');
 		debug_read_big(clk, axi, axo, valnn, addr, lgnb);
-		echo("ECC_TB: read-back on AXI interface: @" & integer'image(addr)
+		echo("[     ecc_tb.vhd ]: Read-back on AXI interface: @" & integer'image(addr)
 		     & " = 0x");
 		hex_echol(lgnb(valnn - 1 downto 0));
 	end procedure;
@@ -2230,9 +2306,9 @@ package body ecc_tb_pkg is
 		--	report "Y-coordinate of R0 seems to equal 0"
 		--		severity WARNING;
 		if (ymsb <= 0) then ymsb := valnn - 1; end if;
-		echo("ECC_TB: read-back on AXI interface: (R0).x = 0x");
+		echo("[     ecc_tb.vhd ]: Read-back on AXI interface: (R0).x = 0x");
 		hex_echol(pax(max(xmsb, ymsb) downto 0));
-		echo("ECC_TB: read-back on AXI interface: (R0).y = 0x");
+		echo("[     ecc_tb.vhd ]: Read-back on AXI interface: (R0).y = 0x");
 		hex_echol(pay(max(xmsb, ymsb) downto 0));
 		-- read back the coordinates of R1
 		pax := (others => '0');
@@ -2261,9 +2337,9 @@ package body ecc_tb_pkg is
 		--	report "Y-coordinate of R1 seems to equal 0"
 		--		severity WARNING;
 		if (ymsb <= 0) then ymsb := valnn - 1; end if;
-		echo("ECC_TB: read-back on AXI interface: (R1).x = 0x");
+		echo("[     ecc_tb.vhd ]: Read-back on AXI interface: (R1).x = 0x");
 		hex_echol(pax(max(xmsb, ymsb) downto 0));
-		echo("ECC_TB: read-back on AXI interface: (R1).y = 0x");
+		echo("[     ecc_tb.vhd ]: Read-back on AXI interface: (R1).y = 0x");
 		hex_echol(pay(max(xmsb, ymsb) downto 0));
 	end procedure;
 

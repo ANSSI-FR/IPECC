@@ -78,11 +78,11 @@ nnmin = ww - 4 + 1                                                             #
 #                                                                              #
 #     - parameter 'nnmin' is increased every period of 'NNMINMOD' generated    #
 #       curves (default value of 'NNMINMOD' is 200) and by an increment of     #
-#       'NNMININCR' (default value 1)                                          #
+#       'NNMININCR' (default value is 1)                                       #
 #                                                                              #
 #     - parameter 'nnmax' is increased every period of 'NNMAXMOD' generated    #
-#       curves (default value 100) and by an increment of 'NNMAXINCR' (default #
-#       value 3).                                                              #
+#       curves (default value is 100) and by an increment of 'NNMAXINCR'       #
+#       (default value is 3).                                                  #
 #                                                                              #
 #   Now, as 'nnmin' is regularly increased, parameter 'nnminmax' defines the   #
 #   maximal threeshold that 'nnmin' will never exceed.                         #
@@ -153,10 +153,10 @@ NBOPP = 1 # Nb of 'are points opposite?" tests that'll be generated per curve. #
 # computation.                                                                 #
 NN_LIMIT_COMPUTE_Q = 192                                                       #
 #                                                                              #
-# The output tests consist in a series of a few lines per each curve and a few #
-# lines for each generated test. All tests between comprised between the defi- #
-# nition of one curve and the definition of the next one are implicitely rela- #
-# tive to the former.                                                          #
+# The output tests consist in a series of a few textual lines per each curve   #
+# and a few textual lines for each generated test. All tests comprised between #
+# the definition of one curve and the definition of the next one are implici-  #
+# tely relative to the former.                                                 #
 #                                                                              #
 # This is what the definition of a curve looks like:                           #
 #                                                                              #
@@ -167,7 +167,47 @@ NN_LIMIT_COMPUTE_Q = 192                                                       #
 #   b=0xb4d65d09bca6a1dead1ed5fb0df4d39db22e37b41cdee56944634fa9c1b9aa35       #
 #   q=0x0000000000000000000000000000000000000000000000000000000000000001       #
 #                                                                              #
-# This a what the definition of a test looks like:                             #
+#  The presence of each line is mandatory, their order is strict and mandatory #
+#  and must be the one given in the example above. Each one gives a specific   #
+#  information whose meaning is quite clear in the context of elliptic curve   #
+#  cryptography but let's detail these.                                        #
+#                                                                              #
+#  - "== NEW CURVE" oviously introduces the defintion of a new set of curve    #
+#    parameters. You can have it followed by a space followed by any misc.     #
+#    character string which will then be used as an identifier. This script    #
+#    generates identifiers in the form of a '#' character followed by an       #
+#    integer number starting at 0 that will be incremented for each new        #
+#    generated curve.                                                          #
+#                                                                              #
+#  - "nn=" must be directly followed (wo/ space) by an integer defining the    #
+#   value of the main security parameter 'nn'. There is no limit here (except  #
+#   that of VHDL internal representation integer'high) but obviously you       #
+#   should not exceed the maximum value of 'nn' your hardware was customized   #
+#   for. If 'nn_dynamic' was set to FALSE in ecc_customize.vhd when you        #
+#   synthesized IPECC, then you should obviously only use this value (this     #
+#   will what happen if you set parameter 'nn_constant' accordingly in the     #
+#   present script, see the descriptions already given above.                  #
+#                                                                              #
+#  - "p=" must be followed by "0x" and by the value in hexadecimal format      #
+#    of the prime number defining the finite field for the curve. Bitwidth     #
+#    of this number must not exceed value set for 'nn'.                        #
+#                                                                              #
+#  - "a=", "b=" and "q=" must also each be followed by "0x" and by the value   #
+#    also in hexadecimal of the corresponding curve parameter. The case of     #
+#    "q" calls for a few remarks.                                              #
+#                                                                              #
+         REPRENDRE ICI : est-ce que q peut être optionnel, etc, quelle
+         doit être la longueur exactement des paramètres (par exemple,
+         dans le cas ci-dessus de nn=256, peut-on simplement écrire 0x1?
+         Je sais que le testbench VHDL tel que je l'ai écrit l'accepte,
+         mais test_app?
+
+         Mentionner aussi les exceptions, car elles rajoutent des tests
+         pour chaque courbe dont les infos que je donne ci-dessus pour
+         NBKP, NBADD, etc. ne font pas état.
+#                                                                              #
+#                                                                              #
+# This is what the definition of a test looks like:                            #
 #                                                                              #
 #   == TEST [k]P #0.0                                                          #
 #   Px=0x2e33d5f20dff1f4f74dce63b0bc2508e092f31d289553564d5d44e28096d019d      #
@@ -175,6 +215,14 @@ NN_LIMIT_COMPUTE_Q = 192                                                       #
 #   k=0xf327d532d4772272e3166baef2bf844c8c374ae75f834a6df203381ea0e82149       #
 #   kPx=0xb07e6fcc1852ff369ba1c501900b1b4e8e752c743dde3bc9159459bbfb1682a3     #
 #   kPy=0x60831c4c84643ae8dde33f4caf407bb8fb0fe39838ce55d6f87a24c893062a4d     #
+#                                                                              #
+# This format is what is expected by both:                                     #
+#                                                                              #
+#  - the software app. the C source code of which is in driver/test_app/.      #
+#    that you can use to test a real hardware implementation of IPECC          #
+#                                                                              #
+#  - the hardware testbench the source code of which is in sim/ecc_tb.vhd      #
+#    that you can use to test the HDL code of IPECC.                           #
 #                                                                              #
 # Obviously what is interesting in cryptographic applications is to be able to #
 # perform computations on numbers of... cryptographic sizes. You may then find #
