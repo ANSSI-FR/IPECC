@@ -19,46 +19,172 @@ def rdp(nbits=256):
 			return p
 
 
-# ############################ CONFIGURATION ###############################
-# On 7-series (Zynq) imposes value of ww                                   #
-ww = 16                                                                    #
-#                                                                          #
-# nnmin is the first admissible value for nn (ensure that                  #
-# w >= 2 where w = ceil((nn + 4) / ww) which is equivalent                 #
-# to ( (nn + 4) / ww ) > 1 and therefore nn > ww - 4 which                 #
-# gives the minimum ww - 4 + 1 for nn                                      #
-nnmin = ww - 4 + 1                                                         #
-nnminmax = 256                                                             #
-#                                                                          #
-# nnmaxabsolute is the largest admissible value of nn                      #
-# nnmax is the instant-time maximum randomly generate value of nn          #
-nnmaxabsolute = 384 # otherwise computation of curve order is too slow     #
-nnmax = 64 # for start (it will increase and plateau to absolute max)      #
-#                                                                          #
-nn_constant = 0                                                            #
-only_kp_and_no_blinding = False                                            #
-# ##########################################################################
+######################### C O N F I G U R A T I O N ############################
+#                                                                              #
+# Parameter: 'ww'                                                              #
+#                                                                              #
+#   Designates the bit-width of limbs used for the representation of large     #
+#   numbers inside IPECC's internal memory.                                    #
+#                                                                              #
+#   It is only used to define 'nnmin' parameter (see a few lines below)        #
+#   which defines the smallest value admissible by an actual hardware imple-   #
+#   mentation of IPECC.  Hence the value of 'ww' only matters if the present   #
+#   script is used to generate test vectors *for the actual hardware to run*,  #
+#   and if that hardware was synthesized with option 'nn_dynamic' = TRUE in    #
+#   ecc_customize.vhd, to enforce that no test is generated with a dynamic     #
+#   value of 'nn' that goes beyond 'nnmin'.                                    #
+#                                                                              #
+#   On the other hand, if the hardware you want to submit the tests to was     #
+#   synthesized with option 'nn_dynnamic' = FALSE, then simply ignore para-    #
+#   meters 'ww', 'nnmin', 'nnmax' and simply set 'nn_consant' to the static    #
+#   value that was also set for parameter 'nn' in ecc_customize.vhd.           #
+#                                                                              #
+#   Alternatively, you can ignore value of 'ww' and directly set a numerical   #
+#   value to 'nnmin', but do keep in mind that any particular hardware imple-  #
+#   mentation of IPECC will only be able to perform computations with a mini-  #
+#   mal value of 'nn' which depends on the value of 'ww', which is precisely   #
+#   'ww - 4 + 1', hence the default definition of parameter 'nnmin' below.     #
+#                                                                              #
+#   For any particular hardware implementation of IPECC, the value of 'ww' is  #
+#   automatically set at synthesis time based on the technology that was set   #
+#   in file ecc_customize.vhd:                                                 #
+#                                                                              #
+#     - on FPGA targets, value of 'ww' is set based on the device/family       #
+#     - on ASIC targers, value of 'ww' is the same as that of parameter        #
+#       'multwidth' (please c.f ecc_customize.vhd in-file documentation for    #
+#       more information).                                                     #
+#                                                                              #
+#   On 7-series/Zynq Xilinx FPGAs, ww is set to 16.                            #
+#                                                                              #
+ww = 16                                                                        #
+#                                                                              #
+# Parameter: 'nnmin'                                                           #
+#                                                                              #
+#   See info on 'ww' above.                                                    #
+#   The smallest admissible value for 'nn' for any particular hardware imple-  #
+#   mentation of IPECC ensures that w >= 2 where w = ceil((nn + 4) / ww) which #
+#   is equivalent to ( (nn + 4) / ww ) > 1 and therefore nn > ww - 4 which     #
+#   gives the minimum ww - 4 + 1 below.                                        #
+#                                                                              #
+nnmin = ww - 4 + 1                                                             #
+#                                                                              #
+# Parameters: 'nnmin', 'nnmax', 'nnminmax' & 'nnmaxabsolute'                   #
+#                                                                              #
+#   This script generates test vectors by gradually increasing the range from  #
+#   which the random values of 'nn' are withdrawn for each new curve, this     #
+#   range being defined by [nnmin : nnmax].                                    #
+#                                                                              #
+#   Both 'nnmin' and 'nnmax' are regularly increased:                          #
+#                                                                              #
+#     - parameter 'nnmin' is increased every period of 'NNMINMOD' generated    #
+#       curves (default value of 'NNMINMOD' is 200) and by an increment of     #
+#       'NNMININCR' (default value 1)                                          #
+#                                                                              #
+#     - parameter 'nnmax' is increased every period of 'NNMAXMOD' generated    #
+#       curves (default value 100) and by an increment of 'NNMAXINCR' (default #
+#       value 3).                                                              #
+#                                                                              #
+#   Now, as 'nnmin' is regularly increased, parameter 'nnminmax' defines the   #
+#   maximal threeshold that 'nnmin' will never exceed.                         #
+#                                                                              #
+#   Similarly, 'nnmaxabsolute' defines the maximal threeshold that 'nnmax'     #
+#   will neither ever exceed, while 'nnmax' being initially set at nnmin + 16  #
+#   is actually quite arbitrary.                                               #
+#                                                                              #
+nnmax = nnmin + 16  # For start (it will increase and plateau to absolute max) #
+nnmaxabsolute = 384 # Largest possible value of 'nn'.                          #
+nnminmax = 38       # Quite arbitrary too.                                     #
+NNMINMOD = 200                                                                 #
+NNMININCR = 1                                                                  #
+NNMAXMOD = 100                                                                 #
+NNMAXINCR = 3                                                                  #
+#                                                                              #
+nn_constant = 0   # Non-0 value will make it the constant unique value of 'nn' #
+only_kp_and_no_blinding = False  # Well, option's name speaks for itself.      #
+#                                                                              #
+# For any new curve, a random value is drawn from the current range            #
+# [nnmin : nnmax], and then 6 six types of tests are generated for that        #
+# curve:                                                                       #
+#                                                                              #
+#   - NBKP defines the number of [k]P tests.                                   #
+#                                                                              #
+#   - NBADD defines the number of P + Q tests. Points are also generated       #
+#     randomly.                                                                #
+#                                                                              #
+#   - NBDBL defines the number of [2]P tests (computation of the double of     #
+#     of point.                                                                #
+#                                                                              #
+#   - NBNEG defines the number of (-P) tests (computation of the opposite of   #
+#     a point).                                                                #
+#                                                                              #
+#   - NBCHK, NBEQU and NBOPP resp. define the number of boolean 'is point      #
+#     on curve?' tests, 'are points equal' tests, and 'are points opposi-      #
+#     te?' tests, resp. Some of the tests have their answer set to TRUE,       #
+#     some deliberately to FALSE.                                              #
+#                                                                              #
+# All points involved in the tests are generated at random (using SageMath's   #
+# random_element() method on the elliptic curve opject type). Also the scalar  #
+# and any other parmaters such as the cruve parameters a, b, p and q are also  #
+# generated at random.                                                         #
+#                                                                              #
+# The complete script will iterate on a total number of 'NBCURV' curves.       #
+# Setting 0 to 'NBCURV' means the loop shouldn't stop.                         #
+#                                                                              #
+NBCURV = 100000                                                                #
+NBCURV = 1 # A value of 0 means don't stop/ever-lasting producing loop.        #
+NBKP = 1 # Nb of [k]P tests that will be generated per curve.                  #
+NBADD = 1 # Nb of P+Q tests that will be generated per curve.                  #
+NBDBL = 1 # Nb of [2]P tests that will be generated per curve.                 #
+NBNEG = 1 # Nb of (-P) tests that will be generated per curve.                 #
+NBCHK = 1 # Nb of 'is point on curve?' tests that will be generated per curve. #
+NBEQU = 1 # Nb of 'are points equal?' tests that will be generated per curve.  #
+NBOPP = 1 # Nb of 'are points opposite?" tests that'll be generated per curve. #
+#                                                                              #
+# For [k]P tests, blinding may or may not be enabled (and if so, with a number #
+# of blinding bits randomly drawn in the range [1 : nn - 1]). Generating a     #
+# test with blinding enabled requires first to compute the order of the curve, #
+# which can become insupportably long as value of 'nn' exceeds some threeshold #
+# that is quite difficult to define, however that's the reason for parameter   #
+# 'NN_LIMIT_COMPUTE_Q': by definition, any random curve generated for a value  #
+# of 'nn' exceeding 'NN_LIMIT_COMPUTE_Q' will involve no blinding in their     #
+# [k]P tests generation. Furthermore, for these curves, the order 'q' will be  #
+# set to the large number 1, as an artifact which can't make no harm as 'q'    #
+# only plays a role in IPECC when blinding countermeasure is enabled in a [k]P #
+# computation.                                                                 #
+NN_LIMIT_COMPUTE_Q = 192                                                       #
+#                                                                              #
+# The output tests consist in a series of a few lines per each curve and a few #
+# lines for each generated test. All tests between comprised between the defi- #
+# nition of one curve and the definition of the next one are implicitely rela- #
+# tive to the former.                                                          #
+#
+# This is what the definition of a curve looks like:
+#
+# == NEW CURVE #0
+# nn=256
+# p=0xca91effdc4a2698403334216dcd1849ba59c19af4c611ae948352857239eaa9f
+# a=0x0cdb13e47b2099649822d6770cbfdd8fd2de4ef944bc4bf12bf952dca56ffe6a
+# b=0xb4d65d09bca6a1dead1ed5fb0df4d39db22e37b41cdee56944634fa9c1b9aa35
+# q=0x0000000000000000000000000000000000000000000000000000000000000001
+#
+# 
+# Obviously what is interesting in cryptographic applications is to be able to #
+# perform computations on numbers of... cryptographic sizes. You may then find #
+# testing small values like nn=32 to be be inappropriate, however this is not  #
+# completely true, as these tests can be performed faster, and correlatively   #
+# in much higher quantity (think also about HDL testbenchs which are dramati-  #
+# cally slow) enforcing verification of pure control aspects of the computa-   #
+# tions carried inside the IP.                                                 #
+################################################################################
 
 nbcurv = 0
 nbtest = 0
 
-# set NBCURV to 0 to generate an endless test loop
-#NBCURV = 100000
-NBCURV = 0
-NBKP = 100
-NBADD = 50
-NBDBL = 50
-NBNEG = 50
-NBCHK = 50
-NBEQU = 50
-NBOPP = 50
 
 KNRM="\x1B[0m"
 KRED="\x1B[31m"
 KYEL="\x1B[33m"
 KWHT="\x1B[37m"
-
-NN_LIMIT_COMPUTE_Q = 192
 
 def div(i, s):
     if ((i % s) == 0):
@@ -75,13 +201,13 @@ while (nbcurv < NBCURV) or (NBCURV == 0):
         nn = nn_constant
     else:
         new_min_or_max = False
-        if (nbcurv % 100) == 99:
-            nnmax = nnmax + 3;
+        if (nbcurv % NNMAXMOD) == 99:
+            nnmax = nnmax + NNMAXINCR;
             if nnmax > nnmaxabsolute:
                 nnmax = nnmaxabsolute
             new_min_or_max = True
-        if (nbcurv % 200) == 199:
-            nnmin = nnmin + 1;
+        if (nbcurv % NNMINMOD) == 199:
+            nnmin = nnmin + NNMININCR;
             if nnmin > nnminmax:
                 nnmin = nnminmax
             new_min_or_max = True
@@ -122,7 +248,7 @@ while (nbcurv < NBCURV) or (NBCURV == 0):
         continue
     sys.stderr.write("curve #" + str(nbcurv) + " (nn = " + str(nn) + ")\n")
     # print (on standard output) the algebraic & curve parameters
-    print("NEW CURVE #" + str(nbcurv))
+    print("== NEW CURVE #" + str(nbcurv))
     print("nn=" + str(nn))
     print("p=0x%0*x" % (int(div(nn, 4)), p))
     print("a=0x%0*x" % (int(div(nn, 4)), a))
