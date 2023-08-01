@@ -26,3 +26,4 @@ test_devmem
 test_standalone
 test_uio
 *.tar.gz
+*.sage.py
