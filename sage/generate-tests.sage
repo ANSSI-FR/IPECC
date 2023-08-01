@@ -205,7 +205,11 @@ NN_LIMIT_COMPUTE_Q = 192                                                       #
          Mentionner aussi les exceptions, car elles rajoutent des tests
          pour chaque courbe dont les infos que je donne ci-dessus pour
          NBKP, NBADD, etc. ne font pas état.
-#                                                                              #
+
+         Also check that all 4 things (test_app, ecc_tb.vhd and Sage script,
+         and this script) are coherent in the way they expect/generate syntax
+         (for instance: right now (Aug. 2, 2023) the testbench expects
+         "== TEST P+Q" but this script generates simply "P+Q"...)
 #                                                                              #
 # This is what the definition of a test looks like:                            #
 #                                                                              #
