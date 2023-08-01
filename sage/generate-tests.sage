@@ -157,17 +157,25 @@ NN_LIMIT_COMPUTE_Q = 192                                                       #
 # lines for each generated test. All tests between comprised between the defi- #
 # nition of one curve and the definition of the next one are implicitely rela- #
 # tive to the former.                                                          #
-#
-# This is what the definition of a curve looks like:
-#
-# == NEW CURVE #0
-# nn=256
-# p=0xca91effdc4a2698403334216dcd1849ba59c19af4c611ae948352857239eaa9f
-# a=0x0cdb13e47b2099649822d6770cbfdd8fd2de4ef944bc4bf12bf952dca56ffe6a
-# b=0xb4d65d09bca6a1dead1ed5fb0df4d39db22e37b41cdee56944634fa9c1b9aa35
-# q=0x0000000000000000000000000000000000000000000000000000000000000001
-#
-# 
+#                                                                              #
+# This is what the definition of a curve looks like:                           #
+#                                                                              #
+#   == NEW CURVE #0                                                            #
+#   nn=256                                                                     #
+#   p=0xca91effdc4a2698403334216dcd1849ba59c19af4c611ae948352857239eaa9f       #
+#   a=0x0cdb13e47b2099649822d6770cbfdd8fd2de4ef944bc4bf12bf952dca56ffe6a       #
+#   b=0xb4d65d09bca6a1dead1ed5fb0df4d39db22e37b41cdee56944634fa9c1b9aa35       #
+#   q=0x0000000000000000000000000000000000000000000000000000000000000001       #
+#                                                                              #
+# This a what the definition of a test looks like:                             #
+#                                                                              #
+#   == TEST [k]P #0.0                                                          #
+#   Px=0x2e33d5f20dff1f4f74dce63b0bc2508e092f31d289553564d5d44e28096d019d      #
+#   Py=0x29171738df25639218ed7b2626bdb487c768c20f23180087577df700215ce3f2      #
+#   k=0xf327d532d4772272e3166baef2bf844c8c374ae75f834a6df203381ea0e82149       #
+#   kPx=0xb07e6fcc1852ff369ba1c501900b1b4e8e752c743dde3bc9159459bbfb1682a3     #
+#   kPy=0x60831c4c84643ae8dde33f4caf407bb8fb0fe39838ce55d6f87a24c893062a4d     #
+#                                                                              #
 # Obviously what is interesting in cryptographic applications is to be able to #
 # perform computations on numbers of... cryptographic sizes. You may then find #
 # testing small values like nn=32 to be be inappropriate, however this is not  #
@@ -175,6 +183,11 @@ NN_LIMIT_COMPUTE_Q = 192                                                       #
 # in much higher quantity (think also about HDL testbenchs which are dramati-  #
 # cally slow) enforcing verification of pure control aspects of the computa-   #
 # tions carried inside the IP.                                                 #
+#                                                                              #
+# This also the reason for the [nnmin : nnmax] range described above: tests    #
+# will start quite fast at the begining of one test campaign, and then become  #
+# much smaller as values of nnmin & nnmax increase.                            #
+#                                                                              #
 ################################################################################
 
 nbcurv = 0
