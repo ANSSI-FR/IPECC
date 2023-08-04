@@ -122,20 +122,6 @@ int check_test_oncurve(ipecc_test_t* t, stats_t* st, bool* res)
 					 "         Hardware says %s however it should be %s.%s\n", KERR, 
 					 (t->hw_answer.answer == true) ? "true" : "false",
 					 (t->sw_answer.answer == true) ? "true" : "false", KNRM);
-#if 0
-		status_detail();
-		display_large_number(crv->nn, "p=0x", crv->p);
-		display_large_number(crv->nn, "a=0x", crv->a);
-		display_large_number(crv->nn, "b=0x", crv->b);
-		display_large_number(crv->nn, "q=0x", crv->q);
-		if (pt_p->is_null == true) {
-			printf("P=0\n");
-		} else {
-			display_large_number(crv->nn, "Px=0x", pt_p->x);
-			display_large_number(crv->nn, "Py=0x", pt_p->y);
-		}
-		printf("%s", KNRM);
-#endif
 		*res = false;
 		(st->nok)++;
 		goto err;
@@ -276,30 +262,6 @@ int check_test_equal(ipecc_test_t* t, stats_t* st, bool* res)
 					 "         Hardware says %s however it should be %s.%s\n", KERR, 
 					 (t->hw_answer.answer == true) ? "true" : "false",
 					 (t->sw_answer.answer == true) ? "true" : "false", KNRM);
-#if 0
-		status_detail();
-		display_large_number(crv->nn, "p=0x", crv->p);
-		display_large_number(crv->nn, "a=0x", crv->a);
-		display_large_number(crv->nn, "b=0x", crv->b);
-		display_large_number(crv->nn, "q=0x", crv->q);
-		if (pt_p->is_null == true) {
-			printf("P=0\n");
-		} else {
-			display_large_number(crv->nn, "Px=0x", pt_p->x);
-			display_large_number(crv->nn, "Py=0x", pt_p->y);
-		}
-		if (pt_q->is_null == true) {
-			printf("Q=0\n");
-		} else {
-			display_large_number(crv->nn, "Qx=0x", pt_q->x);
-			display_large_number(crv->nn, "Qy=0x", pt_q->y);
-		}
-		printf("%s", KNRM);
-		/*
-		 * acknowledge all errors
-		 */
-		WRITE_REG(W_ERR_ACK, 0xffff0000);
-#endif
 		*res = false;
 		(st->nok)++;
 		goto err;
@@ -440,30 +402,6 @@ int check_test_oppos(ipecc_test_t* t, stats_t* st, bool* res)
 					 "         Hardware says %s however it should be %s.%s\n", KERR, 
 					 (t->hw_answer.answer == true) ? "true" : "false",
 					 (t->sw_answer.answer == true) ? "true" : "false", KNRM);
-#if 0
-		status_detail();
-		display_large_number(crv->nn, "p=0x", crv->p);
-		display_large_number(crv->nn, "a=0x", crv->a);
-		display_large_number(crv->nn, "b=0x", crv->b);
-		display_large_number(crv->nn, "q=0x", crv->q);
-		if (pt_p->is_null == true) {
-			printf("P=0\n");
-		} else {
-			display_large_number(crv->nn, "Px=0x", pt_p->x);
-			display_large_number(crv->nn, "Py=0x", pt_p->y);
-		}
-		if (pt_q->is_null == true) {
-			printf("Q=0\n");
-		} else {
-			display_large_number(crv->nn, "Qx=0x", pt_q->x);
-			display_large_number(crv->nn, "Qy=0x", pt_q->y);
-		}
-		printf("%s", KNRM);
-		/*
-		 * acknowledge all errors
-		 */
-		WRITE_REG(W_ERR_ACK, 0xffff0000);
-#endif
 		*res = false;
 		(st->nok)++;
 		goto err;

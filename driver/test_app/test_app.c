@@ -270,60 +270,6 @@ int main(int argc, char *argv[])
 	bool result_pts_are_equal;
 	bool result_tests_are_identical;
 
-#if 0
-	/* Intput points coords & scalar (part of input test vector) */
-	struct point_t p;
-	struct point_t q;
-	uint8_t nb_k[NBMAXSZ];
-	uint32_t nb_k_sz;
-	/* Output points (part of input test vector) */
-	struct point_t sw_kp;
-	struct point_t sw_pplusq;
-	struct point_t sw_twop;
-	struct point_t sw_negp;
-	/* Output points (computed by hardware) */
-	struct point_t hw_kp;
-	struct point_t hw_pplusq;
-	struct point_t hw_twop;
-	struct point_t hw_negp;
-	/* Tests metadata */
-	struct pt_test_t tst_chk;
-	struct pt_test_t tst_equ;
-	struct pt_test_t tst_opp;
-	/* statistics (nb of passed tests, nb of errors, etc) */
-	struct stats_t stats;
-
-	/* init some flags */
-	/* curve validity */
-	curve.valid = 0;
-	/* points validity */
-	p.valid = false;
-	q.valid = false;
-	sw_pplusq.valid = false;
-	hw_pplusq.valid = false;
-	sw_kp.valid = false;
-	hw_kp.valid = false;
-	sw_twop.valid = false;
-	hw_twop.valid = false;
-	sw_negp.valid = false;
-	hw_negp.valid = false;
-	/* tests validity */
-	tst_chk.sw_valid = false;
-	tst_chk.hw_valid = false;
-	tst_equ.sw_valid = false;
-	tst_equ.hw_valid = false;
-	tst_opp.sw_valid = false;
-	tst_opp.hw_valid = false;
-	op = OP_NONE;
-	/* stats */
-	stats.ok = 0;
-	stats.nok = 0;
-	stats.total = 0;
-	/* scalar for [k]P */
-	k_valid = false;
-#endif
-
-
 	printf("%sWelcome to the IPECC test applet.\n", KWHT);
 
 	/* Move the claptrap below rather in --help. */
@@ -351,10 +297,11 @@ int main(int argc, char *argv[])
 			exit(EXIT_FAILURE);
 		}
 		log_print("Debug mode (HW version %d.%d)\n", version_major, version_minor);
-		/* We must activate, in the TRNG, the pulling of raw random bytes by the
+		/*
+		 * We must activate, in the TRNG, the pulling of raw random bytes by the
 		 * post-processing function (because in debug mode it is disabled upon
 		 * reset).
-		 * */
+		 */
 		if (hw_driver_trng_post_proc_enable()){
 			printf("%sError: Enabling TRNG post-processing on hardware triggered an error.%s\n", KERR, KNRM);
 			exit(EXIT_FAILURE);
@@ -576,15 +523,6 @@ int main(int argc, char *argv[])
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_P')", __LINE__);
 					}
 					test.curve->p.sz = DIV(test.curve->nn, 8);
-#if 0
-					{
-						PRINTF("%sp=0x", KCYN);
-						for (int i=0; i< DIV(test.curve->nn, 8); i++){
-							PRINTF(" %02x", (test.curve->p.val)[i]);
-						}
-						PRINTF("%s\n", KNRM);
-					}
-#endif
 					test.curve->p.valid = true;
 					line_type_expected = EXPECT_A;
 				} else {

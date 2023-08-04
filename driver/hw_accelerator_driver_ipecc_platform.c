@@ -176,20 +176,6 @@ int hw_driver_setup(volatile unsigned char **base_addr_p, volatile unsigned char
 		log_print("OK, loaded IP @%p\n", (*base_addr_p));
 	}
 
-#if 0
-	/* Is it a 'debug' or a 'production' version of the IP? */
-	if (ip_ecc_is_debug(&hw_driver_debug_not_prod)) {
-		hw_driver_debug_not_prod = 1;
-		log_print("Debug mode (version %d.%d)\n", ip_ecc_get_version_major(), hw_driver_get_version_minor());
-		/* We must activate, in the TRNG, the pulling of raw random bytes by the
-		 * post-processing function (as in debug mode it is disabled upon reset). */
-		hw_driver_trng_post_proc_enable();
-	} else {
-		hw_driver_debug_not_prod = 0;
-		log_print("Production mode.\n");
-	}
-#endif
-
 	ret = 0;
 err:
 	return ret;

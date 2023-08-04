@@ -155,38 +155,6 @@ int check_kp_result(ipecc_test_t* t, stats_t* st, bool* res)
 			 */
 			printf("%sError: [k]P mistmatch between hardware result and expected one.\n"
 						 "         [k]P is not 0 however it should be.%s\n", KERR, KNRM);
-#if 0
-			status_detail();
-			printf("nn=%d (HW = %d)\n", crv->nn, READ_REG(R_PRIME_SIZE));
-			display_large_number(crv->nn, "p=0x", crv->p);
-			display_large_number(crv->nn, "a=0x", crv->a);
-			display_large_number(crv->nn, "b=0x", crv->b);
-			display_large_number(crv->nn, "q=0x", crv->q);
-			if (ptp->is_null == true) {
-				printf("P=0\n");
-			} else {
-				display_large_number(crv->nn, "Px=0x", ptp->x);
-				display_large_number(crv->nn, "Py=0x", ptp->y);
-			}
-			display_large_number(crv->nn, "k=0x", nb_k);
-			if (nbbld) {
-				printf("nbbld=%d\n", nbbld);
-			}
-			if (sw_kp->is_null == true) {
-				printf("SW: [k]P = 0\n");
-			} else {
-				display_large_number(crv->nn, "SW: [k]Px=0x", sw_kp->x);
-				display_large_number(crv->nn, "    [k]Py=0x", sw_kp->y);
-			}
-			if (hw_kp->is_null == true) {
-				printf("HW: [k]P = 0\n");
-			} else {
-				display_large_number(crv->nn, "HW: [k]Px=0x", hw_kp->x);
-				display_large_number(crv->nn, "    [k]Py=0x", hw_kp->y);
-			}
-			printf("%s", KNRM);
-			WRITE_REG(W_ERR_ACK, 0xffff0000);
-#endif
 			*res = false;
 			(st->nok)++;
 			goto err;
@@ -201,38 +169,6 @@ int check_kp_result(ipecc_test_t* t, stats_t* st, bool* res)
 			 */
 			printf("%sError: [k]P mistmatch between hardware result and expected one.\n"
 						 "         [k]P is 0 however it should not be.%s\n", KERR, KNRM);
-#if 0
-			status_detail();
-			printf("nn=%d (HW = %d)\n", crv->nn, READ_REG(R_PRIME_SIZE));
-			display_large_number(crv->nn, "p=0x", crv->p);
-			display_large_number(crv->nn, "a=0x", crv->a);
-			display_large_number(crv->nn, "b=0x", crv->b);
-			display_large_number(crv->nn, "q=0x", crv->q);
-			if (ptp->is_null == true) {
-				printf("P=0\n");
-			} else {
-				display_large_number(crv->nn, "Px=0x", ptp->x);
-				display_large_number(crv->nn, "Py=0x", ptp->y);
-			}
-			display_large_number(crv->nn, "k=0x", nb_k);
-			if (nbbld) {
-				printf("nbbld=%d\n", nbbld);
-			}
-			if (sw_kp->is_null == true) {
-				printf("SW: [k]P = 0\n");
-			} else {
-				display_large_number(crv->nn, "SW: [k]Px=0x", sw_kp->x);
-				display_large_number(crv->nn, "    [k]Py=0x", sw_kp->y);
-			}
-			if (hw_kp->is_null == true) {
-				printf("HW: [k]P = 0\n");
-			} else {
-				display_large_number(crv->nn, "HW: [k]Px=0x", hw_kp->x);
-				display_large_number(crv->nn, "    [k]Py=0x", hw_kp->y);
-			}
-			printf("%s", KNRM);
-			WRITE_REG(W_ERR_ACK, 0xffff0000);
-#endif
 			*res = false;
 			(st->nok)++;
 			goto err;
@@ -248,50 +184,12 @@ int check_kp_result(ipecc_test_t* t, stats_t* st, bool* res)
 			}
 			if (*res == true) {
 				PRINTF("[k]P results match\n");
-#if 0
-				display_large_number(crv->nn, "SW: kPx = 0x", sw_kp->x);
-				display_large_number(crv->nn, "    kPy = 0x", sw_kp->y);
-				display_large_number(crv->nn, "HW: kPx = 0x", hw_kp->x);
-				display_large_number(crv->nn, "    kPy = 0x", hw_kp->y);
-#endif
 				(st->ok)++;
 			} else {
 				/*
 				 * Mismatch error (hardware [k]P coords & expected ones differ).
 				 */
 				printf("%sError: [k]P mistmatch between hardware coordinates and those of the expected result.%s\n", KERR, KNRM);
-#if 0
-				status_detail();
-				printf("nn=%d (HW = %d)\n", crv->nn, READ_REG(R_PRIME_SIZE));
-				display_large_number(crv->nn, "p=0x", crv->p);
-				display_large_number(crv->nn, "a=0x", crv->a);
-				display_large_number(crv->nn, "b=0x", crv->b);
-				display_large_number(crv->nn, "q=0x", crv->q);
-				if (ptp->is_null == true) {
-					printf("P=0\n");
-				} else {
-					display_large_number(crv->nn, "Px=0x", ptp->x);
-					display_large_number(crv->nn, "Py=0x", ptp->y);
-				}
-				display_large_number(crv->nn, "k=0x", nb_k);
-				if (nbbld) {
-					printf("nbbld=%d\n", nbbld);
-				}
-				if (sw_kp->is_null == true) {
-					printf("SW: [k]P = 0\n");
-				} else {
-					display_large_number(crv->nn, "SW: [k]Px=0x", sw_kp->x);
-					display_large_number(crv->nn, "    [k]Py=0x", sw_kp->y);
-				}
-				if (hw_kp->is_null == true) {
-					printf("HW: [k]P = 0\n");
-				} else {
-					display_large_number(crv->nn, "HW: [k]Px=0x", hw_kp->x);
-					display_large_number(crv->nn, "    [k]Py=0x", hw_kp->y);
-				}
-				printf("%s", KNRM);
-				WRITE_REG(W_ERR_ACK, 0xffff0000);
-#endif
 				(st->nok)++;
 				goto err;
 			}

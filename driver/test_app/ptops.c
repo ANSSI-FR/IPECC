@@ -159,40 +159,6 @@ int check_ptadd_result(ipecc_test_t* t, stats_t* st, bool* res)
 			 */
 			printf("%sError: P + Q mismatch between hardware result and expected one.\n"
 						 "         P + Q is not 0 however it should be.%s\n", KERR, KNRM);
-#if 0
-			status_detail();
-			printf("nn=%d (HW = %d)\n", crv->nn, READ_REG(R_PRIME_SIZE));
-			display_large_number(crv->nn, "p=0x", crv->p);
-			display_large_number(crv->nn, "a=0x", crv->a);
-			display_large_number(crv->nn, "b=0x", crv->b);
-			display_large_number(crv->nn, "q=0x", crv->q);
-			if (pt_p->is_null == true) {
-				printf("P=0\n");
-			} else {
-				display_large_number(crv->nn, "Px=0x", pt_p->x);
-				display_large_number(crv->nn, "Py=0x", pt_p->y);
-			}
-			if (pt_q->is_null == true) {
-				printf("Q=0\n");
-			} else {
-				display_large_number(crv->nn, "Qx=0x", pt_q->x);
-				display_large_number(crv->nn, "Qy=0x", pt_q->y);
-			}
-			if (sw_pplusq->is_null == true) {
-				printf("SW: P + Q = 0\n");
-			} else {
-				display_large_number(crv->nn, "SW: (P+Q)x=0x", sw_pplusq->x);
-				display_large_number(crv->nn, "    (P+Q)y=0x", sw_pplusq->y);
-			}
-			if (hw_pplusq->is_null == true) {
-				printf("HW: P + Q = 0\n");
-			} else {
-				display_large_number(crv->nn, "HW: (P+Q)x=0x", hw_pplusq->x);
-				display_large_number(crv->nn, "    (P+Q)y=0x", hw_pplusq->y);
-			}
-			printf("%s", KNRM);
-			WRITE_REG(W_ERR_ACK, 0xffff0000);
-#endif
 			*res = false;
 			(st->nok)++;
 			goto err;
@@ -207,40 +173,6 @@ int check_ptadd_result(ipecc_test_t* t, stats_t* st, bool* res)
 			 */
 			printf("%sError: P + Q mismatch between hardware result and expected one.\n"
 						 "         P + Q is 0 however it should not be.%s\n", KERR, KNRM);
-#if 0
-			status_detail();
-			printf("nn=%d (HW = %d)\n", crv->nn, READ_REG(R_PRIME_SIZE));
-			display_large_number(crv->nn, "p=0x", crv->p);
-			display_large_number(crv->nn, "a=0x", crv->a);
-			display_large_number(crv->nn, "b=0x", crv->b);
-			display_large_number(crv->nn, "q=0x", crv->q);
-			if (pt_p->is_null == true) {
-				printf("P=0\n");
-			} else {
-				display_large_number(crv->nn, "Px=0x", pt_p->x);
-				display_large_number(crv->nn, "Py=0x", pt_p->y);
-			}
-			if (pt_q->is_null == true) {
-				printf("Q=0\n");
-			} else {
-				display_large_number(crv->nn, "Qx=0x", pt_q->x);
-				display_large_number(crv->nn, "Qy=0x", pt_q->y);
-			}
-			if (sw_pplusq->is_null == true) {
-				printf("SW: P + Q = 0\n");
-			} else {
-				display_large_number(crv->nn, "SW: (P+Q)x=0x", sw_pplusq->x);
-				display_large_number(crv->nn, "    (P+Q)y=0x", sw_pplusq->y);
-			}
-			if (hw_pplusq->is_null == true) {
-				printf("HW: P + Q = 0\n");
-			} else {
-				display_large_number(crv->nn, "HW: (P+Q)x=0x", hw_pplusq->x);
-				display_large_number(crv->nn, "    (P+Q)y=0x", hw_pplusq->y);
-			}
-			printf("%s", KNRM);
-			WRITE_REG(W_ERR_ACK, 0xffff0000);
-#endif
 			*res = false;
 			(st->nok)++;
 			goto err;
@@ -256,52 +188,12 @@ int check_ptadd_result(ipecc_test_t* t, stats_t* st, bool* res)
 			}
 			if (*res == true) {
 				PRINTF("P + Q results match\n");
-#if 0
-				display_large_number(crv->nn, "SW: (P+Q)x = 0x", sw_pplusq->x);
-				display_large_number(crv->nn, "    (P+Q)y = 0x", sw_pplusq->y);
-				display_large_number(crv->nn, "HW: (P+Q)x = 0x", hw_pplusq->x);
-				display_large_number(crv->nn, "    (P+Q)y = 0x", hw_pplusq->y);
-#endif
 				(st->ok)++;
 			} else {
 				/*
 				 * Mismatch error (hardware P + Q coords & expected ones differ).
 				 */
 				printf("%sError: P + Q mismatch between hardware coordinates and those of the expected result.%s\n", KERR, KNRM);
-#if 0
-				status_detail();
-				printf("nn=%d (HW = %d)\n", crv->nn, READ_REG(R_PRIME_SIZE));
-				display_large_number(crv->nn, "p=0x", crv->p);
-				display_large_number(crv->nn, "a=0x", crv->a);
-				display_large_number(crv->nn, "b=0x", crv->b);
-				display_large_number(crv->nn, "q=0x", crv->q);
-				if (pt_p->is_null == true) {
-					printf("P=0\n");
-				} else {
-					display_large_number(crv->nn, "Px=0x", pt_p->x);
-					display_large_number(crv->nn, "Py=0x", pt_p->y);
-				}
-				if (pt_q->is_null == true) {
-					printf("Q=0\n");
-				} else {
-					display_large_number(crv->nn, "Qx=0x", pt_q->x);
-					display_large_number(crv->nn, "Qy=0x", pt_q->y);
-				}
-				if (sw_pplusq->is_null == true) {
-					printf("SW: P + Q = 0\n");
-				} else {
-					display_large_number(crv->nn, "SW: (P+Q)x=0x", sw_pplusq->x);
-					display_large_number(crv->nn, "    (P+Q)y=0x", sw_pplusq->y);
-				}
-				if (hw_pplusq->is_null == true) {
-					printf("HW: P + Q = 0\n");
-				} else {
-					display_large_number(crv->nn, "HW: (P+Q)x=0x", hw_pplusq->x);
-					display_large_number(crv->nn, "    (P+Q)y=0x", hw_pplusq->y);
-				}
-				printf("%s", KNRM);
-				WRITE_REG(W_ERR_ACK, 0xffff0000);
-#endif
 				(st->nok)++;
 				goto err;
 			}
@@ -420,34 +312,6 @@ int check_ptdbl_result(ipecc_test_t* t, stats_t* st, bool* res)
 			 */
 			printf("%sError: [2]P mismatch between hardware result and expected one.\n"
 						 "         [2]P is not 0 however it should be.%s\n", KERR, KNRM);
-#if 0
-			status_detail();
-			printf("nn=%d (HW = %d)\n", crv->nn, READ_REG(R_PRIME_SIZE));
-			display_large_number(crv->nn, "p=0x", crv->p);
-			display_large_number(crv->nn, "a=0x", crv->a);
-			display_large_number(crv->nn, "b=0x", crv->b);
-			display_large_number(crv->nn, "q=0x", crv->q);
-			if (pt_p->is_null == true) {
-				printf("P=0\n");
-			} else {
-				display_large_number(crv->nn, "Px=0x", pt_p->x);
-				display_large_number(crv->nn, "Py=0x", pt_p->y);
-			}
-			if (sw_twop->is_null == true) {
-				printf("SW: 2[P] = 0\n");
-			} else {
-				display_large_number(crv->nn, "SW: [2]Px=0x", sw_twop->x);
-				display_large_number(crv->nn, "    [2]Py=0x", sw_twop->y);
-			}
-			if (hw_twop->is_null == true) {
-				printf("HW: [2]P = 0\n");
-			} else {
-				display_large_number(crv->nn, "HW: [2]Px=0x", hw_twop->x);
-				display_large_number(crv->nn, "    [2]Py=0x", hw_twop->y);
-			}
-			printf("%s", KNRM);
-			WRITE_REG(W_ERR_ACK, 0xffff0000);
-#endif
 			*res = false;
 			(st->nok)++;
 			goto err;
@@ -462,34 +326,6 @@ int check_ptdbl_result(ipecc_test_t* t, stats_t* st, bool* res)
 			 */
 			printf("%sError: [2]P mismatch between hardware result and expected one.\n"
 						 "         [2]P is 0 however it should not be.%s\n", KERR, KNRM);
-#if 0
-			status_detail();
-			printf("nn=%d (HW = %d)\n", crv->nn, READ_REG(R_PRIME_SIZE));
-			display_large_number(crv->nn, "p=0x", crv->p);
-			display_large_number(crv->nn, "a=0x", crv->a);
-			display_large_number(crv->nn, "b=0x", crv->b);
-			display_large_number(crv->nn, "q=0x", crv->q);
-			if (pt_p->is_null == true) {
-				printf("P=0\n");
-			} else {
-				display_large_number(crv->nn, "Px=0x", pt_p->x);
-				display_large_number(crv->nn, "Py=0x", pt_p->y);
-			}
-			if (sw_twop->is_null == true) {
-				printf("SW: [2]P = 0\n");
-			} else {
-				display_large_number(crv->nn, "SW: [2]Px=0x", sw_twop->x);
-				display_large_number(crv->nn, "    [2]Py=0x", sw_twop->y);
-			}
-			if (hw_twop->is_null == true) {
-				printf("HW: [2]P = 0\n");
-			} else {
-				display_large_number(crv->nn, "HW: [2]Px=0x", hw_twop->x);
-				display_large_number(crv->nn, "    [2]Py=0x", hw_twop->y);
-			}
-			printf("%s", KNRM);
-			WRITE_REG(W_ERR_ACK, 0xffff0000);
-#endif
 			*res = false;
 			(st->nok)++;
 			goto err;
@@ -505,57 +341,12 @@ int check_ptdbl_result(ipecc_test_t* t, stats_t* st, bool* res)
 			}
 			if (*res == true) {
 				PRINTF("[2]P results match\n");
-#if 0
-				display_large_number(crv->nn, "SW: [2]Px = 0x", sw_twop->x);
-				display_large_number(crv->nn, "    [2]Py = 0x", sw_twop->y);
-				display_large_number(crv->nn, "HW: [2]Px = 0x", hw_twop->x);
-				display_large_number(crv->nn, "    [2]Py = 0x", hw_twop->y);
-#endif
 				(st->ok)++;
 			} else {
 				/*
 				 * Mismatch error (hardware [2]P coords & expected ones differ).
 				 */
-#if 1
-				{
-					unsigned int i;
-					printf("%sSoft: [2]P.x = 0x", KWHT);
-					for (i=0; i< DIV((t->curve->nn), 8); i++) {
-						printf("%02x", (t->pt_sw_res.x.val)[i]);
-					}
-					printf("%s\n", KNRM);
-					printf("%sSoft: [2]P.y = 0x", KWHT);
-					for (i=0; i< DIV((t->curve->nn), 8); i++) {
-						printf("%02x", (t->pt_sw_res.y.val)[i]);
-					}
-					printf("%s\n", KNRM);
-					printf("%sHard: [2]P.x = 0x", KWHT);
-					for (i=0; i< DIV((t->curve->nn), 8); i++) {
-						printf("%02x", (t->pt_hw_res.x.val)[i]);
-					}
-					printf("%s\n", KNRM);
-					printf("%sHard: [2]P.y = 0x", KWHT);
-					for (i=0; i< DIV((t->curve->nn), 8); i++) {
-						printf("%02x", (t->pt_hw_res.y.val)[i]);
-					}
-					printf("%s\n", KNRM);
-				}
-#endif
 				printf("%sError: [2]P mismatch between hardware coordinates and those of the expected result.%s\n", KERR, KNRM);
-#if 0
-				status_detail();
-				printf("nn=%d (HW = %d)\n", crv->nn, READ_REG(R_PRIME_SIZE));
-				display_large_number(crv->nn, "p=0x", crv->p);
-				display_large_number(crv->nn, "a=0x", crv->a);
-				display_large_number(crv->nn, "b=0x", crv->b);
-				display_large_number(crv->nn, "q=0x", crv->q);
-				display_large_number(crv->nn, "SW: [2]Px = 0x", sw_twop->x);
-				display_large_number(crv->nn, "    [2]Py = 0x", sw_twop->y);
-				display_large_number(crv->nn, "HW: [2]Px = 0x", hw_twop->x);
-				display_large_number(crv->nn, "    [2]Py = 0x", hw_twop->y);
-				printf("%s", KNRM);
-				WRITE_REG(W_ERR_ACK, 0xffff0000);
-#endif
 				(st->nok)++;
 				goto err;
 			}
@@ -676,34 +467,6 @@ int check_ptneg_result(ipecc_test_t* t, stats_t* st, bool* res)
 			 */
 			printf("%sError: (-P) mismatch between hardware result and expected one.\n"
 						 "         (-P) is not 0 however it should be.%s\n", KERR, KNRM);
-#if 0
-			status_detail();
-			printf("nn=%d (HW = %d)\n", crv->nn, READ_REG(R_PRIME_SIZE));
-			display_large_number(crv->nn, "p=0x", crv->p);
-			display_large_number(crv->nn, "a=0x", crv->a);
-			display_large_number(crv->nn, "b=0x", crv->b);
-			display_large_number(crv->nn, "q=0x", crv->q);
-			if (pt_p->is_null == true) {
-				printf("P=0\n");
-			} else {
-				display_large_number(crv->nn, "Px=0x", pt_p->x);
-				display_large_number(crv->nn, "Py=0x", pt_p->y);
-			}
-			if (sw_negp->is_null == true) {
-				printf("SW: -P = 0\n");
-			} else {
-				display_large_number(crv->nn, "SW: -Px=0x", sw_negp->x);
-				display_large_number(crv->nn, "    -Py=0x", sw_negp->y);
-			}
-			if (hw_negp->is_null == true) {
-				printf("HW: -P = 0\n");
-			} else {
-				display_large_number(crv->nn, "HW: -Px=0x", hw_negp->x);
-				display_large_number(crv->nn, "    -Py=0x", hw_negp->y);
-			}
-			printf("%s", KNRM);
-			WRITE_REG(W_ERR_ACK, 0xffff0000);
-#endif
 			*res = false;
 			(st->nok)++;
 			goto err;
@@ -718,35 +481,6 @@ int check_ptneg_result(ipecc_test_t* t, stats_t* st, bool* res)
 			 */
 			printf("%sError: (-P) mismatch between hardware result and expected one.\n"
 						 "         (-P) is 0 however it should not be.%s\n", KERR, KNRM);
-#if 0
-			status_detail();
-			printf("nn=%d (HW = %d)\n", crv->nn, READ_REG(R_PRIME_SIZE));
-			display_large_number(crv->nn, "p=0x", crv->p);
-			display_large_number(crv->nn, "a=0x", crv->a);
-			display_large_number(crv->nn, "b=0x", crv->b);
-			display_large_number(crv->nn, "q=0x", crv->q);
-			if (pt_p->is_null == true) {
-				printf("P=0\n");
-			} else {
-				display_large_number(crv->nn, "Px=0x", pt_p->x);
-				display_large_number(crv->nn, "Py=0x", pt_p->y);
-			}
-			if (sw_negp->is_null == true) {
-				printf("SW: -P = 0\n");
-			} else {
-				display_large_number(crv->nn, "SW: -Px=0x", sw_negp->x);
-				display_large_number(crv->nn, "    -Py=0x", sw_negp->y);
-			}
-			if (hw_negp->is_null == true) {
-				printf("HW: -P = 0\n");
-			} else {
-				display_large_number(crv->nn, "HW: -Px=0x", hw_negp->x);
-				display_large_number(crv->nn, "    -Py=0x", hw_negp->y);
-				printf("%s", KNRM);
-			}
-			printf("%s", KNRM);
-			WRITE_REG(W_ERR_ACK, 0xffff0000);
-#endif
 			*res = false;
 			(st->nok)++;
 			goto err;
@@ -762,31 +496,12 @@ int check_ptneg_result(ipecc_test_t* t, stats_t* st, bool* res)
 			}
 			if (*res == true) {
 				PRINTF("(-P) results match\n");
-#if 0
-				display_large_number(crv->nn, "SW: -Px = 0x", sw_negp->x);
-				display_large_number(crv->nn, "    -Py = 0x", sw_negp->y);
-				display_large_number(crv->nn, "HW: -Px = 0x", hw_negp->x);
-				display_large_number(crv->nn, "    -Py = 0x", hw_negp->y);
-#endif
 				(st->ok)++;
 			} else {
 				/*
 				 * Mismatch error (hardware (-P) coords & expected ones differ).
 				 */
 				printf("%sError: (-P) mismatch between hardware coordinates and those of the expected result.%s\n", KERR, KNRM);
-#if 0
-				status_detail();
-				display_large_number(crv->nn, "p=0x", crv->p);
-				display_large_number(crv->nn, "a=0x", crv->a);
-				display_large_number(crv->nn, "b=0x", crv->b);
-				display_large_number(crv->nn, "q=0x", crv->q);
-				display_large_number(crv->nn, "SW: -Px = 0x", sw_negp->x);
-				display_large_number(crv->nn, "    -Py = 0x", sw_negp->y);
-				display_large_number(crv->nn, "HW: -Px = 0x", hw_negp->x);
-				display_large_number(crv->nn, "    -Py = 0x", hw_negp->y);
-				printf("%s", KNRM);
-				WRITE_REG(W_ERR_ACK, 0xffff0000);
-#endif
 				(st->nok)++;
 				goto err;
 			}
