@@ -42,13 +42,13 @@ typedef enum {
 int hw_driver_reset(void);
 
 /* To know if the IP is in 'debug' or 'production' mode */
-int hw_driver_is_debug(void);
+int hw_driver_is_debug(unsigned int*);
 
 /* Get major version of the IP */
-int hw_driver_get_version_major(void);
+int hw_driver_get_version_major(unsigned int*);
 
 /* Get minor version of the IP */
-int hw_driver_get_version_minor(void);
+int hw_driver_get_version_minor(unsigned int*);
 
 /* Enable TRNG post-processing logic */
 int hw_driver_trng_post_proc_enable(void);

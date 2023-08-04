@@ -45,19 +45,19 @@ int ip_set_pts_and_run_ptadd(ipecc_test_t* t)
 		printf("%sError: Can't program IP for P + Q computation, input point Q not set.%s\n", KERR, KNRM);
 		goto err;
 	}
-	if (t->ptp.x.sz > NN_SZ(t->curve->nn)) {
+	if ((t->ptp.x.sz) > (NN_SZ(t->curve->nn))) {
 		printf("%sError: Can't program IP for P + Q computation, X coord. of point P larger than current curve size set in hardware.%s\n", KERR, KNRM);
 		goto err;
 	}
-	if (t->ptp.y.sz > NN_SZ(t->curve->nn)) {
+	if ((t->ptp.y.sz) > (NN_SZ(t->curve->nn))) {
 		printf("%sError: Can't program IP for P + Q computation, Y coord. of point P larger than currrent curve size set in hardware.%s\n", KERR, KNRM);
 		goto err;
 	}
-	if (t->ptq.x.sz > NN_SZ(t->curve->nn)) {
+	if ((t->ptq.x.sz) > (NN_SZ(t->curve->nn))) {
 		printf("%sError: Can't program IP for P + Q computation, X coord. of point Q larger than current curve size set in hardware.%s\n", KERR, KNRM);
 		goto err;
 	}
-	if (t->ptq.y.sz > NN_SZ(t->curve->nn)) {
+	if ((t->ptq.y.sz) > (NN_SZ(t->curve->nn))) {
 		printf("%sError: Can't program IP for P + Q computation, Y coord. of point Q larger than currrent curve size set in hardware.%s\n", KERR, KNRM);
 		goto err;
 	}
@@ -157,7 +157,7 @@ int check_ptadd_result(ipecc_test_t* t, stats_t* st, bool* res)
 			/*
 			 * Mismatch error (the hardware result is not the null point).
 			 */
-			printf("%sError: P + Q mistmatch between hardware result and expected one.\n"
+			printf("%sError: P + Q mismatch between hardware result and expected one.\n"
 						 "         P + Q is not 0 however it should be.%s\n", KERR, KNRM);
 #if 0
 			status_detail();
@@ -205,7 +205,7 @@ int check_ptadd_result(ipecc_test_t* t, stats_t* st, bool* res)
 			/*
 			 * Mismatch error (the hardware result is the null point).
 			 */
-			printf("%sError: P + Q mistmatch between hardware result and expected one.\n"
+			printf("%sError: P + Q mismatch between hardware result and expected one.\n"
 						 "         P + Q is 0 however it should not be.%s\n", KERR, KNRM);
 #if 0
 			status_detail();
@@ -267,7 +267,7 @@ int check_ptadd_result(ipecc_test_t* t, stats_t* st, bool* res)
 				/*
 				 * Mismatch error (hardware P + Q coords & expected ones differ).
 				 */
-				printf("%sError: P + Q mistmatch between hardware coordinates and those of the expected result.%s\n", KERR, KNRM);
+				printf("%sError: P + Q mismatch between hardware coordinates and those of the expected result.%s\n", KERR, KNRM);
 #if 0
 				status_detail();
 				printf("nn=%d (HW = %d)\n", crv->nn, READ_REG(R_PRIME_SIZE));
@@ -331,11 +331,11 @@ int ip_set_pt_and_run_ptdbl(ipecc_test_t* t)
 		printf("%sError: Can't program IP for [2]P computation, input point P not set.%s\n", KERR, KNRM);
 		goto err;
 	}
-	if (t->ptp.x.sz > NN_SZ(t->curve->nn)) {
+	if ((t->ptp.x.sz) > (NN_SZ(t->curve->nn))) {
 		printf("%sError: Can't program IP for [2]P computation, X coord. of point P larger than current curve size set in hardware.%s\n", KERR, KNRM);
 		goto err;
 	}
-	if (t->ptp.y.sz > NN_SZ(t->curve->nn)) {
+	if ((t->ptp.y.sz) > (NN_SZ(t->curve->nn))) {
 		printf("%sError: Can't program IP for [2]P computation, Y coord. of point P larger than currrent curve size set in hardware.%s\n", KERR, KNRM);
 		goto err;
 	}
@@ -418,7 +418,7 @@ int check_ptdbl_result(ipecc_test_t* t, stats_t* st, bool* res)
 			/*
 			 * Mismatch error (the hardware result is not the null point).
 			 */
-			printf("%sError: [2]P mistmatch between hardware result and expected one.\n"
+			printf("%sError: [2]P mismatch between hardware result and expected one.\n"
 						 "         [2]P is not 0 however it should be.%s\n", KERR, KNRM);
 #if 0
 			status_detail();
@@ -460,7 +460,7 @@ int check_ptdbl_result(ipecc_test_t* t, stats_t* st, bool* res)
 			/*
 			 * Mismatch error (the hardware result is the null point).
 			 */
-			printf("%sError: [2]P mistmatch between hardware result and expected one.\n"
+			printf("%sError: [2]P mismatch between hardware result and expected one.\n"
 						 "         [2]P is 0 however it should not be.%s\n", KERR, KNRM);
 #if 0
 			status_detail();
@@ -516,7 +516,32 @@ int check_ptdbl_result(ipecc_test_t* t, stats_t* st, bool* res)
 				/*
 				 * Mismatch error (hardware [2]P coords & expected ones differ).
 				 */
-				printf("%sError: [2]P mistmatch between hardware coordinates and those of the expected result.%s\n", KERR, KNRM);
+#if 1
+				{
+					unsigned int i;
+					printf("%sSoft: [2]P.x = 0x", KWHT);
+					for (i=0; i< DIV((t->curve->nn), 8); i++) {
+						printf("%02x", (t->pt_sw_res.x.val)[i]);
+					}
+					printf("%s\n", KNRM);
+					printf("%sSoft: [2]P.y = 0x", KWHT);
+					for (i=0; i< DIV((t->curve->nn), 8); i++) {
+						printf("%02x", (t->pt_sw_res.y.val)[i]);
+					}
+					printf("%s\n", KNRM);
+					printf("%sHard: [2]P.x = 0x", KWHT);
+					for (i=0; i< DIV((t->curve->nn), 8); i++) {
+						printf("%02x", (t->pt_hw_res.x.val)[i]);
+					}
+					printf("%s\n", KNRM);
+					printf("%sHard: [2]P.y = 0x", KWHT);
+					for (i=0; i< DIV((t->curve->nn), 8); i++) {
+						printf("%02x", (t->pt_hw_res.y.val)[i]);
+					}
+					printf("%s\n", KNRM);
+				}
+#endif
+				printf("%sError: [2]P mismatch between hardware coordinates and those of the expected result.%s\n", KERR, KNRM);
 #if 0
 				status_detail();
 				printf("nn=%d (HW = %d)\n", crv->nn, READ_REG(R_PRIME_SIZE));
@@ -560,11 +585,11 @@ int ip_set_pt_and_run_ptneg(ipecc_test_t* t)
 		printf("%sError: Can't program IP for (-P) computation, input point P not set.%s\n", KERR, KNRM);
 		goto err;
 	}
-	if (t->ptp.x.sz > NN_SZ(t->curve->nn)) {
+	if ((t->ptp.x.sz) > (NN_SZ(t->curve->nn))) {
 		printf("%sError: Can't program IP for (-P) computation, X coord. of point P larger than current curve size set in hardware.%s\n", KERR, KNRM);
 		goto err;
 	}
-	if (t->ptp.y.sz > NN_SZ(t->curve->nn)) {
+	if ((t->ptp.y.sz) > (NN_SZ(t->curve->nn))) {
 		printf("%sError: Can't program IP for (-P) computation, Y coord. of point P larger than currrent curve size set in hardware.%s\n", KERR, KNRM);
 		goto err;
 	}
@@ -649,7 +674,7 @@ int check_ptneg_result(ipecc_test_t* t, stats_t* st, bool* res)
 			/*
 			 * Mismatch error (the hardware result is not the null point).
 			 */
-			printf("%sError: (-P) mistmatch between hardware result and expected one.\n"
+			printf("%sError: (-P) mismatch between hardware result and expected one.\n"
 						 "         (-P) is not 0 however it should be.%s\n", KERR, KNRM);
 #if 0
 			status_detail();
@@ -691,7 +716,7 @@ int check_ptneg_result(ipecc_test_t* t, stats_t* st, bool* res)
 			/*
 			 * Mismatch error (the hardware result is the null point).
 			 */
-			printf("%sError: (-P) mistmatch between hardware result and expected one.\n"
+			printf("%sError: (-P) mismatch between hardware result and expected one.\n"
 						 "         (-P) is 0 however it should not be.%s\n", KERR, KNRM);
 #if 0
 			status_detail();
@@ -748,7 +773,7 @@ int check_ptneg_result(ipecc_test_t* t, stats_t* st, bool* res)
 				/*
 				 * Mismatch error (hardware (-P) coords & expected ones differ).
 				 */
-				printf("%sError: (-P) mistmatch between hardware coordinates and those of the expected result.%s\n", KERR, KNRM);
+				printf("%sError: (-P) mismatch between hardware coordinates and those of the expected result.%s\n", KERR, KNRM);
 #if 0
 				status_detail();
 				display_large_number(crv->nn, "p=0x", crv->p);

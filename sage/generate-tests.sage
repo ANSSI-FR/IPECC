@@ -130,15 +130,15 @@ only_kp_and_no_blinding = False  # Well, option's name speaks for itself.      #
 # The complete script will iterate on a total number of 'NBCURV' curves.       #
 # Setting 0 to 'NBCURV' means the loop shouldn't stop.                         #
 #                                                                              #
-NBCURV = 100000                                                                #
-NBCURV = 1 # A value of 0 means don't stop/ever-lasting producing loop.        #
-NBKP = 1 # Nb of [k]P tests that will be generated per curve.                  #
-NBADD = 1 # Nb of P+Q tests that will be generated per curve.                  #
-NBDBL = 1 # Nb of [2]P tests that will be generated per curve.                 #
-NBNEG = 1 # Nb of (-P) tests that will be generated per curve.                 #
-NBCHK = 1 # Nb of 'is point on curve?' tests that will be generated per curve. #
-NBEQU = 1 # Nb of 'are points equal?' tests that will be generated per curve.  #
-NBOPP = 1 # Nb of 'are points opposite?" tests that'll be generated per curve. #
+#NBCURV = 100000                                                                #
+NBCURV = 0 # A value of 0 means don't stop/ever-lasting producing loop.        #
+NBKP = 100 # Nb of [k]P tests that will be generated per curve.                  #
+NBADD = 50 # Nb of P+Q tests that will be generated per curve.                  #
+NBDBL = 50 # Nb of [2]P tests that will be generated per curve.                 #
+NBNEG = 50 # Nb of (-P) tests that will be generated per curve.                 #
+NBCHK = 50 # Nb of 'is point on curve?' tests that will be generated per curve. #
+NBEQU = 50 # Nb of 'are points equal?' tests that will be generated per curve.  #
+NBOPP = 50 # Nb of 'are points opposite?" tests that'll be generated per curve. #
 #                                                                              #
 # For [k]P tests, blinding may or may not be enabled (and if so, with a number #
 # of blinding bits randomly drawn in the range [1 : nn - 1]). Generating a     #
@@ -196,20 +196,22 @@ NN_LIMIT_COMPUTE_Q = 192                                                       #
 #    also in hexadecimal of the corresponding curve parameter. The case of     #
 #    "q" calls for a few remarks.                                              #
 #                                                                              #
-         REPRENDRE ICI : est-ce que q peut être optionnel, etc, quelle
-         doit être la longueur exactement des paramètres (par exemple,
-         dans le cas ci-dessus de nn=256, peut-on simplement écrire 0x1?
-         Je sais que le testbench VHDL tel que je l'ai écrit l'accepte,
-         mais test_app?
 
-         Mentionner aussi les exceptions, car elles rajoutent des tests
-         pour chaque courbe dont les infos que je donne ci-dessus pour
-         NBKP, NBADD, etc. ne font pas état.
+#         REPRENDRE ICI : est-ce que q peut être optionnel, etc, quelle
+#         doit être la longueur exactement des paramètres (par exemple,
+#         dans le cas ci-dessus de nn=256, peut-on simplement écrire 0x1?
+#         Je sais que le testbench VHDL tel que je l'ai écrit l'accepte,
+#         mais test_app?
+#
+#         Mentionner aussi les exceptions, car elles rajoutent des tests
+#         pour chaque courbe dont les infos que je donne ci-dessus pour
+#         NBKP, NBADD, etc. ne font pas état.
+#
+#         Also check that all 4 things (test_app, ecc_tb.vhd and Sage script,
+#         and this script) are coherent in the way they expect/generate syntax
+#         (for instance: right now (Aug. 2, 2023) the testbench expects
+#         "== TEST P+Q" but this script generates simply "P+Q"...)
 
-         Also check that all 4 things (test_app, ecc_tb.vhd and Sage script,
-         and this script) are coherent in the way they expect/generate syntax
-         (for instance: right now (Aug. 2, 2023) the testbench expects
-         "== TEST P+Q" but this script generates simply "P+Q"...)
 #                                                                              #
 # This is what the definition of a test looks like:                            #
 #                                                                              #

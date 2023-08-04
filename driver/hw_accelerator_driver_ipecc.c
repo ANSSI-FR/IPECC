@@ -80,7 +80,7 @@ static volatile uint64_t *ipecc_pseudotrng_baddr = NULL;
 /* NOTE: addresses in the IP are 64-bit aligned */
 #define IPECC_ALIGNED(a) ((a) / sizeof(uint64_t))
 
-/* write-only registers */
+/* Write-only registers */
 #define IPECC_W_CTRL			(ipecc_baddr + IPECC_ALIGNED(0x000))
 #define IPECC_W_WRITE_DATA		(ipecc_baddr + IPECC_ALIGNED(0x008))
 #define IPECC_W_R0_NULL 		(ipecc_baddr + IPECC_ALIGNED(0x010))
@@ -94,7 +94,7 @@ static volatile uint64_t *ipecc_pseudotrng_baddr = NULL;
 #define IPECC_W_ERR_ACK			(ipecc_baddr + IPECC_ALIGNED(0x050))
 #define IPECC_W_SMALL_SCALAR		(ipecc_baddr + IPECC_ALIGNED(0x058))
 #define IPECC_W_SOFT_RESET  	(ipecc_baddr + IPECC_ALIGNED(0x060))
-/*	-- reserved                                                           0x068...0x0f8  */
+/*	-- Reserved                                                           0x068...0x0f8  */
 #define IPECC_W_DBG_HALT    (ipecc_baddr + IPECC_ALIGNED(0x100))
 #define IPECC_W_DBG_BKPT 		(ipecc_baddr + IPECC_ALIGNED(0x108))
 #define IPECC_W_DBG_STEPS 		(ipecc_baddr + IPECC_ALIGNED(0x110))
@@ -112,15 +112,15 @@ static volatile uint64_t *ipecc_pseudotrng_baddr = NULL;
 #define IPECC_W_DBG_CFG_AXIMSK  		(ipecc_baddr + IPECC_ALIGNED(0x170))
 #define IPECC_W_DBG_CFG_TOKEN  		(ipecc_baddr + IPECC_ALIGNED(0x178))
 #define IPECC_W_DBG_RESET_TRNG_CNT    (ipecc_baddr + IPECC_ALIGNED(0x180))
-/*	-- reserved                                                           0x188...0x1f8  */
+/*	-- Reserved                                                           0x188...0x1f8  */
 
-/* read-only registers */
+/* Read-only registers */
 #define IPECC_R_STATUS  		(ipecc_baddr + IPECC_ALIGNED(0x000))
 #define IPECC_R_READ_DATA  		(ipecc_baddr + IPECC_ALIGNED(0x008))
 #define IPECC_R_CAPABILITIES  		(ipecc_baddr + IPECC_ALIGNED(0x010))
 #define IPECC_R_PRIME_SIZE  		(ipecc_baddr + IPECC_ALIGNED(0x018))
 #define IPECC_R_HW_VERSION      (ipecc_baddr + IPECC_ALIGNED(0x020))
-/*	-- reserved                               0x028...0x0f8 */
+/*	-- Reserved                               0x028...0x0f8 */
 #define IPECC_R_DBG_CAPABILITIES_0	(ipecc_baddr + IPECC_ALIGNED(0x100))
 #define IPECC_R_DBG_CAPABILITIES_1	(ipecc_baddr + IPECC_ALIGNED(0x108))
 #define IPECC_R_DBG_CAPABILITIES_2	(ipecc_baddr + IPECC_ALIGNED(0x110))
@@ -147,30 +147,30 @@ static volatile uint64_t *ipecc_pseudotrng_baddr = NULL;
 #define IPECC_R_DBG_TRNG_DIAG_6  		(ipecc_baddr + IPECC_ALIGNED(0x1a8))
 #define IPECC_R_DBG_TRNG_DIAG_7  		(ipecc_baddr + IPECC_ALIGNED(0x1b0))
 #define IPECC_R_DBG_TRNG_DIAG_8  		(ipecc_baddr + IPECC_ALIGNED(0x1b8))
-/*	-- reserved                               0x1c0...0x1f8 */
+/*	-- Reserved                               0x1c0...0x1f8 */
 
 /* Optional device acting as "pseudo TRNG" device, which software can push
- * some byte stream (or file) to.
+ * some byte stream/file to.
  *
- * Using the same byte stream (or file) in the VHDL testbench of the IP hence
+ * Using the same byte stream/file in the VHDL testbench of the IP hence
  * makes it possible to get full bit-by-bit and instruction-per-instruction 
- * omparison between VHDL simulation & real hardware.
+ * comparison between VHDL simulation & real hardware.
  *
  * This is not "CABA" (cycle-accurate, bit-accurate) simulation yet,
  * rather "IACA" (instruction-accurate, bit-accurate) simulation - which,
  * using the breakpoint & the step-by-step features provided with the IP
  * and its driver, can be a powerful debugging tool.
  * */
-/* write-only registers */
+/* Write-only registers */
 #define IPECC_PSEUDOTRNG_W_SOFT_RESET   (ipecc_pseudotrng_baddr + IPECC_ALIGNED(0x00))
 #define IPECC_PSEUDOTRNG_W_WRITE_DATA   (ipecc_pseudotrng_baddr + IPECC_ALIGNED(0x08))
 
-/* read-only registers */
+/* Read-only registers */
 #define IPECC_PSEUDOTRNG_R_FIFO_COUNT   (ipecc_pseudotrng_baddr + IPECC_ALIGNED(0x00))
 
-/*******************************************
- * Bit & fields positions in these registers
- *******************************************/
+/*************************************
+ * Bit & fields positions in registers
+ *************************************/
 
 /* Fields for W_CTRL */
 #define IPECC_W_CTRL_PT_KP		((uint32_t)0x1 << 0)
@@ -436,11 +436,10 @@ static volatile uint64_t *ipecc_pseudotrng_baddr = NULL;
 
 
 /*************************************************************
- * Low-level action macros: actions involving a direct write
- * or read to/from an IP register, along with related helper
- * macros.
+ * Low-level macros: actions involving a direct write or read
+ * to/from an IP register, along with related helper macros.
  *
- * Sorted by their target register.
+ * Hereafter sorted by their target register.
  *************************************************************/
 /*
  * Actions involving registers R_STATUS & W_CTRL
@@ -1573,11 +1572,11 @@ static volatile uint64_t *ipecc_pseudotrng_baddr = NULL;
 
 
 
-/********************************************************
- * One layer up - Middle-level actions macros & functions
+/************************************************
+ * One layer up - Middle-level macros & functions
  *
- * Sorted by category/function.
- ********************************************************/
+ * Hereafter sorted by category/function.
+ ************************************************/
 
 /* TRNG handling */
 /* Read the FIFOs at an offset */
@@ -1885,9 +1884,7 @@ static inline int ip_ecc_set_nn_bit_size(unsigned int bit_sz)
 	 */
 	if(IPECC_IS_DYNAMIC_NN_SUPPORTED()){
 		/* Set the current dynamic value */
-		ip_ecc_log("IPECC_SET_NN_SIZE before\n");
 		IPECC_SET_NN_SIZE(bit_sz);
-		ip_ecc_log("IPECC_SET_NN_SIZE after\n");
 		/* Wait until the IP is not busy */
 		IPECC_BUSY_WAIT();
 
@@ -2152,7 +2149,7 @@ err:
 	return -1;
 }
 
-/* Read a big number from the IP
+/* Read a big number from the IP.
  *
  *   The output big number is in big-endian format, and it is read from the IP in the
  *   endianness it expects, meaning: the numbers are little-endian in words (of 32
@@ -2523,54 +2520,48 @@ err:
 }
 
 /* Is the IP in 'debug' or 'production' mode? */
-static inline int ip_ecc_is_debug()
+static inline int ip_ecc_is_debug(unsigned int* answer)
 {
-	int debug;
-
 	/* Wait until the IP is not busy */
 	IPECC_BUSY_WAIT();
 
 	/* Ask the IP register. */
-	debug = IPECC_IS_DEBUG_OR_PROD();
+	*answer = IPECC_IS_DEBUG_OR_PROD();
 
 	/* Wait until the IP is not busy */
 	IPECC_BUSY_WAIT();
 
-	return debug;
+	return 0;
 }
 
 /* Get the major version number of the IP */
-static inline int ip_ecc_get_version_major()
+static inline int ip_ecc_get_version_major(unsigned int* nb)
 {
-	unsigned int maj;
-
 	/* Wait until the IP is not busy */
 	IPECC_BUSY_WAIT();
 
 	/* Get both version numbers from IP register. */
-	maj = IPECC_GET_MAJOR_VERSION();
+	*nb = IPECC_GET_MAJOR_VERSION();
 
 	/* Wait until the IP is not busy */
 	IPECC_BUSY_WAIT();
 
-	return maj;
+	return 0;
 }
 
 /* Get the minor version number of the IP */
-static inline int ip_ecc_get_version_minor()
+static inline int ip_ecc_get_version_minor(unsigned int* nb)
 {
-	unsigned int min;
-
 	/* Wait until the IP is not busy */
 	IPECC_BUSY_WAIT();
 
 	/* Get both version numbers from IP register. */
-	min = IPECC_GET_MINOR_VERSION();
+	*nb = IPECC_GET_MINOR_VERSION();
 
 	/* Wait until the IP is not busy */
 	IPECC_BUSY_WAIT();
 
-	return min;
+	return 0;
 }
 
 /*
@@ -2745,8 +2736,6 @@ err:
 
 static volatile unsigned char hw_driver_setup_state = 0;
 
-unsigned char hw_driver_debug_not_prod;
-
 static inline int driver_setup(void)
 {
 	if(!hw_driver_setup_state){
@@ -2754,11 +2743,25 @@ static inline int driver_setup(void)
 		if(hw_driver_setup((volatile unsigned char**)&ipecc_baddr, (volatile unsigned char**)&ipecc_pseudotrng_baddr)){
 			goto err;
 		}
+#if 0
+		log_print("Waiting for 2s back from hw_driver_setup() & B4 soft reset...\n");
+		sleep(2);
+#endif
 		/* Reset the IP for a clean state */
 		IPECC_SOFT_RESET();
 
+#if 0
+		log_print("Waiting for 2s after soft reset...\n");
+		sleep(2);
+#endif
+
+#if 0
 		/* Reset the pseudo TRNG device to empty its FIFO of pseudo raw random bytes */
 		IPECC_PSEUDOTRNG_SOFT_RESET();
+
+		log_print("Waiting for 2s after soft pseudo TRNG reset...\n");
+		sleep(2);
+#endif
 
 		/* We are in the initialized state */
 		hw_driver_setup_state = 1;
@@ -2768,8 +2771,6 @@ static inline int driver_setup(void)
 err:
 	return -1;
 }
-
-
 
 /*********************************************
  **  Driver API (top-layer exported functions)
@@ -2785,33 +2786,73 @@ int hw_driver_reset(void)
 }
 
 /* To know if the IP is in 'debug' or 'production' mode */
-int hw_driver_is_debug()
+int hw_driver_is_debug(unsigned int* answer)
 {
-	return ip_ecc_is_debug();
+	if(driver_setup()){
+		goto err;
+	}
+	if (ip_ecc_is_debug(answer)){
+		goto err;
+	}
+	return 0;
+err: 
+	return -1;
 }
 
 /* Get major version of the IP */
-int hw_driver_get_version_major()
+int hw_driver_get_version_major(unsigned int* nb)
 {
-	return ip_ecc_get_version_major();
+	if(driver_setup()){
+		goto err;
+	}
+	if (ip_ecc_get_version_major(nb)){
+		goto err;
+	}
+	return 0;
+err: 
+	return -1;
 }
 
 /* Get minor version of the IP */
-int hw_driver_get_version_minor()
+int hw_driver_get_version_minor(unsigned int* nb)
 {
-	return ip_ecc_get_version_minor();
+	if(driver_setup()){
+		goto err;
+	}
+	if (ip_ecc_get_version_minor(nb)){
+		goto err;
+	}
+	return 0;
+err: 
+	return -1;
 }
 
 /* Enable TRNG post-processing logic */
 int hw_driver_trng_post_proc_enable()
 {
-	return ip_ecc_trng_postproc_enable();
+	if(driver_setup()){
+		goto err;
+	}
+	if (ip_ecc_trng_postproc_enable()){
+		goto err;
+	}
+	return 0;
+err: 
+	return -1;
 }
 
 /* Disable TRNG post-processing logic */
 int hw_driver_trng_post_proc_disable()
 {
-	 return ip_ecc_trng_postproc_disable();
+	if(driver_setup()){
+		goto err;
+	}
+	if (ip_ecc_trng_postproc_disable()){
+		goto err;
+	}
+	return 0;
+err: 
+	return -1;
 }
 
 /* Set the curve parameters a, b, p and q.
@@ -3513,6 +3554,7 @@ int hw_driver_mul(const unsigned char *x, unsigned int x_sz, const unsigned char
 	unsigned char token[4096] = {0, }; /* Heck, a whole page? Yes indeed. */
 
 	if(driver_setup()){
+		log_print("In hw_driver_mul(): Error in driver_setup()\n");
 		goto err;
 	}
 
@@ -3524,64 +3566,82 @@ int hw_driver_mul(const unsigned char *x, unsigned int x_sz, const unsigned char
 	 * allocated to the token on the stack.
 	 */
 	if(ip_ecc_nn_bytes_from_bits_sz(ip_ecc_get_nn_bit_size()) > 4096){
+		log_print("In hw_driver_mul(): Error in ip_ecc_nn_bytes_from_bits_sz()\n");
 		goto err;
 	}
 
 	/* Preserve our inf flags in a constant time fashion */
 	if(ip_ecc_get_r0_inf(&inf_r0)){
+		log_print("In hw_driver_mul(): Error in ip_ecc_get_r0_inf()\n");
 		goto err;
 	}
 	if(ip_ecc_get_r1_inf(&inf_r1)){
+		log_print("In hw_driver_mul(): Error in ip_ecc_get_r1_inf()\n");
 		goto err;
 	}
 
 	/* Get the random one-shot token */
 	if (ip_ecc_get_token(token, nn_sz)){
+		log_print("In hw_driver_mul(): Error in ip_ecc_get_token()\n");
 		goto err;
 	}
 
 	/* Write our scalar register with the scalar k */
 	if(ip_ecc_write_bignum(scalar, scalar_sz, EC_HW_REG_SCALAR)){
+		log_print("In hw_driver_mul(): Error in ip_ecc_write_bignum()\n");
 		goto err;
 	}
 	/* Write our R1 register with the point to be multiplied */
 	if(ip_ecc_write_bignum(x, x_sz, EC_HW_REG_R1_X)){
+		log_print("In hw_driver_mul(): Error in ip_ecc_write_bignum()\n");
 		goto err;
 	}
 	if(ip_ecc_write_bignum(y, y_sz, EC_HW_REG_R1_Y)){
+		log_print("In hw_driver_mul(): Error in ip_ecc_write_bignum()\n");
 		goto err;
 	}
 
 	/* Restore our inf flags in a constant time fashion */
 	if(ip_ecc_set_r0_inf(inf_r0)){
+		log_print("In hw_driver_mul(): Error in ip_ecc_set_r0_inf()\n");
 		goto err;
 	}
 	if(ip_ecc_set_r1_inf(inf_r1)){
+		log_print("In hw_driver_mul(): Error in ip_ecc_set_r1_inf()\n");
 		goto err;
 	}
 
 	/* Execute our [k]P command */
 	if(ip_ecc_exec_command(PT_KP, NULL)){
+		log_print("In hw_driver_mul(): Error in ip_ecc_exec_command()\n");
 		goto err;
 	}
 
 	/* Get back the result from R1 */
 	if(((*out_x_sz) < nn_sz) || ((*out_y_sz) < nn_sz)){
+		log_print("In hw_driver_mul(): *out_x_sz = %d\n", *out_x_sz);
+		log_print("In hw_driver_mul(): *out_y_sz = %d\n", *out_y_sz);
+		log_print("In hw_driver_mul(): nn_sz = %d\n", nn_sz);
+		log_print("In hw_driver_mul(): Error in sizes' comparison\n");
 		goto err;
 	}
 	(*out_x_sz) = (*out_y_sz) = nn_sz;
 	if(ip_ecc_read_bignum(out_x, (*out_x_sz), EC_HW_REG_R1_X)){
+		log_print("In hw_driver_mul(): Error in ip_ecc_read_bignum()\n");
 		goto err;
 	}
 	if(ip_ecc_read_bignum(out_y, (*out_y_sz), EC_HW_REG_R1_Y)){
+		log_print("In hw_driver_mul(): Error in ip_ecc_read_bignum()\n");
 		goto err;
 	}
 
 	/* Unmask the [k]P result coordinates with the one-shot token */
 	if (ip_ecc_unmask_with_token(out_x, (*out_x_sz), token, nn_sz, out_x, out_x_sz)) {
+		log_print("In hw_driver_mul(): Error in ip_ecc_unmask_with_token()\n");
 		goto err;
 	}
 	if (ip_ecc_unmask_with_token(out_y, (*out_y_sz), token, nn_sz, out_y, out_y_sz)) {
+		log_print("In hw_driver_mul(): Error in ip_ecc_unmask_with_token()\n");
 		goto err;
 	};
 

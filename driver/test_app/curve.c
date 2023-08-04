@@ -48,19 +48,19 @@ int ip_set_curve(curve_t* crv)
 		printf("%sError: Can't set hardware with curve, parameter 'q' missing.%s\n", KERR, KNRM);
 		goto err;
 	}
-	if (crv->p.sz > NN_SZ(crv->nn)) {
+	if ((crv->p.sz) > (NN_SZ(crv->nn))) {
 		printf("%sError: Can't set hardware with curve, parameter 'p' larger than current curve size set in hardware.%s\n", KERR, KNRM);
 		goto err;
 	}
-	if (crv->a.sz > NN_SZ(crv->nn)) {
+	if ((crv->a.sz) > (NN_SZ(crv->nn))) {
 		printf("%sError: Can't set hardware with curve, parameter 'a' larger than current curve size set in hardware.%s\n", KERR, KNRM);
 		goto err;
 	}
-	if (crv->b.sz > NN_SZ(crv->nn)) {
+	if ((crv->b.sz) > (NN_SZ(crv->nn))) {
 		printf("%sError: Can't set hardware with curve, parameter 'b' larger than current curve size set in hardware.%s\n", KERR, KNRM);
 		goto err;
 	}
-	if (crv->q.sz > NN_SZ(crv->nn)) {
+	if ((crv->q.sz) > (NN_SZ(crv->nn))) {
 		printf("%sError: Can't set hardware with curve, parameter 'q' larger than current curve size set in hardware.%s\n", KERR, KNRM);
 		goto err;
 	}

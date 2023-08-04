@@ -32,27 +32,27 @@ int ip_set_pt_and_check_on_curve(ipecc_test_t* t)
 	 * Verify that expected result of test is set.
 	 * Verify that operation type is valid.
 	 */
-	if (t->curve->set_in_hw == false) {
+	if ((t->curve->set_in_hw) == false) {
 		printf("%sError: Can't program IP for the \"is on curve?\" test, assoc. curve not set in hardware.%s\n", KERR, KNRM);
 		goto err;
 	}
-	if (t->ptp.valid == false) {
+	if ((t->ptp.valid) == false) {
 		printf("%sError: Can't program IP for the \"is on curve?\" test, input point P not set.%s\n", KERR, KNRM);
 		goto err;
 	}
-	if (t->ptp.x.sz > NN_SZ(t->curve->nn)) {
+	if ((t->ptp.x.sz) > (NN_SZ(t->curve->nn))) {
 		printf("%sError: Can't program IP for the \"is on curve?\" test, X coord. of point P larger than current curve size set in hardware.%s\n", KERR, KNRM);
 		goto err;
 	}
-	if (t->ptp.y.sz > NN_SZ(t->curve->nn)) {
+	if ((t->ptp.y.sz) > (NN_SZ(t->curve->nn))) {
 		printf("%sError: Can't program IP for the \"is on curve?\" test, Y coord. of point P larger than currrent curve size set in hardware.%s\n", KERR, KNRM);
 		goto err;
 	}
-	if (t->pt_sw_res.valid == false) {
+	if ((t->sw_answer.valid) == false) {
 		printf("%sError: Can't program IP for the \"is on curve?\" test, missing expected result of test.%s\n", KERR, KNRM);
 		goto err;
 	}
-	if (t->op != OP_TST_CHK) {
+	if ((t->op) != OP_TST_CHK) {
 		printf("%sError: Can't program IP for the \"is on curve?\" test, operation type mismatch.%s\n", KERR, KNRM);
 		goto err;
 	}
@@ -169,23 +169,23 @@ int ip_set_pts_and_test_equal(ipecc_test_t* t)
 		printf("%sError: Can't program IP for the \"are pts equal?\" test, input point Q not set.%s\n", KERR, KNRM);
 		goto err;
 	}
-	if (t->ptp.x.sz > NN_SZ(t->curve->nn)) {
+	if ((t->ptp.x.sz) > (NN_SZ(t->curve->nn))) {
 		printf("%sError: Can't program IP for the \"are pts equal?\" test, X coord. of point P larger than current curve size set in hardware.%s\n", KERR, KNRM);
 		goto err;
 	}
-	if (t->ptp.y.sz > NN_SZ(t->curve->nn)) {
+	if ((t->ptp.y.sz) > (NN_SZ(t->curve->nn))) {
 		printf("%sError: Can't program IP for the \"are pts equal?\" test, Y coord. of point P larger than currrent curve size set in hardware.%s\n", KERR, KNRM);
 		goto err;
 	}
-	if (t->ptq.x.sz > NN_SZ(t->curve->nn)) {
+	if ((t->ptq.x.sz) > (NN_SZ(t->curve->nn))) {
 		printf("%sError: Can't program IP for the \"are pts equal?\" test, X coord. of point Q larger than current curve size set in hardware.%s\n", KERR, KNRM);
 		goto err;
 	}
-	if (t->ptq.y.sz > NN_SZ(t->curve->nn)) {
+	if ((t->ptq.y.sz) > (NN_SZ(t->curve->nn))) {
 		printf("%sError: Can't program IP for the \"are pts equal?\" test, Y coord. of point Q larger than currrent curve size set in hardware.%s\n", KERR, KNRM);
 		goto err;
 	}
-	if (t->pt_sw_res.valid == false) {
+	if (t->sw_answer.valid == false) {
 		printf("%sError: Can't program IP for the \"are pts equal?\" test, missing expected result of test.%s\n", KERR, KNRM);
 		goto err;
 	}
@@ -333,27 +333,27 @@ int ip_set_pts_and_test_oppos(ipecc_test_t* t)
 		printf("%sError: Can't program IP for the \"are pts opposite?\" test, input point Q not set.%s\n", KERR, KNRM);
 		goto err;
 	}
-	if (t->ptp.x.sz > NN_SZ(t->curve->nn)) {
+	if ((t->ptp.x.sz) > (NN_SZ(t->curve->nn))) {
 		printf("%sError: Can't program IP for the \"are pts opposite?\" test, X coord. of point P larger than current curve size set in hardware.%s\n", KERR, KNRM);
 		goto err;
 	}
-	if (t->ptp.y.sz > NN_SZ(t->curve->nn)) {
+	if ((t->ptp.y.sz) > (NN_SZ(t->curve->nn))) {
 		printf("%sError: Can't program IP for the \"are pts opposite?\" test, Y coord. of point P larger than currrent curve size set in hardware.%s\n", KERR, KNRM);
 		goto err;
 	}
-	if (t->ptq.x.sz > NN_SZ(t->curve->nn)) {
+	if ((t->ptq.x.sz) > (NN_SZ(t->curve->nn))) {
 		printf("%sError: Can't program IP for the \"are pts opposite?\" test, X coord. of point Q larger than current curve size set in hardware.%s\n", KERR, KNRM);
 		goto err;
 	}
-	if (t->ptq.y.sz > NN_SZ(t->curve->nn)) {
+	if ((t->ptq.y.sz) > (NN_SZ(t->curve->nn))) {
 		printf("%sError: Can't program IP for the \"are pts opposite?\" test, Y coord. of point Q larger than currrent curve size set in hardware.%s\n", KERR, KNRM);
 		goto err;
 	}
-	if (t->pt_sw_res.valid == false) {
+	if (t->sw_answer.valid == false) {
 		printf("%sError: Can't program IP for the \"are pts opposite?\" test, missing expected result of test.%s\n", KERR, KNRM);
 		goto err;
 	}
-	if (t->op != OP_TST_EQU) {
+	if (t->op != OP_TST_OPP) {
 		printf("%sError: Can't program IP for the \"are pts opposite?\" test, operation type mismatch.%s\n", KERR, KNRM);
 		goto err;
 	}

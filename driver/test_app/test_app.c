@@ -14,6 +14,7 @@
  */
 
 #include "../hw_accelerator_driver.h"
+#include "../hw_accelerator_driver_ipecc_platform.h"
 #include "test_app.h"
 #if 0
 #include <stdio.h>
@@ -55,8 +56,9 @@ extern int ip_set_pts_and_test_oppos(ipecc_test_t*);
 extern int check_test_oppos(ipecc_test_t*, stats_t*, bool* res);
 
 /*
- * Pointer 'line' will be allocated by getline, but freed by us,
- * as mentionned in the man GETLINE(3) page.
+ * Pointer 'line' will be allocated by getline, but freed by us
+ * as recommanded in the man GETLINE(3) page (see function
+ * print_stats_and_exit() hereafter).
  */
 char* line = NULL;
 
@@ -103,7 +105,7 @@ void print_stats_and_exit(ipecc_test_t* t, stats_t* s, const char* msg, unsigned
 }
 
 /*
- * Convert an hexadecimal digit to integer
+ * Convert one hexadecimal digit into an integer.
  */
 static int hex2dec(const char c, unsigned char *nb)
 {
@@ -117,7 +119,7 @@ static int hex2dec(const char c, unsigned char *nb)
 		printf("%sError: '%c' not an hexadecimal digit%s\n", KERR, c, KNRM);
 		goto err;
 	}
-	return c - '0';
+	return 0;
 err:
 	return -1;
 }
@@ -125,13 +127,14 @@ err:
 /*
  * Extract an hexadecimal string (without the 0x) from a position in a line 
  * (pointed to by parameter 'pc') convert it in binary form and fill buffer
- * 'nb_x' with it, parsing exactly 'nbchar' characters.
+ * 'nb_x' with it, parsing exactly 'nbchar' - 2 characters.
  *
  * Also set the size (in bytes) of the output buffer.
  */
-static int hex_to_large_num(const char *pc, unsigned char* nb_x, unsigned int *nb_x_sz, const ssize_t nbchar)
+static int hex_to_large_num(const char *pc, unsigned char* nb_x, unsigned int valnn, const ssize_t nbchar)
 {
 	int i, j;
+	unsigned int k;
 	uint8_t tmp;
 
 #if 0
@@ -142,7 +145,8 @@ static int hex_to_large_num(const char *pc, unsigned char* nb_x, unsigned int *n
 #endif
 	/* Format bytes of large number; */
 	j = 0;
-	for (i = nbchar - 1 ; i>=0 ; i--) {
+	for (i = nbchar - 2 ; i>=0 ; i--) {
+	//for (i = 0; i < nbchar - 1 ; i++) {
 		if (hex2dec(pc[i], &tmp)) {
 			printf("%sError while trying to convert character string '%s'"
 					" into an hexadecimal number%s\n", KERR, pc, KNRM);
@@ -153,20 +157,37 @@ static int hex_to_large_num(const char *pc, unsigned char* nb_x, unsigned int *n
 				nb_x[j / 2] = 0;
 			}
 #endif
-			nb_x[j/2] = ( (j % 2) ? nb_x[j/2] : 0) + ( tmp * (0x1U << (4*(j % 2))) );
+			nb_x[DIV(valnn, 8) - 1 - j/2] = ( (j % 2) ? nb_x[DIV(valnn, 8) - 1 - j/2] : 0) + ( tmp * (0x1U << (4*(j % 2))) );
 			j++;
 		}
 	}
+	 /* Fill possible remaining buffer space with 0s.
+	 */
+	for (k = 1 + (j-1)/2; k < DIV(valnn, 8); k++) {
+		nb_x[k] = 0;
+	}
+	for (k=0; k<DIV(valnn, 8); k++) {
+		PRINTF(" %02x", nb_x[k]);
+	}
+	PRINTF("\n");
+#if 0
 	/* Set the size of the number */
 	*nb_x_sz = (unsigned int)(((j % 2) == 0) ? (j/2) : (j/2) + 1);
+#endif
+
+#if 0
+	for (i=0 ; i<(*nb_x_sz) ; i++) {
+		PRINTF("%s%02x%s", KWHT, nb_x[i], KNRM);
+	}
+	PRINTF("\n");
+#endif
 
 	return 0;
 err:
 	return -1;
 }
 
-/*
- * Same as strtol() but as mentioned in the man STRTOL(3) page,
+/* Same as strtol() but as mentioned in the man STRTOL(3) page,
  * 'errno' is set to 0 before the call, and then checked after to
  * catch if an error occurred (see below 'print_stats_and_exit()'
  * function).
@@ -240,6 +261,8 @@ int main(int argc, char *argv[])
 	line_t line_type_expected;
 	size_t len = 0;
 	ssize_t nread;
+	uint32_t debug_not_prod;
+	uint32_t version_major, version_minor;
 
 	(void)argc;
 	(void)argv;
@@ -301,7 +324,45 @@ int main(int argc, char *argv[])
 #endif
 
 
-	printf("Welcome to the IPECC comprehensive test tool!\n");
+	printf("%sWelcome to the IPECC test applet.\n", KWHT);
+
+	/* Move the claptrap below rather in --help. */
+#if 0
+	printf("Reads test-vectors from standard-input, has them computed by hardware,\n");
+	printf("then checks that result matches what was expected.\n");
+	printf("Text format for tests is described in the IPECC doc.\n");
+	printf("(c.f Appendix \"Simulating & testing the IP\").%s\n", KNRM);
+#endif
+
+#if 1
+	/* Is it a 'debug' or a 'production' version of the IP? */
+	if (hw_driver_is_debug(&debug_not_prod)) {
+		printf("%sError: Probing 'debug or production mode' triggered an error.%s\n", KERR, KNRM);
+		exit(EXIT_FAILURE);
+	}
+
+	if (debug_not_prod){
+		if (hw_driver_get_version_major(&version_major)){
+			printf("%sError: Probing major number triggered an error.%s\n", KERR, KNRM);
+			exit(EXIT_FAILURE);
+		}
+		if (hw_driver_get_version_minor(&version_minor)){
+			printf("%sError: Probing minor number triggered an error.%s\n", KERR, KNRM);
+			exit(EXIT_FAILURE);
+		}
+		log_print("Debug mode (HW version %d.%d)\n", version_major, version_minor);
+		/* We must activate, in the TRNG, the pulling of raw random bytes by the
+		 * post-processing function (because in debug mode it is disabled upon
+		 * reset).
+		 * */
+		if (hw_driver_trng_post_proc_enable()){
+			printf("%sError: Enabling TRNG post-processing on hardware triggered an error.%s\n", KERR, KNRM);
+			exit(EXIT_FAILURE);
+		}
+	} else {
+		printf("Production mode.\n");
+	}
+#endif
 
 	/* Main infinite loop, parsing lines from standard input to extract:
 	 *   - input vectors
@@ -331,7 +392,7 @@ int main(int argc, char *argv[])
 		}
 		/*
 		 * Process line according to some kind of finite state
-		 * machine or input vector test format
+		 * machine on input vector test format.
 		 */
 		switch (line_type_expected) {
 
@@ -339,11 +400,11 @@ int main(int argc, char *argv[])
 				/*
 				 * Parse line.
 				 */
-				if ( (strncmp(line, "NEW CURVE #", strlen("NEW CURVE #"))) == 0 ) {
+				if ( (strncmp(line, "== NEW CURVE #", strlen("== NEW CURVE #"))) == 0 ) {
 					/*
 					 * Extract the curve nb, after '#' character.
 					 */
-					strtol_with_err(line + strlen("NEW CURVE #"), &curve.id); /* NEW CURVE #x */
+					strtol_with_err(line + strlen("== NEW CURVE #"), &curve.id); /* NEW CURVE #x */
 					line_type_expected = EXPECT_NN;
 					curve.valid = false;
 				} else if ( (strncmp(line, "== TEST [k]P #", strlen("== TEST [k]P #"))) == 0 ) {
@@ -489,6 +550,7 @@ int main(int argc, char *argv[])
 				if ( (strncmp(line, "nn=", strlen("nn="))) == 0 )
 				{
 					strtol_with_err(&line[3], &curve.nn);
+					PRINTF("%snn=%d\n%s", KINF, curve.nn, KNRM);
 					line_type_expected = EXPECT_P;
 				} else {
 					printf("%sError: Could not find the expected token \"nn=\" "
@@ -501,18 +563,28 @@ int main(int argc, char *argv[])
 			case EXPECT_P:{
 				/* Parse line to extract value of p */
 				if ( (strncmp(line, "p=0x", strlen("p=0x"))) == 0 ) {
-					PRINTF("%sp=0x%s%s", KWHT, line + strlen("p=0x"), KNRM);
+					PRINTF("%sp=0x%s%s", KINF, line + strlen("p=0x"), KNRM);
 					/*
 					 * Process the hexadecimal value of p to create the list
 					 * of bytes to transfer to the IP.
 					 */
 					if (hex_to_large_num(
-							line + strlen("p=0x"), test.curve->p.val, &(test.curve->p.sz), nread - strlen("p=0x")))
+							line + strlen("p=0x"), test.curve->p.val, test.curve->nn, nread - strlen("p=0x")))
 					{
 						printf("%sError: Value of main curve parameter 'p' could not be extracted "
 								"from input file/stream.%s\n", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_P')", __LINE__);
 					}
+					test.curve->p.sz = DIV(test.curve->nn, 8);
+#if 0
+					{
+						PRINTF("%sp=0x", KCYN);
+						for (int i=0; i< DIV(test.curve->nn, 8); i++){
+							PRINTF(" %02x", (test.curve->p.val)[i]);
+						}
+						PRINTF("%s\n", KNRM);
+					}
+#endif
 					test.curve->p.valid = true;
 					line_type_expected = EXPECT_A;
 				} else {
@@ -526,18 +598,19 @@ int main(int argc, char *argv[])
 			case EXPECT_A:{
 				/* Parse line to extract value of a */
 				if ( (strncmp(line, "a=0x", strlen("a=0x"))) == 0 ) {
-					PRINTF("%sa=0x%s%s", KWHT, line + strlen("a=0x"), KNRM);
+					PRINTF("%sa=0x%s%s", KINF, line + strlen("a=0x"), KNRM);
 					/*
 					 * Process the hexadecimal value of a to create the list
 					 * of bytes to transfer to the IP.
 					 */
 					if (hex_to_large_num(
-							line + strlen("a=0x"), test.curve->a.val, &(test.curve->a.sz), nread - strlen("a=0x")))
+							line + strlen("a=0x"), test.curve->a.val, test.curve->nn, nread - strlen("a=0x")))
 					{
 						printf("%sError: Value of curve parameter 'a' could not be extracted "
 								"from input file/stream.%s\n", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_A')", __LINE__);
 					}
+					test.curve->a.sz = DIV(test.curve->nn, 8);
 					test.curve->a.valid = true;
 					line_type_expected = EXPECT_B;
 				} else {
@@ -551,18 +624,19 @@ int main(int argc, char *argv[])
 			case EXPECT_B:{
 				/* Parse line to extract value of b/ */
 				if ( (strncmp(line, "b=0x", strlen("b=0x"))) == 0 ) {
-					PRINTF("%sb=0x%s%s", KWHT, line + strlen("b=0x"), KNRM);
+					PRINTF("%sb=0x%s%s", KINF, line + strlen("b=0x"), KNRM);
 					/*
 					 * Process the hexadecimal value of b to create the list
 					 * of bytes to transfer to the IP.
 					 */
 					if (hex_to_large_num(
-							line + strlen("b=0x"), test.curve->b.val, &(test.curve->b.sz), nread - strlen("b=0x")))
+							line + strlen("b=0x"), test.curve->b.val, test.curve->nn, nread - strlen("b=0x")))
 					{
 						printf("%sError: Value of curve parameter 'b' could not be extracted "
 								"from input file/stream.%s\n", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_B')", __LINE__);
 					}
+					test.curve->b.sz = DIV(test.curve->nn, 8);
 					test.curve->b.valid = true;
 					line_type_expected = EXPECT_Q;
 				} else {
@@ -577,19 +651,20 @@ int main(int argc, char *argv[])
 				/* Parse line to extract value of q. */
 				if ( (strncmp(line, "q=0x", strlen("q=0x"))) == 0 )
 				{
-					PRINTF("%sq=0x%s%s", KWHT, line + strlen("q=0x"), KNRM);
+					PRINTF("%sq=0x%s%s", KINF, line + strlen("q=0x"), KNRM);
 					/*
 					 * Process the hexadecimal value of q to create the list
 					 * of bytes to transfer to the IP (also set the size of
 					 * the number).
 					 */
 					if (hex_to_large_num(
-							line + strlen("q=0x"), test.curve->q.val, &(test.curve->q.sz), nread - strlen("q=0x")))
+							line + strlen("q=0x"), test.curve->q.val, test.curve->nn, nread - strlen("q=0x")))
 					{
 						printf("%sError: Value of curve parameter 'q' could not be extracted "
 								"from input file/stream.%s\n", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_Q')", __LINE__);
 					}
+					test.curve->q.sz = DIV(test.curve->nn, 8);
 					test.curve->q.valid = true;
 					test.curve->valid = true;
 					/*
@@ -612,13 +687,13 @@ int main(int argc, char *argv[])
 			case EXPECT_PX:{
 				/* Parse line to extract value of Px */
 				if ( (strncmp(line, "Px=0x", strlen("Px=0x"))) == 0 ) {
-					PRINTF("%sPx=0x%s%s", KWHT, line + strlen("Px=0x"), KNRM);
+					PRINTF("%sPx=0x%s%s", KINF, line + strlen("Px=0x"), KNRM);
 					/*
 					 * Process the hexadecimal value of Px to create the list
 					 * of bytes to transfer to the IP.
 					 */
 					if (hex_to_large_num(
-							line + strlen("Px=0x"), test.ptp.x.val, &(test.ptp.x.sz), nread - strlen("Px=0x")))
+							line + strlen("Px=0x"), test.ptp.x.val, test.curve->nn, nread - strlen("Px=0x")))
 					{
 						printf("%sError: Value of point coordinate 'Px' could not be extracted "
 								"from input file/stream.%s\n", KERR, KNRM);
@@ -627,10 +702,11 @@ int main(int argc, char *argv[])
 					/*
 					 * Position point P not to be null
 					 */
+					test.ptp.x.sz = DIV(test.curve->nn, 8);
 					test.ptp.is_null = false;
 					line_type_expected = EXPECT_PY;
 				} else if ( (strncmp(line, "P=0", strlen("P=0"))) == 0 ) {
-					PRINTF("%sP=0%s\n", KWHT, KNRM);
+					PRINTF("%sP=0\n%s", KINF, KNRM);
 					/*
 					 * Position point P to be null
 					 */
@@ -663,18 +739,19 @@ int main(int argc, char *argv[])
 			case EXPECT_PY:{
 				/* Parse line to extract value of Py */
 				if ( (strncmp(line, "Py=0x", strlen("Py=0x"))) == 0 ) {
-					PRINTF("%sPy=0x%s%s", KWHT, line + strlen("Py=0x"), KNRM);
+					PRINTF("%sPy=0x%s%s", KINF, line + strlen("Py=0x"), KNRM);
 					/*
 					 * Process the hexadecimal value of Py to create the list
 					 * of bytes to transfer to the IP.
 					 */
 					if (hex_to_large_num(
-							line + strlen("Py=0x"), test.ptp.y.val, &(test.ptp.y.sz), nread - strlen("Py=0x")))
+							line + strlen("Py=0x"), test.ptp.y.val, test.curve->nn, nread - strlen("Py=0x")))
 					{
 						printf("%sError: Value of point coordinate 'Py' could not be extracted "
 								"from input file/stream.%s\n", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_PY')", __LINE__);
 					}
+					test.ptp.y.sz = DIV(test.curve->nn, 8);
 					test.ptp.valid = true;
 					if (test.op == OP_KP) {
 						line_type_expected = EXPECT_K;
@@ -701,29 +778,30 @@ int main(int argc, char *argv[])
 			}
 
 			case EXPECT_QX:{
-				/* Parse line to extract value of Qx */
+				/* Parse line to extract value of Qx. */
 				if ( (strncmp(line, "Qx=0x", strlen("Qx=0x"))) == 0 ) {
-					PRINTF("%sQx=0x%s%s", KWHT, line + strlen("Qx=0x"), KNRM);
+					PRINTF("%sQx=0x%s%s", KINF, line + strlen("Qx=0x"), KNRM);
 					/*
 					 * Process the hexadecimal value of Qx to create the list
 					 * of bytes to transfer to the IP.
 					 */
 					if (hex_to_large_num(
-							line + strlen("Qx=0x"), test.ptq.x.val, &(test.ptq.x.sz), nread - strlen("Qx=0x")))
+							line + strlen("Qx=0x"), test.ptq.x.val, test.curve->nn, nread - strlen("Qx=0x")))
 					{
 						printf("%sError: Value of point coordinate 'Qx' could not be extracted "
 								"from input file/stream.%s\n", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_QX')", __LINE__);
 					}
 					/*
-					 * position point Q not to be null
+					 * Position point Q not to be null.
 					 */
+					test.ptq.x.sz = DIV(test.curve->nn, 8);
 					test.ptq.is_null = false;
 					line_type_expected = EXPECT_QY;
 				} else if ( (strncmp(line, "Q=0", strlen("Q=0"))) == 0 ) {
-					PRINTF("%sQ=0%s\n", KWHT, KNRM);
+					PRINTF("%sQ=0\n%s", KINF, KNRM);
 					/*
-					 * position point Q to be null
+					 * Position point Q to be null.
 					 */
 					test.ptq.is_null = true;
 					test.ptq.valid = true;
@@ -750,18 +828,19 @@ int main(int argc, char *argv[])
 				 * Parse line to extract value of Py.
 				 */
 				if ( (strncmp(line, "Qy=0x", strlen("Qy=0x"))) == 0 ) {
-					PRINTF("%sQy=0x%s%s", KWHT, line + strlen("Qy=0x"), KNRM);
+					PRINTF("%sQy=0x%s%s", KINF, line + strlen("Qy=0x"), KNRM);
 					/*
 					 * Process the hexadecimal value of Py to create the list
 					 * of bytes to transfer to the IP.
 					 */
 					if (hex_to_large_num(
-							line + strlen("Qy=0x"), test.ptq.y.val, &(test.ptq.y.sz), nread - strlen("Qy=0x")))
+							line + strlen("Qy=0x"), test.ptq.y.val, test.curve->nn, nread - strlen("Qy=0x")))
 					{
 						printf("%sError: Value of point coordinate 'Qy' could not be extracted "
 								"from input file/stream.%s\n", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_QY')", __LINE__);
 					}
+					test.ptq.y.sz = DIV(test.curve->nn, 8);
 					test.ptq.valid = true;
 					if (test.op == OP_PTADD) {
 						line_type_expected = EXPECT_P_PLUS_QX;
@@ -786,18 +865,19 @@ int main(int argc, char *argv[])
 				 * Parse line to extract value of k.
 				 */
 				if ( (strncmp(line, "k=0x", strlen("k=0x"))) == 0 ) {
-					PRINTF("%sk=0x%s%s", KWHT, line + strlen("k=0x"), KNRM);
+					PRINTF("%sk=0x%s%s", KINF, line + strlen("k=0x"), KNRM);
 					/*
 					 * Process the hexadecimal value of k to create the list
 					 * of bytes to transfer to the IP.
 					 */
 					if (hex_to_large_num(
-							line + strlen("k=0x"), test.k.val, &(test.k.sz), nread - strlen("k=0x")))
+							line + strlen("k=0x"), test.k.val, test.curve->nn, nread - strlen("k=0x")))
 					{
 						printf("%sError: Value of scalar number 'k' could not be extracted "
 								"from input file/stream.%s\n", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_K')", __LINE__);
 					}
+					test.k.sz = DIV(test.curve->nn, 8);
 					test.k.valid = true;
 					line_type_expected = EXPECT_KPX_OR_BLD;
 				} else {
@@ -813,7 +893,7 @@ int main(int argc, char *argv[])
 				 * Parse line to extract possible nb of blinding bits.
 				 * */
 				if ( (strncmp(line, "nbbld=", strlen("nbbld="))) == 0 ) {
-					PRINTF("%snbbld=%s%s", KWHT, line + strlen("nbbld="), KNRM);
+					PRINTF("%snbbld=%s%s", KINF, line + strlen("nbbld="), KNRM);
 					if (strtol_with_err(line + strlen("nbbld="), &test.blinding))
 					{
 						printf("%sError: while converting \"nbbld=\" argument to a number.%s\n", KERR, KNRM);
@@ -821,13 +901,12 @@ int main(int argc, char *argv[])
 					}
 					/* Keep line_type_expected to EXPECT_KPX_OR_BLD to parse point [k]P coordinates */
 				} else if ( (strncmp(line, "kPx=0x", strlen("kPx=0x"))) == 0 ) {
-					PRINTF("%skPx=0x%s%s", KWHT, line + strlen("kPx=0x"), KNRM);
+					PRINTF("%skPx=0x%s%s", KINF, line + strlen("kPx=0x"), KNRM);
 					/*
 					 * Process the hexadecimal value of kPx for comparison with HW.
 					 */
 					if (hex_to_large_num(
-							line + strlen("kPx=0x"), test.pt_sw_res.x.val, &(test.pt_sw_res.x.sz),
-							nread - strlen("kPx=0x")))
+							line + strlen("kPx=0x"), test.pt_sw_res.x.val, test.curve->nn, nread - strlen("kPx=0x")))
 					{
 						printf("%sError: Value of point coordinate 'kPx' could not be extracted "
 								"from input file/stream.%s\n", KERR, KNRM);
@@ -836,10 +915,11 @@ int main(int argc, char *argv[])
 					/*
 					 * Record that expected result point [k]P should not be null.
 					 */
+					test.pt_sw_res.x.sz = DIV(test.curve->nn, 8);
 					test.pt_sw_res.is_null = false;
 					line_type_expected = EXPECT_KPY;
 				} else if ( (strncmp(line, "kP=0", strlen("kP=0"))) == 0 ) {
-					PRINTF("%sExpected result point [k]P = 0%s\n", KWHT, KNRM);
+					PRINTF("%sExpected result point [k]P = 0\n%s", KINF, KNRM);
 					/*
 					 * Record that expected result point [k]P should be null.
 					 */
@@ -886,18 +966,18 @@ int main(int argc, char *argv[])
 			case EXPECT_KPY:{
 				/* Parse line to extract value of [k]Py (y of result) */
 				if ( (strncmp(line, "kPy=0x", strlen("kPy=0x"))) == 0 ) {
-					PRINTF("%skPy=0x%s%s", KWHT, line + strlen("kPy=0x"), KNRM);
+					PRINTF("%skPy=0x%s%s", KINF, line + strlen("kPy=0x"), KNRM);
 					/*
 					 * Process the hexadecimal value of kPy for comparison with HW
 					 */
 					if (hex_to_large_num(
-							line + strlen("kPy=0x"), test.pt_sw_res.y.val, &(test.pt_sw_res.y.sz),
-							nread - strlen("kPy=0x")))
+							line + strlen("kPy=0x"), test.pt_sw_res.y.val, test.curve->nn, nread - strlen("kPy=0x")))
 					{
 						printf("%sError: Value of point coordinate 'kPy' could not be extracted "
 								"from input file/stream.%s\n", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_KPY')", __LINE__);
 					}
+					test.pt_sw_res.y.sz = DIV(test.curve->nn, 8);
 					test.pt_sw_res.valid = true;
 					/*
 					 * Set and execute a [k]P computation test on harware.
@@ -942,22 +1022,22 @@ int main(int argc, char *argv[])
 				 * Parse line to extract value of (P+Q).x
 				 */
 				if ( (strncmp(line, "PplusQx=0x", strlen("PplusQx=0x"))) == 0 ) {
-					PRINTF("%s(P+Q)x=0x%s%s", KWHT, line + strlen("PplusQx=0x"), KNRM);
+					PRINTF("%s(P+Q)x=0x%s%s", KINF, line + strlen("PplusQx=0x"), KNRM);
 					/*
 					 * Process the hexadecimal value of (P+Q).x for comparison with HW
 					 */
 					if (hex_to_large_num(
-							line + strlen("PplusQx=0x"), test.pt_sw_res.x.val, &(test.pt_sw_res.x.sz),
-							nread - strlen("PplusQx=0x")))
+							line + strlen("PplusQx=0x"), test.pt_sw_res.x.val, test.curve->nn, nread - strlen("PplusQx=0x")))
 					{
 						printf("%sError: Value of point coordinate '(P+Q).x' could not be extracted "
 								"from input file/stream.%s\n", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_P_PLUS_QX')", __LINE__);
 					}
+					test.pt_sw_res.x.sz = DIV(test.curve->nn, 8);
 					test.pt_sw_res.is_null = false;
 					line_type_expected = EXPECT_P_PLUS_QY;
 				} else if ( (strncmp(line, "PplusQ=0", strlen("PplusQ=0"))) == 0 ) {
-					PRINTF("%s(P+Q)=0%s\n", KWHT, KNRM);
+					PRINTF("%s(P+Q)=0%s", KINF, KNRM);
 					test.pt_sw_res.is_null = true;
 					test.pt_sw_res.valid = true;
 					/*
@@ -1003,18 +1083,19 @@ int main(int argc, char *argv[])
 				 * Parse line to extract value of (P+Q).y
 				 */
 				if ( (strncmp(line, "PplusQy=0x", strlen("PplusQy=0x"))) == 0 ) {
-					PRINTF("%s(P+Q)y=0x%s%s", KWHT, line + strlen("PplusQy=0x"), KNRM);
+					PRINTF("%s(P+Q)y=0x%s%s", KINF, line + strlen("PplusQy=0x"), KNRM);
 					/*
 					 * Process the hexadecimal value of (P+Q).y for comparison with HW
 					 */
 					if (hex_to_large_num(
-							line + strlen("PplusQy=0x"), test.pt_sw_res.y.val, &(test.pt_sw_res.y.sz),
+							line + strlen("PplusQy=0x"), test.pt_sw_res.y.val, test.curve->nn,
 							nread - strlen("PplusQy=0x")))
 					{
 						printf("%sError: Value of point coordinate '(P+Q).y' could not be extracted "
 								"from input file/stream.%s\n", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_P_PLUS_QY')", __LINE__);
 					}
+					test.pt_sw_res.y.sz = DIV(test.curve->nn, 8);
 					test.pt_sw_res.valid = true;
 					/*
 					 * Set and execute a P + Q computation test on harware.
@@ -1059,22 +1140,23 @@ int main(int argc, char *argv[])
 				 * Parse line to extract value of [2]P.x
 				 */
 				if ( (strncmp(line, "twoPx=0x", strlen("twoPx=0x"))) == 0 ) {
-					PRINTF("%s[2]P.x=0x%s%s", KWHT, line + strlen("twoPx=0x"), KNRM);
+					PRINTF("%s[2]P.x=0x%s%s", KINF, line + strlen("twoPx=0x"), KNRM);
 					/*
 					 * Process the hexadecimal value of [2]P.x for comparison with HW
 					 */
 					if (hex_to_large_num(
-							line + strlen("twoPx=0x"), test.pt_sw_res.x.val, &(test.pt_sw_res.x.sz),
+							line + strlen("twoPx=0x"), test.pt_sw_res.x.val, test.curve->nn,
 							nread - strlen("twoPx=0x")))
 					{
 						printf("%sError: Value of point coordinate '[2]P.x' could not be extracted "
 								"from input file/stream.%s\n", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_TWOP_X')", __LINE__);
 					}
+					test.pt_sw_res.x.sz = DIV(test.curve->nn, 8);
 					test.pt_sw_res.is_null = false;
 					line_type_expected = EXPECT_TWOP_Y;
 				} else if ( (strncmp(line, "twoP=0", strlen("twoP=0"))) == 0 ) {
-					PRINTF("%s[2]P=0%s\n", KWHT, KNRM);
+					PRINTF("%s[2]P=0\n%s", KINF, KNRM);
 					test.pt_sw_res.is_null = true;
 					test.pt_sw_res.valid = true;
 					/*
@@ -1120,18 +1202,19 @@ int main(int argc, char *argv[])
 				 * Parse line to extract value of [2]P.y
 				 */
 				if ( (strncmp(line, "twoPy=0x", strlen("twoPy=0x"))) == 0 ) {
-					PRINTF("%s[2]P.y=0x%s%s", KWHT, line + strlen("twoPy=0x"), KNRM);
+					PRINTF("%s[2]P.y=0x%s%s", KINF, line + strlen("twoPy=0x"), KNRM);
 					/*
 					 * Process the hexadecimal value of [2]P.y for comparison with HW
 					 */
 					if (hex_to_large_num(
-							line + strlen("twoPy=0x"), test.pt_sw_res.x.val, &(test.pt_sw_res.x.sz),
+							line + strlen("twoPy=0x"), test.pt_sw_res.y.val, test.curve->nn,
 							nread - strlen("twoPy=0x")))
 					{
 						printf("%sError: Value of point coordinate '[2]P.y' could not be extracted "
 								"from input file/stream.%s\n", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_TWOP_Y')", __LINE__);
 					}
+					test.pt_sw_res.y.sz = DIV(test.curve->nn, 8);
 					test.pt_sw_res.valid = true;
 					/*
 					 * Set and execute a [2]P computation test on hardware.
@@ -1176,22 +1259,23 @@ int main(int argc, char *argv[])
 				 * Parse line to extract value of -P.x
 				 */
 				if ( (strncmp(line, "negPx=0x", strlen("negPx=0x"))) == 0 ) {
-					PRINTF("%s-P.x=0x%s%s", KWHT, line + strlen("negPx=0x"), KNRM);
+					PRINTF("%s-P.x=0x%s%s", KINF, line + strlen("negPx=0x"), KNRM);
 					/*
 					 * Process the hexadecimal value of -P.x for comparison with HW
 					 */
 					if (hex_to_large_num(
-							line + strlen("negPx=0x"), test.pt_sw_res.x.val, &(test.pt_sw_res.x.sz),
+							line + strlen("negPx=0x"), test.pt_sw_res.x.val, test.curve->nn,
 							nread - strlen("negPx=0x")))
 					{
 						printf("%sError: Value of point coordinate '(-P).x' could not be extracted "
 								"from input file/stream.%s\n", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_NEGP_X')", __LINE__);
 					}
+					test.pt_sw_res.x.sz = DIV(test.curve->nn, 8);
 					test.pt_sw_res.is_null = false;
 					line_type_expected = EXPECT_NEGP_Y;
 				} else if ( (strncmp(line, "negP=0", strlen("negP=0"))) == 0 ) {
-					PRINTF("%s-P=0%s\n", KWHT, KNRM);
+					PRINTF("%s-P=0\n%s", KINF, KNRM);
 					test.pt_sw_res.is_null = true;
 					test.pt_sw_res.valid = true;
 					/*
@@ -1237,18 +1321,19 @@ int main(int argc, char *argv[])
 				 * Parse line to extract value of -P.y
 				 */
 				if ( (strncmp(line, "negPy=0x", strlen("negPy=0x"))) == 0 ) {
-					PRINTF("%s-P.y=0x%s%s", KWHT, line + strlen("negPy=0x"), KNRM);
+					PRINTF("%s-P.y=0x%s%s", KINF, line + strlen("negPy=0x"), KNRM);
 					/*
 					 * Process the hexadecimal value of -P.y for comparison with HW
 					 */
 					if (hex_to_large_num(
-							line + strlen("negPy=0x"), test.pt_sw_res.x.val, &(test.pt_sw_res.x.sz),
+							line + strlen("negPy=0x"), test.pt_sw_res.y.val, test.curve->nn,
 							nread - strlen("negPy=0x")))
 					{
 						printf("%sError: Value of point coordinate '(-P).y' could not be extracted "
 								"from input file/stream.%s\n", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_NEGP_Y')", __LINE__);
 					}
+					test.pt_sw_res.y.sz = DIV(test.curve->nn, 8);
 					test.pt_sw_res.valid = true;
 					/*
 					 * Set and execute a -P computation test on hardware.
@@ -1293,7 +1378,7 @@ int main(int argc, char *argv[])
 				 * Parse line to extract test answer (true or false)
 				 */
 				if ( (strncasecmp(line, "true", strlen("true"))) == 0 ) {
-					PRINTF("%sanswer is true%s\n", KWHT, KNRM);
+					PRINTF("%sanswer is true\n%s", KINF, KNRM);
 					switch (test.op) {
 						case OP_TST_CHK:
 						case OP_TST_EQU:
@@ -1302,13 +1387,13 @@ int main(int argc, char *argv[])
 							test.sw_answer.valid = true;
 							break;
 						default:{
-							printf("%sError: Invalid test Id.%s\n", KERR, KNRM);
+							printf("%sError: Invalid test type.%s\n", KERR, KNRM);
 							print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_TRUE_OR_FALSE')", __LINE__);
 							break;
 						}
 					}
 				} else if ( (strncasecmp(line, "false", strlen("false"))) == 0 ) {
-					PRINTF("%sanswer is false%s\n", KWHT, KNRM);
+					PRINTF("%sanswer is false\n%s", KINF, KNRM);
 					switch (test.op) {
 						case OP_TST_CHK:
 						case OP_TST_EQU:
@@ -1317,7 +1402,7 @@ int main(int argc, char *argv[])
 							test.sw_answer.valid = true;
 							break;
 						default:
-							printf("%sError: Invalid test Id.%s\n", KERR, KNRM);
+							printf("%sError: Invalid test type.%s\n", KERR, KNRM);
 							print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_TRUE_OR_FALSE')", __LINE__);
 							break;
 					}
@@ -1357,13 +1442,13 @@ int main(int argc, char *argv[])
 						break;
 					}
 					default:{
-						printf("%sError: Invalid test Id.%s\n", KERR, KNRM);
+						printf("%sError: Invalid test type.%s\n", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_TRUE_OR_FALSE')", __LINE__);
 						break;
 					}
 				}
 				/*
-				 * Check IP answer to the testagainst the expected one.
+				 * Check IP answer to the test against the expected one.
 				 */
 				switch (test.op) {
 					case OP_TST_CHK:{
@@ -1394,7 +1479,7 @@ int main(int argc, char *argv[])
 						break;
 					}
 					default:{
-						printf("%sError: Invalid test Id.%s\n", KERR, KNRM);
+						printf("%sError: Invalid test type.%s\n", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_TRUE_OR_FALSE')", __LINE__);
 						break;
 					}
@@ -1429,8 +1514,8 @@ int main(int argc, char *argv[])
 			test.sw_answer.valid = false;
 			test.hw_answer.valid = false;
 			test.k.valid = false;
-			test.op = OP_NONE;
 			test.blinding = 0;
+			test.op = OP_NONE;
 			test.is_an_exception = false;
 		}
 

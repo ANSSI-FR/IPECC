@@ -148,6 +148,19 @@ typedef struct {
 	uint32_t id;
 } ipecc_test_t;
 
+/*
+ * DIV(i, s) returns the number of s-bit limbs required to encode
+ * an i-bit number.
+ */
+#define DIV(i, s) \
+	((i) % (s) ? (i) / (s) + 1 : (i) / (s))
+
+/*
+ * NN_SZ(nn) returns the number of bytes that a large number supposed
+ * to be of size 'nn' bits should occupy at most.
+ */
+#define NN_SZ(nn)  DIV((nn), 8)
+
 #define INIT_LARGE_NUMBER() \
 	{ .sz = 0, .valid = false }
 
@@ -190,12 +203,6 @@ typedef struct {
 	(t).valid = false; \
 } while (0)
 
-/*
- * NN_SZ(nn) returns the number of bytes that a large number supposed
- * to be of size 'nn' bits should occupy at most.
- */
-#define NN_SZ(nn)   ((nn) % 8) ? ((nn) / 8) : (((nn) / 8) + 1)
-
 #define INT_TO_BOOLEAN(i)   ((i) ? true : false)
 
 /*
@@ -212,6 +219,8 @@ typedef struct {
 #define KMAG  "\x1B[35m"
 #define KCYN  "\x1B[36m"
 #define KWHT  "\x1B[37m"
+#define KORA  "\033[93m"
+#define KUNK  "\033[91m"
 #else
 #define KNRM  ""
 #define KRED  ""
@@ -221,11 +230,14 @@ typedef struct {
 #define KMAG  ""
 #define KCYN  ""
 #define KWHT  ""
+#define KORA  ""
+#define KUNK  ""
 #endif /* TERM_COLORS */
 
-#define KERR  KCYN
+#define KERR  KUNK
+#define KINF  KORA
 
-#define DISPLAY_MODULO  1000
+#define DISPLAY_MODULO  10
 
 #ifdef VERBOSE
 #define PRINTF(fmt, ...) printf(fmt, ##__VA_ARGS__)

@@ -45,19 +45,19 @@ int ip_set_pt_and_run_kp(ipecc_test_t* t)
 		printf("%sError: Can't program IP for [k]P computation, scalar k not set.%s\n", KERR, KNRM);
 		goto err;
 	}
-	if (t->ptp.x.sz > NN_SZ(t->curve->nn)) {
+	if ((t->ptp.x.sz) > (NN_SZ(t->curve->nn))) {
 		printf("%sError: Can't program IP for [k]P computation, X coord. of point P larger than current curve size set in hardware.%s\n", KERR, KNRM);
 		goto err;
 	}
-	if (t->ptp.y.sz > NN_SZ(t->curve->nn)) {
+	if ((t->ptp.y.sz) > (NN_SZ(t->curve->nn))) {
 		printf("%sError: Can't program IP for [k]P computation, Y coord. of point P larger than currrent curve size set in hardware.%s\n", KERR, KNRM);
 		goto err;
 	}
-	if (t->k.sz > NN_SZ(t->curve->nn)) {
+	if ((t->k.sz) > (NN_SZ(t->curve->nn))) {
 		printf("%sError: Can't program IP for [k]P computation, scalar larger than current curve size set in hardware.%s\n", KERR, KNRM);
 		goto err;
 	}
-	if (t->blinding >= t->curve->nn) {
+	if ((t->blinding) >= (t->curve->nn)) {
 		printf("%sError: Can't program IP for [k]P computation, blinding size larger than (or equal) to the current curve size set in hardware.%s\n", KERR, KNRM);
 		goto err;
 	}
@@ -94,6 +94,8 @@ int ip_set_pt_and_run_kp(ipecc_test_t* t)
 			goto err;
 		}
 	}
+
+	t->pt_hw_res.x.sz = t->pt_hw_res.y.sz = t->ptp.x.sz;
 
 	/* Run [k]P command */
 	if (hw_driver_mul(t->ptp.x.val, t->ptp.x.sz, t->ptp.y.val, t->ptp.y.sz, t->k.val, t->k.sz,
