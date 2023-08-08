@@ -209,7 +209,7 @@ def div(i, s):
         return (i // s) + 1;
 
 
-sys.stderr.write(KWHT + "generating curves from nn = " + str(nnmin) + " to " + str(nnmax) + KNRM + "\n")
+sys.stderr.write(KWHT + "Generating curves from nn = " + str(nnmin) + " to " + str(nnmax) + KNRM + "\n")
 
 # infinite loop
 while (nbcurv < NBCURV) or (NBCURV == 0):
@@ -228,7 +228,7 @@ while (nbcurv < NBCURV) or (NBCURV == 0):
                 nnmin = nnminmax
             new_min_or_max = True
         if new_min_or_max:
-            sys.stderr.write(KWHT + "generating curves from nn = "
+            sys.stderr.write(KWHT + "Generating curves from nn = "
                     + str(nnmin) + " to " + str(nnmax) + KNRM + "\n")
         # generate a random prime size (nn)
         nn = random.randint(nnmin, nnmax)
