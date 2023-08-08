@@ -405,7 +405,7 @@ begin
 	-- (s29), see (s30)
 	-- pragma translate_off
 	assert (log2(nn) <= 16)
-		report "blinding size is too large for debug mode"
+		report "[ ecc_scalar.vhd ]: ERROR: Blinding size is too large for debug mode."
 			severity FAILURE;
 	-- pragma translate_on
 
@@ -540,7 +540,7 @@ begin
 				-- pragma translate_off
 				if simkb /= 0 then
 					assert simkb >= 3
-						report "simkb parameter (ecc_pkg.vhd) must be >= 3"
+						report "[ ecc_scalar.vhd ]: ERROR: parameter 'sim_kb' (ecc_pkg.vhd) must be >= 3."
 							severity FAILURE;
 					if simkb >= 3 then
 						v_simkb := simkb - 3;
@@ -1293,7 +1293,7 @@ begin
 							-- neither R0 nor R1 were null when starting ZADDU
 							if r.kp.pts_are_equal = '1' then -- was set by (s45)
 								assert (FALSE)
-									report "ERROR - points were equal in pre-ZADDU: "
+									report "[ ecc_scalar.vhd ]: ERROR: Points were equal in pre-ZADDU: "
 									& "we shouldn't be at the end of ZADDU but at the "
 									& "end of ZDBLU!"
 										severity FAILURE;
@@ -1383,18 +1383,18 @@ begin
 							elsif r.kp.pts_are_oppos = '1' then -- was set by (s46)
 								-- pragma translate_off
 								assert (FALSE)
-									report "ERROR - points were opposite in pre-ZADDU: "
+									report "[ ecc_scalar.vhd ]: ERROR: Points were opposite in pre-ZADDU: "
 									& "we shouldn't be at the end of ZDBLU but at the "
-									& "end of ZADDU"
+									& "end of ZADDU."
 										severity FAILURE;
 								-- pragma translate_on
 								null;
 							else
 								-- pragma translate_off
 								assert (FALSE)
-									report "ERROR - R0 & R1 were neither equal nor opposite "
+									report "[ ecc_scalar.vhd ]: ERROR: Points R0 & R1 were neither equal nor opposite "
 									& "in pre-ZADDU: we shouldn't be at the end of ZDBLU "
-									& "but of ZADDU instead"
+									& "but of ZADDU instead."
 										severity FAILURE;
 								-- pragma translate_on
 								null;
@@ -1402,24 +1402,24 @@ begin
 						elsif r.ctrl.r0z = '0' and r.ctrl.r1z = '1' then
 							-- pragma translate_off
 							assert (FALSE)
-								report "ERROR - R0 was not null but R1 was in pre-ZADDU: "
-								& "we shouldn't be at the end of ZDBLU but of ZADDU instead"
+								report "[ ecc_scalar.vhd ]: ERROR: Point R0 was not null but R1 was in pre-ZADDU: "
+								& "we shouldn't be at the end of ZDBLU but of ZADDU instead."
 									severity FAILURE;
 							-- pragma translate_on
 							null;
 						elsif r.ctrl.r0z = '1' and r.ctrl.r1z = '0' then
 							-- pragma translate_off
 							assert (FALSE)
-								report "ERROR - R0 was null with R1 non-null in pre-ZADDU: "
-								& "we shouldn't be at the end of ZDBLU but of ZADDU instead"
+								report "[ ecc_scalar.vhd ]: ERROR: Point R0 was null with R1 non-null in pre-ZADDU: "
+								& "we shouldn't be at the end of ZDBLU but of ZADDU instead."
 									severity FAILURE;
 							-- pragma translate_on
 							null;
 						elsif r.ctrl.r0z = '1' and r.ctrl.r1z = '1' then
 							-- pragma translate_off
 							assert (FALSE)
-								report "ERROR - R0 & R1 were both null in pre-ZADDU: "
-								& "we shouldn't be at the end of ZDBLU but of ZADDC instead"
+								report "[ ecc_scalar.vhd ]: ERROR: R0 & R1 were both null in pre-ZADDU: "
+								& "we shouldn't be at the end of ZDBLU but of ZADDC instead."
 									severity FAILURE;
 							-- pragma translate_on
 							null;
@@ -1507,9 +1507,9 @@ begin
 							else
 								-- pragma translate_off
 								assert (FALSE)
-									report "ERROR - R0 & R1 were neither equal nor opposite "
+									report "[ ecc_scalar.vhd ]: ERROR: Points R0 & R1 were neither equal nor opposite "
 									& "in pre-ZADDC: we shouldn't be at the end of ZDBLC "
-									& "but of ZADDC instead"
+									& "but of ZADDC instead."
 										severity FAILURE;
 								-- pragma translate_on
 								null;
@@ -1517,24 +1517,24 @@ begin
 						elsif r.ctrl.r0z = '0' and r.ctrl.r1z = '1' then
 							-- pragma translate_off
 							assert (FALSE)
-								report "ERROR - R0 was not null but R1 was in pre-ZADDC: "
-								& "we shouldn't be at the end of ZDBLC but of NEGC instead"
+								report "[ ecc_scalar.vhd ]: ERROR: Point R0 was not null but R1 was in pre-ZADDC: "
+								& "we shouldn't be at the end of ZDBLC but of NEGC instead."
 									severity FAILURE;
 							-- pragma translate_on
 							null;
 						elsif r.ctrl.r0z = '1' and r.ctrl.r1z = '0' then
 							-- pragma translate_off
 							assert (FALSE)
-								report "ERROR - R0 was null with R1 non-null in pre-ZADDC: "
-								& "we shouldn't be at the end of ZDBLC but of NEGC instead"
+								report "[ ecc_scalar.vhd ]: ERROR: Point R0 was null with R1 non-null in pre-ZADDC: "
+								& "we shouldn't be at the end of ZDBLC but of NEGC instead."
 									severity FAILURE;
 							-- pragma translate_on
 							null;
 						elsif r.ctrl.r0z = '1' and r.ctrl.r1z = '1' then
 							-- pragma translate_off
 							assert (FALSE)
-								report "ERROR - R0 & R1 were both null in pre-ZADDC: "
-								& "we shouldn't be at the end of ZDBLC but of ZADDC instead"
+								report "[ ecc_scalar.vhd ]: ERROR: Points R0 & R1 were both null in pre-ZADDC: "
+								& "we shouldn't be at the end of ZDBLC but of ZADDC instead."
 									severity FAILURE;
 							-- pragma translate_on
 							null;
@@ -1551,8 +1551,8 @@ begin
 						if r.ctrl.r0z = '0' and r.ctrl.r1z = '0' then
 							-- pragma translate_off
 							assert (FALSE)
-								report "ERROR - none of R0/R1 was null in pre-ZADDC: "
-								& "we shouldn't be at the end of NEGC but of ZDBLC instead"
+								report "[ ecc_scalar.vhd ]: ERROR: None of points R0/R1 was null in pre-ZADDC: "
+								& "we shouldn't be at the end of NEGC but of ZDBLC instead."
 									severity FAILURE;
 							-- pragma translate_on
 							null;
@@ -1565,8 +1565,8 @@ begin
 						elsif r.ctrl.r0z = '1' and r.ctrl.r1z = '1' then
 							-- pragma translate_off
 							assert (FALSE)
-								report "ERROR - R0 & R1 were both null in pre-ZADDC: "
-								& "we shouldn't be at the end of NEGC but of ZADDC instead"
+								report "[ ecc_scalar.vhd ]: ERROR: Points R0 & R1 were both null in pre-ZADDC: "
+								& "we shouldn't be at the end of NEGC but of ZADDC instead."
 									severity FAILURE;
 							-- pragma translate_on
 							null;
@@ -2189,95 +2189,95 @@ begin
 			rbak_joye_state <= r.kp.joye.state;
 			-- log main states
 			if (r.ctrl.state = idle and rbak_state /= idle) then
-				echo("ECC_SCALAR: ");
-				echo("returning to state 'idle' (");
+				echo("[ ecc_scalar.vhd ]: ");
+				echo("Returning to state 'idle' (");
 				echo(time'image(now));
 				echol(")");
 			elsif (r.ctrl.state = cst and rbak_state /= cst) then
-				echo("ECC_SCALAR: ");
-				echo("entering state 'cst' (");
+				echo("[ ecc_scalar.vhd ]: ");
+				echo("Entering state 'cst' (");
 				echo(time'image(now));
 				echol(")");
 			elsif (r.ctrl.state = set and rbak_state /= set) then
-				echo("ECC_SCALAR: ");
-				echo("entering state 'set' (");
+				echo("[ ecc_scalar.vhd ]: ");
+				echo("Entering state 'set' (");
 				echo(time'image(now));
 				echol(")");
 			elsif (r.ctrl.state = kp and rbak_state /= kp) then
-				echo("ECC_SCALAR: ");
-				echo("entering state 'kp' (");
+				echo("[ ecc_scalar.vhd ]: ");
+				echo("Entering state 'kp' (");
 				echo(time'image(now));
 				echol(")");
 			elsif (r.ctrl.state = pop and rbak_state /= pop) then
-				echo("ECC_SCALAR: ");
-				echo("entering state 'pop' (");
+				echo("[ ecc_scalar.vhd ]: ");
+				echo("Entering state 'pop' (");
 				echo(time'image(now));
 				echol(")");
 			end if;
 			-- also log substates
 			if (r.kp.substate = idle and rbak_substate = checkoncurve) then
-				echo("ECC_SCALAR: ");
-				echo("input point is NOT on curve, ");
+				echo("[ ecc_scalar.vhd ]: ");
+				echo("Input point is NOT on curve, ");
 				echo("returning to substate 'idle' (");
 				echo(time'image(now));
 				echol(")");
 			elsif (rbak_substate = exits and r.kp.substate /= exits) then
-				echo("ECC_SCALAR: ");
+				echo("[ ecc_scalar.vhd ]: ");
 				--if (rbak_substate = exits) then
 					if zero = '1' or r.ctrl.r1z = '1' then
-						echo("output point IS on curve");
+						echo("Output point IS on curve");
 						if r.ctrl.r1z = '1' then
 							echol(" (it is null)");
 						else
 							echol("");
 						end if;
 					else
-						echol("output point IS NOT on curve");
+						echol("Output point IS NOT on curve");
 					end if;
 				--end if;
 				if r.kp.substate = idle then
-					echo("ECC_SCALAR: ");
-					echo("returning to substate 'idle' (");
+					echo("[ ecc_scalar.vhd ]: ");
+					echo("Returning to substate 'idle' (");
 					echo(time'image(now));
 					echol(")");
-					echo("ECC_SCALAR: PERF: ");
+					echo("[ ecc_scalar.vhd ]: PERF: ");
 					echo(integer'image(r.sim.perfcnt));
 					echo(" clock cycles (");
 					echo(time'image(now));
 					echol(")");
 				end if;
 			elsif (rbak_substate = token and r.kp.substate = idle) then
-				echo("ECC_SCALAR: ");
-				echo("returning to substate 'idle' (");
+				echo("[ ecc_scalar.vhd ]: ");
+				echo("Returning to substate 'idle' (");
 				echo(time'image(now));
 				echol(")");
-				echo("ECC_SCALAR: PERF: ");
+				echo("[ ecc_scalar.vhd ]: PERF: ");
 				echo(integer'image(r.sim.perfcnt));
 				echo(" clock cycles (");
 				echo(time'image(now));
 				echol(")");
 			elsif (r.kp.substate = checkoncurve and rbak_substate /= checkoncurve)
 			then
-				echo("ECC_SCALAR: ");
-				echo("entering substate 'checkoncurve' (");
+				echo("[ ecc_scalar.vhd ]: ");
+				echo("Entering substate 'checkoncurve' (");
 				echo(time'image(now));
 				echol(")");
 			elsif r.kp.substate = blindinit and rbak_substate = checkoncurve then
 				if (zero = '1' or r.ctrl.r1z = '1') then
-					echo("ECC_SCALAR: ");
-					echo("input point IS on curve, ");
-					echo("entering substate 'blindinit' (");
+					echo("[ ecc_scalar.vhd ]: ");
+					echo("Input point IS on curve, ");
+					echo("Entering substate 'blindinit' (");
 					echo(time'image(now));
 					echol(")");
 				else
-					echo("ECC_SCALAR: ");
-					echo("input point is NOT on curve (but carrying on...) [");
+					echo("[ ecc_scalar.vhd ]: ");
+					echo("Input point is NOT on curve (but carrying on...) [");
 					echo(time'image(now));
 					echol(")");
 				end if;
 			elsif (r.kp.substate = blindbit and rbak_substate /= blindbit) then
-				echo("ECC_SCALAR: ");
-				echo("entering substate 'blindbit' (");
+				echo("[ ecc_scalar.vhd ]: ");
+				echo("Entering substate 'blindbit' (");
 				echo(time'image(now));
 				echol(")");
 				rlog_blind_nbbits <= to_integer(unsigned(blindbits));
@@ -2287,8 +2287,8 @@ begin
 				if (r.sim.simblbit mod NB_BITS_LINE = NB_BITS_LINE - 1)
 					or (r.sim.simblbit = blbits_max_s - 1)
 				then
-					echo("ECC_SCALAR: ");
-					echo("blinding bits #");
+					echo("[ ecc_scalar.vhd ]: ");
+					echo("Blinding bits #");
 					echo(integer'image(r_sim_prevblbit));
 					echo(" ... ");
 					echol(integer'image(r.sim.simblbit));
@@ -2296,32 +2296,32 @@ begin
 				end if;
 			elsif r.kp.substate = adpa and rbak_substate = checkoncurve then
 				if (zero = '1' or r.ctrl.r1z = '1') then
-					echo("ECC_SCALAR: ");
-					echo("input point IS on curve, ");
-					echo("entering substate 'adpa' (");
+					echo("[ ecc_scalar.vhd ]: ");
+					echo("Input point IS on curve, ");
+					echo("Entering substate 'adpa' (");
 					echo(time'image(now));
 					echol(")");
 				else
-					echo("ECC_SCALAR: ");
-					echo("input point is NOT on curve (but carrying on...) [");
+					echo("[ ecc_scalar.vhd ]: ");
+					echo("Input point is NOT on curve (but carrying on...) [");
 					echo(time'image(now));
 					echol(")");
 				end if;
 			elsif (r.kp.substate = ssetup and rbak_substate /= ssetup) then
-				echo("ECC_SCALAR: ");
-				echo("entering substate 'ssetup' (");
+				echo("[ ecc_scalar.vhd ]: ");
+				echo("Entering substate 'ssetup' (");
 				echo(time'image(now));
 				echol(")");
 				r_sim_prevbit <= 2;
 				r_sim_prevblbit <= 0;
 			--elsif (r.kp.substate = switch3p and rbak_substate /= switch3p) then
-			--	echo("ECC_SCALAR: ");
-			--	echo("entering substate 'switch3p' (");
+			--	echo("[ ecc_scalar.vhd ]: ");
+			--	echo("Entering substate 'switch3p' (");
 			--	echo(time'image(now));
 			--	echol(")");
 			elsif (r.kp.substate = joyecoz and rbak_substate /= joyecoz) then
-				echo("ECC_SCALAR: ");
-				echo("entering substate 'joyecoz' (");
+				echo("[ ecc_scalar.vhd ]: ");
+				echo("Entering substate 'joyecoz' (");
 				echo(time'image(now));
 				echol(")");
 			elsif (r.kp.joye.state /= zaddc
@@ -2330,21 +2330,21 @@ begin
 				if (r.sim.simbit mod NB_BITS_LINE = NB_BITS_LINE - 1)
 					or (r.sim.simbit = nnmax_joye_loop_s + 2)
 				then
-					echo("ECC_SCALAR: ");
-					echo("scalar bits #");
+					echo("[ ecc_scalar.vhd ]: ");
+					echo("Processed scalar bits #");
 					echo(integer'image(r_sim_prevbit));
 					echo(" ... ");
 					echol(integer'image(r.sim.simbit));
 					r_sim_prevbit <= r.sim.simbit + 1;
 				end if;
 			elsif (r.kp.substate = subtractp and rbak_substate /= subtractp) then
-				echo("ECC_SCALAR: ");
-				echo("entering substate 'subtractp' (");
+				echo("[ ecc_scalar.vhd ]: ");
+				echo("Entering substate 'subtractp' (");
 				echo(time'image(now));
 				echol(")");
 			elsif (r.kp.substate = exits and rbak_substate /= exits) then
-				echo("ECC_SCALAR: ");
-				echo("entering substate 'exits' (");
+				echo("[ ecc_scalar.vhd ]: ");
+				echo("Entering substate 'exits' (");
 				echo(time'image(now));
 				echol(")");
 			end if;

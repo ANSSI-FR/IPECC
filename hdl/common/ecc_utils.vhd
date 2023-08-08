@@ -71,6 +71,8 @@ package ecc_utils is
 	procedure hex_echol(value: in std_logic_vector);
 	-- write hexadecimal value on a given input 'line'
 	procedure hex_write(l: inout line; constant value: in std_logic_vector);
+	-- write a character to the console (without flushing the line)
+	procedure echoc(c : in character);
 	-- pragma translate_on
 
 	subtype std_logic2 is std_logic_vector(1 downto 0);
@@ -102,9 +104,11 @@ end package ecc_utils;
 package body ecc_utils is
 
 	-- div() returns the number of s-bit words required to write an i-bit number.
+
 	-- This is equal to ceil function applied to the rational number i/s,
 	-- but ceil function is not defined in standard VHDL packages - but for
 	-- type 'real' from package 'math_real', which we do not want to use.
+	--
 	-- That's why we use built-in operators to compute div()
 	function div(i : natural; s : natural) return positive is
 	begin
@@ -385,6 +389,14 @@ package body ecc_utils is
 		end loop;
 		std.textio.write(l, str);
 	end procedure hex_write;
+
+	-- Write a character to the console (without flushing the line).
+	procedure echoc(c : in character) is
+		variable s : string(1 to 1);
+	begin
+		s(1) := c;
+		std.textio.write(std.textio.output, s);
+	end procedure echoc;
 	-- pragma translate_on
 
 end package body ecc_utils;

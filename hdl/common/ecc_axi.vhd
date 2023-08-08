@@ -4520,7 +4520,7 @@ begin
 					-- is the most meaningful bit for the 3 bit vectors to display)
 					bdx0 := to_integer(r.nndyn.valnn) - 1;
 					bdx := bdx0 + to_integer(r.ctrl.blindbits);
-					echo("ECC_AXI: k (as set by software) = 0x");
+					echo("[    ecc_axi.vhd ]: k (as set by software) = 0x");
 					if r.ctrl.doblinding = '1' then
 						if (bdx > bdx0) then
 							hex_echol(std_logic_vector(to_unsigned(0, bdx - bdx0))
@@ -4528,15 +4528,15 @@ begin
 						else
 							hex_echol(r_k(bdx0 downto 0));
 						end if;
-						echo("ECC_AXI: mask of k (additive)   = 0x");
+						echo("[    ecc_axi.vhd ]: Mask of k (additive)   = 0x");
 						hex_echol(r_mask(bdx downto 0));
-						echo("ECC_AXI: masked value of k      = 0x");
+						echo("[    ecc_axi.vhd ]: Masked value of k      = 0x");
 						hex_echol(r_k_masked(bdx downto 0));
 					elsif r.ctrl.doblinding = '0' then
 						hex_echol(r_k(bdx0 downto 0));
-						echo("ECC_AXI: mask of k (boolean)    = 0x");
+						echo("[    ecc_axi.vhd ]: Mask of k (boolean)    = 0x");
 						hex_echol(r_mask(bdx0 downto 0));
-						echo("ECC_AXI: masked value of k      = 0x");
+						echo("[    ecc_axi.vhd ]: Masked value of k      = 0x");
 						hex_echol(r_k_masked(bdx0 downto 0));
 					end if;
 				else

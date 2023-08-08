@@ -3252,7 +3252,7 @@ begin
 					xmsb := xmsb - 1;
 				end loop;
 				if (xmsb <= 0) then
-					write(lineout0, string'("ECC_FP: found no high bit in [k]P.x"));
+					write(lineout0, string'("[     ecc_fp.vhd ]: Found no high bit in [k]P.x"));
 					writeline(output, lineout0);
 				end if;
 				ymsb := ykp'high;
@@ -3263,13 +3263,13 @@ begin
 					ymsb := ymsb - 1;
 				end loop;
 				if (ymsb <= 0) then
-					write(lineout0, string'("ECC_FP: found no high bit in [k]P.y"));
+					write(lineout0, string'("[     ecc_fp.vhd ]: Found no high bit in [k]P.y"));
 					writeline(output, lineout0);
 				end if;
-				write(lineout0, string'("ECC_FP: [k]P.x = 0x"));
+				write(lineout0, string'("[     ecc_fp.vhd ]: [k]P.x = 0x"));
 				hex_write(lineout0, xkp(max(xmsb, ymsb) downto 0));
 				writeline(output0, lineout0);
-				write(lineout0, string'("ECC_FP: [k]P.y = 0x"));
+				write(lineout0, string'("[     ecc_fp.vhd ]: [k]P.y = 0x"));
 				hex_write(lineout0, ykp(max(xmsb, ymsb) downto 0));
 				writeline(output0, lineout0);
 				write(lineout1, string'("[k]P.x = 0x"));

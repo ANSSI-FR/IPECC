@@ -200,7 +200,7 @@ package ecc_tb_pkg is
 
 	-- Identical to read_big, except that here debug mode is assumed,
 	-- hence we do not poll the BUSY bit in R_STATUS register
-	-- (otherwise we would be creating a deadlock)
+	-- (otherwise we would be creating a deadlock).
 	procedure debug_read_big(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
@@ -209,7 +209,7 @@ package ecc_tb_pkg is
 		constant addr : in natural range 0 to nblargenb - 1;
 		variable bignb: inout std_logic_vector);
 
-	-- Emulate software driver reading [k]P result's coordinates
+	-- Emulate software driver reading [k]P result's coordinates.
 	procedure read_and_display_kp_result(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
@@ -218,7 +218,7 @@ package ecc_tb_pkg is
 		constant token: in std_logic512);
 
 	-- Emulate software driver reading [k]P result's coordinates
-	-- and returning them as
+	-- and returning them as passed arguments.
 	procedure read_and_return_kp_result(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
@@ -226,16 +226,15 @@ package ecc_tb_pkg is
 		constant valnn: in positive;
 		constant token: in std_logic512;
 		variable kpx : inout std_logic512;
-		variable kpy : inout std_logic512;
-		variable kp_is_null : out boolean);
+		variable kpy : inout std_logic512);
 
-	-- Emulate software driver acknowledging all errors
+	-- Emulate software driver acknowledging all errors.
 	procedure ack_all_errors(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
 		signal axo: in axi_out_type);
 
-	-- Emulate software driver setting all curve parameters
+	-- Emulate software driver setting all curve parameters.
 	procedure set_curve(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
@@ -243,7 +242,7 @@ package ecc_tb_pkg is
 		constant size: in positive;
 		constant curve: curve_param_type);
 
-	-- Emulate software driver setting R0 to be the null point
+	-- Emulate software driver setting R0 to be the null point.
 	procedure set_r0_null(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
@@ -295,6 +294,16 @@ package ecc_tb_pkg is
 		signal axo: in axi_out_type;
 		constant valnn: in positive);
 
+	-- Emulate software driver reading result coords after point-add
+	-- and returning them as passed arguments.
+	procedure read_and_return_ptadd_result(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant valnn: in positive;
+		variable pax : inout std_logic512;
+		variable pay : inout std_logic512);
+
 	-- Emulate software driver issuing command 'do point-doubling'
 	procedure run_point_double(
 		signal clk: in std_logic;
@@ -329,6 +338,16 @@ package ecc_tb_pkg is
 		signal axo: in axi_out_type;
 		constant valnn: in positive);
 	
+	-- Emulate software driver reading result's coords after point-double
+	-- and returning them as passed arguments.
+	procedure read_and_return_ptdbl_result(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant valnn: in positive;
+		variable pdx : inout std_logic512;
+		variable pdy : inout std_logic512);
+
 	-- Emulate software driver issuing command 'do point-negate'
 	procedure run_point_negate(
 		signal clk: in std_logic;
@@ -353,6 +372,16 @@ package ecc_tb_pkg is
 		signal axi: out axi_in_type;
 		signal axo: in axi_out_type;
 		constant valnn: in positive);
+
+	-- Emulate software driver reading result coords after point-negate
+	-- and returning them as passed arguments.
+	procedure read_and_return_ptneg_result(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant valnn: in positive;
+		variable pnx: inout std_logic512;
+		variable pny: inout std_logic512);
 
 	-- Emulate software driver issuing command 'do P == Q test'
 	procedure run_point_test_equal(
@@ -416,8 +445,7 @@ package ecc_tb_pkg is
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
 		signal axo: in axi_out_type;
-		variable yes_or_no: out boolean;
-		variable answer_right: out boolean);
+		variable yes_or_no: out boolean);
 
 	-- Identical to check_test_answer with display on console
 	procedure read_and_display_pttest_result(
@@ -1271,7 +1299,7 @@ package body ecc_tb_pkg is
 			xmsb := xmsb - 1;
 		end loop;
 		if xmsb <= 0 then
-			echol("[     ecc_tb.vhd ]: Found no high bit in [k]P.x");
+			echol("[     ecc_tb.vhd ]: WARNING: Found no high bit in [k]P.x");
 			xmsb := valnn;
 		end if;
 		-- find the position of the highest non-null bit in kpy
@@ -1283,7 +1311,7 @@ package body ecc_tb_pkg is
 			ymsb := ymsb - 1;
 		end loop;
 		if ymsb <= 0 then
-			echol("[     ecc_tb.vhd ]: Found no high bit in [k]P.y");
+			echol("[     ecc_tb.vhd ]: WARNING: Found no high bit in [k]P.y");
 			ymsb := valnn;
 		end if;
 		-- find the position of the highest non-null bit in token
@@ -1295,7 +1323,7 @@ package body ecc_tb_pkg is
 			tmsb := tmsb - 1;
 		end loop;
 		if tmsb <= 0 then
-			echol("[     ecc_tb.vhd ]: Found no high bit in token");
+			echol("[     ecc_tb.vhd ]: WARNING: Found no high bit in token");
 			tmsb := valnn;
 		end if;
 		dmsb := max(max(xmsb, ymsb), tmsb);
@@ -1312,8 +1340,7 @@ package body ecc_tb_pkg is
 		constant valnn: in positive;
 		constant token: in std_logic512;
 		variable kpx : inout std_logic512;
-		variable kpy : inout std_logic512;
-		variable kp_is_null : out boolean)
+		variable kpy : inout std_logic512)
 	is
 		--variable kpx : std_logic512 := (others => '0');
 		--variable kpy : std_logic512 := (others => '0');
@@ -1326,7 +1353,7 @@ package body ecc_tb_pkg is
 		kpy := (others => '0');
 		read_big(clk, axi, axo, valnn, LARGE_NB_XR1_ADDR, kpx);
 		read_big(clk, axi, axo, valnn, LARGE_NB_YR1_ADDR, kpy);
-		-- find the position of the highest non-null bit in kpx
+		-- Find the position of the highest non-null bit in 'kpx'.
 		xmsb := kpx'high;
 		for i in kpx'high downto 0 loop
 			if kpx(i) /= '0' then
@@ -1335,7 +1362,7 @@ package body ecc_tb_pkg is
 			xmsb := xmsb - 1;
 		end loop;
 		if xmsb <= 0 then
-			echol("[     ecc_tb.vhd ]: Found no high bit in [k]P.x");
+			echol("[     ecc_tb.vhd ]: WARNING: Found no high bit in [k]P.x");
 			xmsb := valnn;
 		end if;
 		-- find the position of the highest non-null bit in kpy
@@ -1347,7 +1374,7 @@ package body ecc_tb_pkg is
 			ymsb := ymsb - 1;
 		end loop;
 		if ymsb <= 0 then
-			echol("[     ecc_tb.vhd ]: Found no high bit in [k]P.y");
+			echol("[     ecc_tb.vhd ]: WARNING: Found no high bit in [k]P.y");
 			ymsb := valnn;
 		end if;
 		-- find the position of the highest non-null bit in token
@@ -1359,7 +1386,7 @@ package body ecc_tb_pkg is
 			tmsb := tmsb - 1;
 		end loop;
 		if tmsb <= 0 then
-			echol("[     ecc_tb.vhd ]: Found no high bit in token");
+			echol("[     ecc_tb.vhd ]: WARNING: Found no high bit in token");
 			tmsb := valnn;
 		end if;
 		dmsb := max(max(xmsb, ymsb), tmsb);
@@ -1634,6 +1661,56 @@ package body ecc_tb_pkg is
 		hex_echol(pay(max(xmsb, ymsb) downto 0));
 	end procedure;
 
+	procedure read_and_return_ptadd_result(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant valnn: in positive;
+		variable pax : inout std_logic512;
+		variable pay : inout std_logic512)
+	is
+		variable xmsb, ymsb : integer;
+		variable vz1 : boolean;
+	begin
+		wait until clk'event and clk = '1';
+		-- read back the coordinates of result point (R1)
+		pax := (others => '0');
+		pay := (others => '0');
+		read_big(clk, axi, axo, valnn, LARGE_NB_XR1_ADDR, pax);
+		read_big(clk, axi, axo, valnn, LARGE_NB_YR1_ADDR, pay);
+		xmsb := pax'high;
+		for i in pax'high downto 0 loop
+			if pax(i) /= '0' then
+				exit;
+			end if;
+			xmsb := xmsb - 1;
+		end loop;
+		--assert (xmsb > 0)
+		--	report "X-coordinate of point-addition result seems to equal 0"
+		--		severity WARNING;
+		if (xmsb <= 0) then xmsb := valnn - 1; end if;
+		ymsb := pay'high;
+		for i in pay'high downto 0 loop
+			if pay(i) /= '0' then
+				exit;
+			end if;
+			ymsb := ymsb - 1;
+		end loop;
+		--assert (ymsb > 0)
+		--	report "Y-coordinate of point-addition result seems to equal 0"
+		--		severity WARNING;
+		if (ymsb <= 0) then ymsb := valnn - 1; end if;
+		--echo("[     ecc_tb.vhd ]: Read-back on AXI interface: (P+Q).x = 0x");
+		--hex_echol(pax(max(xmsb, ymsb) downto 0));
+		--echo("[     ecc_tb.vhd ]: Read-back on AXI interface: (P+Q).y = 0x");
+		--hex_echol(pay(max(xmsb, ymsb) downto 0));
+
+		-- Remark: point R0 shuold have been preserved.
+	end procedure;
+
+
+
+
 	procedure run_point_double(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
@@ -1744,6 +1821,46 @@ package body ecc_tb_pkg is
 		end if;
 	end procedure;
 
+	procedure read_and_return_ptdbl_result(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant valnn: in positive;
+		variable pdx : inout std_logic512;
+		variable pdy : inout std_logic512)
+	is
+		variable xmsb, ymsb : integer;
+		variable vz1 : boolean;
+	begin
+		wait until clk'event and clk = '1';
+		pdx := (others => '0');
+		pdy := (others => '0');
+		read_big(clk, axi, axo, valnn, LARGE_NB_XR1_ADDR, pdx);
+		read_big(clk, axi, axo, valnn, LARGE_NB_YR1_ADDR, pdy);
+		xmsb := pdx'high;
+		for i in pdx'high downto 0 loop
+			if pdx(i) /= '0' then
+				exit;
+			end if;
+			xmsb := xmsb - 1;
+		end loop;
+		--assert (xmsb > 0)
+		--	report "X-coordinate of point-doubling result seems to equal 0"
+		--		severity WARNING;
+		if (xmsb <= 0) then xmsb := valnn - 1; end if;
+		ymsb := pdy'high;
+		for i in pdy'high downto 0 loop
+			if pdy(i) /= '0' then
+				exit;
+			end if;
+			ymsb := ymsb - 1;
+		end loop;
+		--assert (ymsb > 0)
+		--	report "Y-coordinate of point-doubling result seems to equal 0"
+		--		severity WARNING;
+		if (ymsb <= 0) then ymsb := valnn - 1; end if;
+	end procedure;
+
 	procedure run_point_negate(
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
@@ -1839,6 +1956,46 @@ package body ecc_tb_pkg is
 			echo("[     ecc_tb.vhd ]: Read-back on AXI interface: (-P).y = 0x");
 			hex_echol(pay(max(xmsb, ymsb) downto 0));
 		end if;
+	end procedure;
+
+	procedure read_and_return_ptneg_result(
+		signal clk: in std_logic;
+		signal axi: out axi_in_type;
+		signal axo: in axi_out_type;
+		constant valnn: in positive;
+		variable pnx: inout std_logic512;
+		variable pny: inout std_logic512)
+	is
+		variable xmsb, ymsb : integer;
+		variable vz1 : boolean;
+	begin
+		wait until clk'event and clk = '1';
+		pnx := (others => '0');
+		pny := (others => '0');
+		read_big(clk, axi, axo, valnn, LARGE_NB_XR1_ADDR, pnx);
+		read_big(clk, axi, axo, valnn, LARGE_NB_YR1_ADDR, pny);
+		xmsb := pnx'high;
+		for i in pnx'high downto 0 loop
+			if pnx(i) /= '0' then
+				exit;
+			end if;
+			xmsb := xmsb - 1;
+		end loop;
+		--assert (xmsb > 0)
+		--	report "X-coordinate of opposite-point result seems to equal 0"
+		--		severity WARNING;
+		if (xmsb <= 0) then xmsb := valnn - 1; end if;
+		ymsb := pny'high;
+		for i in pny'high downto 0 loop
+			if pny(i) /= '0' then
+				exit;
+			end if;
+			ymsb := ymsb - 1;
+		end loop;
+		--assert (ymsb > 0)
+		--	report "Y-coordinate of opposite-point result seems to equal 0"
+		--		severity WARNING;
+		if (ymsb <= 0) then ymsb := valnn - 1; end if;
 	end procedure;
 
 	procedure run_point_test_equal(
@@ -2016,8 +2173,7 @@ package body ecc_tb_pkg is
 		signal clk: in std_logic;
 		signal axi: out axi_in_type;
 		signal axo: in axi_out_type;
-		variable yes_or_no: out boolean;
-		variable answer_right: out boolean) is
+		variable yes_or_no: out boolean) is
 	begin
 		wait until clk'event and clk = '1';
 		-- read R_STATUS register
@@ -2034,7 +2190,6 @@ package body ecc_tb_pkg is
 		else
 			yes_or_no := FALSE;
 		end if;
-		answer_right := TRUE;
 	end procedure;
 
 	procedure read_and_display_pttest_result(
@@ -2043,18 +2198,14 @@ package body ecc_tb_pkg is
 		signal axo: in axi_out_type;
 		constant valnn: in positive)
 	is
-		variable yes_or_no, answer_right : boolean;
+		variable yes_or_no: boolean;
 	begin
 		wait until clk'event and clk = '1';
-		check_test_answer(clk, axi, axo, yes_or_no, answer_right);
-		if answer_right then
-			if yes_or_no then
-				echol("[     ecc_tb.vhd ]: Answer is YES");
-			else
-				echol("[     ecc_tb.vhd ]: Answer is NO");
-			end if;
+		check_test_answer(clk, axi, axo, yes_or_no);
+		if yes_or_no then
+			echol("[     ecc_tb.vhd ]: Answer is YES");
 		else
-			echol("[     ecc_tb.vhd ]: No answer :/");
+			echol("[     ecc_tb.vhd ]: Answer is NO");
 		end if;
 	end procedure;
 
@@ -2310,7 +2461,7 @@ package body ecc_tb_pkg is
 		hex_echol(pax(max(xmsb, ymsb) downto 0));
 		echo("[     ecc_tb.vhd ]: Read-back on AXI interface: (R0).y = 0x");
 		hex_echol(pay(max(xmsb, ymsb) downto 0));
-		-- read back the coordinates of R1
+		-- Read back the coordinates of R1.
 		pax := (others => '0');
 		pay := (others => '0');
 		read_big(clk, axi, axo, valnn, LARGE_NB_XR1_ADDR, pax);
