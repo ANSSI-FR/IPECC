@@ -19,17 +19,17 @@ use ieee.numeric_std.all;
 
 package ecc_customize is
 	-- **********************************
-	-- start of: user-editable parameters
+	-- Start of: user-editable parameters
 	-- **********************************
 	-- Please refer to the in-file documentation of parameters below (after the
 	-- package specification), where parameters are described in the same order
-	-- as they appear in the code hereafter.
-	constant nn : positive := 528;
+	-- as they appear hereafter.
+	constant nn : positive := 512;
 	constant nn_dynamic : boolean := TRUE;
 	type techno_type is (spartan6, virtex6, series7, ultrascale, ialtera, asic);
 	constant techno : techno_type := ultrascale; -- set a 'techno_type' value
 	-- ------------------------------
-	-- performance related parameters
+	-- Performance related parameters
 	-- ------------------------------
 	-- multwidth is only used if 'techno' = 'asic'
 	-- (otherwise its value has no meaning and can be ignored)
@@ -40,14 +40,14 @@ package ecc_customize is
 	constant sramlat : positive range 1 to 2 := 1;
 	constant async : boolean := TRUE;
 	-- -----------------------------------------------
-	-- side-channel countermeasures related parameters
+	-- Side-channel countermeasures related parameters
 	-- -----------------------------------------------
 	constant debug : boolean := FALSE; -- FALSE = highly secure, TRUE = highly not
 	constant blinding : integer := 96; -- 96 seems fair for size of blinding rnd
 	constant shuffle : boolean := TRUE; -- memory shuffling
 	type shuftype is (none, linear, permute_lgnb, permute_limbs);
 	constant shuffle_type : shuftype := permute_lgnb; -- set a 'shuftype' value
-	constant zremask : integer := 16; -- quite arbitrary
+	constant zremask : integer := 4; -- quite arbitrary but quite often too
 	-- -----------------------
 	-- TRNG related parameters
 	-- -----------------------
@@ -60,19 +60,20 @@ package ecc_customize is
 	constant trng_ramsz_crv : positive := 4; -- in kB
 	constant trng_ramsz_shf : positive := 16; -- in kB
 	-- -------------
-	-- miscellaneous
+	-- Miscellaneous
 	-- -------------
 	constant axi32or64 : natural := 32; -- 32 or 64 only allowed values
-	constant nblargenb : positive := 32;  -- change these two parameters only if
-	constant nbopcodes : positive := 512; -- you really know what you're doing
+	constant nblargenb : positive := 32;  -- Change these two parameters only if
+	constant nbopcodes : positive := 512; -- you really know what you're doing.
 	-- --------------------------
-	-- simulation-only parameters
+	-- Simulation-only parameters
 	-- --------------------------
+	constant simvecfile : string := "/tmp/ecc_vec_in.txt";
 	constant simkb : natural range 0 to natural'high := 0; -- if 0 then ignored
 	constant simlog : string := "/tmp/ecc.log";
-	constant simtrngfile: string := "/tmp/random.txt";
+	constant simtrngfile : string := "/tmp/random.txt";
 	-- ********************************
-	-- end of: user-editable parameters
+	-- End of: user-editable parameters
 	-- ********************************
 end package ecc_customize;
 
@@ -1393,13 +1394,13 @@ end package ecc_customize;
 -- TYPE/VALUE
 --       Character string indicating a file path which should be accessible
 --       in write mode.
---       Default is "/tmp/ecc.log", which should be convenient (at least for
---       Unix-like systems).
+--       Default is "/tmp/ecc.log" which should be convenient at least for
+--       Unix-like systems.
 --
 -- DESCRIPTION
 --       This is the path of the file where simulation will dump the information
---       detailing all the instructions that were executed, with their operands
---       address, result value, timestamp, etc.
+--       detailing all the instructions that were executed by ecc_curve.vhd,
+--       with the address of thier operands, their result, timestamp, etc.
 --
 --       If you provide a relative path, the place where the file will actually
 --       be placed is dependent on your simulator (the default "/tmp/ecc.log"
@@ -1417,7 +1418,7 @@ end package ecc_customize;
 -- TYPE/VALUE
 --       Character string indicating a file path which should be accessible
 --       in read mode.
---       Default "/tmp/random.txt" is arbitrary.
+--       Default is "/tmp/random.txt" is arbitrary.
 --
 -- DESCRIPTION
 --       Format of this file is the following: each value should be an

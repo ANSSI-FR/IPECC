@@ -34,8 +34,16 @@ end entity ecc_tb;
 
 architecture sim of ecc_tb is
 
-	-- 'stoponerr' is defined in ecc_customize.vhd
-	constant CONTINUE_ON_ERROR: boolean := not stoponerr;
+	-- Parameter 'CONTINUE_ON_ERROR'
+	--
+	-- If TRUE then simulation will continue even if a mismatch is detected
+	-- between the simulated RTL and the expected result from the input test-
+	-- vectors file.
+	--
+	-- If FALSE then the simulation will stop upon the first test where a
+	-- mismatch is detected.
+	--
+	constant CONTINUE_ON_ERROR: boolean := FALSE;
 
 	-- DuT component declaration
 	component ecc is
@@ -2090,8 +2098,8 @@ begin
 		echol("[     ecc_tb.vhd ]: End of testbench simulation (EOF) (" & time'image(now) & ")");
 
 		echol("[     ecc_tb.vhd ]: Tests statistics:");
-		echol("[     ecc_tb.vhd ]:	    ok = " & integer'image(stats_ok));
-	 	echol("[     ecc_tb.vhd ]:      nok = " & integer'image(stats_nok));
+		echol("[     ecc_tb.vhd ]:      ok = " & integer'image(stats_ok));
+		echol("[     ecc_tb.vhd ]:      nok = " & integer'image(stats_nok));
 		echol("[     ecc_tb.vhd ]:      total = " & integer'image(stats_total));
 
 		-- Wait indefinitely.
