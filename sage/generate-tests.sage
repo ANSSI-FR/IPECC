@@ -21,6 +21,8 @@ def rdp(nbits=256):
 
 ######################### C O N F I G U R A T I O N ############################
 #                                                                              #
+#                (You should only edit parameters in this frame)               #
+#                                                                              #
 # Parameter: 'ww'                                                              #
 #                                                                              #
 #   Designates the bit-width of limbs used for the representation of large     #
@@ -29,32 +31,33 @@ def rdp(nbits=256):
 #   It is only used to define 'nnmin' parameter (see a few lines below)        #
 #   which defines the smallest value admissible by an actual hardware imple-   #
 #   mentation of IPECC.  Hence the value of 'ww' only matters if the present   #
-#   script is used to generate test vectors *for the actual hardware to run*,  #
+#   script is used to generate test-vectors *for the actual hardware to run*,  #
 #   and if that hardware was synthesized with option 'nn_dynamic' = TRUE in    #
-#   ecc_customize.vhd, to enforce that no test is generated with a dynamic     #
-#   value of 'nn' that goes beyond 'nnmin'.                                    #
+#   ecc_customize.vhd (to enforce that no test is generated with a dynamic     #
+#   value of 'nn' that goes beyond 'nnmin').                                   #
 #                                                                              #
 #   On the other hand, if the hardware you want to submit the tests to was     #
 #   synthesized with option 'nn_dynnamic' = FALSE, then simply ignore para-    #
-#   meters 'ww', 'nnmin', 'nnmax' and simply set 'nn_consant' to the static    #
+#   meters 'ww', 'nnmin', 'nnmax' and simply set 'nn_constant' to the static   #
 #   value that was also set for parameter 'nn' in ecc_customize.vhd.           #
 #                                                                              #
 #   Alternatively, you can ignore value of 'ww' and directly set a numerical   #
 #   value to 'nnmin', but do keep in mind that any particular hardware imple-  #
 #   mentation of IPECC will only be able to perform computations with a mini-  #
 #   mal value of 'nn' which depends on the value of 'ww', which is precisely   #
-#   'ww - 4 + 1', hence the default definition of parameter 'nnmin' below.     #
+#   'ww - 4 + 1', hence the default value set for parameter 'nnmin' below.     #
 #                                                                              #
 #   For any particular hardware implementation of IPECC, the value of 'ww' is  #
-#   automatically set at synthesis time based on the technology that was set   #
-#   in file ecc_customize.vhd:                                                 #
+#   automatically set at synthesis time based on the technology that was       #
+#   given in file ecc_customize.vhd:                                           #
 #                                                                              #
 #     - on FPGA targets, value of 'ww' is set based on the device/family       #
-#     - on ASIC targers, value of 'ww' is the same as that of parameter        #
-#       'multwidth' (please c.f ecc_customize.vhd in-file documentation for    #
-#       more information).                                                     #
+#     - on ASIC targets, value of 'ww' is the same as the value of parameter   #
+#       'multwidth'.                                                           #
 #                                                                              #
-#   On 7-series/Zynq Xilinx FPGAs, ww is set to 16.                            #
+#   Please see ecc_customize.vhd in-file documentation for more information.   #
+#                                                                              #
+#   On 7-series/Zynq Xilinx FPGAs, 'ww' is set to 16.                          #
 #                                                                              #
 ww = 16                                                                        #
 #                                                                              #
@@ -68,9 +71,10 @@ ww = 16                                                                        #
 #                                                                              #
 nnmin = ww - 4 + 1                                                             #
 #                                                                              #
-# Parameters: 'nnmin', 'nnmax', 'nnminmax' & 'nnmaxabsolute'                   #
+# Parameters: 'nnmax', 'nnminmax', 'nnmaxabsolute'                             #
+#             'NNMINMOD', 'NNMININCR', 'NNMAXMOD', 'NNMAXINCR'                 #
 #                                                                              #
-#   This script generates test vectors by gradually increasing the range from  #
+#   This script generates test-vectors by gradually increasing the range from  #
 #   which the random values of 'nn' are withdrawn for each new curve, this     #
 #   range being defined by [nnmin : nnmax].                                    #
 #                                                                              #
@@ -102,25 +106,28 @@ NNMAXINCR = 3                                                                  #
 nn_constant = 0   # Non-0 value will make it the constant unique value of 'nn' #
 only_kp_and_no_blinding = False  # Well, option's name speaks for itself.      #
 #                                                                              #
-# For any new curve, a random value is drawn from the current range            #
-# [nnmin : nnmax], and then 6 six types of tests are generated for that        #
-# curve:                                                                       #
+# Parameters: 'NBCURV'                                                         #
+#             'NB*' where * = KP|ADD|DBL|NEG|CHK|EQU|OPP                       #
 #                                                                              #
-#   - NBKP defines the number of [k]P tests.                                   #
+#   For any new curve, a random value is drawn from the current range          #
+#   [nnmin : nnmax], and then 6 six types of tests are generated for that      #
+#   curve:                                                                     #
 #                                                                              #
-#   - NBADD defines the number of P + Q tests. Points are also generated       #
-#     randomly.                                                                #
+#     - NBKP defines the number of [k]P tests.                                 #
 #                                                                              #
-#   - NBDBL defines the number of [2]P tests (computation of the double of     #
-#     of point.                                                                #
+#     - NBADD defines the number of P + Q tests. Points are also generated     #
+#       randomly.                                                              #
 #                                                                              #
-#   - NBNEG defines the number of (-P) tests (computation of the opposite of   #
-#     a point).                                                                #
+#     - NBDBL defines the number of [2]P tests (computation of the double      #
+#       of a point.                                                            #
 #                                                                              #
-#   - NBCHK, NBEQU and NBOPP resp. define the number of boolean 'is point      #
-#     on curve?' tests, 'are points equal' tests, and 'are points opposi-      #
-#     te?' tests, resp. Some of the tests have their answer set to TRUE,       #
-#     some deliberately to FALSE.                                              #
+#     - NBNEG defines the number of (-P) tests (computation of the opposite    #
+#       of a point).                                                           #
+#                                                                              #
+#     - NBCHK, NBEQU and NBOPP resp. define the number of boolean 'is point    #
+#       on curve?' tests, 'are points equal' tests, and 'are points opposi-    #
+#       te?' tests, resp. Some of the tests have their answer set to TRUE,     #
+#       some deliberately to FALSE.                                            #
 #                                                                              #
 # All points involved in the tests are generated at random (using SageMath's   #
 # random_element() method on the elliptic curve opject type). Also the scalar  #
@@ -130,117 +137,59 @@ only_kp_and_no_blinding = False  # Well, option's name speaks for itself.      #
 # The complete script will iterate on a total number of 'NBCURV' curves.       #
 # Setting 0 to 'NBCURV' means the loop shouldn't stop.                         #
 #                                                                              #
-#NBCURV = 100000                                                                #
-NBCURV = 0 # A value of 0 means don't stop/ever-lasting producing loop.        #
-NBKP = 100 # Nb of [k]P tests that will be generated per curve.                  #
-NBADD = 50 # Nb of P+Q tests that will be generated per curve.                  #
-NBDBL = 50 # Nb of [2]P tests that will be generated per curve.                 #
-NBNEG = 50 # Nb of (-P) tests that will be generated per curve.                 #
-NBCHK = 50 # Nb of 'is point on curve?' tests that will be generated per curve. #
-NBEQU = 50 # Nb of 'are points equal?' tests that will be generated per curve.  #
-NBOPP = 50 # Nb of 'are points opposite?" tests that'll be generated per curve. #
+NBCURV = 0 # A value of 0 means don't stop or ever-lasting producing loop.     #
+NBKP = 100 # Nb of [k]P tests that will be generated per curve.                #
+NBADD = 50 # Nb of P+Q tests that will be generated per curve.                 #
+NBDBL = 50 # Nb of [2]P tests that will be generated per curve.                #
+NBNEG = 50 # Nb of (-P) tests that will be generated per curve.                #
+NBCHK = 50 # Nb of 'is point on curve?' tests that will be generated per curve #
+NBEQU = 50 # Nb of 'are points equal?' tests that will be generated per curve. #
+NBOPP = 50 # Nb of 'are points opposite?" tests that'll be generated per curve #
 #                                                                              #
-# For [k]P tests, blinding may or may not be enabled (and if so, with a number #
-# of blinding bits randomly drawn in the range [1 : nn - 1]). Generating a     #
-# test with blinding enabled requires first to compute the order of the curve, #
-# which can become insupportably long as value of 'nn' exceeds some threeshold #
-# that is quite difficult to define, however that's the reason for parameter   #
-# 'NN_LIMIT_COMPUTE_Q': by definition, any random curve generated for a value  #
-# of 'nn' exceeding 'NN_LIMIT_COMPUTE_Q' will involve no blinding in their     #
-# [k]P tests generation. Furthermore, for these curves, the order 'q' will be  #
-# set to the large number 1, as an artifact which can't make no harm as 'q'    #
-# only plays a role in IPECC when blinding countermeasure is enabled in a [k]P #
-# computation.                                                                 #
+# Parameter 'NN_LIMIT_COMPUTE_Q':                                              #
+#                                                                              #
+#   For [k]P tests, blinding may or may not be enabled (and if so, with a      #
+#   number of blinding bits randomly drawn in the range [1 : nn - 1]).         #
+#   Generating a test with blinding enabled requires first to compute the      #
+#   order of the curve, which can become insupportably long as value of 'nn'   #
+#   exceeds some threeshold. Such a threeshold is difficult to estimate,       #
+#   however that's the reason for parameter 'NN_LIMIT_COMPUTE_Q'.              #
+#   By definition, any random curve generated for a value of 'nn' exceeding    #
+#   'NN_LIMIT_COMPUTE_Q' will involve no blinding in their [k]P tests          #
+#   generation. Furthermore, for these curves, the order 'q' will be           #
+#   set to the large number 1, as an artifact which can't make no harm         #
+#   as 'q' only plays a role in IPECC when blinding countermeasure is          #
+#   enabled in a [k]P computation.                                             #
+#                                                                              #
 NN_LIMIT_COMPUTE_Q = 192                                                       #
 #                                                                              #
-# The output tests consist in a series of a few textual lines per each curve   #
-# and a few textual lines for each generated test. All tests comprised between #
-# the definition of one curve and the definition of the next one are implici-  #
-# tely relative to the former.                                                 #
+# Parameter: 'NO_EXCEPTIONS'                                                   #
 #                                                                              #
-# This is what the definition of a curve looks like:                           #
+#   If set to False, the script will also generate, in addition to the         #
+#   amounts of tests defined above (e.g NBKP, NBADD, etc) a certain number     #
+#   of tests that would have the IP to meet an exception during computation,   #
+#   like for instance adding two points which are opposite, or multiplying     #
+#   a point of small order by a scalar equal to that order, etc.               #
 #                                                                              #
-#   == NEW CURVE #0                                                            #
-#   nn=256                                                                     #
-#   p=0xca91effdc4a2698403334216dcd1849ba59c19af4c611ae948352857239eaa9f       #
-#   a=0x0cdb13e47b2099649822d6770cbfdd8fd2de4ef944bc4bf12bf952dca56ffe6a       #
-#   b=0xb4d65d09bca6a1dead1ed5fb0df4d39db22e37b41cdee56944634fa9c1b9aa35       #
-#   q=0x0000000000000000000000000000000000000000000000000000000000000001       #
+#   If set to True, no such test will be generated by the script.              #
 #                                                                              #
-#  The presence of each line is mandatory, their order is strict and mandatory #
-#  and must be the one given in the example above. Each one gives a specific   #
-#  information whose meaning is quite clear in the context of elliptic curve   #
-#  cryptography but let's detail these.                                        #
+NO_EXCEPTIONS = False                                                          #
 #                                                                              #
-#  - "== NEW CURVE" oviously introduces the defintion of a new set of curve    #
-#    parameters. You can have it followed by a space followed by any misc.     #
-#    character string which will then be used as an identifier. This script    #
-#    generates identifiers in the form of a '#' character followed by an       #
-#    integer number starting at 0 that will be incremented for each new        #
-#    generated curve.                                                          #
+# Note:                                                                        #
 #                                                                              #
-#  - "nn=" must be directly followed (wo/ space) by an integer defining the    #
-#   value of the main security parameter 'nn'. There is no limit here (except  #
-#   that of VHDL internal representation integer'high) but obviously you       #
-#   should not exceed the maximum value of 'nn' your hardware was customized   #
-#   for. If 'nn_dynamic' was set to FALSE in ecc_customize.vhd when you        #
-#   synthesized IPECC, then you should obviously only use this value (this     #
-#   will what happen if you set parameter 'nn_constant' accordingly in the     #
-#   present script, see the descriptions already given above.                  #
+#   Obviously what is interesting in cryptographic applications is to be       #
+#   able to perform computations on numbers of... cryptographic sizes.         #
 #                                                                              #
-#  - "p=" must be followed by "0x" and by the value in hexadecimal format      #
-#    of the prime number defining the finite field for the curve. Bitwidth     #
-#    of this number must not exceed value set for 'nn'.                        #
+#   You may then find testing small values like nn=32 to be be inappro-        #
+#   priate, however this is not completely true, as these tests can be         #
+#   performed faster, and correlatively in much higher quantity (also          #
+#   think about HDL testbenchs which are dramatically slow) enforcing          #
+#   verification of pure control aspects of the computations carried           #
+#   inside the IP.                                                             #
 #                                                                              #
-#  - "a=", "b=" and "q=" must also each be followed by "0x" and by the value   #
-#    also in hexadecimal of the corresponding curve parameter. The case of     #
-#    "q" calls for a few remarks.                                              #
-#                                                                              #
-
-#         REPRENDRE ICI : est-ce que q peut être optionnel, etc, quelle
-#         doit être la longueur exactement des paramètres (par exemple,
-#         dans le cas ci-dessus de nn=256, peut-on simplement écrire 0x1?
-#         Je sais que le testbench VHDL tel que je l'ai écrit l'accepte,
-#         mais test_app?
-#
-#         Mentionner aussi les exceptions, car elles rajoutent des tests
-#         pour chaque courbe dont les infos que je donne ci-dessus pour
-#         NBKP, NBADD, etc. ne font pas état.
-#
-#         Also check that all 4 things (test_app, ecc_tb.vhd and Sage script,
-#         and this script) are coherent in the way they expect/generate syntax
-#         (for instance: right now (Aug. 2, 2023) the testbench expects
-#         "== TEST P+Q" but this script generates simply "P+Q"...)
-
-#                                                                              #
-# This is what the definition of a test looks like:                            #
-#                                                                              #
-#   == TEST [k]P #0.0                                                          #
-#   Px=0x2e33d5f20dff1f4f74dce63b0bc2508e092f31d289553564d5d44e28096d019d      #
-#   Py=0x29171738df25639218ed7b2626bdb487c768c20f23180087577df700215ce3f2      #
-#   k=0xf327d532d4772272e3166baef2bf844c8c374ae75f834a6df203381ea0e82149       #
-#   kPx=0xb07e6fcc1852ff369ba1c501900b1b4e8e752c743dde3bc9159459bbfb1682a3     #
-#   kPy=0x60831c4c84643ae8dde33f4caf407bb8fb0fe39838ce55d6f87a24c893062a4d     #
-#                                                                              #
-# This format is what is expected by both:                                     #
-#                                                                              #
-#  - the software app. the C source code of which is in driver/test_app/.      #
-#    that you can use to test a real hardware implementation of IPECC          #
-#                                                                              #
-#  - the hardware testbench the source code of which is in sim/ecc_tb.vhd      #
-#    that you can use to test the HDL code of IPECC.                           #
-#                                                                              #
-# Obviously what is interesting in cryptographic applications is to be able to #
-# perform computations on numbers of... cryptographic sizes. You may then find #
-# testing small values like nn=32 to be be inappropriate, however this is not  #
-# completely true, as these tests can be performed faster, and correlatively   #
-# in much higher quantity (think also about HDL testbenchs which are dramati-  #
-# cally slow) enforcing verification of pure control aspects of the computa-   #
-# tions carried inside the IP.                                                 #
-#                                                                              #
-# This also the reason for the [nnmin : nnmax] range described above: tests    #
-# will start quite fast at the begining of one test campaign, and then become  #
-# much smaller as values of nnmin & nnmax increase.                            #
+#   This also the reason for the [nnmin : nnmax] range described above:        #
+#   tests will start quite fast at the begining of one test campaign,          #
+#   then become much slower as values of nnmin & nnmax increase.               #
 #                                                                              #
 ################################################################################
 
