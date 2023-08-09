@@ -20,7 +20,7 @@ use ieee.numeric_std.all;
 library UNISIM;
 use UNISIM.vcomponents.all;
 
-use work.ecc_utils.all; -- for ln2()
+use work.ecc_log.all; -- for ln2()
 use work.ecc_pkg.all;
 use work.mm_ndsp_pkg.all; -- for 'ndsp'
 
