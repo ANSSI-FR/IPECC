@@ -1115,46 +1115,46 @@ package body ecc_tb_pkg is
 		wait until clk'event and clk = '1' and axo.rvalid = '1';
 		axi.rready <= '0';
 		if axo.rdata(STATUS_ERR_IN_PT_NOT_ON_CURVE) = '1' then
-			echol("[     ecc_tb.vhd ]: R_STATUS shows STATUS_ERR_IN_PT_NOT_ON_CURVE error");
+			echol("[     ecc_tb.vhd ]: R_STATUS shows STATUS_ERR_IN_PT_NOT_ON_CURVE error (" & time'image(now) & ")");
 		end if;
 		if axo.rdata(STATUS_ERR_OUT_PT_NOT_ON_CURVE) = '1' then
-			echol("[     ecc_tb.vhd ]: R_STATUS shows STATUS_ERR_OUT_PT_NOT_ON_CURVE error");
+			echol("[     ecc_tb.vhd ]: R_STATUS shows STATUS_ERR_OUT_PT_NOT_ON_CURVE error (" & time'image(now) & ")");
 		end if;
 		if axo.rdata(STATUS_ERR_I_COMP) = '1' then
-			echol("[     ecc_tb.vhd ]: R_STATUS shows STATUS_ERR_I_COMP error");
+			echol("[     ecc_tb.vhd ]: R_STATUS shows STATUS_ERR_COMP error (" & time'image(now) & ")");
 		end if;
 		if axo.rdata(STATUS_ERR_I_WREG_FBD) = '1' then
-			echol("[     ecc_tb.vhd ]: R_STATUS shows STATUS_ERR_I_WREG_FBD error");
+			echol("[     ecc_tb.vhd ]: R_STATUS shows STATUS_ERR_WREG_FBD error (" & time'image(now) & ")");
 		end if;
 		if axo.rdata(STATUS_ERR_I_KP_FBD) = '1' then
-			echol("[     ecc_tb.vhd ]: R_STATUS shows STATUS_ERR_I_KP_FBD error");
+			echol("[     ecc_tb.vhd ]: R_STATUS shows STATUS_ERR_KP_FBD error (" & time'image(now) & ")");
 		end if;
 		if axo.rdata(STATUS_ERR_I_NNDYN) = '1' then
-			echol("[     ecc_tb.vhd ]: R_STATUS shows STATUS_ERR_I_NNDYN error");
+			echol("[     ecc_tb.vhd ]: R_STATUS shows STATUS_ERR_NNDYN error (" & time'image(now) & ")");
 		end if;
 		if axo.rdata(STATUS_ERR_I_POP_FBD) = '1' then
-			echol("[     ecc_tb.vhd ]: R_STATUS shows STATUS_ERR_I_POP_FBD error");
+			echol("[     ecc_tb.vhd ]: R_STATUS shows STATUS_ERR_POP_FBD error (" & time'image(now) & ")");
 		end if;
 		if axo.rdata(STATUS_ERR_I_RDNB_FBD) = '1' then
-			echol("[     ecc_tb.vhd ]: R_STATUS shows STATUS_ERR_I_RDNB_FBD error");
+			echol("[     ecc_tb.vhd ]: R_STATUS shows STATUS_ERR_RDNB_FBD error (" & time'image(now) & ")");
 		end if;
 		if axo.rdata(STATUS_ERR_I_BLN) = '1' then
-			echol("[     ecc_tb.vhd ]: R_STATUS shows STATUS_ERR_I_BLN error");
+			echol("[     ecc_tb.vhd ]: R_STATUS shows STATUS_ERR_BLN error (" & time'image(now) & ")");
 		end if;
 		if axo.rdata(STATUS_ERR_I_UNKNOWN_REG) = '1' then
-			echol("[     ecc_tb.vhd ]: R_STATUS shows STATUS_ERR_I_UNKNOWN_REG error");
+			echol("[     ecc_tb.vhd ]: R_STATUS shows STATUS_ERR_UNKNOWN_REG error (" & time'image(now) & ")");
 		end if;
 		if axo.rdata(STATUS_ERR_I_TOKEN) = '1' then
-			echol("[     ecc_tb.vhd ]: R_STATUS shows STATUS_ERR_I_TOKEN error");
+			echol("[     ecc_tb.vhd ]: R_STATUS shows STATUS_ERR_TOKEN error (" & time'image(now) & ")");
 		end if;
 		if axo.rdata(STATUS_ERR_I_SHUFFLE) = '1' then
-			echol("[     ecc_tb.vhd ]: R_STATUS shows STATUS_ERR_I_SHUFFLE error");
+			echol("[     ecc_tb.vhd ]: R_STATUS shows STATUS_ERR_SHUFFLE error (" & time'image(now) & ")");
 		end if;
 		if axo.rdata(STATUS_ERR_I_ZREMASK) = '1' then
-			echol("[     ecc_tb.vhd ]: R_STATUS shows STATUS_ERR_I_ZREMASK error");
+			echol("[     ecc_tb.vhd ]: R_STATUS shows STATUS_ERR_ZREMASK error (" & time'image(now) & ")");
 		end if;
 		if axo.rdata(STATUS_ERR_I_NOT_ENOUGH_RANDOM_WK) = '1' then
-			echol("[     ecc_tb.vhd ]: R_STATUS shows STATUS_ERR_I_NOT_ENOUGH_RANDOM_WK error");
+			echol("[     ecc_tb.vhd ]: R_STATUS shows STATUS_ERR_NOT_ENOUGH_RANDOM_WK error (" & time'image(now) & ")");
 		end if;
 		wait until clk'event and clk = '1';
 	end procedure;
@@ -2754,9 +2754,11 @@ package body ecc_tb_pkg is
 		axi.wvalid <= '1';
 		wait until clk'event and clk = '1' and axo.wready = '1';
 		axi.wdata <= (others => 'X'); axi.wvalid <= '0';
+		wait until clk'event and clk = '1';
 		-- poll register R_STATUS until it shows ready
 		poll_until_ready(clk, axi, axo);
 		-- write W_CTRL register
+		wait until clk'event and clk = '1';
 		axi.awaddr <= W_CTRL & "000"; axi.awvalid <= '1';
 		wait until clk'event and clk = '1' and axo.awready = '1';
 		axi.awaddr <= (others => 'X'); axi.awvalid <= '0';

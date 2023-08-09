@@ -244,13 +244,11 @@ architecture sim of ecc_tb is
 			d := 0;
 			uns := (others => '0');
 			for i in sz - 1 downto 0 loop
-				--nb := nb + da(i) * (10**d);
 				prod := resize(to_unsigned(da(i), 34) * to_unsigned(10**d, 34), 34);
 				uns := uns + prod;
 				d := d + 1;
 			end loop;
 		end if;
-		--echo("uns = 0x"); hex_echol(std_logic_vector(uns));
 		if uns(33 downto 31) /= "000" then
 			ok := FALSE;
 			echol("[     ecc_tb.vhd ]: ERROR: Too large an integer (the maximum "
@@ -1985,8 +1983,20 @@ begin
 					-- Set point(s) to do the test on, according to parameters
 					-- extracted from the input test-vectors file.
 					--
-					point_test_equal(s_axi_aclk, axi0, axo0, valnn, px_val, py_val,
-						qx_val, qy_val, sw_p_is_null, sw_q_is_null);
+					case op is
+						when OP_TST_CHK =>
+							point_test_on_curve(s_axi_aclk, axi0, axo0, valnn, px_val, py_val,
+								sw_p_is_null);
+						when OP_TST_EQU =>
+							point_test_equal(s_axi_aclk, axi0, axo0, valnn, px_val, py_val,
+								qx_val, qy_val, sw_p_is_null, sw_q_is_null);
+						when OP_TST_OPP =>
+							point_test_opposite(s_axi_aclk, axi0, axo0, valnn, px_val, py_val,
+								qx_val, qy_val, sw_p_is_null, sw_q_is_null);
+						when others =>
+							echol("[     ecc_tb.vhd ]: Internal ERROR (Unknown test type).");
+							print_stats_and_exit;
+					end case;
 					--
 					-- Poll until IP has completed computation and is ready.
 					--

@@ -1295,9 +1295,10 @@ begin
 			-- -------------------------------------------------
 			-- decoding write to W_CTRL register
 			-- -------------------------------------------------
-			if (debug and r.axi.waddr = W_CTRL)
-				or ((not debug) and r.axi.waddr(ADB - 2 downto 0) =
-					W_CTRL(ADB - 2 downto 0))
+			if r.axi.waddr = W_CTRL
+			--if (debug and r.axi.waddr = W_CTRL)
+			--	or ((not debug) and r.axi.waddr(ADB - 2 downto 0) =
+			--		W_CTRL(ADB - 2 downto 0))
 			then
 				-- assert both AWREADY & WREADY signals to allow a new AXI data-beat
 				-- to happen again
@@ -1693,9 +1694,10 @@ begin
 			-- -------------------------------------------------------
 			-- decoding write to W_WRITE_DATA register
 			-- -------------------------------------------------------
-			elsif (debug and r.axi.waddr = W_WRITE_DATA)
-				or ((not debug) and r.axi.waddr(ADB - 2 downto 0) =
-					W_WRITE_DATA(ADB - 2 downto 0))
+			elsif r.axi.waddr = W_WRITE_DATA
+			--elsif (debug and r.axi.waddr = W_WRITE_DATA)
+			--	or ((not debug) and r.axi.waddr(ADB - 2 downto 0) =
+			--		W_WRITE_DATA(ADB - 2 downto 0))
 			then
 				v.axi.awready := '1'; -- (s3)
 				v.axi.arready := '1';
@@ -1727,9 +1729,10 @@ begin
 			-- ------------------------------------------------------
 			-- decoding write to W_R0_NULL register
 			-- ------------------------------------------------------
-			elsif (debug and r.axi.waddr = W_R0_NULL) or
-				((not debug) and r.axi.waddr(ADB - 2 downto 0) =
-					W_R0_NULL(ADB - 2 downto 0))
+			elsif r.axi.waddr = W_R0_NULL
+			--elsif (debug and r.axi.waddr = W_R0_NULL) or
+			--	((not debug) and r.axi.waddr(ADB - 2 downto 0) =
+			--		W_R0_NULL(ADB - 2 downto 0))
 			then
 				v.axi.wready := '1';
 				v.axi.awready := '1';
@@ -1746,9 +1749,10 @@ begin
 			-- ------------------------------------------------------
 			-- decoding write to W_R1_NULL register
 			-- ------------------------------------------------------
-			elsif (debug and r.axi.waddr = W_R1_NULL) or
-				((not debug) and r.axi.waddr(ADB - 2 downto 0) =
-					W_R1_NULL(ADB - 2 downto 0))
+			elsif r.axi.waddr = W_R1_NULL
+			--elsif (debug and r.axi.waddr = W_R1_NULL) or
+			--	((not debug) and r.axi.waddr(ADB - 2 downto 0) =
+			--		W_R1_NULL(ADB - 2 downto 0))
 			then
 				v.axi.wready := '1';
 				v.axi.awready := '1';
@@ -1765,9 +1769,10 @@ begin
 			-- -------------------------------------------------------------
 			-- decoding write to W_PRIME_SIZE register (s41)
 			-- -------------------------------------------------------------
-			elsif (debug and r.axi.waddr = W_PRIME_SIZE) or
-				((not debug) and r.axi.waddr(ADB - 2 downto 0) =
-					W_PRIME_SIZE(ADB - 2 downto 0))
+			elsif r.axi.waddr = W_PRIME_SIZE
+			--elsif (debug and r.axi.waddr = W_PRIME_SIZE) or
+			--	((not debug) and r.axi.waddr(ADB - 2 downto 0) =
+			--		W_PRIME_SIZE(ADB - 2 downto 0))
 			then
 				v.axi.wready := '1';
 				v.axi.awready := '1';
@@ -1798,9 +1803,10 @@ begin
 			-- -----------------------------------------------------
 			-- decoding write to W_BLINDING register - (s241)
 			-- -----------------------------------------------------
-			elsif (debug and r.axi.waddr = W_BLINDING) or
-				((not debug) and r.axi.waddr(ADB - 2 downto 0) =
-					W_BLINDING(ADB - 2 downto 0))
+			elsif r.axi.waddr = W_BLINDING
+			--elsif (debug and r.axi.waddr = W_BLINDING) or
+			--	((not debug) and r.axi.waddr(ADB - 2 downto 0) =
+			--		W_BLINDING(ADB - 2 downto 0))
 			then
 				-- (s125) - For the W_BLINDING register, a test on the number of
 				-- blinding bits set by software must occur before we release
@@ -1848,9 +1854,10 @@ begin
 			-- -------------------------------------------------------------
 			-- decoding write to W_SHUFFLE register
 			-- -------------------------------------------------------------
-			elsif (debug and r.axi.waddr = W_SHUFFLE) or
-				((not debug) and r.axi.waddr(ADB - 2 downto 0) =
-					W_SHUFFLE(ADB - 2 downto 0))
+			elsif r.axi.waddr = W_SHUFFLE
+			--elsif (debug and r.axi.waddr = W_SHUFFLE) or
+			--	((not debug) and r.axi.waddr(ADB - 2 downto 0) =
+			--		W_SHUFFLE(ADB - 2 downto 0))
 			then
 				v.axi.wready := '1';
 				v.axi.awready := '1';
@@ -1889,9 +1896,10 @@ begin
 			-- -------------------------------------------------------------
 			-- decoding write to W_ZREMASK register
 			-- -------------------------------------------------------------
-			elsif (debug and r.axi.waddr = W_ZREMASK) or
-				((not debug) and r.axi.waddr(ADB - 2 downto 0) =
-					W_ZREMASK(ADB - 2 downto 0))
+			elsif r.axi.waddr = W_ZREMASK
+			--elsif (debug and r.axi.waddr = W_ZREMASK) or
+			--	((not debug) and r.axi.waddr(ADB - 2 downto 0) =
+			--		W_ZREMASK(ADB - 2 downto 0))
 			then
 				-- For register W_ZREMASK same remark applies as to W_BLINDING,
 				-- see (s125) above.
@@ -1940,9 +1948,10 @@ begin
 			-- ------------------------------------------------
 			-- decoding write to W_IRQ register
 			-- ------------------------------------------------
-			elsif (debug and r.axi.waddr = W_IRQ) or
-				((not debug) and r.axi.waddr(ADB - 2 downto 0) =
-					W_IRQ(ADB - 2 downto 0))
+			elsif r.axi.waddr = W_IRQ
+			--elsif (debug and r.axi.waddr = W_IRQ) or
+			--	((not debug) and r.axi.waddr(ADB - 2 downto 0) =
+			--		W_IRQ(ADB - 2 downto 0))
 			then
 				-- TODO: set multicycle constraint on path:
 				--    r.axi.wdatax -> r.ctrl.irqen
@@ -1962,9 +1971,10 @@ begin
 			-- decoding write to W_ERR_ACK register
 			-- ------------------------------------------------
 			-- writing W_ERR_ACK register is always allowed
-			elsif (debug and r.axi.waddr = W_ERR_ACK) or
-				((not debug) and r.axi.waddr(ADB - 2 downto 0) =
-					W_ERR_ACK(ADB - 2 downto 0))
+			elsif r.axi.waddr = W_ERR_ACK
+			--elsif (debug and r.axi.waddr = W_ERR_ACK) or
+			--	((not debug) and r.axi.waddr(ADB - 2 downto 0) =
+			--		W_ERR_ACK(ADB - 2 downto 0))
 			then
 				v.axi.wready := '1';
 				v.axi.awready := '1';
@@ -1979,9 +1989,10 @@ begin
 			-- ------------------------------------------------
 			-- decoding write to W_SMALL_SCALAR register
 			-- ------------------------------------------------
-			elsif (debug and r.axi.waddr = W_SMALL_SCALAR) or
-				((not debug) and r.axi.waddr(ADB - 2 downto 0) =
-					W_SMALL_SCALAR(ADB - 2 downto 0))
+			elsif r.axi.waddr = W_SMALL_SCALAR
+			--elsif (debug and r.axi.waddr = W_SMALL_SCALAR) or
+			--	((not debug) and r.axi.waddr(ADB - 2 downto 0) =
+			--		W_SMALL_SCALAR(ADB - 2 downto 0))
 			then
 				-- (s157), we assert AWREADY but NOT WREADY yet, postponed to (s158)
 				-- because we first need to sanity check the value set by software
@@ -2001,9 +2012,10 @@ begin
 			-- ------------------------------------------------
 			-- decoding write to W_SOFT_RESET register
 			-- ------------------------------------------------
-			elsif (debug and r.axi.waddr = W_SOFT_RESET) or
-				((not debug) and r.axi.waddr(ADB - 2 downto 0) =
-					W_SOFT_RESET(ADB - 2 downto 0)) 
+			elsif r.axi.waddr = W_SOFT_RESET
+			--elsif (debug and r.axi.waddr = W_SOFT_RESET) or
+			--	((not debug) and r.axi.waddr(ADB - 2 downto 0) =
+			--		W_SOFT_RESET(ADB - 2 downto 0)) 
 			then
 				v.axi.awready := '1';
 				v.axi.arready := '1';
@@ -2018,9 +2030,10 @@ begin
 			-- decoding write to W_TOKEN register
 			-- ------------------------------------------------
 			-- (s226)
-			elsif (debug and r.axi.waddr = W_TOKEN) or
-				((not debug) and r.axi.waddr(ADB - 2 downto 0) =
-					W_TOKEN(ADB - 2 downto 0))
+			elsif r.axi.waddr = W_TOKEN
+			--elsif (debug and r.axi.waddr = W_TOKEN) or
+			--	((not debug) and r.axi.waddr(ADB - 2 downto 0) =
+			--		W_TOKEN(ADB - 2 downto 0))
 			then
 				v.axi.wready := '1';
 				v.axi.awready := '1';
@@ -2028,7 +2041,7 @@ begin
 				v.axi.bvalid := '1';
 				if ((not debug) or (debug and r.ctrl.token_act = '1'))
 					and r.ctrl.gentoken = '0' -- no sense if command already issued
-					and r.ctrl.tokpending = '0' -- no sense if action still pengin
+					and r.ctrl.tokpending = '0' -- no sense if action still pending
 					and r.ctrl.tokavail4read = '0' -- no sense if token avail. & not read
 				then
 					v.ctrl.gentoken := '1';
@@ -2988,9 +3001,10 @@ begin
 			-- ----------------------------------
 			-- decoding read of R_STATUS register
 			-- ----------------------------------
-			if (debug and s_axi_araddr(ADB + 2 downto 3) = R_STATUS)
-				or ((not debug) and s_axi_araddr(ADB + 1 downto 3) =
-					R_STATUS(ADB - 2 downto 0))
+			if s_axi_araddr(ADB + 2 downto 3) = R_STATUS
+			--if (debug and s_axi_araddr(ADB + 2 downto 3) = R_STATUS)
+			--	or ((not debug) and s_axi_araddr(ADB + 1 downto 3) =
+			--		R_STATUS(ADB - 2 downto 0))
 			then
 				dw := (others => '0');
 				-- Informational bits
@@ -3025,9 +3039,10 @@ begin
 			-- -------------------------------------
 			-- decoding read of R_READ_DATA register
 			-- -------------------------------------
-			elsif (debug and s_axi_araddr(ADB + 2 downto 3) = R_READ_DATA)
-				or ((not debug) and s_axi_araddr(ADB + 1 downto 3) =
-					R_READ_DATA(ADB - 2 downto 0))
+			elsif s_axi_araddr(ADB + 2 downto 3) = R_READ_DATA
+			--elsif (debug and s_axi_araddr(ADB + 2 downto 3) = R_READ_DATA)
+			--	or ((not debug) and s_axi_araddr(ADB + 1 downto 3) =
+			--		R_READ_DATA(ADB - 2 downto 0))
 			then
 				-- Actually there is nothing to do here: s_axi_rvalid will be asserted
 				-- (along with data on the AXI read-data channel) once available data
@@ -3050,9 +3065,10 @@ begin
 			-- ----------------------------------------
 			-- decoding read of R_CAPABILITIES register
 			-- ----------------------------------------
-			elsif (debug and s_axi_araddr(ADB + 2 downto 3) = R_CAPABILITIES)
-				or ((not debug) and s_axi_araddr(ADB + 1 downto 3) =
-					R_CAPABILITIES(ADB - 2 downto 0))
+			elsif s_axi_araddr(ADB + 2 downto 3) = R_CAPABILITIES
+			--elsif (debug and s_axi_araddr(ADB + 2 downto 3) = R_CAPABILITIES)
+			--	or ((not debug) and s_axi_araddr(ADB + 1 downto 3) =
+			--		R_CAPABILITIES(ADB - 2 downto 0))
 			then
 				dw := (others => '0');
 				-- debug versus prod
@@ -3087,9 +3103,10 @@ begin
 			-- --------------------------------------
 			-- decoding read of R_PRIME_SIZE register
 			-- --------------------------------------
-			elsif (debug and s_axi_araddr(ADB + 2 downto 3) = R_PRIME_SIZE)
-				or ((not debug) and s_axi_araddr(ADB + 1 downto 3) =
-					R_PRIME_SIZE(ADB - 2 downto 0))
+			elsif s_axi_araddr(ADB + 2 downto 3) = R_PRIME_SIZE
+			--elsif (debug and s_axi_araddr(ADB + 2 downto 3) = R_PRIME_SIZE)
+			--	or ((not debug) and s_axi_araddr(ADB + 1 downto 3) =
+			--		R_PRIME_SIZE(ADB - 2 downto 0))
 			then
 				dw --(PMSZ_VALNN_MSB downto PMSZ_VALNN_LSB)
 					:= std_logic_vector(
@@ -3099,9 +3116,10 @@ begin
 			-- --------------------------------------
 			-- decoding read of R_HW_VERSION register
 			-- --------------------------------------
-			elsif (debug and s_axi_araddr(ADB + 2 downto 3) = R_HW_VERSION)
-				or ((not debug) and s_axi_araddr(ADB + 1 downto 3) =
-					R_HW_VERSION(ADB - 2 downto 0))
+			elsif s_axi_araddr(ADB + 2 downto 3) = R_HW_VERSION
+			--elsif (debug and s_axi_araddr(ADB + 2 downto 3) = R_HW_VERSION)
+			--	or ((not debug) and s_axi_araddr(ADB + 1 downto 3) =
+			--		R_HW_VERSION(ADB - 2 downto 0))
 			then
 				-- version number, we use the first 32 bits of git commit checksum
 				dw := (others => '0');

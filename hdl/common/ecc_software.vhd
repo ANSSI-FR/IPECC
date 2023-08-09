@@ -33,6 +33,8 @@ package ecc_software is
 	-- and 'ADB' in ecc_pkg.vhd, including the small ASCII figure which
 	-- captures in a simple way the definition of these two parameters.
 	--
+	-- Note: the disgracious 'rat' type is defined in ecc_pkg.vhd.
+	--
 	-- -----------------------------------------------
 	-- addresses of all AXI-accessible write registers
 	-- -----------------------------------------------
