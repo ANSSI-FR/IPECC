@@ -1695,7 +1695,7 @@ begin
 	process
 	begin
 		-- 1st console log line (general settings)
-		echo("[        ecc.vhd ]: nn = ");
+		echo("[        ecc.vhd ]: Config: nn = ");
 		echo(integer'image(nn));
 		echo(" (nn_dynamic ");
 		if nn_dynamic then
@@ -1750,7 +1750,7 @@ begin
 			echol("");
 		end if;
 		-- 2nd console log line (ecc_curve_iram & ecc_fp settings)
-		echo("[        ecc.vhd ]: microcode memory size: ");
+		echo("[        ecc.vhd ]: Config (continuing): Microcode memory size: ");
 		echo(integer'image(ge_pow_of_2(nbopcodes)));
 		echo(" opcodes of ");
 		echo(integer'image(OPCODE_SZ));
@@ -1758,7 +1758,7 @@ begin
 		echo(integer'image(ge_pow_of_2(nblargenb)));
 		echol(" large-numbers");
 		-- 3rd console log line (TRNG fifos)
-		 echo("[        ecc.vhd ]: trng fifo sizes: raw=");
+		 echo("[        ecc.vhd ]: Config (continuing): TRNG fifo sizes: raw=");
 		echo(integer'image(raw_ram_size));
 		echo("-bit, irn axi=");
 		echo(integer'image(irn_fifo_size_axi));
