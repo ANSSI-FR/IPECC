@@ -319,7 +319,6 @@ architecture sim of ecc_tb is
 		variable begpos, endpos: integer;
 		variable zero: boolean;
 		variable s4: std_logic4;
-		--variable s0: string(1 to 1);
 	begin
 		st := (others => '0');
 		-- Parse the string input argument till the first non-hexadecimal
@@ -331,8 +330,6 @@ architecture sim of ecc_tb is
 		zero := FALSE;
 		outpos := inpos;
 		endpos := inpos;
-		--echol(">>> begpos = " & integer'image(begpos));
-		--echol(">>> maxpos = " & integer'image(maxpos));
 		if not (maxpos >= begpos) then
 			echol("[     ecc_tb.vhd ]: ERROR: Missing hexadecimal value after prefix '0x'.");
 			assert FALSE severity FAILURE;
@@ -341,7 +338,6 @@ architecture sim of ecc_tb is
 			if leading_zeros then
 				if s(i) = '0' then
 					ok := TRUE;
-					--echol(">>>" & integer'image(i) & ":" & "step 0");
 					if i = maxpos then
 						zero := TRUE;
 						exit;
@@ -355,13 +351,11 @@ architecture sim of ecc_tb is
 						if i > inpos then
 							ok := TRUE;
 							zero := TRUE;
-							--echol(">>>" & integer'image(i) & ":" & "step 1");
 							exit;
 						else
 							-- Force an unknown output bit vector.
 							st := (others => 'X');
 							ok := FALSE;
-							--echol(">>>" & integer'image(i) & ":" & "step 2");
 							exit;
 						end if;
 					else -- It is an hex digit, and it isn't '0'.
@@ -369,34 +363,20 @@ architecture sim of ecc_tb is
 						begpos := i;
 						endpos := i;
 						leading_zeros := FALSE;
-						--echol(">>>" & integer'image(i) & ":" & "step 3");
 					end if;
 				end if;
 			else -- Met at least one valid hex non-null digit.
 				if is_char_an_hex_digit(s(i)) then
-					--s0(1) := s(i);
 					endpos := i;
-					--echol(integer'image(i) & ": '" & s0 & "' " & integer'image(endpos));
-					--echol(">>>" & integer'image(i) & ":" & "step 4");
 				else
-					--echol(">>>" & integer'image(i) & ":" & "step 5");
 					echol("[     ecc_tb.vhd ]: ERROR: '" & s(i) & "' is not an hexadecimal digit.");
 					ok := FALSE;
 					exit;
 				end if;
 			end if;
 		end loop;
-		--if ok then echol(">>> ok = TRUE"); else echol(">>> ok = FALSE"); end if;
-		--if zero then echol(">>> zero = TRUE"); else echol(">>> zero = FALSE"); end if;
 		if ok and not zero then
 			outpos := endpos;
-			--if endpos = inpos then
-			--	ok := FALSE;
-			--else
-			--	ok := TRUE;
-			--end if;
-			--echol("begpos = " & integer'image(begpos));
-			--echol("endpos = " & integer'image(endpos));
 			-- Also enforce that the nb of hexadecimal digits that was found does not
 			-- exceed the maximal nb of hex digits for a bit vector of 'valnn' bits.
 			if endpos - begpos + 1 > div(valnn, 4) then
@@ -423,7 +403,6 @@ architecture sim of ecc_tb is
 									& "as compared to the current value of nn.");
 							assert FALSE severity FAILURE;
 						end if;
-						--if to_integer(unsigned(char_to_stdlogic4(s(begpos)))) > (valnn % 4) then
 					end loop;
 				end if; -- valnn not a mult. of 4
 			end if; -- if ok
@@ -610,15 +589,6 @@ begin
 		-- Input file (containing input test-vectors)
 		file fvin : text open read_mode is simvecfile;
 		variable tline : line;
-		-- A few flags used while parsing input test-vectors file
-		--variable expect_none : boolean;
-		--variable expect_nn : boolean;
-		--variable expect_p, expect_a, expect_b, expect_q : boolean;
-		--variable expect_px, expect_py, expect_k : boolean;
-		--variable expect_kpx_sw, expect_kpy_sw : boolean;
-		--variable expect_pplusqx_sw, expect_pplusqy_sw : boolean;
-		--variable expect_twopx_sw, expect_twopy_sw : boolean;
-		--variable expect_negpx_sw, expect_negpy_sw : boolean;
 		variable rdok : boolean;
 		-- A few strings used while parsing input test-vectors file
 		variable nline, nline0 : string(1 to 16384); -- "== NEW CURVE #" or "== TEST *"
@@ -703,7 +673,6 @@ begin
 		--
 		variable void : integer;
 		variable str3 : string(1 to 3);
-		variable foo : integer;
 		variable line_length : integer;
 		variable test_label : string(1 to 16384);
 		variable test_label_sz : natural;
@@ -780,11 +749,6 @@ begin
 		-- Enable the post-processing unit from reading raw random bytes.
 		debug_trng_pp_start_pulling_raw(s_axi_aclk, axi0, axo0);
 
-		-- -- Reset the TRNG (both raw & irn logic).
-		-- debug_trng_reset_raw(s_axi_aclk, axi0, axo0);
-		-- debug_trng_reset_irn(s_axi_aclk, axi0, axo0);
-
-
 		nbbld := 0;
 		op := OP_NONE;
 		line_type_expected := EXPECT_NONE;
@@ -798,7 +762,6 @@ begin
 		--
 		echol("[     ecc_tb.vhd ]: Reading test-vectors from input file: """
 			& simvecfile & """");
-		--foo := 0;
 
 		--
 		-- Main infinite loop, parsing lines from standard input to extract:
@@ -819,13 +782,8 @@ begin
 			if line_length = 0 then
 				next;
 			end if;
-			--foo := foo + 1;
 			-- Extract the whole line as a fixed constant (very large) character string.
 			read(tline, nline(1 to tline'length), rdok);
-			--if (foo = 3) then
-			--	str3 := nline(14 to 16);
-			--	echol("nline(14,15,16) = """ & str3 & """");
-			--end if;
 			if not rdok then
 				echol("[     ecc_tb.vhd ]: ERROR: While reading one line " &
 						"from" & """" & simtrngfile & " file. Aborting.");
