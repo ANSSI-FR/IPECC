@@ -22,29 +22,29 @@
       </db_ref>
    </db_ref_list>
    <zoom_setting>
-      <ZoomStartTime time="0.000000 us"></ZoomStartTime>
-      <ZoomEndTime time="8,535.000001 us"></ZoomEndTime>
-      <Cursor1Time time="395.268000 us"></Cursor1Time>
+      <ZoomStartTime time="314.538569 us"></ZoomStartTime>
+      <ZoomEndTime time="340.238570 us"></ZoomEndTime>
+      <Cursor1Time time="315.395000 us"></Cursor1Time>
    </zoom_setting>
    <column_width_setting>
-      <NameColumnWidth column_width="278"></NameColumnWidth>
-      <ValueColumnWidth column_width="79"></ValueColumnWidth>
+      <NameColumnWidth column_width="244"></NameColumnWidth>
+      <ValueColumnWidth column_width="67"></ValueColumnWidth>
    </column_width_setting>
-   <WVObjectSize size="43" />
+   <WVObjectSize size="40" />
+   <wave_markers>
+      <marker label="" time="601535000" />
+      <marker label="" time="339783702" />
+   </wave_markers>
    <wvobject fp_name="divider2041" type="divider">
       <obj_property name="label">AXI interface</obj_property>
       <obj_property name="DisplayName">label</obj_property>
       <obj_property name="BkColor">#000000</obj_property>
    </wvobject>
-   <wvobject type="logic" fp_name="/ecc_tb/e0/s0/clk">
-      <obj_property name="ElementShortName">clk</obj_property>
-      <obj_property name="ObjectShortName">clk</obj_property>
-      <obj_property name="CustomSignalColor">#FFFF00</obj_property>
-      <obj_property name="UseCustomSignalColor">true</obj_property>
-   </wvobject>
    <wvobject type="logic" fp_name="/ecc_tb/s_axi_aresetn">
       <obj_property name="ElementShortName">s_axi_aresetn</obj_property>
       <obj_property name="ObjectShortName">s_axi_aresetn</obj_property>
+      <obj_property name="CustomSignalColor">#808000</obj_property>
+      <obj_property name="UseCustomSignalColor">true</obj_property>
    </wvobject>
    <wvobject fp_name="divider2041" type="divider">
       <obj_property name="label">AW</obj_property>
@@ -54,26 +54,26 @@
    <wvobject type="array" fp_name="/ecc_tb/e0/a0/s_axi_awaddr">
       <obj_property name="ElementShortName">s_axi_awaddr[8:0]</obj_property>
       <obj_property name="ObjectShortName">s_axi_awaddr[8:0]</obj_property>
-      <obj_property name="CustomSignalColor">#00FFFF</obj_property>
+      <obj_property name="CustomSignalColor">#808000</obj_property>
       <obj_property name="UseCustomSignalColor">true</obj_property>
       <obj_property name="Radix">HEXRADIX</obj_property>
    </wvobject>
    <wvobject type="array" fp_name="/ecc_tb/e0/a0/s_axi_awprot">
       <obj_property name="ElementShortName">s_axi_awprot[2:0]</obj_property>
       <obj_property name="ObjectShortName">s_axi_awprot[2:0]</obj_property>
-      <obj_property name="CustomSignalColor">#00FFFF</obj_property>
+      <obj_property name="CustomSignalColor">#808000</obj_property>
       <obj_property name="UseCustomSignalColor">true</obj_property>
    </wvobject>
    <wvobject type="logic" fp_name="/ecc_tb/e0/a0/s_axi_awvalid">
       <obj_property name="ElementShortName">s_axi_awvalid</obj_property>
       <obj_property name="ObjectShortName">s_axi_awvalid</obj_property>
-      <obj_property name="CustomSignalColor">#00FFFF</obj_property>
+      <obj_property name="CustomSignalColor">#808000</obj_property>
       <obj_property name="UseCustomSignalColor">true</obj_property>
    </wvobject>
    <wvobject type="logic" fp_name="/ecc_tb/e0/s_axi_awready">
       <obj_property name="ElementShortName">s_axi_awready</obj_property>
       <obj_property name="ObjectShortName">s_axi_awready</obj_property>
-      <obj_property name="CustomSignalColor">#00FFFF</obj_property>
+      <obj_property name="CustomSignalColor">#808000</obj_property>
       <obj_property name="UseCustomSignalColor">true</obj_property>
    </wvobject>
    <wvobject fp_name="divider2041" type="divider">
@@ -84,26 +84,26 @@
    <wvobject type="array" fp_name="/ecc_tb/e0/a0/s_axi_wdata">
       <obj_property name="ElementShortName">s_axi_wdata[31:0]</obj_property>
       <obj_property name="ObjectShortName">s_axi_wdata[31:0]</obj_property>
-      <obj_property name="CustomSignalColor">#00FFFF</obj_property>
+      <obj_property name="CustomSignalColor">#808000</obj_property>
       <obj_property name="UseCustomSignalColor">true</obj_property>
       <obj_property name="Radix">HEXRADIX</obj_property>
    </wvobject>
    <wvobject type="array" fp_name="/ecc_tb/e0/a0/s_axi_wstrb">
       <obj_property name="ElementShortName">s_axi_wstrb[3:0]</obj_property>
       <obj_property name="ObjectShortName">s_axi_wstrb[3:0]</obj_property>
-      <obj_property name="CustomSignalColor">#00FFFF</obj_property>
+      <obj_property name="CustomSignalColor">#808000</obj_property>
       <obj_property name="UseCustomSignalColor">true</obj_property>
    </wvobject>
    <wvobject type="logic" fp_name="/ecc_tb/e0/a0/s_axi_wvalid">
       <obj_property name="ElementShortName">s_axi_wvalid</obj_property>
       <obj_property name="ObjectShortName">s_axi_wvalid</obj_property>
-      <obj_property name="CustomSignalColor">#00FFFF</obj_property>
+      <obj_property name="CustomSignalColor">#808000</obj_property>
       <obj_property name="UseCustomSignalColor">true</obj_property>
    </wvobject>
    <wvobject type="logic" fp_name="/ecc_tb/e0/s_axi_wready">
       <obj_property name="ElementShortName">s_axi_wready</obj_property>
       <obj_property name="ObjectShortName">s_axi_wready</obj_property>
-      <obj_property name="CustomSignalColor">#00FFFF</obj_property>
+      <obj_property name="CustomSignalColor">#808000</obj_property>
       <obj_property name="UseCustomSignalColor">true</obj_property>
    </wvobject>
    <wvobject fp_name="divider2041" type="divider">
@@ -114,20 +114,20 @@
    <wvobject type="array" fp_name="/ecc_tb/e0/s_axi_bresp">
       <obj_property name="ElementShortName">s_axi_bresp[1:0]</obj_property>
       <obj_property name="ObjectShortName">s_axi_bresp[1:0]</obj_property>
-      <obj_property name="CustomSignalColor">#00FFFF</obj_property>
+      <obj_property name="CustomSignalColor">#808000</obj_property>
       <obj_property name="UseCustomSignalColor">true</obj_property>
       <obj_property name="Radix">BINARYRADIX</obj_property>
    </wvobject>
    <wvobject type="logic" fp_name="/ecc_tb/e0/s_axi_bvalid">
       <obj_property name="ElementShortName">s_axi_bvalid</obj_property>
       <obj_property name="ObjectShortName">s_axi_bvalid</obj_property>
-      <obj_property name="CustomSignalColor">#00FFFF</obj_property>
+      <obj_property name="CustomSignalColor">#808000</obj_property>
       <obj_property name="UseCustomSignalColor">true</obj_property>
    </wvobject>
    <wvobject type="logic" fp_name="/ecc_tb/e0/a0/s_axi_bready">
       <obj_property name="ElementShortName">s_axi_bready</obj_property>
       <obj_property name="ObjectShortName">s_axi_bready</obj_property>
-      <obj_property name="CustomSignalColor">#00FFFF</obj_property>
+      <obj_property name="CustomSignalColor">#808000</obj_property>
       <obj_property name="UseCustomSignalColor">true</obj_property>
    </wvobject>
    <wvobject fp_name="divider2041" type="divider">
@@ -138,25 +138,25 @@
    <wvobject type="array" fp_name="/ecc_tb/e0/a0/s_axi_araddr">
       <obj_property name="ElementShortName">s_axi_araddr[8:0]</obj_property>
       <obj_property name="ObjectShortName">s_axi_araddr[8:0]</obj_property>
-      <obj_property name="CustomSignalColor">#00FFFF</obj_property>
+      <obj_property name="CustomSignalColor">#808000</obj_property>
       <obj_property name="UseCustomSignalColor">true</obj_property>
    </wvobject>
    <wvobject type="array" fp_name="/ecc_tb/e0/a0/s_axi_arprot">
       <obj_property name="ElementShortName">s_axi_arprot[2:0]</obj_property>
       <obj_property name="ObjectShortName">s_axi_arprot[2:0]</obj_property>
-      <obj_property name="CustomSignalColor">#00FFFF</obj_property>
+      <obj_property name="CustomSignalColor">#808000</obj_property>
       <obj_property name="UseCustomSignalColor">true</obj_property>
    </wvobject>
    <wvobject type="logic" fp_name="/ecc_tb/e0/a0/s_axi_arvalid">
       <obj_property name="ElementShortName">s_axi_arvalid</obj_property>
       <obj_property name="ObjectShortName">s_axi_arvalid</obj_property>
-      <obj_property name="CustomSignalColor">#00FFFF</obj_property>
+      <obj_property name="CustomSignalColor">#808000</obj_property>
       <obj_property name="UseCustomSignalColor">true</obj_property>
    </wvobject>
    <wvobject type="logic" fp_name="/ecc_tb/e0/s_axi_arready">
       <obj_property name="ElementShortName">s_axi_arready</obj_property>
       <obj_property name="ObjectShortName">s_axi_arready</obj_property>
-      <obj_property name="CustomSignalColor">#00FFFF</obj_property>
+      <obj_property name="CustomSignalColor">#808000</obj_property>
       <obj_property name="UseCustomSignalColor">true</obj_property>
    </wvobject>
    <wvobject fp_name="divider2041" type="divider">
@@ -167,31 +167,26 @@
    <wvobject type="array" fp_name="/ecc_tb/e0/s_axi_rdata">
       <obj_property name="ElementShortName">s_axi_rdata[31:0]</obj_property>
       <obj_property name="ObjectShortName">s_axi_rdata[31:0]</obj_property>
-      <obj_property name="CustomSignalColor">#00FFFF</obj_property>
+      <obj_property name="CustomSignalColor">#808000</obj_property>
       <obj_property name="UseCustomSignalColor">true</obj_property>
    </wvobject>
    <wvobject type="array" fp_name="/ecc_tb/e0/s_axi_rresp">
       <obj_property name="ElementShortName">s_axi_rresp[1:0]</obj_property>
       <obj_property name="ObjectShortName">s_axi_rresp[1:0]</obj_property>
-      <obj_property name="CustomSignalColor">#00FFFF</obj_property>
+      <obj_property name="CustomSignalColor">#808000</obj_property>
       <obj_property name="UseCustomSignalColor">true</obj_property>
+      <obj_property name="Radix">BINARYRADIX</obj_property>
    </wvobject>
    <wvobject type="logic" fp_name="/ecc_tb/e0/s_axi_rvalid">
       <obj_property name="ElementShortName">s_axi_rvalid</obj_property>
       <obj_property name="ObjectShortName">s_axi_rvalid</obj_property>
-      <obj_property name="CustomSignalColor">#00FFFF</obj_property>
+      <obj_property name="CustomSignalColor">#808000</obj_property>
       <obj_property name="UseCustomSignalColor">true</obj_property>
    </wvobject>
    <wvobject type="logic" fp_name="/ecc_tb/e0/a0/s_axi_rready">
       <obj_property name="ElementShortName">s_axi_rready</obj_property>
       <obj_property name="ObjectShortName">s_axi_rready</obj_property>
-      <obj_property name="CustomSignalColor">#00FFFF</obj_property>
-      <obj_property name="UseCustomSignalColor">true</obj_property>
-   </wvobject>
-   <wvobject type="logic" fp_name="/ecc_tb/e0/c0/clk">
-      <obj_property name="ElementShortName">clk</obj_property>
-      <obj_property name="ObjectShortName">clk</obj_property>
-      <obj_property name="CustomSignalColor">#FFFF00</obj_property>
+      <obj_property name="CustomSignalColor">#808000</obj_property>
       <obj_property name="UseCustomSignalColor">true</obj_property>
    </wvobject>
    <wvobject fp_name="divider2041" type="divider">
@@ -203,7 +198,7 @@
       <obj_property name="DisplayName">label</obj_property>
       <obj_property name="ElementShortName">.active</obj_property>
       <obj_property name="ObjectShortName">.active</obj_property>
-      <obj_property name="CustomSignalColor">#F0E68C</obj_property>
+      <obj_property name="CustomSignalColor">#008000</obj_property>
       <obj_property name="UseCustomSignalColor">true</obj_property>
       <obj_property name="label">r.ctrl.active</obj_property>
    </wvobject>
@@ -211,7 +206,7 @@
       <obj_property name="DisplayName">label</obj_property>
       <obj_property name="ElementShortName">.state</obj_property>
       <obj_property name="ObjectShortName">.state</obj_property>
-      <obj_property name="CustomSignalColor">#F0E68C</obj_property>
+      <obj_property name="CustomSignalColor">#008000</obj_property>
       <obj_property name="UseCustomSignalColor">true</obj_property>
       <obj_property name="label">r.ctrl.state (&apos;main&apos; FSM)</obj_property>
    </wvobject>
@@ -220,7 +215,7 @@
       <obj_property name="ElementShortName">.computing</obj_property>
       <obj_property name="ObjectShortName">.computing</obj_property>
       <obj_property name="label">r.kp.computing</obj_property>
-      <obj_property name="CustomSignalColor">#F0E68C</obj_property>
+      <obj_property name="CustomSignalColor">#008000</obj_property>
       <obj_property name="UseCustomSignalColor">true</obj_property>
    </wvobject>
    <wvobject type="other" fp_name="/ecc_tb/e0/s0/r.kp.substate">
@@ -228,7 +223,7 @@
       <obj_property name="ElementShortName">.substate</obj_property>
       <obj_property name="ObjectShortName">.substate</obj_property>
       <obj_property name="label">r.kp.substate (&apos;programs&apos; FSM)</obj_property>
-      <obj_property name="CustomSignalColor">#F0E68C</obj_property>
+      <obj_property name="CustomSignalColor">#008000</obj_property>
       <obj_property name="UseCustomSignalColor">true</obj_property>
    </wvobject>
    <wvobject type="logic" fp_name="/ecc_tb/e0/s0/r.mty.computing">
@@ -236,33 +231,25 @@
       <obj_property name="ElementShortName">.computing</obj_property>
       <obj_property name="ObjectShortName">.computing</obj_property>
       <obj_property name="label">r.mty.computing</obj_property>
-      <obj_property name="CustomSignalColor">#F0E68C</obj_property>
+      <obj_property name="CustomSignalColor">#008000</obj_property>
       <obj_property name="UseCustomSignalColor">true</obj_property>
    </wvobject>
    <wvobject type="array" fp_name="/ecc_tb/e0/s0/r.kp.joye.nbbits">
       <obj_property name="DisplayName">label</obj_property>
-      <obj_property name="ElementShortName">.nbbits[10:0]</obj_property>
-      <obj_property name="ObjectShortName">.nbbits[10:0]</obj_property>
+      <obj_property name="ElementShortName">.nbbits[9:0]</obj_property>
+      <obj_property name="ObjectShortName">.nbbits[9:0]</obj_property>
       <obj_property name="label">r.kp.joye.nbbits[8:0]</obj_property>
-      <obj_property name="CustomSignalColor">#F0E68C</obj_property>
+      <obj_property name="CustomSignalColor">#008000</obj_property>
       <obj_property name="UseCustomSignalColor">true</obj_property>
       <obj_property name="Radix">UNSIGNEDDECRADIX</obj_property>
-   </wvobject>
-   <wvobject type="other" fp_name="/ecc_tb/e0/s0/r.sim.simbit">
-      <obj_property name="DisplayName">label</obj_property>
-      <obj_property name="ElementShortName">.simbit</obj_property>
-      <obj_property name="ObjectShortName">.simbit</obj_property>
-      <obj_property name="CustomSignalColor">#F0E68C</obj_property>
-      <obj_property name="UseCustomSignalColor">true</obj_property>
-      <obj_property name="label">r.sim.simbit</obj_property>
    </wvobject>
    <wvobject type="array" fp_name="/ecc_tb/e0/s0/r.dbg.joyebit">
       <obj_property name="DisplayName">label</obj_property>
-      <obj_property name="ElementShortName">.joyebit[9:0]</obj_property>
-      <obj_property name="ObjectShortName">.joyebit[9:0]</obj_property>
+      <obj_property name="ElementShortName">.joyebit[8:0]</obj_property>
+      <obj_property name="ObjectShortName">.joyebit[8:0]</obj_property>
       <obj_property name="label">r.dbg.joyebit[10:0]</obj_property>
       <obj_property name="Radix">UNSIGNEDDECRADIX</obj_property>
-      <obj_property name="CustomSignalColor">#F0E68C</obj_property>
+      <obj_property name="CustomSignalColor">#008000</obj_property>
       <obj_property name="UseCustomSignalColor">true</obj_property>
    </wvobject>
    <wvobject type="other" fp_name="/ecc_tb/e0/s0/r.kp.joye.state">
@@ -270,7 +257,7 @@
       <obj_property name="ElementShortName">.state</obj_property>
       <obj_property name="ObjectShortName">.state</obj_property>
       <obj_property name="label">r.kp.joye.state &apos;coZ&apos; FSM</obj_property>
-      <obj_property name="CustomSignalColor">#F0E68C</obj_property>
+      <obj_property name="CustomSignalColor">#008000</obj_property>
       <obj_property name="UseCustomSignalColor">true</obj_property>
    </wvobject>
    <wvobject fp_name="divider2041" type="divider">
