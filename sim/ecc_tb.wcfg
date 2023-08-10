@@ -22,15 +22,15 @@
       </db_ref>
    </db_ref_list>
    <zoom_setting>
-      <ZoomStartTime time="0.000000000 ms"></ZoomStartTime>
-      <ZoomEndTime time="10.681815683 ms"></ZoomEndTime>
-      <Cursor1Time time="0.000365000 ms"></Cursor1Time>
+      <ZoomStartTime time="0.000000 us"></ZoomStartTime>
+      <ZoomEndTime time="8,535.000001 us"></ZoomEndTime>
+      <Cursor1Time time="395.268000 us"></Cursor1Time>
    </zoom_setting>
    <column_width_setting>
       <NameColumnWidth column_width="278"></NameColumnWidth>
-      <ValueColumnWidth column_width="83"></ValueColumnWidth>
+      <ValueColumnWidth column_width="79"></ValueColumnWidth>
    </column_width_setting>
-   <WVObjectSize size="44" />
+   <WVObjectSize size="43" />
    <wvobject fp_name="divider2041" type="divider">
       <obj_property name="label">AXI interface</obj_property>
       <obj_property name="DisplayName">label</obj_property>
@@ -199,16 +199,13 @@
       <obj_property name="DisplayName">label</obj_property>
       <obj_property name="BkColor">#000000</obj_property>
    </wvobject>
-   <wvobject fp_name="divider2041" type="divider">
-      <obj_property name="label">r.ctrl</obj_property>
-      <obj_property name="DisplayName">label</obj_property>
-      <obj_property name="BkColor">#000000</obj_property>
-   </wvobject>
    <wvobject type="logic" fp_name="/ecc_tb/e0/s0/r.ctrl.active">
+      <obj_property name="DisplayName">label</obj_property>
       <obj_property name="ElementShortName">.active</obj_property>
       <obj_property name="ObjectShortName">.active</obj_property>
       <obj_property name="CustomSignalColor">#F0E68C</obj_property>
       <obj_property name="UseCustomSignalColor">true</obj_property>
+      <obj_property name="label">r.ctrl.active</obj_property>
    </wvobject>
    <wvobject type="other" fp_name="/ecc_tb/e0/s0/r.ctrl.state">
       <obj_property name="DisplayName">label</obj_property>
@@ -216,7 +213,7 @@
       <obj_property name="ObjectShortName">.state</obj_property>
       <obj_property name="CustomSignalColor">#F0E68C</obj_property>
       <obj_property name="UseCustomSignalColor">true</obj_property>
-      <obj_property name="label">.state (&apos;main&apos; FSM)</obj_property>
+      <obj_property name="label">r.ctrl.state (&apos;main&apos; FSM)</obj_property>
    </wvobject>
    <wvobject type="logic" fp_name="/ecc_tb/e0/s0/r.kp.computing">
       <obj_property name="DisplayName">label</obj_property>
@@ -290,7 +287,7 @@
       <obj_property name="DisplayName">label</obj_property>
       <obj_property name="ElementShortName">.rdy</obj_property>
       <obj_property name="ObjectShortName">.rdy</obj_property>
-      <obj_property name="label">    .rdy</obj_property>
+      <obj_property name="label">r.decode.rdy</obj_property>
       <obj_property name="CustomSignalColor">#FFA500</obj_property>
       <obj_property name="UseCustomSignalColor">true</obj_property>
    </wvobject>
@@ -298,7 +295,7 @@
       <obj_property name="DisplayName">label</obj_property>
       <obj_property name="ElementShortName">.state</obj_property>
       <obj_property name="ObjectShortName">.state</obj_property>
-      <obj_property name="label">    .state</obj_property>
+      <obj_property name="label">r.decode.state</obj_property>
       <obj_property name="CustomSignalColor">#FFA500</obj_property>
       <obj_property name="UseCustomSignalColor">true</obj_property>
    </wvobject>
@@ -306,7 +303,7 @@
       <obj_property name="DisplayName">label</obj_property>
       <obj_property name="ElementShortName">.pc[8:0]</obj_property>
       <obj_property name="ObjectShortName">.pc[8:0]</obj_property>
-      <obj_property name="label">    .pc[8:0]</obj_property>
+      <obj_property name="label">r.decode.pc[8:0]</obj_property>
       <obj_property name="CustomSignalColor">#FF0000</obj_property>
       <obj_property name="UseCustomSignalColor">true</obj_property>
    </wvobject>
