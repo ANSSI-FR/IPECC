@@ -1,0 +1,46 @@
+== NEW CURVE #0
+nn=21
+p=0x1ce54b
+a=0x0ec20f
+b=0x1bb973
+q=0x1ce256
+== TEST [k]P #0.0
+Px=0x00851a
+Py=0x0a0e0f
+k=0x1c0ac1
+nbbld=14
+kPx=0x0acc93
+kPy=0x0e007f
+== TEST P+Q #0.1
+Px=0x0e58a7
+Py=0x0b0eb7
+Qx=0x07136d
+Qy=0x032a06
+PplusQx=0x0c11ee
+PplusQy=0x07c882
+== TEST [2]P #0.2
+Px=0x0adc61
+Py=0x14fae0
+twoPx=0x1462de
+twoPy=0x0cfb3a
+== TEST -P #0.3
+Px=0x0a3f63
+Py=0x16043d
+negPx=0x0a3f63
+negPy=0x06e10e
+== TEST isPoncurve #0.4
+Px=0x041730
+Py=0x19233e
+false
+== TEST isP==Q #0.5
+Px=0x01abef
+Py=0x040c8d
+Qx=0x0e2427
+Qy=0x037216
+false
+== TEST isP==-Q #0.6
+Px=0x123a44
+Py=0x18f264
+Qx=0x123a44
+Qy=0x03f2e7
+true

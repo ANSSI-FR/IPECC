@@ -1,5 +1,20 @@
 #!/usr/bin/env sage
 
+#
+#  Copyright (C) 2023 - This file is part of IPECC project
+#
+#  Authors:
+#      Karim KHALFALLAH <karim.khalfallah@ssi.gouv.fr>
+#      Ryad BENADJILA <ryadbenadjila@gmail.com>
+#
+#  Contributors:
+#      Adrian THILLARD
+#      Emmanuel PROUFF
+#
+#  This software is licensed under GPL v2 license.
+#  See LICENSE file at the root folder of the project.
+#
+
 import random
 import sys
 from os.path import getsize

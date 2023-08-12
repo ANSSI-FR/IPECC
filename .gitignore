@@ -27,3 +27,5 @@ test_standalone
 test_uio
 *.tar.gz
 *.sage.py
+sage/kpsage.py
+sage/__pycache__
