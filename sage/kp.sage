@@ -305,8 +305,9 @@ def display_coord_of_R0_and_R1(msg, XR0, YR0, XR1, YR1, ZR01, r0z, r1z, padd, en
 ################
 
 def main(nn, p, a, b, q, Px, Py, P_is_null, k, alpha0, nbblindbits,
-        mu0, mu1, phi0, phi1, lambd, ww, bb):
+        mu0, mu1, phi0, phi1, lambd, ww):
     global XR0, YR0, XR1, YR1, XmXC, YmY, G, ZR01, aR, bR
+    bb=2*ww
     # prime field definition
     Fp = GF(p)
     # curve definition
