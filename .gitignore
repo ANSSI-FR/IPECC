@@ -29,3 +29,4 @@ test_uio
 *.sage.py
 sage/kpsage.py
 sage/__pycache__
+sage/kp*.py
