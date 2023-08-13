@@ -392,11 +392,13 @@ architecture rtl of ecc_fp is
 		end if;
 	end function div4;
 
-	procedure is_new_routine(lineo: inout line;
-		pca: in std_logic_vector; newprg: inout boolean) is
+	procedure is_new_routine(
+		lineo: inout line;
+		pca: in std_logic_vector;
+		fileo: out TEXT)
+	is
 		variable v_pca : std_logic_vector(IRAM_ADDR_SZ - 1 downto 0);
 	begin
-		newprg := FALSE;
 		v_pca := pca(IRAM_ADDR_SZ - 1 downto 0);
 		-- write() function from STD.textio package is overloaded, which is
 		-- the reason for the string' attribute appearing several times below
@@ -406,129 +408,229 @@ architecture rtl of ecc_fp is
 			write(lineo, string'(".constMTY0L [0x"));
 			hex_write(lineo, pca);
 			write(lineo, string'("]"));
-			newprg := TRUE;
-		elsif v_pca = ECC_IRAM_CONSTMTY1_ADDR then
+			writeline(fileo, lineo);
+		end if;
+		if v_pca = ECC_IRAM_CONSTMTY1_ADDR then
 			write(lineo, string'(".constMTY1L [0x"));
 			hex_write(lineo, pca);
 			write(lineo, string'("]"));
-			newprg := TRUE;
-		elsif v_pca = ECC_IRAM_CONSTMTY2_ADDR then
+			writeline(fileo, lineo);
+		end if;
+		if v_pca = ECC_IRAM_CONSTMTY2_ADDR then
 			write(lineo, string'(".constMTY2L [0x"));
 			hex_write(lineo, pca);
 			write(lineo, string'("]"));
-			newprg := TRUE;
-		elsif v_pca = ECC_IRAM_AMONTY_ADDR then
+			writeline(fileo, lineo);
+		end if;
+		if v_pca = ECC_IRAM_AMONTY_ADDR then
 			write(lineo, string'(".aMontyL [0x"));
 			hex_write(lineo, pca);
 			write(lineo, string'("]"));
-			newprg := TRUE;
-		elsif v_pca = ECC_IRAM_CHKCURVE_ADDR then
+			writeline(fileo, lineo);
+		end if;
+		if v_pca = ECC_IRAM_CHKCURVE_ADDR then
 			write(lineo, string'(".chkcurveL [0x"));
 			hex_write(lineo, pca);
 			write(lineo, string'("]"));
-			newprg := TRUE;
-		elsif v_pca = ECC_IRAM_BLINDSTART_ADDR then
+			writeline(fileo, lineo);
+		end if;
+		if v_pca = ECC_IRAM_BLINDSTART_ADDR then
 			write(lineo, string'(".blindstartL [0x"));
 			hex_write(lineo, pca);
 			write(lineo, string'("]"));
-			newprg := TRUE;
-		elsif v_pca = ECC_IRAM_BLNBIT_ADDR then
+			writeline(fileo, lineo);
+		end if;
+		if v_pca = ECC_IRAM_RANDOM_ALPHA_ADDR then
+			write(lineo, string'(".random_alphaL [0x"));
+			hex_write(lineo, pca);
+			write(lineo, string'("]"));
+			writeline(fileo, lineo);
+		end if;
+		if v_pca = ECC_IRAM_BLNBIT_ADDR then
 			write(lineo, string'(".blnbitL [0x"));
 			hex_write(lineo, pca);
 			write(lineo, string'("]"));
-			newprg := TRUE;
-		elsif v_pca = ECC_IRAM_BLINDSTOP_ADDR then
+			writeline(fileo, lineo);
+		end if;
+		if v_pca = ECC_IRAM_BLINDSTOP_ADDR then
 			write(lineo, string'(".blindstopL [0x"));
 			hex_write(lineo, pca);
 			write(lineo, string'("]"));
-			newprg := TRUE;
-		elsif v_pca = ECC_IRAM_ADPA_ADDR then
+			writeline(fileo, lineo);
+		end if;
+		if v_pca = ECC_IRAM_RANDOM_MU_ADDR then
+			write(lineo, string'(".random_muL [0x"));
+			hex_write(lineo, pca);
+			write(lineo, string'("]"));
+			writeline(fileo, lineo);
+		end if;
+		if v_pca = ECC_IRAM_ADPA_ADDR then
 			write(lineo, string'(".adpaL [0x"));
 			hex_write(lineo, pca);
 			write(lineo, string'("]"));
-			newprg := TRUE;
-		elsif v_pca = ECC_IRAM_DRAWZ_ADDR then
+			writeline(fileo, lineo);
+		end if;
+		if v_pca = ECC_IRAM_RANDOM_PHI_ADDR then
+			write(lineo, string'(".random_phiL [0x"));
+			hex_write(lineo, pca);
+			write(lineo, string'("]"));
+			writeline(fileo, lineo);
+		end if;
+		if v_pca = ECC_IRAM_DRAWZ_ADDR then
 			write(lineo, string'(".drawZL [0x"));
 			hex_write(lineo, pca);
 			write(lineo, string'("]"));
-			newprg := TRUE;
-		elsif v_pca = ECC_IRAM_SETUP_ADDR then
+			writeline(fileo, lineo);
+		end if;
+		if v_pca = ECC_IRAM_RANDOM_LAMBDA_ADDR then
+			write(lineo, string'(".random_lambdaL [0x"));
+			hex_write(lineo, pca);
+			write(lineo, string'("]"));
+			writeline(fileo, lineo);
+		end if;
+		if v_pca = ECC_IRAM_SETUP_ADDR then
 			write(lineo, string'(".setupL [0x"));
 			hex_write(lineo, pca);
 			write(lineo, string'("]"));
-			newprg := TRUE;
-		elsif v_pca = ECC_IRAM_ITOH_ADDR then
+			writeline(fileo, lineo);
+		end if;
+		if v_pca = ECC_IRAM_DOUBLE_ADDR then
+			write(lineo, string'(".doubleL [0x"));
+			hex_write(lineo, pca);
+			write(lineo, string'("]"));
+			writeline(fileo, lineo);
+		end if;
+		if v_pca = ECC_IRAM_ITOH_ADDR then
 			write(lineo, string'(".itohL [0x"));
 			hex_write(lineo, pca);
 			write(lineo, string'("]"));
-			newprg := TRUE;
-		elsif v_pca = ECC_IRAM_PRE_ZADDU_ADDR then
+			writeline(fileo, lineo);
+		end if;
+		if v_pca = ECC_IRAM_PRE_ZADDU_ADDR then
 			write(lineo, string'(".pre_zadduL [0x"));
 			hex_write(lineo, pca);
 			write(lineo, string'("]"));
-			newprg := TRUE;
-		elsif v_pca = ECC_IRAM_ZADDU_ADDR then
+			writeline(fileo, lineo);
+		end if;
+		if v_pca = ECC_IRAM_ZADDU_ADDR then
 			write(lineo, string'(".zadduL [0x"));
 			hex_write(lineo, pca);
 			write(lineo, string'("]"));
-			newprg := TRUE;
-		elsif v_pca = ECC_IRAM_PRE_ZADDC_ADDR then
+			writeline(fileo, lineo);
+		end if;
+		if v_pca = ECC_IRAM_PRE_ZADDC_ADDR then
 			write(lineo, string'(".pre_zaddcL [0x"));
 			hex_write(lineo, pca);
 			write(lineo, string'("]"));
-			newprg := TRUE;
-		elsif v_pca = ECC_IRAM_ZADDC_ADDR then
+			writeline(fileo, lineo);
+		end if;
+		if v_pca = ECC_IRAM_ZADDC_ADDR then
 			write(lineo, string'(".zaddcL [0x"));
 			hex_write(lineo, pca);
 			write(lineo, string'("]"));
-			newprg := TRUE;
-		elsif v_pca = ECC_IRAM_SUBTRACTP_ADDR then
+			writeline(fileo, lineo);
+		end if;
+		if v_pca = ECC_IRAM_SUBTRACTP_ADDR then
 			write(lineo, string'(".subtractpL [0x"));
 			hex_write(lineo, pca);
 			write(lineo, string'("]"));
-			newprg := TRUE;
-		elsif v_pca = ECC_IRAM_EXIT_ADDR then
+			writeline(fileo, lineo);
+		end if;
+		if v_pca = ECC_IRAM_EXIT_ADDR then
 			write(lineo, string'(".exitL [0x"));
 			hex_write(lineo, pca);
 			write(lineo, string'("]"));
-			newprg := TRUE;
-		elsif v_pca = ECC_IRAM_ZDBL_ADDR then
-			write(lineo, string'(".zdblL [0x"));
+			writeline(fileo, lineo);
+		end if;
+		if v_pca = ECC_IRAM_EUCINV_ADDR then
+			write(lineo, string'(".eucinvL [0x"));
 			hex_write(lineo, pca);
 			write(lineo, string'("]"));
-			newprg := TRUE;
-		elsif v_pca = ECC_IRAM_ZNEGC_ADDR then
-			write(lineo, string'(".znegcL [0x"));
+			writeline(fileo, lineo);
+		end if;
+		if v_pca = ECC_IRAM_MODINV_ADDR then
+			write(lineo, string'(".modinvL [0x"));
 			hex_write(lineo, pca);
 			write(lineo, string'("]"));
-			newprg := TRUE;
-		elsif v_pca = ECC_IRAM_ADDITION_BEGIN_ADDR then
+			writeline(fileo, lineo);
+		end if;
+		if v_pca = ECC_IRAM_ADDITION_BEGIN_ADDR then
 			write(lineo, string'(".addition_beginL [0x"));
 			hex_write(lineo, pca);
 			write(lineo, string'("]"));
-			newprg := TRUE;
-		elsif v_pca = ECC_IRAM_ADDITION_END_ADDR then
+			writeline(fileo, lineo);
+		end if;
+		if v_pca = ECC_IRAM_ADDITION_END_ADDR then
 			write(lineo, string'(".addition_endL [0x"));
 			hex_write(lineo, pca);
 			write(lineo, string'("]"));
-			newprg := TRUE;
-		elsif v_pca = ECC_IRAM_GET_TOKEN_ADDR then
+			writeline(fileo, lineo);
+		end if;
+		if v_pca = ECC_IRAM_ZDBL_SW_ADDR then
+			write(lineo, string'(".zdbl_swL [0x"));
+			hex_write(lineo, pca);
+			write(lineo, string'("]"));
+			writeline(fileo, lineo);
+		end if;
+		if v_pca = ECC_IRAM_NEGATIVE_ADDR then
+			write(lineo, string'(".nagativeL [0x"));
+			hex_write(lineo, pca);
+			write(lineo, string'("]"));
+			writeline(fileo, lineo);
+		end if;
+		if v_pca = ECC_IRAM_EQUALX_ADDR then
+			write(lineo, string'(".equalXL [0x"));
+			hex_write(lineo, pca);
+			write(lineo, string'("]"));
+			writeline(fileo, lineo);
+		end if;
+		if v_pca = ECC_IRAM_EQUALY_ADDR then
+			write(lineo, string'(".equalYL [0x"));
+			hex_write(lineo, pca);
+			write(lineo, string'("]"));
+			writeline(fileo, lineo);
+		end if;
+		if v_pca = ECC_IRAM_OPPOSITEY_ADDR then
+			write(lineo, string'(".oppositeYL [0x"));
+			hex_write(lineo, pca);
+			write(lineo, string'("]"));
+			writeline(fileo, lineo);
+		end if;
+		if v_pca = ECC_IRAM_IS_ON_CURVE_ADDR then
+			write(lineo, string'(".is_on_curveL [0x"));
+			hex_write(lineo, pca);
+			write(lineo, string'("]"));
+			writeline(fileo, lineo);
+		end if;
+		if v_pca = ECC_IRAM_ZDBL_ADDR then
+			write(lineo, string'(".zdblL [0x"));
+			hex_write(lineo, pca);
+			write(lineo, string'("]"));
+			writeline(fileo, lineo);
+		end if;
+		if v_pca = ECC_IRAM_ZNEGC_ADDR then
+			write(lineo, string'(".znegcL [0x"));
+			hex_write(lineo, pca);
+			write(lineo, string'("]"));
+			writeline(fileo, lineo);
+		end if;
+		if v_pca = ECC_IRAM_GET_TOKEN_ADDR then
 			write(lineo, string'(".get_tokenL [0x"));
 			hex_write(lineo, pca);
 			write(lineo, string'("]"));
-			newprg := TRUE;
-		elsif v_pca = ECC_IRAM_TOKEN_KP_MASK_ADDR then
+			writeline(fileo, lineo);
+		end if;
+		if v_pca = ECC_IRAM_TOKEN_KP_MASK_ADDR then
 			write(lineo, string'(".token_kp_maskL [0x"));
 			hex_write(lineo, pca);
 			write(lineo, string'("]"));
-			newprg := TRUE;
-		elsif v_pca = ECC_IRAM_ZREMASK_ADDR then
+			writeline(fileo, lineo);
+		end if;
+		if v_pca = ECC_IRAM_ZREMASK_ADDR then
 			write(lineo, string'(".ZremaskL [0x"));
 			hex_write(lineo, pca);
 			write(lineo, string'("]"));
-			newprg := TRUE;
-		else
-			newprg := FALSE;
+			writeline(fileo, lineo);
 		end if;
 	end procedure is_new_routine;
 
@@ -2379,10 +2481,10 @@ begin
 						else
 							redc_2nd_input_s <= TRUE;
 							newprg := FALSE;
-							is_new_routine(lineout, pc, newprg);
-							if newprg then
-								writeline(output, lineout);
-							end if;
+							is_new_routine(lineout, pc, output);
+							--if newprg then
+							--	writeline(output, lineout);
+							--end if;
 						end if;
 						write(lineout, string'("[0x"));
 						hex_write(lineout, pc);
@@ -2448,7 +2550,7 @@ begin
 							vi := vi + 1;
 							if vi = vw then
 								newprg := FALSE;
-								is_new_routine(lineout, pc, newprg);
+								is_new_routine(lineout, pc, output);
 								if newprg then
 									writeline(output, lineout);
 								end if;
@@ -2507,7 +2609,7 @@ begin
 							if vi = vw then
 								-- last word is being written, log out whole result on console
 								newprg := FALSE;
-								is_new_routine(lineout, pc, newprg);
+								is_new_routine(lineout, pc, output);
 								if newprg then
 									writeline(output, lineout);
 								end if;
@@ -2555,7 +2657,7 @@ begin
 								if vi = vw then
 									-- last word is being written, log out whole result on console
 									newprg := FALSE;
-									is_new_routine(lineout, pc, newprg);
+									is_new_routine(lineout, pc, output);
 									if newprg then
 										writeline(output, lineout);
 									end if;
@@ -2597,7 +2699,7 @@ begin
 								vi := vi + 1;
 								if vi = vw then
 									newprg := FALSE;
-									is_new_routine(lineout, pc, newprg);
+									is_new_routine(lineout, pc, output);
 									if newprg then
 										writeline(output, lineout);
 									end if;
@@ -2640,7 +2742,7 @@ begin
 								vi := vi + 1;
 								if vi = vw then
 									newprg := FALSE;
-									is_new_routine(lineout, pc, newprg);
+									is_new_routine(lineout, pc, output);
 									if newprg then
 										writeline(output, lineout);
 									end if;
@@ -2681,7 +2783,7 @@ begin
 					-- --------------------------
 					if r.par.sh(0) = '1' then
 						newprg := FALSE;
-						is_new_routine(lineout, pc, newprg);
+						is_new_routine(lineout, pc, output);
 						if newprg then
 							writeline(output, lineout);
 						end if;
@@ -2753,7 +2855,7 @@ begin
 							vi := vi + 1;
 							if vi = vw then
 								newprg := FALSE;
-								is_new_routine(lineout, pc, newprg);
+								is_new_routine(lineout, pc, output);
 								if newprg then
 									writeline(output, lineout);
 								end if;
@@ -2795,7 +2897,7 @@ begin
 				-- --------------------
 				if rblog.b = '1' and rblogbak.b = '0' then
 					newprg := FALSE;
-					is_new_routine(lineout, pc, newprg);
+					is_new_routine(lineout, pc, output);
 					if newprg then
 						writeline(output, lineout);
 					end if;
@@ -2823,7 +2925,7 @@ begin
 				-- ---------------------
 				elsif rblog.bz = '1' and rblogbak.bz = '0' then
 					newprg := FALSE;
-					is_new_routine(lineout, pc, newprg);
+					is_new_routine(lineout, pc, output);
 					if newprg then
 						writeline(output, lineout);
 					end if;
@@ -2851,7 +2953,7 @@ begin
 				-- ----------------------
 				elsif rblog.bsn = '1' and rblogbak.bsn = '0' then
 					newprg := FALSE;
-					is_new_routine(lineout, pc, newprg);
+					is_new_routine(lineout, pc, output);
 					if newprg then
 						writeline(output, lineout);
 					end if;
@@ -2879,7 +2981,7 @@ begin
 				-- -----------------------
 				elsif rblog.bodd = '1' and rblogbak.bodd = '0' then
 					newprg := FALSE;
-					is_new_routine(lineout, pc, newprg);
+					is_new_routine(lineout, pc, output);
 					if newprg then
 						writeline(output, lineout);
 					end if;
@@ -2907,7 +3009,7 @@ begin
 				-- ---------------------
 				elsif rblog.call = '1' and rblogbak.call = '0' then
 					newprg := FALSE;
-					is_new_routine(lineout, pc, newprg);
+					is_new_routine(lineout, pc, output);
 					if newprg then
 						writeline(output, lineout);
 					end if;
@@ -2935,7 +3037,7 @@ begin
 				-- -----------------------
 				elsif rblog.callsn = '1' and rblogbak.callsn = '0' then
 					newprg := FALSE;
-					is_new_routine(lineout, pc, newprg);
+					is_new_routine(lineout, pc, output);
 					if newprg then
 						writeline(output, lineout);
 					end if;
@@ -2963,7 +3065,7 @@ begin
 				-- ----------------------
 				elsif rblog.ret = '1' and rblogbak.ret = '0' then
 					newprg := FALSE;
-					is_new_routine(lineout, pc, newprg);
+					is_new_routine(lineout, pc, output);
 					if newprg then
 						writeline(output, lineout);
 					end if;
@@ -2992,7 +3094,7 @@ begin
 				-- ======================
 				elsif rblog.nop = '1' and rblogbak.nop = '0' then
 					newprg := FALSE;
-					is_new_routine(lineout, pc, newprg);
+					is_new_routine(lineout, pc, output);
 					if newprg then
 						writeline(output, lineout);
 					end if;

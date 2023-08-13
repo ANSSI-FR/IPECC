@@ -18,6 +18,8 @@
 # generate lambda random value (Z-mask)
 # ****************************************************************
 	BARRIER
+.random_lambdaL:
+.random_lambdaL_export:
 	NNRNDm			lambda
 	NNSUB	lambda	p	red
 	NNADD,p4	red	patchme	lambda

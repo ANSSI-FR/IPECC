@@ -19,6 +19,8 @@
 # *******************************************************************
 	BARRIER
 	NNCLR			alf
+.random_phiL:
+.random_phiL_export:
 	NNRND			phi0
 	NNRND			phi1
 .savekb0L:

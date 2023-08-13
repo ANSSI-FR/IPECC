@@ -19,6 +19,8 @@
 	BARRIER
 	NNMOV	kb0		kb0
 	NNMOV	kb1		kb1
+.random_alphaL:
+.random_alphaL_export:
 	NNRND			alf
 	NNMOV	q		qsh0
 	NNCLR			qsh1
@@ -57,6 +59,8 @@
 	NNCLR			m0
 	NNCLR			m1
 # switch to a logical mask
+.random_muL:
+.random_muL_export:
 	NNRND			mu0
 	TESTPAR	mu0		%mu0
 	NNRND			mu1
