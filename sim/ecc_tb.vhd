@@ -747,28 +747,23 @@ begin
 		-- Enable the post-processing unit from reading raw random bytes.
 		debug_trng_pp_start_pulling_raw(s_axi_aclk, axi0, axo0);
 
-		nbbld := 0;
-		op := OP_NONE;
-		line_type_expected := EXPECT_NONE;
-		stats_ok := 0;
-		stats_nok := 0;
-		stats_total := 0;
-
-		--
+		-- End of IP initialization & config
+		-- -----------------------------------------------------------------
 		-- Main infinite loop, getting lines from input file 'simvecfile'
-		-- (parameter defined in ecc_customize.vhd).
-		--
-		echol("[     ecc_tb.vhd ]: Reading test-vectors from input file: """
-			& simvecfile & """");
-
-		--
-		-- Main infinite loop, parsing lines from standard input to extract:
+		-- (parameter defined in ecc_customize.vhd) to extract:
 		--   - input vectors
 		--   - type of operation
 		--   - expected result,
 		-- then have the same computation done by RTL of DuT, and then check
 		-- the result of simulated hardware against the expected one.
-		--
+		-- -----------------------------------------------------------------
+
+		echol("[     ecc_tb.vhd ]: Reading test-vectors from input file: """
+			& simvecfile & """");
+
+		nbbld := 0; op := OP_NONE; line_type_expected := EXPECT_NONE;
+		stats_ok := 0; stats_nok := 0; stats_total := 0;
+
 		while not endfile(fvin) loop
 			-- Read a new line from input test-vectors file.
 			readline(fvin, tline);
