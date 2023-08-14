@@ -31,4 +31,4 @@ sage/kpsage.py
 sage/__pycache__
 sage/kp*.py
 .tar.gz
-.tar.gz.md5sum
+*.tar.gz.md5sum
