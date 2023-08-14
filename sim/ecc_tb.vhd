@@ -748,6 +748,7 @@ begin
 		debug_trng_pp_start_pulling_raw(s_axi_aclk, axi0, axo0);
 
 		-- End of IP initialization & config
+
 		-- -----------------------------------------------------------------
 		-- Main infinite loop, getting lines from input file 'simvecfile'
 		-- (parameter defined in ecc_customize.vhd) to extract:
