@@ -199,7 +199,8 @@ architecture rtl of ecc_trng is
 begin
 
 	t0: if notrng = FALSE generate
-		-- ES-TRNG: real physical entropy source based on Xilinx LUTs & DFFs
+		-- 'ES-TRNG': real physical entropy source described structurally with
+		-- Xilinx low-level primitives (LUTs & DFFs) and combinational loops.
 		t0: es_trng
 			port map(
 				clk => clk,
@@ -223,8 +224,8 @@ begin
 
 	-- pragma translate_off
 	t1: if notrng = TRUE generate
-		-- es_trng_sim reads randomness from local file
-		-- and provide them to ecc_trng_pp
+		-- 'es_trng_sim' reads randomness from local file
+		-- and provides them to 'ecc_trng_pp'
 		t0: es_trng_sim
 			port map(
 				clk => clk,
