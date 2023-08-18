@@ -48,12 +48,12 @@ architecture syn of virt_to_phys_async is
 	--type mem_content_type is array(integer range 0 to datadepth - 1)
 	--	of std_ram_word;
 
-	-- if FPGA technology does not support the initialization of memory at
+	-- If FPGA technology does not support the initialization of memory at
 	-- configuration time, or if you're targeting an ASIC, a small amount of
 	-- logic should be added to write Identity permutation into memory at
 	-- reset time (actually it is so small we could add the feature whatever
 	-- the target). This means writing 0 at address 0, 1 at address 1, 2 at
-	-- address 2, etc until the top word in memory
+	-- address 2, etc until the top word in memory.
 	function init_vp_ram return virt_to_phys_table_type is
 		variable m : virt_to_phys_table_type;
 	begin
@@ -73,8 +73,8 @@ begin
 	process(clk)
 	begin
 		if (clk'event and clk = '1') then
-			-- (in simulation, only affects array content if no METAVALUE in rwaddra)
-			-- otherwise issue a WARNING message
+			-- In simulation, only affects array content if no METAVALUE in rwaddra
+			-- otherwise issue a WARNING message.
 			if (we = '1') then
 				assert(not is_X(waddr))
 					report "write to virt_to_phys_async with a METAVALUE address"
@@ -89,7 +89,7 @@ begin
 	-- --------------------------
 	process(raddr, re)
 	begin
-		-- (in simulation returns 'force unknown' ('X') if METAVALUE in raddrb)
+		-- In simulation returns 'force unknown' ('X') if METAVALUE in raddrb.
 		if (re = '1') then
 			-- pragma translate_off
 			if is_X(raddr) then

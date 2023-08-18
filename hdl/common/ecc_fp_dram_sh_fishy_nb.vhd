@@ -183,38 +183,38 @@ architecture syn of ecc_fp_dram_sh_fishy_nb is
 begin
 
 	-- Notation: the comments in the code below use a[i] & a[j] (or
-	-- sometimes euivalently a_i & a_j) to designate the virtual addresses
+	-- sometimes equivalently a_i & a_j) to designate the virtual addresses
 	-- of large numbers i & j. From the perspective of the Fisher-Yates
 	-- algorithm that the logic below implements, the aim is to generate
 	-- a complete random permutation of the array 'a' holding virtual
 	-- addresses of the large numbers that reside in ecc_fp_dram memory
 	-- (which instance is named 'd0' below).
 	--
-	-- There are two different running modes of the present module:
+	-- At "runtime" there are two different modes of the present module:
 	--
-	--   - The 1st mode is characterized by register r.permute.active = 0
+	--   - The 1st mode is when register r.permute.active = 0
 	--
 	--         As long as register r.permute.active is low, the logic acts
 	--         as a virtual-to-physical address translator, meaning that
 	--         addresses presented to the module are first translated as
 	--         physical addresses into ecc_fp_dram before actually being
 	--         served (either for writes or for reads). The instance of
-	--         memory virt_to_phys_async named 'vp0' below is used to translate
+	--         memory 'virt_to_phys_async' named 'vp0' below is used to translate
 	--         addresses for the write accesses, while the one named 'vp1'
 	--         is used to translate addresses for the read accesses (two
 	--         instances are required indeed, as ecc_fp needs to access
 	--         to large numbers both in read & write simultaneously).
 	--         Note that 'vp0' & 'vp1' memories always store the exact same
-	--         content, which is why their repsective write ports are con-
+	--         content, which is why their respective write ports are con-
 	--         nected to the exact same signals.
 	--
-	--   - The 2nd mode is characterized by register r.permute.active = 1
+	--   - The 2nd mode is when register r.permute.active = 1
 	--
 	--         When r.permute.active is high, it means that d0/ecc_fp_dram
-	--         memory cannot be accessed to serve neither read nor writes,
-	--         because a complete run of the Fisher-Yates algorithm is currently
-	--         under way to completely re-shuffle the content of the 'a'
-	--         array (equivalently saying, of the vp0 & vp1 memories). Of course,
+	--         memory cannot be accessed, neither to serve read nor to serve
+	--         writes, because a complete run of the Fisher-Yates algorithm is
+	--         currently under way to completely re-shuffle the content of the 'a'
+	--         array (equivalently saying: of the vp0 & vp1 memories). Of course,
 	--         simultaneously to the permutation of the 'a' array, the content
 	--         of d0/ecc_fp_dram is also reformated to reflect the exact change
 	--         in the virtual-to-physical mapping stored in 'a'
@@ -224,7 +224,7 @@ begin
 	-- possibilities of doing so. The algorithm is very simple and consists
 	-- in scanning the n items (for instance in the range i from n - 1
 	-- downto 0), generating a random number j in [0..i] at each step i and
-	-- swapping the items of the set in positions i & j (a[i] <-> a[j]).
+	-- swapping the items of the set in positions i and j (a[i] <-> a[j]).
 	--
 	-- That is exactly what the logic below describes: i & j now denote
 	-- base addresses of large numbers in d0/ecc_fp_dram. For each value i,
@@ -244,7 +244,7 @@ begin
 	-- to-physical address translations).
 
 	-- vp0: 1st instance of the virtual-to-physical address translation table
-	-- (used for write accesses to d0/ecc_fp_dram from the outside of the
+	-- (used for WRITE accesses to d0/ecc_fp_dram from the outside of the
 	-- module)
 	vp0: virt_to_phys_async
 		generic map(
@@ -267,7 +267,7 @@ begin
 		);
 
 	-- vp1: 2nd instance of the virtual-to-physical address translation table
-	-- (used for read accesses to d0/ecc_fp_dram from the outside of the
+	-- (used for READ accesses to d0/ecc_fp_dram from the outside of the
 	-- module)
 	vp1: virt_to_phys_async
 		generic map(
@@ -452,7 +452,7 @@ begin
 				-- TODO: check the effect on synthesis of the 'exit' instruction
 				-- below (however since the range of the loop is expected to
 				-- be very small (NB_JSH_REG ~ log(log(nn))) there should not be
-				-- any problem - this also means that the fan-in of r.vp.raddr0
+				-- a problem - this also means that the fan-in of r.vp.raddr0
 				-- should remain very low (2 or 3 paths at most)
 				exit;
 				-- (actually we could also remove the 'exit', because we know
