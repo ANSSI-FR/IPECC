@@ -87,20 +87,24 @@ begin
 	-- --------------------------
 	-- port B (asynchronous read)
 	-- --------------------------
-	process(raddr, re)
+	-- We want the process below to describe a purely combinational read
+	-- of the memory, hence all signals read inside the process must be
+	-- in the sensitivity list, included 'r_mem_content' (the signal for
+	-- the memory content itself).
+	-- An alternative would be to use an implicite one liner process
+	-- (but we want to catch the 'X' values on the address)
+	process(raddr, r_mem_content)
 	begin
 		-- In simulation returns 'force unknown' ('X') if METAVALUE in raddrb.
-		if (re = '1') then
-			-- pragma translate_off
-			if is_X(raddr) then
-				do <= (others => 'X');
-			else
-			-- pragma translate_on
-				do <= r_mem_content(to_integer(unsigned(raddr)));
-			-- pragma translate_off
-			end if;
-			-- pragma translate_on
+		-- pragma translate_off
+		if is_X(raddr) then
+			do <= (others => 'X');
+		else
+		-- pragma translate_on
+			do <= r_mem_content(to_integer(unsigned(raddr)));
+		-- pragma translate_off
 		end if;
+		-- pragma translate_on
 	end process;
 	
 	-- pragma translate_off

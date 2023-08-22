@@ -130,6 +130,7 @@ architecture syn of ecc_fp_dram_sh_fishy_nb is
 		rdy : std_logic;
 		i : std_logic_vector(FP_ADDR_MSB - 1 downto 0);
 		aofi : std_logic_vector(FP_ADDR_MSB - 1 downto 0);
+		aofj : std_logic_vector(FP_ADDR_MSB - 1 downto 0);
 		do_brlphase_sh : std_logic_vector(1 downto 0);
 		i_next : std_logic_vector(FP_ADDR_MSB - 1 downto 0);
 		trngrdy : std_logic;
@@ -180,7 +181,23 @@ architecture syn of ecc_fp_dram_sh_fishy_nb is
 	signal r_permute_rdy : std_logic;
 	-- pragma translate_on
 
+	-- pragma translate_off
+	signal r_fp_waddr_msb : std_logic_vector(FP_ADDR_MSB - 1 downto 0);
+	signal r_fp_waddr_lsb : std_logic_vector(FP_ADDR_LSB - 1 downto 0);
+	signal r_fp_raddr_msb : std_logic_vector(FP_ADDR_MSB - 1 downto 0);
+	signal r_fp_raddr_lsb : std_logic_vector(FP_ADDR_LSB - 1 downto 0);
+	signal r_fp_re : std_logic;
+	-- pragma translate_on
+
 begin
+
+	-- pragma translate_off
+	r_fp_waddr_msb <= r.fp.waddr(FP_ADDR - 1 downto FP_ADDR_MSB);
+	r_fp_waddr_lsb <= r.fp.waddr(FP_ADDR_LSB - 1 downto 0);
+	r_fp_raddr_msb <= r.fp.raddr(FP_ADDR - 1 downto FP_ADDR_MSB);
+	r_fp_raddr_lsb <= r.fp.raddr(FP_ADDR_LSB - 1 downto 0);
+	r_fp_re <= r.fp.resh(rdlat);
+	-- pragma translate_on
 
 	-- Notation: the comments in the code below use a[i] & a[j] (or
 	-- sometimes equivalently a_i & a_j) to designate the virtual addresses
@@ -240,7 +257,7 @@ begin
 	-- r.permute.active is deasserted and the memory becomes available
 	-- again to serve reads & writes from the outside of the module
 	-- (as it would if shuffle countermeasure was not activated, but
-	-- simply with the extra lantecy in reads incurred by the virtual-
+	-- simply with the extra latency in reads incurred by the virtual-
 	-- to-physical address translations).
 
 	-- vp0: 1st instance of the virtual-to-physical address translation table
@@ -372,7 +389,7 @@ begin
 		end if;
 
 		-- --------------
-		-- barrel-shifter
+		-- Barrel-shifter
 		-- (2 bits of the controlling number, that is the number telling of how many
 		-- positions the input should be right-shifted, are processed per cycle)
 		-- --------------
@@ -397,7 +414,7 @@ begin
 					null; -- vbrl0 := vbrl0;
 				end if;
 			else
-				-- last stage of the barrel-shifter
+				-- Last stage of the barrel-shifter
 				-- (possibly also the first one, this is not exclusive)
 				if log2(NB_MAX_SHIFT) mod 2 = 0 then -- statically resolv by synth.
 					-- even case
@@ -429,7 +446,7 @@ begin
 			v.permute.brl(i + 1) := vbrl0;
 		end loop;
 
-		-- optimization: select the ouput of the barrel-register according to
+		-- Optimization: select the ouput of the barrel-register according to
 		-- r.permute.brlout_sel (for most values of i, the value drawn from
 		-- the TRNG does not require to go through all the stages of the barrel-
 		-- shifter)
@@ -470,7 +487,7 @@ begin
 			v.fp.resh1 := (not r.fp.resh1(rdlat)) & r.fp.resh1(rdlat downto 1);
 		end if;
 
-		-- the only value read from vp1 memory when .active = 1 is a[j]
+		-- the only value read from vp1 memory when r.permute.active = 1 is a[j]
 		if r.vp.re1 = '1' and r.permute.active = '1' then
 			-- read from vp1 is only pertinent if .jtoobig = '0'
 			if r.permute.jtoobig = '1' then
@@ -490,7 +507,7 @@ begin
 				v.permute.doburst := '1';
 				v.fp.resh(rdlat) := '1'; -- (s20), bypass of (s9)
 				-- In (s21) below, pushing a logic 1 in r.fp.resh1(rdlat) identifies
-				-- a read of an a_i limb, while a logic 0 would identifie read of
+				-- a read of an a_i limb, while a logic 0 would identify a read of
 				-- an a_j limb, see (s22). Hence the importance of the reset of
 				-- r.fp.resh1 (see (s23)). Pushing a 0 or a 1 into r.fp.resh1(rdat)
 				-- is later used to determine from which large number a limb was
@@ -502,23 +519,25 @@ begin
 				-- initialize r.fp.raddr, also initialize the least significant
 				-- bits of r.fp.waddr
 				if nn_dynamic then -- statically resolved by synthesizer
-					v.fp.raddr := vp0rdata & std_logic_vector(nndyn_wm1);
+					v.fp.raddr := --vp0rdata
+						r.permute.aofi & std_logic_vector(nndyn_wm1);
 					v.fp.waddr(FP_ADDR_LSB - 1 downto 0) :=
 						std_logic_vector(nndyn_wm1);
 				else
-					v.fp.raddr := vp0rdata &
-						std_logic_vector(to_unsigned(w - 1, FP_ADDR_LSB));
+					v.fp.raddr := --vp0rdata
+						r.permute.aofi & std_logic_vector(to_unsigned(w - 1, FP_ADDR_LSB));
 					v.fp.waddr(FP_ADDR_LSB - 1 downto 0) := std_logic_vector(
 						to_unsigned(w - 1, FP_ADDR_LSB));
 				end if;
-				v.permute.aofi := vp0rdata;
-				-- at the same time we start the burst. Also switch a_i & a_j
-				-- in vp0 & vp1 virtual-top-physical translation memories,
+				--v.permute.aofi := vp0rdata;
+				-- At the same time we start the burst. Also switch a_i & a_j
+				-- in vp0 & vp1 virtual-to-physical translation memories,
 				-- the 1st step for that is to write a_j at address i
 				v.vp.we := '1'; -- (s34), bypass of (s33)
 				v.vp.swap := '1';
 				v.vp.waddr := r.permute.i;
-				v.vp.wdata := vp1rdata;
+				v.vp.wdata := vp1rdata; -- this is a_j
+				v.permute.aofj := vp1rdata;
 				-- pragma translate_off
 				v.permute.j := r.vp.raddr1; -- still valid from (s36)
 				v.permute.aofi_times_n := to_integer(unsigned(vp0rdata)) * n;
@@ -528,6 +547,10 @@ begin
 			end if;
 		end if;
 
+		if r.vp.re0 = '1' and r.permute.active = '1' then
+			v.permute.aofi := vp0rdata;
+		end if;
+
 		-- the 2nd & last step for the a_i <-> a_j switch is to write a_i
 		-- at address j
 		if r.vp.swap = '1' then
@@ -535,7 +558,7 @@ begin
 			v.vp.we := '1'; -- (s35), bypass of (s33)
 			-- the value of j is still driven on bus r.vp.raddr1, from (s36)
 			v.vp.waddr := r.vp.raddr1;
-			v.vp.wdata := vp0rdata;
+			v.vp.wdata := r.permute.aofi; --vp0rdata;
 		end if;
 
 		-- (s42), bypassed by (s43)
@@ -552,18 +575,18 @@ begin
 			v.permute.active := '0';
 		end if;
 
-		-- burst (swapping the 'w' limbs of large numbers a_i & a_j)
-		if r.permute.doburst = '1' then
+		-- Burst (swapping the 'w' limbs of large numbers a_i & a_j)
+		if r.permute.doburst = '1' then -- (s45)
 			v.fp.resh(rdlat) := '1'; -- (s11), bypass of (s9), bypassed by (s12)
 			if r.fp.resh1(rdlat) = '0' then
-				-- decrement the least significant part (FP_ADDR_LSB bits) of the
-				-- address every cycle of two reads
+				-- Decrement the least significant part (FP_ADDR_LSB bits) of the
+				-- address every cycle of two reads.
 				v.fp.raddr(FP_ADDR_LSB - 1 downto 0) := std_logic_vector(
 					unsigned(r.fp.raddr(FP_ADDR_LSB - 1 downto 0)) - 1);
 				if r.fp.raddr(FP_ADDR_LSB - 1 downto 0) =
 					std_logic_vector(to_unsigned(0, FP_ADDR_LSB))
 				then
-					-- terminate one swapping burst
+					-- Terminate one swapping burst
 					v.permute.doburst := '0';
 					v.fp.resh(rdlat) := '0'; -- (s12), bypass of (s11)
 					-- switch to next value of i (next step of the Fisher-Yates algorithm)
@@ -588,33 +611,35 @@ begin
 				end if;
 			end if;
 			-- (s22)
-			-- the base address of r.fp.raddr (most signifiant bits, in a
+			-- The base address of r.fp.raddr (most signifiant bits, in a
 			-- quantity FP_ADDR_MSB) must switch at each cycle between a_i
-			-- and a_j
+			-- and a_j (mind that test on fp.resh1 below is still protected
+			-- by .doburst = 1 condition of (s45) above, which implicitly
+			-- also means that .permute.active = 1).
 			if r.fp.resh1(rdlat) = '1' then -- identifies a_i, see (s21)
-				v.fp.raddr(FP_ADDR - 1 downto FP_ADDR_LSB) := vp1rdata;
+				v.fp.raddr(FP_ADDR - 1 downto FP_ADDR_LSB) := r.permute.aofj; --vp1rdata;
 			elsif r.fp.resh1(rdlat) = '0' then -- identifies a_j, see (s21)
-				v.fp.raddr(FP_ADDR - 1 downto FP_ADDR_LSB) := vp0rdata;
+				v.fp.raddr(FP_ADDR - 1 downto FP_ADDR_LSB) := r.permute.aofi; --vp0rdata;
 			end if;
 		end if;
 
 		v.fp.we :=  '0'; -- (s15), bypassed by (s16) & (s18)
 
-		-- set write address into d0/ecc_fp_dram during the swapping burst
-		-- of large numbers
+		-- Set write address into d0/ecc_fp_dram during the swapping burst
+		-- of large numbers.
 		if r.permute.active = '1' and r.fp.resh(0) = '1' then
 			v.fp.we := '1'; -- (s16), bypass of (s15), bypassed by (s17)
 			if r.fp.resh1(0) = '0' then -- identifies an a_j limb
 				v.fp.waddr(FP_ADDR - 1 downto FP_ADDR_LSB) := r.permute.aofi; -- (s31)
 			elsif r.fp.resh1(0) = '1' then -- identifies an a_i limb
-				v.fp.waddr(FP_ADDR - 1 downto FP_ADDR_LSB) := vp1rdata; -- (s30)
-				-- in this cycle we also decrement the LSbits of r.fp.waddr
+				v.fp.waddr(FP_ADDR - 1 downto FP_ADDR_LSB) := r.permute.aofj; --vp1rdata; -- (s30)
+				-- In this cycle we also decrement the LSbits of r.fp.waddr
 				if r.fp.we = '1' then
 					v.fp.waddr(FP_ADDR_LSB - 1 downto 0) := std_logic_vector(
 						unsigned(r.fp.waddr(FP_ADDR_LSB - 1 downto 0)) - 1);
 				end if;
 			end if;
-			-- drive write data bus into ecc_fp_dram
+			-- Drive write data bus into ecc_fp_dram.
 			v.fp.wdata := fprdata;
 		end if;
 
