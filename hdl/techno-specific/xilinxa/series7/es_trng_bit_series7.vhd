@@ -96,26 +96,26 @@ begin
 	-- -------------------------------------------------------
 	-- RO2 oscillator  1 x LUT2 (same eq. as ro1) and 2 x LUT1
 	-- -------------------------------------------------------
-	ro2_0: LUT2 -- O = I1.!I0
+	ro2_0: LUT2
 		generic map(
-			INIT => x"4"
+			INIT => x"4" -- O = I1.!I0
 		) port map(
 			I0 => ro2s1,
 			I1 => ro2en,
 			O => ro2out
 		);
 
-	ro2_1: LUT1 -- O = I0
+	ro2_1: LUT1
 		generic map(
-			INIT => "10"
+			INIT => "10" -- O = I0
 		) port map(
 			I0 => ro2out,
 			O => ro2s0
 		);
 
-	ro2_2: LUT1 -- O = I0
+	ro2_2: LUT1
 		generic map(
-			INIT => "10"
+			INIT => "10" -- O = I0
 		) port map(
 			I0 => ro2s0,
 			O => ro2s1
