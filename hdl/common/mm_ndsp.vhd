@@ -1283,11 +1283,6 @@ begin
 		--       r.prod.nbx -> r.prod.nextnbx
 		--       r.prod.nbx -> r.prod.nextxlsbraddr
 		--       r.prod.nbx -> r.prod.nextslkcnt
-		--       r.prod.rw -> r.prod.nextxicnt
-		--       r.prod.rw -> r.prod.nextxicntzero
-		--       r.prod.rw -> r.prod.nextnbx
-		--       r.prod.rw -> r.prod.nextxlsbraddr
-		--       r.prod.rw -> r.prod.nextslkcnt
 		-- CHECKED OK: v_prod_tobenext always set: no LATCH should be inferred
 		if r.prod.nbx = (r.prod.nbx'range => '0') then -- (s85)
 			v_prod_tobenext := '0';
@@ -1412,15 +1407,9 @@ begin
 		end if;
 
 		-- ------------------------------------------------------------------
-		-- computation of r.prod.nextxmsbraddr & r.prod.nextymsbraddr as a
+		-- computation of v_prod_nextxmsbraddr & v_prod_nextymsbraddr as a
 		-- multi-cycle function of r.prod.nbx & input nndyn_w
 		-- ------------------------------------------------------------------
-
-		-- TODO: set a multicycle constraint on path:
-		--       r.ctrl.state -> r.prod.nextxmsbraddr
-		--       r.ctrl.state -> r.prod.nextymsbraddr
-		--       r.prod.nbx -> r.prod.nextxmsbraddr (mind (s85))
-		--       r.prod.nbx -> r.prod.nextymsbraddr (mind (s85))
 		-- CHECKED OK: v_prod_nextxmsbraddr always set: no LATCH should be inferred
 		-- CHECKED OK: v_prod_nextymsbraddr always set: no LATCH should be inferred
 		v_prod_nextxmsbraddr := (others => '0'); -- TO AVOID INFERENCE
@@ -1443,7 +1432,7 @@ begin
 						v_prod_nextymsbraddr := Y_ORAM_ADDR;
 					elsif r.prod.nextxymsb = '1' then
 						v_prod_nextxmsbraddr := S_ORAM_ADDR;
-							v_prod_nextymsbraddr := PP_ORAM_ADDR;
+						v_prod_nextymsbraddr := PP_ORAM_ADDR;
 					end if;
 				end if;
 
@@ -1454,11 +1443,11 @@ begin
 					v_prod_nextymsbraddr := PP_ORAM_ADDR;
 				elsif v_prod_tobenext = '0' then
 					if r.prod.nextxymsb = '0' then
-					v_prod_nextxmsbraddr := S_ORAM_ADDR;
-					v_prod_nextymsbraddr := PP_ORAM_ADDR;
+						v_prod_nextxmsbraddr := S_ORAM_ADDR;
+						v_prod_nextymsbraddr := PP_ORAM_ADDR;
 					elsif r.prod.nextxymsb = '1' then
 						v_prod_nextxmsbraddr := ALPHA_ORAM_ADDR;
-							v_prod_nextymsbraddr := P_ORAM_ADDR;
+						v_prod_nextymsbraddr := P_ORAM_ADDR;
 					end if;
 				end if;
 
@@ -1473,7 +1462,7 @@ begin
 						v_prod_nextymsbraddr := P_ORAM_ADDR;
 					elsif r.prod.nextxymsb = '1' then
 						v_prod_nextxmsbraddr := X_ORAM_ADDR;
-							v_prod_nextymsbraddr := Y_ORAM_ADDR;
+						v_prod_nextymsbraddr := Y_ORAM_ADDR;
 					end if;
 				end if;
 
@@ -1528,7 +1517,6 @@ begin
 			v.prod.xiphase := '1';
 			v.prod.yiphase := '0';
 			v.prod.xitoshcnt(sramlat) := '1'; -- asserted only 1 cycle, see (s2)
-			-- TODO: set large multicycle on path r.prod.rw -> r.prod.nbx
 			-- the 1st nbx count used in the 1st cycle of multiply-&-accumulate
 			-- is always the flip one (that is 0)
 			v.prod.nbx := v_prod_nextnbx;

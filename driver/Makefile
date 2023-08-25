@@ -2,16 +2,20 @@ ARM_CC ?= arm-linux-gnueabihf-gcc
 CFLAGS = -Wall -Wextra -Wpedantic -O3 -g3 -mcpu=cortex-a9 -mfpu=vfpv3 -mfloat-abi=hard -static
 CFLAGS += -DWITH_EC_HW_DEBUG
 
-C_FILES = hw_accelerator_driver_ipecc_platform.c hw_accelerator_driver_ipecc.c test_app/curve.c test_app/kp.c test_app/ptops.c test_app/pttests.c test_app/test_app.c
-C_EMUL_FILES = hw_accelerator_driver_socket_emul.c test_driver.c
+C_FILES = hw_accelerator_driver_ipecc_platform.c hw_accelerator_driver_ipecc.c
+C_FILES_LINUX = $(C_FILES) linux/ecc-test-linux.c linux/curve.c linux/kp.c linux/ptops.c linux/pttests.c
+C_FILES_STDALONE = $(C_FILES) stdalone/ecc-test-stdl.c
 
-all:
-	$(ARM_CC) $(CFLAGS) -DWITH_EC_HW_ACCELERATOR -DWITH_EC_HW_UIO $(C_FILES) -o test_uio
-	$(ARM_CC) $(CFLAGS) -DWITH_EC_HW_ACCELERATOR -DWITH_EC_HW_DEVMEM $(C_FILES) -o test_devmem
-	#$(ARM_CC) $(CFLAGS) -DWITH_EC_HW_ACCELERATOR -DWITH_EC_HW_STANDALONE $(C_FILES) -o test_devmem
+.PHONY: linux-target stdalone-target
 
-emulator:
-	$(CC) -DWITH_EC_HW_ACCELERATOR -DWITH_EC_HW_SOCKET_EMUL $(C_EMUL_FILES) -o test_emul
+all: linux-target stdalone-target
+
+linux-target:
+	$(ARM_CC) $(CFLAGS) -DWITH_EC_HW_ACCELERATOR -DWITH_EC_HW_UIO $(C_FILES_LINUX) -o ecc-test-uio
+	$(ARM_CC) $(CFLAGS) -DWITH_EC_HW_ACCELERATOR -DWITH_EC_HW_DEVMEM $(C_FILES_LINUX) -o ecc-test-devmem
+
+stdalone-target:
+	$(ARM_CC) $(CFLAGS) -DWITH_EC_HW_ACCELERATOR -DWITH_EC_HW_STANDALONE $(C_FILES_STDALONE) -o ecc-test-stdalone
 
 clean:
-	@rm -f test_standalone test_uio test_devmem test_emul
+	@rm -f ecc-test-uio ecc-test-devmem ecc-test-stdalone

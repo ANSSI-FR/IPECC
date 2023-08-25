@@ -36,9 +36,11 @@ def rdp(nbits=256):
 
 ######################### C O N F I G U R A T I O N ############################
 #                                                                              #
-#                (You should only edit parameters in this frame)               #
+#              (You should only edit parameters within this frame)             #
 #                                                                              #
 # Parameter: 'ww'                                                              #
+#                                                                              #
+ww = 16                                                                        #
 #                                                                              #
 #   Designates the bit-width of limbs used for the representation of large     #
 #   numbers inside IPECC's internal memory.                                    #
@@ -74,9 +76,10 @@ def rdp(nbits=256):
 #                                                                              #
 #   On 7-series/Zynq Xilinx FPGAs, 'ww' is set to 16.                          #
 #                                                                              #
-ww = 16                                                                        #
 #                                                                              #
 # Parameter: 'nnmin'                                                           #
+#                                                                              #
+nnmin = ww - 4 + 1                                                             #
 #                                                                              #
 #   See info on 'ww' above.                                                    #
 #   The smallest admissible value for 'nn' for any particular hardware imple-  #
@@ -84,10 +87,17 @@ ww = 16                                                                        #
 #   is equivalent to ( (nn + 4) / ww ) > 1 and therefore nn > ww - 4 which     #
 #   gives the minimum ww - 4 + 1 below.                                        #
 #                                                                              #
-nnmin = ww - 4 + 1                                                             #
 #                                                                              #
 # Parameters: 'nnmax', 'nnminmax', 'nnmaxabsolute'                             #
 #             'NNMINMOD', 'NNMININCR', 'NNMAXMOD', 'NNMAXINCR'                 #
+#                                                                              #
+nnmax = nnmin + 16     # For start (will increase and plateau to absolute max) #
+nnmaxabsolute = 256    # Largest possible value of 'nn'.                       #
+nnminmax = nnmin + 64  # Quite arbitrary too.                                  #
+NNMINMOD = 100                                                                 #
+NNMININCR = 1                                                                  #
+NNMAXMOD = 300                                                                 #
+NNMAXINCR = 3                                                                  #
 #                                                                              #
 #   This script generates test-vectors by gradually increasing the range from  #
 #   which the random values of 'nn' are withdrawn for each new curve, this     #
@@ -110,19 +120,24 @@ nnmin = ww - 4 + 1                                                             #
 #   will neither ever exceed, while 'nnmax' being initially set at nnmin + 16  #
 #   is actually quite arbitrary.                                               #
 #                                                                              #
-nnmax = nnmin + 16  # For start (it will increase and plateau to absolute max) #
-nnmaxabsolute = 384 # Largest possible value of 'nn'.                          #
-nnminmax = 38       # Quite arbitrary too.                                     #
-NNMINMOD = 200                                                                 #
-NNMININCR = 1                                                                  #
-NNMAXMOD = 100                                                                 #
-NNMAXINCR = 3                                                                  #
+#                                                                              #
+# Parameters: 'nn_constant', 'only_kp_and_no_blinding'                         #
 #                                                                              #
 nn_constant = 0  # Non-0 value will make it the constant unique value of 'nn'  #
 only_kp_and_no_blinding = False  # Well, option's name speaks for itself.      #
 #                                                                              #
+#                                                                              #
 # Parameters: 'NBCURV'                                                         #
 #             'NB*' where * = KP|ADD|DBL|NEG|CHK|EQU|OPP                       #
+#                                                                              #
+NBCURV = 0 # A value of 0 means don't stop or ever-lasting producing loop.     #
+NBKP = 100 # Nb of [k]P tests that will be generated per curve.                #
+NBADD = 50 # Nb of P+Q tests that will be generated per curve.                 #
+NBDBL = 50 # Nb of [2]P tests that will be generated per curve.                #
+NBNEG = 50 # Nb of (-P) tests that will be generated per curve.                #
+NBCHK = 50 # Nb of 'is point on curve?' tests that will be generated per curve #
+NBEQU = 50 # Nb of 'are points equal?' tests that will be generated per curve. #
+NBOPP = 50 # Nb of 'are points opposite?" tests that'll be generated per curve #
 #                                                                              #
 #   For any new curve, a random value is drawn from the current range          #
 #   [nnmin : nnmax], and then 6 six types of tests are generated for that      #
@@ -152,16 +167,9 @@ only_kp_and_no_blinding = False  # Well, option's name speaks for itself.      #
 # The complete script will iterate on a total number of 'NBCURV' curves.       #
 # Setting 0 to 'NBCURV' means the loop shouldn't stop.                         #
 #                                                                              #
-NBCURV = 0 # A value of 0 means don't stop or ever-lasting producing loop.     #
-NBKP = 100 # Nb of [k]P tests that will be generated per curve.                #
-NBADD = 50 # Nb of P+Q tests that will be generated per curve.                 #
-NBDBL = 50 # Nb of [2]P tests that will be generated per curve.                #
-NBNEG = 50 # Nb of (-P) tests that will be generated per curve.                #
-NBCHK = 50 # Nb of 'is point on curve?' tests that will be generated per curve #
-NBEQU = 50 # Nb of 'are points equal?' tests that will be generated per curve. #
-NBOPP = 50 # Nb of 'are points opposite?" tests that'll be generated per curve #
-#                                                                              #
 # Parameter 'NN_LIMIT_COMPUTE_Q':                                              #
+#                                                                              #
+NN_LIMIT_COMPUTE_Q = 192                                                       #
 #                                                                              #
 #   For [k]P tests, blinding may or may not be enabled (and if so, with a      #
 #   number of blinding bits randomly drawn in the range [1 : nn - 1]).         #
@@ -176,19 +184,17 @@ NBOPP = 50 # Nb of 'are points opposite?" tests that'll be generated per curve #
 #   as 'q' only plays a role in IPECC when blinding countermeasure is          #
 #   enabled in a [k]P computation.                                             #
 #                                                                              #
-NN_LIMIT_COMPUTE_Q = 192                                                       #
-#                                                                              #
 # Parameter: 'NO_EXCEPTIONS'                                                   #
 #                                                                              #
-#   If set to False, the script will also generate, in addition to the         #
-#   amounts of tests defined above (e.g NBKP, NBADD, etc) a certain number     #
-#   of tests that would have the IP to meet an exception during computation,   #
-#   like for instance adding two points which are opposite, or multiplying     #
-#   a point of small order by a scalar equal to that order, etc.               #
+NO_EXCEPTIONS = False                                                          #
+#                                                                              #
+#   If set to False, the script will also generate, for each generated         #
+#   curve and in addition to the tests defined above (c.f NBKP, NBADD, etc)    #
+#   a certain number of tests that will have the IP to meet an exception       #
+#   during computation, like for instance adding two points which are          #
+#   opposite, or multiplying a point by a scalar equal to its order, etc.      #
 #                                                                              #
 #   If set to True, no such test will be generated by the script.              #
-#                                                                              #
-NO_EXCEPTIONS = False                                                          #
 #                                                                              #
 # Note:                                                                        #
 #                                                                              #
