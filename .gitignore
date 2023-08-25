@@ -32,3 +32,6 @@ sage/__pycache__
 sage/kp*.py
 .tar.gz
 *.tar.gz.md5sum
+driver/ecc-test-linux-devmem
+driver/ecc-test-linux-uio
+driver/ecc-test-stdalone

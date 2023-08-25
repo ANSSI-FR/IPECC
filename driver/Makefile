@@ -6,13 +6,17 @@ C_FILES = hw_accelerator_driver_ipecc_platform.c hw_accelerator_driver_ipecc.c
 C_FILES_LINUX = $(C_FILES) linux/ecc-test-linux.c linux/curve.c linux/kp.c linux/ptops.c linux/pttests.c
 C_FILES_STDALONE = $(C_FILES) stdalone/ecc-test-stdl.c
 
-.PHONY: linux-target stdalone-target
+.PHONY: linux-targets stdalone-target
 
-all: linux-target stdalone-target
+all: linux-targets stdalone-target
 
-linux-target:
-	$(ARM_CC) $(CFLAGS) -DWITH_EC_HW_ACCELERATOR -DWITH_EC_HW_UIO $(C_FILES_LINUX) -o ecc-test-uio
-	$(ARM_CC) $(CFLAGS) -DWITH_EC_HW_ACCELERATOR -DWITH_EC_HW_DEVMEM $(C_FILES_LINUX) -o ecc-test-devmem
+linux-targets: ecc-test-linux-uio ecc-test-linux-devmem
+
+ecc-test-linux-uio: $(C_FILES_LINUX)
+	$(ARM_CC) $(CFLAGS) -DWITH_EC_HW_ACCELERATOR -DWITH_EC_HW_UIO $(C_FILES_LINUX) -o ecc-test-linux-uio
+
+ecc-test-linux-devmem: $(C_FILES_LINUX)
+	$(ARM_CC) $(CFLAGS) -DWITH_EC_HW_ACCELERATOR -DWITH_EC_HW_DEVMEM $(C_FILES_LINUX) -o ecc-test-linux-devmem
 
 stdalone-target:
 	$(ARM_CC) $(CFLAGS) -DWITH_EC_HW_ACCELERATOR -DWITH_EC_HW_STANDALONE $(C_FILES_STDALONE) -o ecc-test-stdalone

@@ -18,7 +18,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include "test_app.h"
+#include "ecc-test-linux.h"
 
 extern int cmp_two_pts_coords(point_t*, point_t*, bool*);
 

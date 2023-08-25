@@ -18,7 +18,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include "test_app.h"
+#include "ecc-test-linux.h"
 
 /* Test "is point on curve?" */
 int ip_set_pt_and_check_on_curve(ipecc_test_t* t)

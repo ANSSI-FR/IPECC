@@ -18,7 +18,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include "test_app.h"
+#include "ecc-test-linux.h"
 
 int ip_set_curve(curve_t* crv)
 {

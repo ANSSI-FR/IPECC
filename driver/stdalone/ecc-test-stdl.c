@@ -1,4 +1,4 @@
-#include "hw_accelerator_driver.h"
+#include "../hw_accelerator_driver.h"
 #include <stdio.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -6,8 +6,10 @@
 #include <stdlib.h>
 #include <errno.h>
 
+#ifdef XILINX
 #include "platform.h"
 #include "xil_printf.h"
+#endif
 
 /* Include our test suite */
 #include "ecc-test-stdl.h"
