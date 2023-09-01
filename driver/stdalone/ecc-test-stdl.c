@@ -1,4 +1,4 @@
-#include "../hw_accelerator_driver.h"
+#include "hw_accelerator_driver.h"
 #include <stdio.h>
 #include <unistd.h>
 #include <fcntl.h>
