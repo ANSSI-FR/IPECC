@@ -180,11 +180,11 @@ static const ipecc_test ipecc_all_tests[] = {
 //	IPECC_TEST_VECTOR_Q("24-bit test: ECC_TB: Q != Inf  (with null)", _24, P_24, NULL, NULL, SIZE_24_BITS, 0, 0, PT_EQU),
 //	IPECC_TEST_VECTOR_Q("24-bit test: ECC_TB: Inf != Q  (with null)", _24, NULL, P_24, NULL, SIZE_24_BITS, 0, 0, PT_EQU),
 //	/* 127-bit tests */
-	IPECC_TEST_VECTOR_NOQ("127-bit test: k = 100...000000", _127, P_127, MSB_ONE_127, SIZE_127_BITS, 0, 5, PT_KP),
+	IPECC_TEST_VECTOR_NOQ("127-bit test: k = non-0 value (nominal)", _127, P_127, SCALAR_K127, SIZE_127_BITS, 0, 5, PT_KP),
+//	IPECC_TEST_VECTOR_NOQ("127-bit test: k = 100...000000", _127, P_127, MSB_ONE_127, SIZE_127_BITS, 0, 5, PT_KP),
 //	IPECC_TEST_VECTOR_NOQ("127-bit test: k = 0", _127, P_127, ZERO_127, SIZE_127_BITS, 0, 5, PT_KP),
 //	IPECC_TEST_VECTOR_NOQ("127-bit test: k = 000...000001", _127, P_127, LSB_ONE_127, SIZE_127_BITS, 0, 5, PT_KP),
 //	IPECC_TEST_VECTOR_NOQ("127-bit test: k = q", _127, P_127, BIG_Q_127, SIZE_127_BITS, 0, 5, PT_KP),
-//	IPECC_TEST_VECTOR_NOQ("127-bit test: k = non-0 value (nominal)", _127, P_127, SCALAR_K127, SIZE_127_BITS, 0, 5, PT_KP),
 };
 
 #endif /* __TEST_DRIVER_H__ */
