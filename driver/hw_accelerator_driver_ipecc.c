@@ -29,14 +29,14 @@
 
 /***********************************************************/
 /* We default to 32-bit hardware IP */
-#if !defined(EC_HW_ACCELERATOR_WORD32) && !defined(EC_HW_ACCELERATOR_WORD64)
-#define EC_HW_ACCELERATOR_WORD32
+#if !defined(WITH_EC_HW_ACCELERATOR_WORD32) && !defined(WITH_EC_HW_ACCELERATOR_WORD64)
+#define WITH_EC_HW_ACCELERATOR_WORD32
 #endif
-#if defined(EC_HW_ACCELERATOR_WORD32) && defined(EC_HW_ACCELERATOR_WORD64)
-#error "EC_HW_ACCELERATOR_WORD32 and EC_HW_ACCELERATOR_WORD64 cannot be both defined!"
+#if defined(WITH_EC_HW_ACCELERATOR_WORD32) && defined(WITH_EC_HW_ACCELERATOR_WORD64)
+#error "WITH_EC_HW_ACCELERATOR_WORD32 and WITH_EC_HW_ACCELERATOR_WORD64 cannot be both defined!"
 #endif
 
-#if defined(EC_HW_ACCELERATOR_WORD32)
+#if defined(WITH_EC_HW_ACCELERATOR_WORD32)
 typedef volatile uint32_t ip_ecc_word;
 #define IPECC_WORD_FMT "%08x"
 #else
@@ -55,7 +55,7 @@ typedef volatile uint64_t ip_ecc_word;
  * depending on the IP configuration.
  */
 
-#if defined(EC_HW_ACCELERATOR_WORD64)
+#if defined(WITH_EC_HW_ACCELERATOR_WORD64)
 /* In 64 bits, reverse words endianness */
 #define IPECC_GET_REG(reg)	((*((ip_ecc_word*)((reg)))) & 0xffffffff)
 #define IPECC_SET_REG(reg, val)	\

@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <errno.h>
 
-#ifdef XILINX
+#ifdef WITH_EC_HW_STANDALONE_XILINX
 #include "platform.h"
 #include "xil_printf.h"
 #endif
