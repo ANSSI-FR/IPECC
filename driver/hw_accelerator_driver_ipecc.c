@@ -2767,6 +2767,16 @@ static inline int driver_setup(void)
 		hw_driver_setup_state = 1;
 	}
 	
+	/* Enable TRNG post-processing
+	 * (this is in case we're in DEBUG mode, and if not it doesn't change anything).
+	 *
+	 * NOTE: it is important to make this call AFTER setting hw_driver_setup_state to 1
+	 *       above, because ip_ecc_trng_postproc_enable() is going to call driver_setup()
+	 *       which is us right now, and if hw_driver_setup_state was not set yet, we would
+	 *       call again hw_driver_setup() and it would be a recursive deadlock.
+	 */
+	ip_ecc_trng_postproc_enable();
+
 	return 0;
 err:
 	return -1;

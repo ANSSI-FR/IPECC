@@ -22,8 +22,17 @@
  * This address should only be used for direct access in standalone
  * mode or using a physical memory access (e.g. through /dev/mem).
  */
-#define IPECC_PHYS_BADDR                (0x80000000)
-#define IPECC_PHYS_PSEUDO_TRNG_BADDR    (0x8001000)
+#ifdef WITH_EC_HW_STANDALONE_XILINX
+#include <xparameters.h>
+#define IPECC_PHYS_BADDR                (XPAR_ECC_0_BASEADDR)
+#ifdef XPAR_PSEUDO_TRNG_0_BASEADDR
+#define IPECC_PHYS_PSEUDO_TRNG_BADDR    (XPAR_PSEUDO_TRNG_0_BASEADDR)
+#else
+#define IPECC_PHYS_PSEUDO_TRNG_BADDR    (NULL)
+#endif
+#else
+#endif
+
 #define IPECC_PHYS_SZ                   (4096) /* One page size */
 
 #define IPECC_DEV_UIO_IPECC             "/dev/uio4"
@@ -64,6 +73,8 @@ int hw_driver_setup(volatile unsigned char **base_addr_p, volatile unsigned char
 		if (pseudotrng_base_addr_p != NULL) {
 			(*pseudotrng_base_addr_p) = (volatile unsigned char*)IPECC_PHYS_PSEUDO_TRNG_BADDR;
 		}
+		xil_printf("*base_addr_p = 0x%08x\n\r", *base_addr_p);
+		xil_printf("*pseudotrng_base_addr_p = 0x%08x\n\r", *pseudotrng_base_addr_p);
 	}							
 #elif defined(WITH_EC_HW_UIO)
 	{						
@@ -169,6 +180,7 @@ int hw_driver_setup(volatile unsigned char **base_addr_p, volatile unsigned char
 		}
 	}
 #endif
+
 	/* Log print in case of success */
 	if ( (*pseudotrng_base_addr_p) != NULL ) {
 		log_print("OK, loaded IP @%p and Pseudo TRNG source @%p\n", (*base_addr_p), (*pseudotrng_base_addr_p));

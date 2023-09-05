@@ -130,6 +130,10 @@ int hw_driver_mul(const unsigned char *x, unsigned int x_sz, const unsigned char
 /* Set the small scalar size in the hardware */
 int hw_driver_set_small_scalar_size(unsigned int bit_sz);
 
+/* Enable TRNG post-processing (a call upon is required in Debug mode
+ * or the TRNG won't ever provide a single byte). */
+int hw_driver_trng_post_proc_enable(void);
+
 #endif /* !WITH_EC_HW_ACCELERATOR */
 
 #endif /* __HW_ACCELERATOR_DRIVER_H__ */
