@@ -56,7 +56,7 @@ int hw_driver_setup(volatile unsigned char **base_addr_p, volatile unsigned char
 {
 	int ret = -1;
 
-	log_print("Entering in hw_driver_setup.\n");
+	log_print("Entering in hw_driver_setup.\n\r");
 
 
 	if (base_addr_p == NULL) {
@@ -65,7 +65,7 @@ int hw_driver_setup(volatile unsigned char **base_addr_p, volatile unsigned char
 	}
 #if defined(WITH_EC_HW_STANDALONE)
 	{
-		log_print("hw_driver_setup in standalone mode\n");
+		log_print("hw_driver_setup in standalone mode\n\r");
 		/* In standalone mode, the base address
 		 * is the physical one.
 		 */
@@ -73,15 +73,15 @@ int hw_driver_setup(volatile unsigned char **base_addr_p, volatile unsigned char
 		if (pseudotrng_base_addr_p != NULL) {
 			(*pseudotrng_base_addr_p) = (volatile unsigned char*)IPECC_PHYS_PSEUDO_TRNG_BADDR;
 		}
-		xil_printf("*base_addr_p = 0x%08x\n\r", *base_addr_p);
-		xil_printf("*pseudotrng_base_addr_p = 0x%08x\n\r", *pseudotrng_base_addr_p);
+		xil_printf("*base_addr_p = 0x%08x\n\r\r", *base_addr_p);
+		xil_printf("*pseudotrng_base_addr_p = 0x%08x\n\r\r", *pseudotrng_base_addr_p);
 	}							
 #elif defined(WITH_EC_HW_UIO)
 	{						
 		int uio_fd0, uio_fd1;
 		unsigned int uio_size;
 		void *base_address;
-		log_print("hw_driver_setup in UIO mode\n");
+		log_print("hw_driver_setup in UIO mode\n\r");
 
 		/* Handle the main ECC IP */
 		/* Open our UIO device
@@ -89,7 +89,7 @@ int hw_driver_setup(volatile unsigned char **base_addr_p, volatile unsigned char
 		 */
 		uio_fd0 = open(IPECC_DEV_UIO_IPECC, O_RDWR | O_SYNC);
 		if(uio_fd0 == -1){
-			printf("Error when opening %s\n", IPECC_DEV_UIO_PSEUDOTRNG);
+			printf("Error when opening %s\n\r", IPECC_DEV_UIO_PSEUDOTRNG);
 			perror("open uio");
 			ret = -1;
 			goto err;
@@ -97,7 +97,7 @@ int hw_driver_setup(volatile unsigned char **base_addr_p, volatile unsigned char
 		uio_size = IPECC_PHYS_SZ;
 		base_address = mmap(NULL, uio_size, PROT_READ | PROT_WRITE, MAP_SHARED, uio_fd0, 0);
 		if(base_address == MAP_FAILED){
-			printf("Error during mmap!\n");
+			printf("Error during mmap!\n\r");
 			perror("mmap uio");
 			ret = -1;
 			goto err;
@@ -115,7 +115,7 @@ int hw_driver_setup(volatile unsigned char **base_addr_p, volatile unsigned char
 			 */
 			uio_fd1 = open(IPECC_DEV_UIO_PSEUDOTRNG, O_RDWR | O_SYNC);
 			if(uio_fd1 == -1){
-				printf("Error when opening %s\n", IPECC_DEV_UIO_PSEUDOTRNG);
+				printf("Error when opening %s\n\r", IPECC_DEV_UIO_PSEUDOTRNG);
 				perror("open uio");
 				*pseudotrng_base_addr_p = NULL;
 				ret = -1;
@@ -124,7 +124,7 @@ int hw_driver_setup(volatile unsigned char **base_addr_p, volatile unsigned char
 			uio_size = IPECC_PHYS_SZ;
 			base_address = mmap(NULL, uio_size, PROT_READ | PROT_WRITE, MAP_SHARED, uio_fd1, 0);
 			if(base_address == MAP_FAILED){
-				printf("Error during mmap!\n");
+				printf("Error during mmap!\n\r");
 				perror("mmap uio");
 				*pseudotrng_base_addr_p = NULL;
 				ret = -1;
@@ -138,13 +138,13 @@ int hw_driver_setup(volatile unsigned char **base_addr_p, volatile unsigned char
 		int devmem_fd;
 		unsigned int devmem_size;
 		void *base_address;
-		log_print("hw_driver_setup in /dev/mem mode\n");
+		log_print("hw_driver_setup in /dev/mem mode\n\r");
 		/* Open our /dev/mem device
 		 * NOTE: O_SYNC here to avoid caching
 		 */
 		devmem_fd = open("/dev/mem", O_RDWR | O_SYNC);
 		if(devmem_fd == -1){
-			printf("Error when opening /dev/mem\n");
+			printf("Error when opening /dev/mem\n\r");
 			perror("open devmem");
 			ret = -1;
 			goto err;
@@ -153,7 +153,7 @@ int hw_driver_setup(volatile unsigned char **base_addr_p, volatile unsigned char
 		/* Map the main ECC IP */
 		base_address = mmap(NULL, devmem_size, PROT_READ | PROT_WRITE, MAP_SHARED, devmem_fd, IPECC_PHYS_BADDR);
 		if(base_address == MAP_FAILED){
-			printf("Error during ECC IP mmap!\n");
+			printf("Error during ECC IP mmap!\n\r");
 			perror("mmap devmem ECC IP");
 			ret = -1;
 			goto err;
@@ -170,7 +170,7 @@ int hw_driver_setup(volatile unsigned char **base_addr_p, volatile unsigned char
 			/* Map the pseudo TRNG source device */
 			base_address = mmap(NULL, devmem_size, PROT_READ | PROT_WRITE, MAP_SHARED, devmem_fd, IPECC_PHYS_PSEUDO_TRNG_BADDR);
 			if(base_address == MAP_FAILED){
-				printf("Error during pseudo TRNG device mmap!\n");
+				printf("Error during pseudo TRNG device mmap!\n\r");
 				perror("mmap devmem pseudo TRNG dev");
 				*pseudotrng_base_addr_p = NULL;
 				ret = -1;
@@ -183,9 +183,9 @@ int hw_driver_setup(volatile unsigned char **base_addr_p, volatile unsigned char
 
 	/* Log print in case of success */
 	if ( (*pseudotrng_base_addr_p) != NULL ) {
-		log_print("OK, loaded IP @%p and Pseudo TRNG source @%p\n", (*base_addr_p), (*pseudotrng_base_addr_p));
+		log_print("OK, loaded IP @%p and Pseudo TRNG source @%p\n\r", (*base_addr_p), (*pseudotrng_base_addr_p));
 	} else {
-		log_print("OK, loaded IP @%p\n", (*base_addr_p));
+		log_print("OK, loaded IP @%p\n\r", (*base_addr_p));
 	}
 
 	ret = 0;

@@ -29,39 +29,39 @@ int ip_set_curve(curve_t* crv)
 	 * Verify that each one is below or equal in size to curve's parameter 'nn'.
 	 */
 	if (crv->valid == false) {
-		printf("%sError: Can't set hardware with curve (incomplete description).%s\n", KERR, KNRM);
+		printf("%sError: Can't set hardware with curve (incomplete description).%s\n\r", KERR, KNRM);
 		goto err;
 	}
 	if (crv->p.valid == false) {
-		printf("%sError: Can't set hardware with curve, parameter 'p' missing.%s\n", KERR, KNRM);
+		printf("%sError: Can't set hardware with curve, parameter 'p' missing.%s\n\r", KERR, KNRM);
 		goto err;
 	}
 	if (crv->a.valid == false) {
-		printf("%sError: Can't set hardware with curve, parameter 'a' missing.%s\n", KERR, KNRM);
+		printf("%sError: Can't set hardware with curve, parameter 'a' missing.%s\n\r", KERR, KNRM);
 		goto err;
 	}
 	if (crv->b.valid == false) {
-		printf("%sError: Can't set hardware with curve, parameter 'b' missing.%s\n", KERR, KNRM);
+		printf("%sError: Can't set hardware with curve, parameter 'b' missing.%s\n\r", KERR, KNRM);
 		goto err;
 	}
 	if (crv->q.valid == false) {
-		printf("%sError: Can't set hardware with curve, parameter 'q' missing.%s\n", KERR, KNRM);
+		printf("%sError: Can't set hardware with curve, parameter 'q' missing.%s\n\r", KERR, KNRM);
 		goto err;
 	}
 	if ((crv->p.sz) > (NN_SZ(crv->nn))) {
-		printf("%sError: Can't set hardware with curve, parameter 'p' larger than current curve size set in hardware.%s\n", KERR, KNRM);
+		printf("%sError: Can't set hardware with curve, parameter 'p' larger than current curve size set in hardware.%s\n\r", KERR, KNRM);
 		goto err;
 	}
 	if ((crv->a.sz) > (NN_SZ(crv->nn))) {
-		printf("%sError: Can't set hardware with curve, parameter 'a' larger than current curve size set in hardware.%s\n", KERR, KNRM);
+		printf("%sError: Can't set hardware with curve, parameter 'a' larger than current curve size set in hardware.%s\n\r", KERR, KNRM);
 		goto err;
 	}
 	if ((crv->b.sz) > (NN_SZ(crv->nn))) {
-		printf("%sError: Can't set hardware with curve, parameter 'b' larger than current curve size set in hardware.%s\n", KERR, KNRM);
+		printf("%sError: Can't set hardware with curve, parameter 'b' larger than current curve size set in hardware.%s\n\r", KERR, KNRM);
 		goto err;
 	}
 	if ((crv->q.sz) > (NN_SZ(crv->nn))) {
-		printf("%sError: Can't set hardware with curve, parameter 'q' larger than current curve size set in hardware.%s\n", KERR, KNRM);
+		printf("%sError: Can't set hardware with curve, parameter 'q' larger than current curve size set in hardware.%s\n\r", KERR, KNRM);
 		goto err;
 	}
 
@@ -71,7 +71,7 @@ int ip_set_curve(curve_t* crv)
 	if (hw_driver_set_curve(crv->a.val, crv->a.sz, crv->b.val, crv->b.sz,
 				crv->p.val, crv->p.sz, crv->q.val, crv->q.sz))
 	{
-		printf("%sError: transmitting curve parameters to the hardware triggered an error.%s\n", KERR, KNRM);
+		printf("%sError: transmitting curve parameters to the hardware triggered an error.%s\n\r", KERR, KNRM);
 		goto err;
 	}
 

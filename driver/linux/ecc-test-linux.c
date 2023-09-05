@@ -73,7 +73,7 @@ static bool line_is_empty(char *l)
 	uint32_t c;
 	bool ret = true;
 	for (c=0; ;c++) {
-		if ((l[c] == '\r') || (l[c] == '\n')) {
+		if ((l[c] == '\r') || (l[c] == '\n\r')) {
 			break;
 		} else if ((l[c] != ' ') && (l[c] != '\t')) {
 			ret = false;
@@ -86,18 +86,18 @@ static bool line_is_empty(char *l)
 static void print_stats_regularly(stats_t* st)
 {
 	if ((st->total % DISPLAY_MODULO) == 0) {
-		printf("%s%8d%s %s%8d%s %8d\n",
+		printf("%s%8d%s %s%8d%s %8d\n\r",
 				KGRN, st->ok, KNRM, KRED, st->nok, KNRM, st->total);
 	}
 }
 
 void print_stats_and_exit(ipecc_test_t* t, stats_t* s, const char* msg, unsigned int linenum)
 {
-	printf("Stopped on test %d.%d%s\n", t->curve->id, t->id, KNRM);
-	printf("OK = %d\n", s->ok);
-	printf("nOK = %d\n", s->nok);
-	printf("total = %d\n", s->total);
-	printf("--\n");
+	printf("Stopped on test %d.%d%s\n\r", t->curve->id, t->id, KNRM);
+	printf("OK = %d\n\r", s->ok);
+	printf("nOK = %d\n\r", s->nok);
+	printf("total = %d\n\r", s->total);
+	printf("--\n\r");
 	if (line) {
 		free(line);
 	}
@@ -116,7 +116,7 @@ static int hex2dec(const char c, unsigned char *nb)
 	} else if ( (c >= '0') && (c <= '9') ) {
 		*nb = c - '0';
 	} else {
-		printf("%sError: '%c' not an hexadecimal digit%s\n", KERR, c, KNRM);
+		printf("%sError: '%c' not an hexadecimal digit%s\n\r", KERR, c, KNRM);
 		goto err;
 	}
 	return 0;
@@ -149,7 +149,7 @@ static int hex_to_large_num(const char *pc, unsigned char* nb_x, unsigned int va
 	//for (i = 0; i < nbchar - 1 ; i++) {
 		if (hex2dec(pc[i], &tmp)) {
 			printf("%sError while trying to convert character string '%s'"
-					" into an hexadecimal number%s\n", KERR, pc, KNRM);
+					" into an hexadecimal number%s\n\r", KERR, pc, KNRM);
 			goto err;
 		} else {
 #if 0
@@ -169,7 +169,7 @@ static int hex_to_large_num(const char *pc, unsigned char* nb_x, unsigned int va
 	for (k=0; k<DIV(valnn, 8); k++) {
 		PRINTF(" %02x", nb_x[k]);
 	}
-	PRINTF("\n");
+	PRINTF("\n\r");
 #if 0
 	/* Set the size of the number */
 	*nb_x_sz = (unsigned int)(((j % 2) == 0) ? (j/2) : (j/2) + 1);
@@ -179,7 +179,7 @@ static int hex_to_large_num(const char *pc, unsigned char* nb_x, unsigned int va
 	for (i=0 ; i<(*nb_x_sz) ; i++) {
 		PRINTF("%s%02x%s", KWHT, nb_x[i], KNRM);
 	}
-	PRINTF("\n");
+	PRINTF("\n\r");
 #endif
 
 	return 0;
@@ -214,7 +214,7 @@ int cmp_two_pts_coords(point_t* p0, point_t* p1, bool* res)
 	if ( (p0->x.sz != p0->y.sz) || (p0->x.sz != p1->x.sz) || (p0->y.sz != p1->x.sz)
 			|| (p0->y.sz != p1->y.sz) || (p1->x.sz != p1->y.sz) )
 	{
-		printf("%sError: can't compare coord. buffers that are not of the same byte size to begin with.%s\n",
+		printf("%sError: can't compare coord. buffers that are not of the same byte size to begin with.%s\n\r",
 				KERR, KNRM);
 		goto err;
 	}
@@ -270,44 +270,44 @@ int main(int argc, char *argv[])
 	bool result_pts_are_equal;
 	bool result_tests_are_identical;
 
-	printf("%sWelcome to the IPECC test applet.\n", KWHT);
+	printf("%sWelcome to the IPECC test applet.\n\r", KWHT);
 
 	/* Move the claptrap below rather in --help. */
 #if 0
-	printf("Reads test-vectors from standard-input, has them computed by hardware,\n");
-	printf("then checks that result matches what was expected.\n");
-	printf("Text format for tests is described in the IPECC doc.\n");
-	printf("(c.f Appendix \"Simulating & testing the IP\").%s\n", KNRM);
+	printf("Reads test-vectors from standard-input, has them computed by hardware,\n\r");
+	printf("then checks that result matches what was expected.\n\r");
+	printf("Text format for tests is described in the IPECC doc.\n\r");
+	printf("(c.f Appendix \"Simulating & testing the IP\").%s\n\r", KNRM);
 #endif
 
 #if 1
 	/* Is it a 'debug' or a 'production' version of the IP? */
 	if (hw_driver_is_debug(&debug_not_prod)) {
-		printf("%sError: Probing 'debug or production mode' triggered an error.%s\n", KERR, KNRM);
+		printf("%sError: Probing 'debug or production mode' triggered an error.%s\n\r", KERR, KNRM);
 		exit(EXIT_FAILURE);
 	}
 
 	if (debug_not_prod){
 		if (hw_driver_get_version_major(&version_major)){
-			printf("%sError: Probing major number triggered an error.%s\n", KERR, KNRM);
+			printf("%sError: Probing major number triggered an error.%s\n\r", KERR, KNRM);
 			exit(EXIT_FAILURE);
 		}
 		if (hw_driver_get_version_minor(&version_minor)){
-			printf("%sError: Probing minor number triggered an error.%s\n", KERR, KNRM);
+			printf("%sError: Probing minor number triggered an error.%s\n\r", KERR, KNRM);
 			exit(EXIT_FAILURE);
 		}
-		log_print("Debug mode (HW version %d.%d)\n", version_major, version_minor);
+		log_print("Debug mode (HW version %d.%d)\n\r", version_major, version_minor);
 		/*
 		 * We must activate, in the TRNG, the pulling of raw random bytes by the
 		 * post-processing function (because in debug mode it is disabled upon
 		 * reset).
 		 */
 		if (hw_driver_trng_post_proc_enable()){
-			printf("%sError: Enabling TRNG post-processing on hardware triggered an error.%s\n", KERR, KNRM);
+			printf("%sError: Enabling TRNG post-processing on hardware triggered an error.%s\n\r", KERR, KNRM);
 			exit(EXIT_FAILURE);
 		}
 	} else {
-		printf("Production mode.\n");
+		printf("Production mode.\n\r");
 	}
 #endif
 
@@ -484,7 +484,7 @@ int main(int argc, char *argv[])
 					line_type_expected = EXPECT_PX;
 				} else {
 					printf("%sError: Could not find any of the expected commands from "
-							"input file/stream.\n", KERR);
+							"input file/stream.\n\r", KERR);
 					print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_NONE')", __LINE__);
 				}
 				break;
@@ -497,11 +497,11 @@ int main(int argc, char *argv[])
 				if ( (strncmp(line, "nn=", strlen("nn="))) == 0 )
 				{
 					strtol_with_err(&line[3], &curve.nn);
-					PRINTF("%snn=%d\n%s", KINF, curve.nn, KNRM);
+					PRINTF("%snn=%d\n\r%s", KINF, curve.nn, KNRM);
 					line_type_expected = EXPECT_P;
 				} else {
 					printf("%sError: Could not find the expected token \"nn=\" "
-							"from input file/stream.\n", KERR);
+							"from input file/stream.\n\r", KERR);
 					print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_NN)'", __LINE__);
 				}
 				break;
@@ -519,7 +519,7 @@ int main(int argc, char *argv[])
 							line + strlen("p=0x"), test.curve->p.val, test.curve->nn, nread - strlen("p=0x")))
 					{
 						printf("%sError: Value of main curve parameter 'p' could not be extracted "
-								"from input file/stream.%s\n", KERR, KNRM);
+								"from input file/stream.%s\n\r", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_P')", __LINE__);
 					}
 					test.curve->p.sz = DIV(test.curve->nn, 8);
@@ -527,7 +527,7 @@ int main(int argc, char *argv[])
 					line_type_expected = EXPECT_A;
 				} else {
 					printf("%sError: Could not find the expected token \"p=0x\" "
-							"from input file/stream.%s\n", KERR, KNRM);
+							"from input file/stream.%s\n\r", KERR, KNRM);
 					print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_P')", __LINE__);
 				}
 				break;
@@ -545,7 +545,7 @@ int main(int argc, char *argv[])
 							line + strlen("a=0x"), test.curve->a.val, test.curve->nn, nread - strlen("a=0x")))
 					{
 						printf("%sError: Value of curve parameter 'a' could not be extracted "
-								"from input file/stream.%s\n", KERR, KNRM);
+								"from input file/stream.%s\n\r", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_A')", __LINE__);
 					}
 					test.curve->a.sz = DIV(test.curve->nn, 8);
@@ -553,7 +553,7 @@ int main(int argc, char *argv[])
 					line_type_expected = EXPECT_B;
 				} else {
 					printf("%sError: Could not find the expected token \"a=0x\" "
-							"from input file/stream.%s\n", KERR, KNRM);
+							"from input file/stream.%s\n\r", KERR, KNRM);
 					print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_A')", __LINE__);
 				}
 				break;
@@ -571,7 +571,7 @@ int main(int argc, char *argv[])
 							line + strlen("b=0x"), test.curve->b.val, test.curve->nn, nread - strlen("b=0x")))
 					{
 						printf("%sError: Value of curve parameter 'b' could not be extracted "
-								"from input file/stream.%s\n", KERR, KNRM);
+								"from input file/stream.%s\n\r", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_B')", __LINE__);
 					}
 					test.curve->b.sz = DIV(test.curve->nn, 8);
@@ -579,7 +579,7 @@ int main(int argc, char *argv[])
 					line_type_expected = EXPECT_Q;
 				} else {
 					printf("%sError: Could not find the expected token \"b=0x\" "
-							"from input file/stream.%s\n", KERR, KNRM);
+							"from input file/stream.%s\n\r", KERR, KNRM);
 					print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_B')", __LINE__);
 				}
 				break;
@@ -599,7 +599,7 @@ int main(int argc, char *argv[])
 							line + strlen("q=0x"), test.curve->q.val, test.curve->nn, nread - strlen("q=0x")))
 					{
 						printf("%sError: Value of curve parameter 'q' could not be extracted "
-								"from input file/stream.%s\n", KERR, KNRM);
+								"from input file/stream.%s\n\r", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_Q')", __LINE__);
 					}
 					test.curve->q.sz = DIV(test.curve->nn, 8);
@@ -610,13 +610,13 @@ int main(int argc, char *argv[])
 					 */
 					if (ip_set_curve(test.curve))
 					{
-						printf("%sError: Could not transmit curve parameters to driver.%s\n", KERR, KNRM);
+						printf("%sError: Could not transmit curve parameters to driver.%s\n\r", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_Q')", __LINE__);
 					}
 					line_type_expected = EXPECT_NONE;
 				} else {
 					printf("%sError: Could not find the expected token \"q=0x\" "
-							"from input file/stream.%s\n", KERR, KNRM);
+							"from input file/stream.%s\n\r", KERR, KNRM);
 					print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_B')", __LINE__);
 				}
 				break;
@@ -634,7 +634,7 @@ int main(int argc, char *argv[])
 							line + strlen("Px=0x"), test.ptp.x.val, test.curve->nn, nread - strlen("Px=0x")))
 					{
 						printf("%sError: Value of point coordinate 'Px' could not be extracted "
-								"from input file/stream.%s\n", KERR, KNRM);
+								"from input file/stream.%s\n\r", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_PX')", __LINE__);
 					}
 					/*
@@ -644,7 +644,7 @@ int main(int argc, char *argv[])
 					test.ptp.is_null = false;
 					line_type_expected = EXPECT_PY;
 				} else if ( (strncmp(line, "P=0", strlen("P=0"))) == 0 ) {
-					PRINTF("%sP=0\n%s", KINF, KNRM);
+					PRINTF("%sP=0\n\r%s", KINF, KNRM);
 					/*
 					 * Position point P to be null
 					 */
@@ -663,12 +663,12 @@ int main(int argc, char *argv[])
 					} else if ((test.op == OP_TST_EQU) || (test.op == OP_TST_OPP)) {
 						line_type_expected = EXPECT_QX;
 					} else {
-						printf("%sError: unknown or undefined type of operation.%s\n", KERR, KNRM);
+						printf("%sError: unknown or undefined type of operation.%s\n\r", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_PX')", __LINE__);
 					}
 				} else {
 					printf("%sError: Could not find one of the expected tokens \"Px=0x\" "
-							"or \"P=0\" from input file/stream.%s\n", KERR, KNRM);
+							"or \"P=0\" from input file/stream.%s\n\r", KERR, KNRM);
 					print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_PX')", __LINE__);
 				}
 				break;
@@ -686,7 +686,7 @@ int main(int argc, char *argv[])
 							line + strlen("Py=0x"), test.ptp.y.val, test.curve->nn, nread - strlen("Py=0x")))
 					{
 						printf("%sError: Value of point coordinate 'Py' could not be extracted "
-								"from input file/stream.%s\n", KERR, KNRM);
+								"from input file/stream.%s\n\r", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_PY')", __LINE__);
 					}
 					test.ptp.y.sz = DIV(test.curve->nn, 8);
@@ -704,12 +704,12 @@ int main(int argc, char *argv[])
 					} else if ((test.op == OP_TST_EQU) || (test.op == OP_TST_OPP)) {
 						line_type_expected = EXPECT_QX;
 					} else {
-						printf("%sError: unknown or undefined type of operation.%s\n", KERR, KNRM);
+						printf("%sError: unknown or undefined type of operation.%s\n\r", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_PY')", __LINE__);
 					}
 				} else {
 					printf("%sError: Could not find the expected token \"Py=0x\" "
-								"from input file/stream.%s\n", KERR, KNRM);
+								"from input file/stream.%s\n\r", KERR, KNRM);
 					print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_PY')", __LINE__);
 				}
 				break;
@@ -727,7 +727,7 @@ int main(int argc, char *argv[])
 							line + strlen("Qx=0x"), test.ptq.x.val, test.curve->nn, nread - strlen("Qx=0x")))
 					{
 						printf("%sError: Value of point coordinate 'Qx' could not be extracted "
-								"from input file/stream.%s\n", KERR, KNRM);
+								"from input file/stream.%s\n\r", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_QX')", __LINE__);
 					}
 					/*
@@ -737,7 +737,7 @@ int main(int argc, char *argv[])
 					test.ptq.is_null = false;
 					line_type_expected = EXPECT_QY;
 				} else if ( (strncmp(line, "Q=0", strlen("Q=0"))) == 0 ) {
-					PRINTF("%sQ=0\n%s", KINF, KNRM);
+					PRINTF("%sQ=0\n\r%s", KINF, KNRM);
 					/*
 					 * Position point Q to be null.
 					 */
@@ -750,12 +750,12 @@ int main(int argc, char *argv[])
 					} else if (test.op == OP_TST_OPP) {
 						line_type_expected = EXPECT_TRUE_OR_FALSE;
 					} else {
-						printf("%sError: unknown or undefined type of operation.%s\n", KERR, KNRM);
+						printf("%sError: unknown or undefined type of operation.%s\n\r", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_QX')", __LINE__);
 					}
 				} else {
 					printf("%sError: Could not find one of the expected tokens \"Qx=0x\" "
-							"or \"Q=0\" from input file/stream.%s\n", KERR, KNRM);
+							"or \"Q=0\" from input file/stream.%s\n\r", KERR, KNRM);
 					print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_QX')", __LINE__);
 				}
 				break;
@@ -775,7 +775,7 @@ int main(int argc, char *argv[])
 							line + strlen("Qy=0x"), test.ptq.y.val, test.curve->nn, nread - strlen("Qy=0x")))
 					{
 						printf("%sError: Value of point coordinate 'Qy' could not be extracted "
-								"from input file/stream.%s\n", KERR, KNRM);
+								"from input file/stream.%s\n\r", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_QY')", __LINE__);
 					}
 					test.ptq.y.sz = DIV(test.curve->nn, 8);
@@ -787,12 +787,12 @@ int main(int argc, char *argv[])
 					} else if (test.op == OP_TST_OPP) {
 						line_type_expected = EXPECT_TRUE_OR_FALSE;
 					} else {
-						printf("%sError: unknown or undefined type of operation.%s\n", KERR, KNRM);
+						printf("%sError: unknown or undefined type of operation.%s\n\r", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_QY')", __LINE__);
 					}
 				} else {
 					printf("%sError: Could not find the expected token \"Qy=0x\" "
-							"from input file/stream.%s\n", KERR, KNRM);
+							"from input file/stream.%s\n\r", KERR, KNRM);
 					print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_QY')", __LINE__);
 				}
 				break;
@@ -812,7 +812,7 @@ int main(int argc, char *argv[])
 							line + strlen("k=0x"), test.k.val, test.curve->nn, nread - strlen("k=0x")))
 					{
 						printf("%sError: Value of scalar number 'k' could not be extracted "
-								"from input file/stream.%s\n", KERR, KNRM);
+								"from input file/stream.%s\n\r", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_K')", __LINE__);
 					}
 					test.k.sz = DIV(test.curve->nn, 8);
@@ -820,7 +820,7 @@ int main(int argc, char *argv[])
 					line_type_expected = EXPECT_KPX_OR_BLD;
 				} else {
 					printf("%sError: Could not find the expected token \"k=0x\" "
-							"from input file/stream.%s\n", KERR, KNRM);
+							"from input file/stream.%s\n\r", KERR, KNRM);
 					print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_K')", __LINE__);
 				}
 				break;
@@ -834,7 +834,7 @@ int main(int argc, char *argv[])
 					PRINTF("%snbbld=%s%s", KINF, line + strlen("nbbld="), KNRM);
 					if (strtol_with_err(line + strlen("nbbld="), &test.blinding))
 					{
-						printf("%sError: while converting \"nbbld=\" argument to a number.%s\n", KERR, KNRM);
+						printf("%sError: while converting \"nbbld=\" argument to a number.%s\n\r", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_KPX_OR_BLD')", __LINE__);
 					}
 					/* Keep line_type_expected to EXPECT_KPX_OR_BLD to parse point [k]P coordinates */
@@ -847,7 +847,7 @@ int main(int argc, char *argv[])
 							line + strlen("kPx=0x"), test.pt_sw_res.x.val, test.curve->nn, nread - strlen("kPx=0x")))
 					{
 						printf("%sError: Value of point coordinate 'kPx' could not be extracted "
-								"from input file/stream.%s\n", KERR, KNRM);
+								"from input file/stream.%s\n\r", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_KPX_OR_BLD')", __LINE__);
 					}
 					/*
@@ -857,7 +857,7 @@ int main(int argc, char *argv[])
 					test.pt_sw_res.is_null = false;
 					line_type_expected = EXPECT_KPY;
 				} else if ( (strncmp(line, "kP=0", strlen("kP=0"))) == 0 ) {
-					PRINTF("%sExpected result point [k]P = 0\n%s", KINF, KNRM);
+					PRINTF("%sExpected result point [k]P = 0\n\r%s", KINF, KNRM);
 					/*
 					 * Record that expected result point [k]P should be null.
 					 */
@@ -868,7 +868,7 @@ int main(int argc, char *argv[])
 					 */
 					if (ip_set_pt_and_run_kp(&test))
 					{
-						printf("%sError: Computation of scalar multiplication on hardware triggered an error.%s\n", KERR, KNRM);
+						printf("%sError: Computation of scalar multiplication on hardware triggered an error.%s\n\r", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_KPX_OR_BLD')", __LINE__);
 					}
 					/*
@@ -876,7 +876,7 @@ int main(int argc, char *argv[])
 					 */
 					if (check_kp_result(&test, &stats, &result_pts_are_equal))
 					{
-						printf("%sError: Couldn't compare [k]P hardware result w/ the expected one.%s\n", KERR, KNRM);
+						printf("%sError: Couldn't compare [k]P hardware result w/ the expected one.%s\n\r", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_KPX_OR_BLD')", __LINE__);
 					}
 					/*
@@ -895,7 +895,7 @@ int main(int argc, char *argv[])
 #endif
 				} else {
 					printf("%sError: Could not find one of the expected tokens \"nbbld=\" "
-							"or \"kPx=0x\" or \"kP=0\" in input file/stream.%s\n", KERR, KNRM);
+							"or \"kPx=0x\" or \"kP=0\" in input file/stream.%s\n\r", KERR, KNRM);
 					print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_KPX_OR_BLD')", __LINE__);
 				}
 				break;
@@ -912,7 +912,7 @@ int main(int argc, char *argv[])
 							line + strlen("kPy=0x"), test.pt_sw_res.y.val, test.curve->nn, nread - strlen("kPy=0x")))
 					{
 						printf("%sError: Value of point coordinate 'kPy' could not be extracted "
-								"from input file/stream.%s\n", KERR, KNRM);
+								"from input file/stream.%s\n\r", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_KPY')", __LINE__);
 					}
 					test.pt_sw_res.y.sz = DIV(test.curve->nn, 8);
@@ -922,7 +922,7 @@ int main(int argc, char *argv[])
 					 */
 					if (ip_set_pt_and_run_kp(&test))
 					{
-						printf("%sError: Computation of scalar multiplication on hardware triggered an error.%s\n", KERR, KNRM);
+						printf("%sError: Computation of scalar multiplication on hardware triggered an error.%s\n\r", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_KPY')", __LINE__);
 					}
 					/*
@@ -930,7 +930,7 @@ int main(int argc, char *argv[])
 					 */
 					if (check_kp_result(&test, &stats, &result_pts_are_equal))
 					{
-						printf("%sError: Couldn't compare [k]P hardware result w/ the expected one.%s\n", KERR, KNRM);
+						printf("%sError: Couldn't compare [k]P hardware result w/ the expected one.%s\n\r", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_KPY')", __LINE__);
 					}
 					/*
@@ -949,7 +949,7 @@ int main(int argc, char *argv[])
 #endif
 				} else {
 					printf("%sError: Could not find the expected token \"kPy=0x\" "
-							"in input file/stream.%s\n", KERR, KNRM);
+							"in input file/stream.%s\n\r", KERR, KNRM);
 					print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_KPY')", __LINE__);
 				}
 				break;
@@ -968,7 +968,7 @@ int main(int argc, char *argv[])
 							line + strlen("PplusQx=0x"), test.pt_sw_res.x.val, test.curve->nn, nread - strlen("PplusQx=0x")))
 					{
 						printf("%sError: Value of point coordinate '(P+Q).x' could not be extracted "
-								"from input file/stream.%s\n", KERR, KNRM);
+								"from input file/stream.%s\n\r", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_P_PLUS_QX')", __LINE__);
 					}
 					test.pt_sw_res.x.sz = DIV(test.curve->nn, 8);
@@ -983,7 +983,7 @@ int main(int argc, char *argv[])
 					 */
 					if (ip_set_pts_and_run_ptadd(&test))
 					{
-						printf("%sError: Computation of P + Q on hardware triggered an error.%s\n", KERR, KNRM);
+						printf("%sError: Computation of P + Q on hardware triggered an error.%s\n\r", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_P_PLUS_QX')", __LINE__);
 					}
 					/*
@@ -991,7 +991,7 @@ int main(int argc, char *argv[])
 					 */
 					if (check_ptadd_result(&test, &stats, &result_pts_are_equal))
 					{
-						printf("%sError: Couldn't compare P + Q hardware result w/ the expected one.%s\n", KERR, KNRM);
+						printf("%sError: Couldn't compare P + Q hardware result w/ the expected one.%s\n\r", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_P_PLUS_QX')", __LINE__);
 					}
 					/*
@@ -1010,7 +1010,7 @@ int main(int argc, char *argv[])
 #endif
 				} else {
 					printf("%sError: Could not find one of the expected tokens \"PplusQx=0x\" "
-							"or \"(P+Q)=0\" in input file/stream.%s\n", KERR, KNRM);
+							"or \"(P+Q)=0\" in input file/stream.%s\n\r", KERR, KNRM);
 					print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_KPY')", __LINE__);
 				}
 				break;
@@ -1030,7 +1030,7 @@ int main(int argc, char *argv[])
 							nread - strlen("PplusQy=0x")))
 					{
 						printf("%sError: Value of point coordinate '(P+Q).y' could not be extracted "
-								"from input file/stream.%s\n", KERR, KNRM);
+								"from input file/stream.%s\n\r", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_P_PLUS_QY')", __LINE__);
 					}
 					test.pt_sw_res.y.sz = DIV(test.curve->nn, 8);
@@ -1040,7 +1040,7 @@ int main(int argc, char *argv[])
 					 */
 					if (ip_set_pts_and_run_ptadd(&test))
 					{
-						printf("%sError: Computation of P + Q on hardware triggered an error.%s\n", KERR, KNRM);
+						printf("%sError: Computation of P + Q on hardware triggered an error.%s\n\r", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_P_PLUS_QY')", __LINE__);
 					}
 					/*
@@ -1048,7 +1048,7 @@ int main(int argc, char *argv[])
 					 */
 					if (check_ptadd_result(&test, &stats, &result_pts_are_equal))
 					{
-						printf("%sError: Couldn't compare P + Q hardware result w/ the expected one.%s\n", KERR, KNRM);
+						printf("%sError: Couldn't compare P + Q hardware result w/ the expected one.%s\n\r", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_P_PLUS_QY')", __LINE__);
 					}
 					/*
@@ -1067,7 +1067,7 @@ int main(int argc, char *argv[])
 #endif
 				} else {
 					printf("%sError: Could not find the expected token \"PplusQy=0x\" "
-							"in input file/stream.%s\n", KERR, KNRM);
+							"in input file/stream.%s\n\r", KERR, KNRM);
 					print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_P_PLUS_QY')", __LINE__);
 				}
 				break;
@@ -1087,14 +1087,14 @@ int main(int argc, char *argv[])
 							nread - strlen("twoPx=0x")))
 					{
 						printf("%sError: Value of point coordinate '[2]P.x' could not be extracted "
-								"from input file/stream.%s\n", KERR, KNRM);
+								"from input file/stream.%s\n\r", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_TWOP_X')", __LINE__);
 					}
 					test.pt_sw_res.x.sz = DIV(test.curve->nn, 8);
 					test.pt_sw_res.is_null = false;
 					line_type_expected = EXPECT_TWOP_Y;
 				} else if ( (strncmp(line, "twoP=0", strlen("twoP=0"))) == 0 ) {
-					PRINTF("%s[2]P=0\n%s", KINF, KNRM);
+					PRINTF("%s[2]P=0\n\r%s", KINF, KNRM);
 					test.pt_sw_res.is_null = true;
 					test.pt_sw_res.valid = true;
 					/*
@@ -1102,7 +1102,7 @@ int main(int argc, char *argv[])
 					 */
 					if (ip_set_pt_and_run_ptdbl(&test))
 					{
-						printf("%sError: Computation of [2]P on hardware triggered an error.%s\n", KERR, KNRM);
+						printf("%sError: Computation of [2]P on hardware triggered an error.%s\n\r", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_TWOP_X')", __LINE__);
 					}
 					/*
@@ -1110,7 +1110,7 @@ int main(int argc, char *argv[])
 					 */
 					if (check_ptdbl_result(&test, &stats, &result_pts_are_equal))
 					{
-						printf("%sError: Couldn't compare [2]P hardware result w/ the expected one.%s\n", KERR, KNRM);
+						printf("%sError: Couldn't compare [2]P hardware result w/ the expected one.%s\n\r", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_TWOP_X')", __LINE__);
 					}
 					/*
@@ -1129,7 +1129,7 @@ int main(int argc, char *argv[])
 #endif
 				} else {
 					printf("%sError: Could not find one of the expected tokens \"twoPx=0x\" "
-							"or \"twoP=0\" from input file/stream.%s\n", KERR, KNRM);
+							"or \"twoP=0\" from input file/stream.%s\n\r", KERR, KNRM);
 					print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_TWOP_X')", __LINE__);
 				}
 				break;
@@ -1149,7 +1149,7 @@ int main(int argc, char *argv[])
 							nread - strlen("twoPy=0x")))
 					{
 						printf("%sError: Value of point coordinate '[2]P.y' could not be extracted "
-								"from input file/stream.%s\n", KERR, KNRM);
+								"from input file/stream.%s\n\r", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_TWOP_Y')", __LINE__);
 					}
 					test.pt_sw_res.y.sz = DIV(test.curve->nn, 8);
@@ -1159,7 +1159,7 @@ int main(int argc, char *argv[])
 					 */
 					if (ip_set_pt_and_run_ptdbl(&test))
 					{
-						printf("%sError: Computation of [2]P on hardware triggered an error.%s\n", KERR, KNRM);
+						printf("%sError: Computation of [2]P on hardware triggered an error.%s\n\r", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_TWOP_Y')", __LINE__);
 					}
 					/*
@@ -1167,7 +1167,7 @@ int main(int argc, char *argv[])
 					 */
 					if (check_ptdbl_result(&test, &stats, &result_pts_are_equal))
 					{
-						printf("%sError: Couldn't compare [2]P hardware result w/ the expected one.%s\n", KERR, KNRM);
+						printf("%sError: Couldn't compare [2]P hardware result w/ the expected one.%s\n\r", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_TWOP_Y')", __LINE__);
 					}
 					/*
@@ -1186,7 +1186,7 @@ int main(int argc, char *argv[])
 #endif
 				} else {
 					printf("%sError: Could not find the expected token \"twoPy=0x\" "
-							"in input file/stream.%s\n", KERR, KNRM);
+							"in input file/stream.%s\n\r", KERR, KNRM);
 					print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_TWOP_Y')", __LINE__);
 				}
 				break;
@@ -1206,14 +1206,14 @@ int main(int argc, char *argv[])
 							nread - strlen("negPx=0x")))
 					{
 						printf("%sError: Value of point coordinate '(-P).x' could not be extracted "
-								"from input file/stream.%s\n", KERR, KNRM);
+								"from input file/stream.%s\n\r", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_NEGP_X')", __LINE__);
 					}
 					test.pt_sw_res.x.sz = DIV(test.curve->nn, 8);
 					test.pt_sw_res.is_null = false;
 					line_type_expected = EXPECT_NEGP_Y;
 				} else if ( (strncmp(line, "negP=0", strlen("negP=0"))) == 0 ) {
-					PRINTF("%s-P=0\n%s", KINF, KNRM);
+					PRINTF("%s-P=0\n\r%s", KINF, KNRM);
 					test.pt_sw_res.is_null = true;
 					test.pt_sw_res.valid = true;
 					/*
@@ -1221,7 +1221,7 @@ int main(int argc, char *argv[])
 					 */
 					if (ip_set_pt_and_run_ptneg(&test))
 					{
-						printf("%sError: Computation of -P on hardware triggered an error.%s\n", KERR, KNRM);
+						printf("%sError: Computation of -P on hardware triggered an error.%s\n\r", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_NEGP_X')", __LINE__);
 					}
 					/*
@@ -1229,7 +1229,7 @@ int main(int argc, char *argv[])
 					 */
 					if (check_ptneg_result(&test, &stats, &result_pts_are_equal))
 					{
-						printf("%sError: Couldn't compare -P hardware result w/ the expected one.%s\n", KERR, KNRM);
+						printf("%sError: Couldn't compare -P hardware result w/ the expected one.%s\n\r", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_NEGP_X')", __LINE__);
 					}
 					/*
@@ -1248,7 +1248,7 @@ int main(int argc, char *argv[])
 #endif
 				} else {
 					printf("%sError: Could not find one of the expected tokens \"negPx=0x\" "
-							"or \"negP=0\" in input file/stream.%s\n", KERR, KNRM);
+							"or \"negP=0\" in input file/stream.%s\n\r", KERR, KNRM);
 					print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_NEGP_X')", __LINE__);
 				}
 				break;
@@ -1268,7 +1268,7 @@ int main(int argc, char *argv[])
 							nread - strlen("negPy=0x")))
 					{
 						printf("%sError: Value of point coordinate '(-P).y' could not be extracted "
-								"from input file/stream.%s\n", KERR, KNRM);
+								"from input file/stream.%s\n\r", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_NEGP_Y')", __LINE__);
 					}
 					test.pt_sw_res.y.sz = DIV(test.curve->nn, 8);
@@ -1278,7 +1278,7 @@ int main(int argc, char *argv[])
 					 */
 					if (ip_set_pt_and_run_ptneg(&test))
 					{
-						printf("%sError: Computation of -P on hardware triggered an error.%s\n", KERR, KNRM);
+						printf("%sError: Computation of -P on hardware triggered an error.%s\n\r", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_NEGP_Y')", __LINE__);
 					}
 					/*
@@ -1286,7 +1286,7 @@ int main(int argc, char *argv[])
 					 */
 					if (check_ptneg_result(&test, &stats, &result_pts_are_equal))
 					{
-						printf("%sError: Couldn't compare -P hardware result w/ the expected one.%s\n", KERR, KNRM);
+						printf("%sError: Couldn't compare -P hardware result w/ the expected one.%s\n\r", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_NEGP_Y')", __LINE__);
 					}
 					/*
@@ -1305,7 +1305,7 @@ int main(int argc, char *argv[])
 #endif
 				} else {
 					printf("%sError: Could not find the expected token \"negPy=0x\" "
-							"from input file/stream.%s\n", KERR, KNRM);
+							"from input file/stream.%s\n\r", KERR, KNRM);
 					print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_NEGP_Y')", __LINE__);
 				}
 				break;
@@ -1316,7 +1316,7 @@ int main(int argc, char *argv[])
 				 * Parse line to extract test answer (true or false)
 				 */
 				if ( (strncasecmp(line, "true", strlen("true"))) == 0 ) {
-					PRINTF("%sanswer is true\n%s", KINF, KNRM);
+					PRINTF("%sanswer is true\n\r%s", KINF, KNRM);
 					switch (test.op) {
 						case OP_TST_CHK:
 						case OP_TST_EQU:
@@ -1325,13 +1325,13 @@ int main(int argc, char *argv[])
 							test.sw_answer.valid = true;
 							break;
 						default:{
-							printf("%sError: Invalid test type.%s\n", KERR, KNRM);
+							printf("%sError: Invalid test type.%s\n\r", KERR, KNRM);
 							print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_TRUE_OR_FALSE')", __LINE__);
 							break;
 						}
 					}
 				} else if ( (strncasecmp(line, "false", strlen("false"))) == 0 ) {
-					PRINTF("%sanswer is false\n%s", KINF, KNRM);
+					PRINTF("%sanswer is false\n\r%s", KINF, KNRM);
 					switch (test.op) {
 						case OP_TST_CHK:
 						case OP_TST_EQU:
@@ -1340,13 +1340,13 @@ int main(int argc, char *argv[])
 							test.sw_answer.valid = true;
 							break;
 						default:
-							printf("%sError: Invalid test type.%s\n", KERR, KNRM);
+							printf("%sError: Invalid test type.%s\n\r", KERR, KNRM);
 							print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_TRUE_OR_FALSE')", __LINE__);
 							break;
 					}
 				} else {
 					printf("%sError: Could not find one of the expected tokens \"true\" "
-							"or \"false\" from input file/stream for test \"%s\".%s\n", KERR, KNRM,
+							"or \"false\" from input file/stream for test \"%s\".%s\n\r", KERR, KNRM,
 							( test.op == OP_TST_CHK ? "OP_TST_CHK" : (test.op == OP_TST_EQU ? "OP_TST_EQU" :
 							  (test.op == OP_TST_OPP ? "OP_TST_OPP" : "UNKNOWN_TEST"))));
 					print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_TRUE_OR_FALSE')", __LINE__);
@@ -1358,7 +1358,7 @@ int main(int argc, char *argv[])
 					case OP_TST_CHK:{
 						if (ip_set_pt_and_check_on_curve(&test))
 						{
-							printf("%sError: Point test \"is on curve?\" on hardware triggered an error.%s\n", KERR, KNRM);
+							printf("%sError: Point test \"is on curve?\" on hardware triggered an error.%s\n\r", KERR, KNRM);
 							print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_TRUE_OR_FALSE')", __LINE__);
 						}
 						break;
@@ -1366,7 +1366,7 @@ int main(int argc, char *argv[])
 					case OP_TST_EQU:{
 						if (ip_set_pts_and_test_equal(&test))
 						{
-							printf("%sError: Point test \"are pts equal?\" on hardware triggered an error.%s\n", KERR, KNRM);
+							printf("%sError: Point test \"are pts equal?\" on hardware triggered an error.%s\n\r", KERR, KNRM);
 							print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_TRUE_OR_FALSE')", __LINE__);
 						}
 						break;
@@ -1374,13 +1374,13 @@ int main(int argc, char *argv[])
 					case OP_TST_OPP:{
 						if (ip_set_pts_and_test_oppos(&test))
 						{
-							printf("%sError: Point test \"are pts opposite?\" on hardware triggered an error.%s\n", KERR, KNRM);
+							printf("%sError: Point test \"are pts opposite?\" on hardware triggered an error.%s\n\r", KERR, KNRM);
 							print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_TRUE_OR_FALSE')", __LINE__);
 						}
 						break;
 					}
 					default:{
-						printf("%sError: Invalid test type.%s\n", KERR, KNRM);
+						printf("%sError: Invalid test type.%s\n\r", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_TRUE_OR_FALSE')", __LINE__);
 						break;
 					}
@@ -1393,7 +1393,7 @@ int main(int argc, char *argv[])
 						if (check_test_oncurve(&test, &stats, &result_tests_are_identical))
 						{
 							printf("%sError: Couldn't compare hardware result to test \"is on curve?\" "
-									"w/ the expected one.%s\n", KERR, KNRM);
+									"w/ the expected one.%s\n\r", KERR, KNRM);
 							print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_TRUE_OR_FALSE')", __LINE__);
 						}
 						break;
@@ -1402,7 +1402,7 @@ int main(int argc, char *argv[])
 						if (check_test_equal(&test, &stats, &result_tests_are_identical))
 						{
 							printf("%sError: Couldn't compare hardware result to test \"are pts equal?\" "
-									"w/ the expected one.%s\n", KERR, KNRM);
+									"w/ the expected one.%s\n\r", KERR, KNRM);
 							print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_TRUE_OR_FALSE')", __LINE__);
 						}
 						break;
@@ -1411,13 +1411,13 @@ int main(int argc, char *argv[])
 						if (check_test_oppos(&test, &stats, &result_tests_are_identical))
 						{
 							printf("%sError: Couldn't compare hardware result to test \"are pts opposite?\" "
-									"w/ the expected one.%s\n", KERR, KNRM);
+									"w/ the expected one.%s\n\r", KERR, KNRM);
 							print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_TRUE_OR_FALSE')", __LINE__);
 						}
 						break;
 					}
 					default:{
-						printf("%sError: Invalid test type.%s\n", KERR, KNRM);
+						printf("%sError: Invalid test type.%s\n\r", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_TRUE_OR_FALSE')", __LINE__);
 						break;
 					}

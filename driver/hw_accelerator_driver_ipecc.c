@@ -1651,7 +1651,7 @@ static inline void ip_ecc_log(const char *s)
 	/* Print our current status and error */
 	log_print("Status: 0x"IPECC_WORD_FMT", Error: ", IPECC_GET_REG(IPECC_R_STATUS));
 	ip_ecc_errors_print(IPECC_GET_ERROR());
-	log_print("\n");
+	log_print("\n\r");
 
 	return;
 }
@@ -1699,7 +1699,7 @@ static inline int ip_ecc_check_error(ip_ecc_error *out)
 #if defined(WITH_EC_HW_DEBUG)
 		printf("HW ACCEL: status: 0x"IPECC_WORD_FMT", DBG status: 0x"IPECC_WORD_FMT", got error flag 0x"IPECC_WORD_FMT":", IPECC_GET_REG(IPECC_R_STATUS), IPECC_GET_REG(IPECC_R_DBG_STATUS), err);
 		ip_ecc_errors_print(err);
-		printf("\n");
+		printf("\n\r");
 #endif
 		ret = -1;
 		/* Ack the errors */
@@ -2744,14 +2744,14 @@ static inline int driver_setup(void)
 			goto err;
 		}
 #if 0
-		log_print("Waiting for 2s back from hw_driver_setup() & B4 soft reset...\n");
+		log_print("Waiting for 2s back from hw_driver_setup() & B4 soft reset...\n\r");
 		sleep(2);
 #endif
 		/* Reset the IP for a clean state */
 		IPECC_SOFT_RESET();
 
 #if 0
-		log_print("Waiting for 2s after soft reset...\n");
+		log_print("Waiting for 2s after soft reset...\n\r");
 		sleep(2);
 #endif
 
@@ -2759,7 +2759,7 @@ static inline int driver_setup(void)
 		/* Reset the pseudo TRNG device to empty its FIFO of pseudo raw random bytes */
 		IPECC_PSEUDOTRNG_SOFT_RESET();
 
-		log_print("Waiting for 2s after soft pseudo TRNG reset...\n");
+		log_print("Waiting for 2s after soft pseudo TRNG reset...\n\r");
 		sleep(2);
 #endif
 
@@ -3564,7 +3564,7 @@ int hw_driver_mul(const unsigned char *x, unsigned int x_sz, const unsigned char
 	unsigned char token[4096] = {0, }; /* Heck, a whole page? Yes indeed. */
 
 	if(driver_setup()){
-		log_print("In hw_driver_mul(): Error in driver_setup()\n");
+		log_print("In hw_driver_mul(): Error in driver_setup()\n\r");
 		goto err;
 	}
 
@@ -3576,82 +3576,82 @@ int hw_driver_mul(const unsigned char *x, unsigned int x_sz, const unsigned char
 	 * allocated to the token on the stack.
 	 */
 	if(ip_ecc_nn_bytes_from_bits_sz(ip_ecc_get_nn_bit_size()) > 4096){
-		log_print("In hw_driver_mul(): Error in ip_ecc_nn_bytes_from_bits_sz()\n");
+		log_print("In hw_driver_mul(): Error in ip_ecc_nn_bytes_from_bits_sz()\n\r");
 		goto err;
 	}
 
 	/* Preserve our inf flags in a constant time fashion */
 	if(ip_ecc_get_r0_inf(&inf_r0)){
-		log_print("In hw_driver_mul(): Error in ip_ecc_get_r0_inf()\n");
+		log_print("In hw_driver_mul(): Error in ip_ecc_get_r0_inf()\n\r");
 		goto err;
 	}
 	if(ip_ecc_get_r1_inf(&inf_r1)){
-		log_print("In hw_driver_mul(): Error in ip_ecc_get_r1_inf()\n");
+		log_print("In hw_driver_mul(): Error in ip_ecc_get_r1_inf()\n\r");
 		goto err;
 	}
 
 	/* Get the random one-shot token */
 	if (ip_ecc_get_token(token, nn_sz)){
-		log_print("In hw_driver_mul(): Error in ip_ecc_get_token()\n");
+		log_print("In hw_driver_mul(): Error in ip_ecc_get_token()\n\r");
 		goto err;
 	}
 
 	/* Write our scalar register with the scalar k */
 	if(ip_ecc_write_bignum(scalar, scalar_sz, EC_HW_REG_SCALAR)){
-		log_print("In hw_driver_mul(): Error in ip_ecc_write_bignum()\n");
+		log_print("In hw_driver_mul(): Error in ip_ecc_write_bignum()\n\r");
 		goto err;
 	}
 	/* Write our R1 register with the point to be multiplied */
 	if(ip_ecc_write_bignum(x, x_sz, EC_HW_REG_R1_X)){
-		log_print("In hw_driver_mul(): Error in ip_ecc_write_bignum()\n");
+		log_print("In hw_driver_mul(): Error in ip_ecc_write_bignum()\n\r");
 		goto err;
 	}
 	if(ip_ecc_write_bignum(y, y_sz, EC_HW_REG_R1_Y)){
-		log_print("In hw_driver_mul(): Error in ip_ecc_write_bignum()\n");
+		log_print("In hw_driver_mul(): Error in ip_ecc_write_bignum()\n\r");
 		goto err;
 	}
 
 	/* Restore our inf flags in a constant time fashion */
 	if(ip_ecc_set_r0_inf(inf_r0)){
-		log_print("In hw_driver_mul(): Error in ip_ecc_set_r0_inf()\n");
+		log_print("In hw_driver_mul(): Error in ip_ecc_set_r0_inf()\n\r");
 		goto err;
 	}
 	if(ip_ecc_set_r1_inf(inf_r1)){
-		log_print("In hw_driver_mul(): Error in ip_ecc_set_r1_inf()\n");
+		log_print("In hw_driver_mul(): Error in ip_ecc_set_r1_inf()\n\r");
 		goto err;
 	}
 
 	/* Execute our [k]P command */
 	if(ip_ecc_exec_command(PT_KP, NULL)){
-		log_print("In hw_driver_mul(): Error in ip_ecc_exec_command()\n");
+		log_print("In hw_driver_mul(): Error in ip_ecc_exec_command()\n\r");
 		goto err;
 	}
 
 	/* Get back the result from R1 */
 	if(((*out_x_sz) < nn_sz) || ((*out_y_sz) < nn_sz)){
-		log_print("In hw_driver_mul(): *out_x_sz = %d\n", *out_x_sz);
-		log_print("In hw_driver_mul(): *out_y_sz = %d\n", *out_y_sz);
-		log_print("In hw_driver_mul(): nn_sz = %d\n", nn_sz);
-		log_print("In hw_driver_mul(): Error in sizes' comparison\n");
+		log_print("In hw_driver_mul(): *out_x_sz = %d\n\r", *out_x_sz);
+		log_print("In hw_driver_mul(): *out_y_sz = %d\n\r", *out_y_sz);
+		log_print("In hw_driver_mul(): nn_sz = %d\n\r", nn_sz);
+		log_print("In hw_driver_mul(): Error in sizes' comparison\n\r");
 		goto err;
 	}
 	(*out_x_sz) = (*out_y_sz) = nn_sz;
 	if(ip_ecc_read_bignum(out_x, (*out_x_sz), EC_HW_REG_R1_X)){
-		log_print("In hw_driver_mul(): Error in ip_ecc_read_bignum()\n");
+		log_print("In hw_driver_mul(): Error in ip_ecc_read_bignum()\n\r");
 		goto err;
 	}
 	if(ip_ecc_read_bignum(out_y, (*out_y_sz), EC_HW_REG_R1_Y)){
-		log_print("In hw_driver_mul(): Error in ip_ecc_read_bignum()\n");
+		log_print("In hw_driver_mul(): Error in ip_ecc_read_bignum()\n\r");
 		goto err;
 	}
 
 	/* Unmask the [k]P result coordinates with the one-shot token */
 	if (ip_ecc_unmask_with_token(out_x, (*out_x_sz), token, nn_sz, out_x, out_x_sz)) {
-		log_print("In hw_driver_mul(): Error in ip_ecc_unmask_with_token()\n");
+		log_print("In hw_driver_mul(): Error in ip_ecc_unmask_with_token()\n\r");
 		goto err;
 	}
 	if (ip_ecc_unmask_with_token(out_y, (*out_y_sz), token, nn_sz, out_y, out_y_sz)) {
-		log_print("In hw_driver_mul(): Error in ip_ecc_unmask_with_token()\n");
+		log_print("In hw_driver_mul(): Error in ip_ecc_unmask_with_token()\n\r");
 		goto err;
 	};
 

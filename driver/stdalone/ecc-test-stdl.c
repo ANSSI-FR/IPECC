@@ -18,7 +18,7 @@
 
 #define EG(a, b) do {						\
 	if(a){							\
-		printf("Error: line %d: %s\n", __LINE__, b);	\
+		printf("Error: line %d: %s\n\r", __LINE__, b);	\
 		/* Reset the IP */				\
 		hw_driver_reset();				\
 		/*exit(-1);*/					\
@@ -33,7 +33,7 @@ static inline void hexdump(const char *str, const unsigned char *in, unsigned in
 	for(i = 0; i < sz; i++){
 		printf("%02x", in[i]);
 	}
-	printf("\n");
+	printf("\n\r");
 }
 
 static inline int print_point(const char *prefix, const unsigned char *x, unsigned int x_sz, const unsigned char *y, unsigned int y_sz){
@@ -57,7 +57,7 @@ static inline int print_zeros(void)
 	if(ret){
 		goto err;
 	}
-	printf("Iszero R0: %d, Iszero R1: %d\n", iszero0, iszero1);
+	printf("Iszero R0: %d, Iszero R1: %d\n\r", iszero0, iszero1);
 
 	ret = 0;
 err:
@@ -80,14 +80,14 @@ int main(int argc, char *argv[])
 	/* The output */
 	unsigned char Poutx[1024], Pouty[1024];
 
-	printf("Welcome to the driver test!\n");
+	printf("Welcome to the driver test!\n\r");
 
 	/* Parse all our tests and execute them */
 	for(i = 0; i < (sizeof(ipecc_all_tests) / sizeof(ipecc_test)); i++){
 		unsigned int szx, szy;
 
 		ipecc_test t = ipecc_all_tests[i];
-		printf("== Test %s\n", t.name);
+		printf("== Test %s\n\r", t.name);
 		/* Set the blinding if necessary */
 		if(t.blinding){
 			ret = hw_driver_set_blinding(t.blinding); EG(ret, "blinding");
@@ -101,7 +101,7 @@ int main(int argc, char *argv[])
 		/* Set the curve */
 		if(t.nn_sz){
 			unsigned int new_sz = _BYTE_CEIL(t.nn_sz);
-printf("nn=%d\n", 8 * new_sz);
+printf("nn=%d\n\r", 8 * new_sz);
 hexdump("a=0x", END_OF_BUF(t.a, new_sz), new_sz);
 hexdump("b=0x", END_OF_BUF(t.b, new_sz), new_sz);
 hexdump("p=0x", END_OF_BUF(t.p, new_sz), new_sz);
@@ -169,7 +169,7 @@ hexdump("q=0x", END_OF_BUF(t.q, new_sz), new_sz);
 				else{
 					ret = hw_driver_is_on_curve(t.Px, t.Px_sz, t.Py, t.Py_sz, &oncurve); EG(ret, "driver_is_on_curve");
 				}
-				printf("Is on curve: %d\n", oncurve);
+				printf("Is on curve: %d\n\r", oncurve);
 				break;
 			}
 			case PT_EQU:{
@@ -189,7 +189,7 @@ hexdump("q=0x", END_OF_BUF(t.q, new_sz), new_sz);
 				else{
 					ret = hw_driver_eq(t.Px, t.Px_sz, t.Py, t.Py_sz, t.Qx, t.Qx_sz, t.Qy, t.Qy_sz, &equal); EG(ret, "driver_eq");
 				}
-				printf("Are equal: %d\n", equal);
+				printf("Are equal: %d\n\r", equal);
 				break;
 			}
 			case PT_OPP:{
@@ -209,7 +209,7 @@ hexdump("q=0x", END_OF_BUF(t.q, new_sz), new_sz);
 				else{
 					ret = hw_driver_opp(t.Px, t.Px_sz, t.Py, t.Py_sz, t.Qx, t.Qx_sz, t.Qy, t.Qy_sz, &opposite); EG(ret, "driver_opp");
 				}
-				printf("Are opposite: %d\n", opposite);
+				printf("Are opposite: %d\n\r", opposite);
 				break;
 			}
 			case PT_KP:{
@@ -250,7 +250,7 @@ hexdump("Py=0x", END_OF_BUF(t.Py, new_sz), new_sz);
 				break;
 			}
 			default:{
-				printf("Error: unkown IPECC commanf %d\n", t.cmd);
+				printf("Error: unkown IPECC commanf %d\n\r", t.cmd);
 				exit(-1);
 			}
 		}
@@ -266,7 +266,7 @@ hexdump("Py=0x", END_OF_BUF(t.Py, new_sz), new_sz);
 	/* The output */
 	unsigned char Poutx[32], Pouty[32];
 
-	printf("Welcome to the driver test!\n");
+	printf("Welcome to the driver test!\n\r");
 
 
        const unsigned char a[] = {
@@ -325,210 +325,210 @@ hexdump("Py=0x", END_OF_BUF(t.Py, new_sz), new_sz);
                0x00
        };
 
-	printf("==== SET CURVE ====\n");
+	printf("==== SET CURVE ====\n\r");
 	ret = hw_driver_set_curve(a, sizeof(a), b, sizeof(b), p, sizeof(p), q, sizeof(q));
 	if(ret){
-		printf("Error!\n");
+		printf("Error!\n\r");
 		exit(-1);
 	}
-	printf("==== ON CURVE ====\n");
+	printf("==== ON CURVE ====\n\r");
 	ret = hw_driver_is_on_curve(Px, sizeof(Px), Py, sizeof(Py), &oncurve);
 	if(ret){
-		printf("Error!\n");
+		printf("Error!\n\r");
 		exit(-1);
 	}
-	printf("On curve: %d\n", oncurve);
-	printf("==== SCAL MUL ====\n");
+	printf("On curve: %d\n\r", oncurve);
+	printf("==== SCAL MUL ====\n\r");
 	unsigned int szx = sizeof(Poutx);
 	unsigned int szy = sizeof(Pouty);
 	ret = hw_driver_mul(Px, sizeof(Px), Py, sizeof(Py), scal0, sizeof(scal0), Poutx, &szx, Pouty, &szy);
 	if(ret){
-		printf("Error!\n");
+		printf("Error!\n\r");
 		exit(-1);
 	}
 	hexdump("Px ", Poutx, 32);
 	hexdump("Py ", Pouty, 32);
 
-	printf("==== SCAL MUL  ====\n");
+	printf("==== SCAL MUL  ====\n\r");
 	szx = sizeof(Poutx);
 	szy = sizeof(Pouty);
 	ret = hw_driver_mul(Px, sizeof(Px), Py, sizeof(Py), scal1, sizeof(scal1), Poutx, &szx, Pouty, &szy);
 	if(ret){
-		printf("Error!\n");
+		printf("Error!\n\r");
 		exit(-1);
 	}
 	hexdump("Px: ", Poutx, 32);
 	hexdump("Py: ", Pouty, 32);
 
-	printf("==== DBL       ====\n");
+	printf("==== DBL       ====\n\r");
 	szx = sizeof(Poutx);
 	szy = sizeof(Pouty);
 	ret = hw_driver_dbl(Px, sizeof(Px), Py, sizeof(Py), Poutx, &szx, Pouty, &szy);
 	if(ret){
-		printf("Error!\n");
+		printf("Error!\n\r");
 		exit(-1);
 	}
 	hexdump("Px: ", Poutx, 32);
 	hexdump("Py: ", Pouty, 32);
 
-	printf("==== ADD       ====\n");
+	printf("==== ADD       ====\n\r");
 	szx = sizeof(Poutx);
 	szy = sizeof(Pouty);
 	ret = hw_driver_add(Px, sizeof(Px), Py, sizeof(Py), Poutx, szx, Pouty, szy, Poutx, &szx, Pouty, &szy);
 	if(ret){
-		printf("Error!\n");
+		printf("Error!\n\r");
 		exit(-1);
 	}
 	hexdump("Px: ", Poutx, 32);
 	hexdump("Py: ", Pouty, 32);
 
-	printf("==== SCAL MUL  ====\n");
+	printf("==== SCAL MUL  ====\n\r");
 	szx = sizeof(Poutx);
 	szy = sizeof(Pouty);
 	ret = hw_driver_mul(Px, sizeof(Px), Py, sizeof(Py), scal3, sizeof(scal3), Poutx, &szx, Pouty, &szy);
 	if(ret){
-		printf("Error!\n");
+		printf("Error!\n\r");
 		exit(-1);
 	}
 	hexdump("Px: ", Poutx, 32);
 	hexdump("Py: ", Pouty, 32);
 
-	printf("==== NEG       ====\n");
+	printf("==== NEG       ====\n\r");
 	szx = sizeof(Poutx);
 	szy = sizeof(Pouty);
 	ret = hw_driver_neg(Px, sizeof(Px), Py, sizeof(Py), Poutx, &szx, Pouty, &szy);
 	if(ret){
-		printf("Error!\n");
+		printf("Error!\n\r");
 		exit(-1);
 	}
 	hexdump("Px: ", Poutx, 32);
 	hexdump("Py: ", Pouty, 32);
 
-	printf("==== ADD       ====\n");
+	printf("==== ADD       ====\n\r");
 	szx = sizeof(Poutx);
 	szy = sizeof(Pouty);
 	ret = hw_driver_add(Px, sizeof(Px), Py, sizeof(Py), Poutx, szx, Pouty, szy, Poutx, &szx, Pouty, &szy);
 	if(ret){
-		printf("Error!\n");
+		printf("Error!\n\r");
 		exit(-1);
 	}
 	hexdump("Px: ", Poutx, 32);
 	hexdump("Py: ", Pouty, 32);
 	ret = print_zeros();
 	if(ret){
-		printf("Error!\n");
+		printf("Error!\n\r");
 		exit(-1);
 	}
 
-	printf("==============\n");
+	printf("==============\n\r");
 	ret = hw_driver_point_zero(1);
 	if(ret){
-		printf("Error!\n");
+		printf("Error!\n\r");
 		exit(-1);
 	}
 	ret = hw_driver_mul(Px, sizeof(Px), Py, sizeof(Py), scal3, sizeof(scal3), Poutx, &szx, Pouty, &szy);
 	if(ret){
-		printf("Error!\n");
+		printf("Error!\n\r");
 		exit(-1);
 	}
 	hexdump("Px: ", Poutx, 32);
 	hexdump("Py: ", Pouty, 32);
 	ret = print_zeros();
 	if(ret){
-		printf("Error!\n");
+		printf("Error!\n\r");
 		exit(-1);
 	}
-	printf("==============\n");
+	printf("==============\n\r");
 	ret = hw_driver_point_unzero(0);
 	if(ret){
-		printf("Error!\n");
+		printf("Error!\n\r");
 		exit(-1);
 	}
 	ret = hw_driver_point_unzero(1);
 	if(ret){
-		printf("Error!\n");
+		printf("Error!\n\r");
 		exit(-1);
 	}
 	ret = hw_driver_mul(Px, sizeof(Px), Py, sizeof(Py), scal_zero, sizeof(scal3), Poutx, &szx, Pouty, &szy);
 	if(ret){
-		printf("Error!\n");
+		printf("Error!\n\r");
 		exit(-1);
 	}
 	hexdump("Px: ", Poutx, 32);
 	hexdump("Py: ", Pouty, 32);
 	ret = print_zeros();
 	if(ret){
-		printf("Error!\n");
+		printf("Error!\n\r");
 		exit(-1);
 	}
 
-	printf("==============\n");
+	printf("==============\n\r");
 	ret = hw_driver_point_zero(0);
 	if(ret){
-		printf("Error!\n");
+		printf("Error!\n\r");
 		exit(-1);
 	}
 	ret = hw_driver_point_zero(1);
 	if(ret){
-		printf("Error!\n");
+		printf("Error!\n\r");
 		exit(-1);
 	}
 	ret = hw_driver_add(Px, sizeof(Px), Py, sizeof(Py), Poutx, szx, Pouty, szy, Poutx, &szx, Pouty, &szy);
 	if(ret){
-		printf("Error!\n");
+		printf("Error!\n\r");
 		exit(-1);
 	}
 	hexdump("Px: ", Poutx, 32);
 	hexdump("Py: ", Pouty, 32);
 	ret = print_zeros();
 	if(ret){
-		printf("Error!\n");
+		printf("Error!\n\r");
 		exit(-1);
 	}
-	printf("==============\n");
+	printf("==============\n\r");
 	ret = hw_driver_point_zero(0);
 	if(ret){
-		printf("Error!\n");
+		printf("Error!\n\r");
 		exit(-1);
 	}
 	ret = hw_driver_point_unzero(1);
 	if(ret){
-		printf("Error!\n");
+		printf("Error!\n\r");
 		exit(-1);
 	}
 	ret = hw_driver_dbl(Px, sizeof(Px), Py, sizeof(Py), Poutx, &szx, Pouty, &szy);
 	if(ret){
-		printf("Error!\n");
+		printf("Error!\n\r");
 		exit(-1);
 	}
 	hexdump("Px: ", Poutx, 32);
 	hexdump("Py: ", Pouty, 32);
 	ret = print_zeros();
 	if(ret){
-		printf("Error!\n");
+		printf("Error!\n\r");
 		exit(-1);
 	}
-	printf("==============\n");
+	printf("==============\n\r");
 	ret = hw_driver_point_zero(0);
 	if(ret){
-		printf("Error!\n");
+		printf("Error!\n\r");
 		exit(-1);
 	}
 	ret = hw_driver_point_unzero(1);
 	if(ret){
-		printf("Error!\n");
+		printf("Error!\n\r");
 		exit(-1);
 	}
 	ret = hw_driver_neg(Px, sizeof(Px), Py, sizeof(Py), Poutx, &szx, Pouty, &szy);
 	if(ret){
-		printf("Error!\n");
+		printf("Error!\n\r");
 		exit(-1);
 	}
 	hexdump("Px: ", Poutx, 32);
 	hexdump("Py: ", Pouty, 32);
 	ret = print_zeros();
 	if(ret){
-		printf("Error!\n");
+		printf("Error!\n\r");
 		exit(-1);
 	}
 #endif
