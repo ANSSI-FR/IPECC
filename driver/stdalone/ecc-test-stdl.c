@@ -72,7 +72,7 @@ int main(int argc, char *argv[])
 {
 #if 1
 	int ret;
-	unsigned int i;
+	unsigned int i, j;
 
 	(void)argc;
 	(void)argv;
@@ -87,7 +87,16 @@ int main(int argc, char *argv[])
 		unsigned int szx, szy;
 
 		ipecc_test t = ipecc_all_tests[i];
-		printf("== Test %s\n\r", t.name);
+		printf("========");
+		for (j=0; j<strlen(t.name); j++) {
+			printf("=");
+		}
+		printf("\n\r== Test %s\n\r", t.name);
+		printf("========");
+		for (j=0; j<strlen(t.name); j++) {
+			printf("=");
+		}
+		printf("\n\r");
 		/* Set the blinding if necessary */
 		if(t.blinding){
 			ret = hw_driver_set_blinding(t.blinding); EG(ret, "blinding");

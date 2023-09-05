@@ -59,6 +59,7 @@
 #define log_print(...) printf(__VA_ARGS__)
 #else
 #if defined(WITH_EC_HW_STANDALONE) && defined(WITH_EC_HW_STANDALONE_XILINX)
+#include "xil_printf.h"
 #define log_print(...) xil_printf(__VA_ARGS__)
 #else
 #define log_print(...)
