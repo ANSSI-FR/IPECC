@@ -4124,8 +4124,8 @@ begin
 				v.ctrl.zremaskact := '0';
 			end if;
 			v.ctrl.docheckzremask := '0';
-			-- no need to reset v.ctrl.aerr_inpt_ack
-			-- no need to reset v.ctrl.aerr_outpt_ack
+			-- no need to reset r.ctrl.aerr_inpt_ack
+			-- no need to reset r.ctrl.aerr_outpt_ack
 			-- no need to reset r.ctrl.ierrid
 			v.ctrl.yes := '0';
 			v.ctrl.p_set := '0';
@@ -4141,7 +4141,7 @@ begin
 			v.ctrl.r0_is_null := '0';
 			v.ctrl.r1_is_null := '0';
 			if debug then -- statically resolved by synthesizer
-				-- upon reset, read accessto ecc_fp_dram granted by default
+				-- upon reset, read access to ecc_fp_dram granted by default
 				v.ctrl.read_forbidden := '0';
 			else
 				-- upon reset, no read access to ecc_fp_dram
@@ -4277,8 +4277,6 @@ begin
 				--no need to reset r.debug.trng.completebypassbit
 				v.debug.trng.nnrnddeterm := '0';
 				v.debug.trng.vonneuman := '1';
-				-- by default, es_trng_byte will stay only 1 clock cyle into
-				-- idle state (see es_trng_byte.vhd)
 				v.debug.trng.idletime := (r.debug.trng.idletime'range => '0');
 				v.debug.trng.rawfiforeaddis := '0';
 				-- no need to reset r.debug.i[rw]datacnt

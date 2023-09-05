@@ -1493,11 +1493,6 @@ begin
 			else
 				v.oram.re := '1'; -- (s114)
 			end if;
-			-- TODO: set a large multicycle on paths:
-			-- r.oram.nextraddr -> r.oram.raddr
-			-- r.oram.nextxicnt -> r.prod.xicnt
-			-- r.oram.nextraddr -> r.oram.xishencnt
-			-- r.oram.raddr, r.prod.xicnt & r.prod.xishencnt
 			if async then -- statically resolved by synthesizer
 				v.iram.raddr_msb := v_prod_nextxmsbraddr(1 downto 0);
 				v.iram.raddr_lsb := v_prod_nextxlsbraddr;
