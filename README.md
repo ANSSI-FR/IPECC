@@ -2,7 +2,7 @@
 
 Copyright (C) 2023
 
-**Authors**: Karim KHALFALLAH (<mailto:karim.khalfallah@ssi.gou.fr>), Ryad BENADJILA (<mailto:ryadbenadjila@gmail.com>)
+**Authors**: Karim KHALFALLAH (<mailto:karim.khalfallah@ssi.gouv.fr>), Ryad BENADJILA (<mailto:ryadbenadjila@gmail.com>)
 
 **Contributors**: Adrian THILLARD, Emmanuel PROUFF
 
