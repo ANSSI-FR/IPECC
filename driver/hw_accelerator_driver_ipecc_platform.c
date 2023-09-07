@@ -31,12 +31,14 @@
 #define IPECC_PHYS_PSEUDO_TRNG_BADDR    (NULL)
 #endif
 #else
+#define IPECC_PHYS_BADDR                0x40000000
+#define IPECC_PHYS_PSEUDO_TRNG_BADDR    0x40001000
 #endif
 
 #define IPECC_PHYS_SZ                   (4096) /* One page size */
 
-#define IPECC_DEV_UIO_IPECC             "/dev/uio4"
-#define IPECC_DEV_UIO_PSEUDOTRNG        "/dev/uio5"
+#define IPECC_DEV_UIO_IPECC             "/dev/uio0"
+#define IPECC_DEV_UIO_PSEUDOTRNG        "/dev/uio1"
 /* Setup the driver depending on the environment.
  *
  * If 'pseudotrng_base_addr_p' is not NULL then the setup will also try
@@ -73,8 +75,6 @@ int hw_driver_setup(volatile unsigned char **base_addr_p, volatile unsigned char
 		if (pseudotrng_base_addr_p != NULL) {
 			(*pseudotrng_base_addr_p) = (volatile unsigned char*)IPECC_PHYS_PSEUDO_TRNG_BADDR;
 		}
-		xil_printf("*base_addr_p = 0x%08x\n\r\r", *base_addr_p);
-		xil_printf("*pseudotrng_base_addr_p = 0x%08x\n\r\r", *pseudotrng_base_addr_p);
 	}							
 #elif defined(WITH_EC_HW_UIO)
 	{						
@@ -182,10 +182,12 @@ int hw_driver_setup(volatile unsigned char **base_addr_p, volatile unsigned char
 #endif
 
 	/* Log print in case of success */
-	if ( (*pseudotrng_base_addr_p) != NULL ) {
-		log_print("OK, loaded IP @%p and Pseudo TRNG source @%p\n\r", (*base_addr_p), (*pseudotrng_base_addr_p));
-	} else {
-		log_print("OK, loaded IP @%p\n\r", (*base_addr_p));
+	if (pseudotrng_base_addr_p != NULL) {
+		if (*pseudotrng_base_addr_p != NULL) {
+			log_print("OK, loaded IP @%p and Pseudo TRNG source @%p\n\r", (*base_addr_p), (*pseudotrng_base_addr_p));
+		} else {
+			log_print("OK, loaded IP @%p\n\r", (*base_addr_p));
+		}
 	}
 
 	ret = 0;

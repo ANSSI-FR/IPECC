@@ -73,7 +73,7 @@ static bool line_is_empty(char *l)
 	uint32_t c;
 	bool ret = true;
 	for (c=0; ;c++) {
-		if ((l[c] == '\r') || (l[c] == '\n\r')) {
+		if ((l[c] == '\r') || (l[c] == '\n')) {
 			break;
 		} else if ((l[c] != ' ') && (l[c] != '\t')) {
 			ret = false;

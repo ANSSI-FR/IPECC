@@ -2740,7 +2740,7 @@ static inline int driver_setup(void)
 {
 	if(!hw_driver_setup_state){
 		/* Ask the lower layer for a setup */
-		if(hw_driver_setup((volatile unsigned char**)&ipecc_baddr, (volatile unsigned char**)&ipecc_pseudotrng_baddr)){
+		if(hw_driver_setup((volatile unsigned char**)&ipecc_baddr, NULL /*(volatile unsigned char**)&ipecc_pseudotrng_baddr)*/)) {
 			goto err;
 		}
 #if 0

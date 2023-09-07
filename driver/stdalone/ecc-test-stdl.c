@@ -5,6 +5,7 @@
 //#include <sys/mman.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <string.h>
 
 #ifdef WITH_EC_HW_STANDALONE_XILINX
 #include "platform.h"
