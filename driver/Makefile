@@ -6,7 +6,7 @@ C_FILES = hw_accelerator_driver_ipecc_platform.c hw_accelerator_driver_ipecc.c
 C_FILES_LINUX = $(C_FILES) linux/ecc-test-linux.c linux/curve.c linux/kp.c linux/ptops.c linux/pttests.c
 C_FILES_STDOL = $(C_FILES) stdalone/ecc-test-stdl.c
 
-.PHONY: linux-targets stdalone-target
+#.PHONY: linux-targets stdalone-target
 all: linux-targets stdalone-target
 
 linux-targets: ecc-test-linux-uio ecc-test-linux-devmem
@@ -23,4 +23,4 @@ ecc-test-stdalone: $(C_FILES_STDOL)
 	$(ARM_CC) $(CFLAGS) -DWITH_EC_HW_ACCELERATOR -DWITH_EC_HW_STANDALONE $(C_FILES_STDOL) -o ecc-test-stdalone
 
 clean:
-	@rm -f ecc-test-uio ecc-test-devmem ecc-test-stdalone
+	@rm -f ecc-test-linux-uio ecc-test-linux-devmem ecc-test-stdalone

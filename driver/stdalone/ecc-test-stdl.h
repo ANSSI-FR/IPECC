@@ -156,6 +156,7 @@ const unsigned char ZERO_127[] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 
 #define SIZE_24_BITS	32
 #define SIZE_127_BITS	127
+#define SIZE_256_BITS	256
 #define SIZE_FULL	0
 
 static const ipecc_test ipecc_all_tests[] = {

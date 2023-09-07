@@ -38,9 +38,9 @@ static inline void hexdump(const char *str, const unsigned char *in, unsigned in
 
 static inline int print_point(const char *prefix, const unsigned char *x, unsigned int x_sz, const unsigned char *y, unsigned int y_sz){
 	printf("%s", prefix);
-	hexdump("x: ", x, x_sz);
+	hexdump("x=0x", x, x_sz);
 	printf("%s", prefix);
-	hexdump("y: ", y, y_sz);
+	hexdump("y=0x", y, y_sz);
 
 	return 0;
 }
