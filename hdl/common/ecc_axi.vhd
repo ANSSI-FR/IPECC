@@ -1064,7 +1064,7 @@ begin
 			-- compute "nn" - "nb of blinding bits"
 			v_blindiff := vtmp6 - vtmp7;
 			if v_blindiff(BLD_BITS_MSB - BLD_BITS_LSB + 1) = '1' then
-				-- This means blindbits > nn - 1. This is an error, which an only be
+				-- This means blindbits > nn - 1. This is an error, which can only be
 				-- provoked by (s241), not by (s243), hence we don't need to recompute
 				--.nn_extrabits here. Nothing changes, we just signal back the error
 				-- to software driver with bit STATUS_ERR_I_BLN of R_STATUS register.
@@ -1082,8 +1082,8 @@ begin
 				-- Setting .doblindsh(0) to 1 by (s244) below is going to trigger a
 				-- sequence of four operations leading to the recomputation of register
 				-- r.ctrl.nn_extrabits, see (s245) below.
-				-- (note that the complete shifting of .doblindsh - meaning: until it
-				-- becomes all 0s again -, does not happen in a row during 4 consecutive
+				-- (note that the complete shifting of .doblindsh (meaning: until it
+				-- becomes all 0s again), does not happen in a row during 4 consecutive
 				-- clock-cycles; instead each of the 4 steps below shift the register
 				-- .doblindsh once its particular job is done).
 				v.ctrl.doblindsh(0) := '1'; -- (s244)
@@ -1096,7 +1096,7 @@ begin
 
 		-- (s245)
 		-- 1st step: compute max(size of alpha, 4)
-		-- Functionnaly, ecc_scalar (for which signal r.ctrl.blindbits is intended)
+		-- Functionnaly, ecc_scalar (to which signal r.ctrl.blindbits is intended)
 		-- does not support a nb of blinding bits less than 4.
 		if r.ctrl.doblindsh(0) = '1' then
 			vtmp13 := resize(r.ctrl.blindbitstest, log2(nn) + 1);
@@ -3715,7 +3715,8 @@ begin
 						-- bits which is the one currently set by software driver. Note that
 						-- if nn has been lowered down by software driver, the current value
 						-- of r.ctrl.blindbits might not be adequate with the new value of
-						-- nn (the former might be be larger than the latter). If this hap-
+						-- nn (the former might be larger than the latter - for clarity's
+						-- sake: r.ctrl.blindbits might be > new value of nn). If this hap-
 						-- pens, (s249) will raise an error, which might disconcert software
 						-- driver as it simply asked for a modification of nn value which is
 						-- completely legit. Anyway it's not a bad thing as software driver
