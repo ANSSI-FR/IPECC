@@ -3121,7 +3121,7 @@ begin
 			then
 				-- version number, we use the first 32 bits of git commit checksum
 				dw := (others => '0');
-				dw(31 downto 0) := x"0001" & x"0002"; -- version 1.2
+				dw(31 downto 0) := x"01" & x"02" & x"0018"; -- version 1.2.24
 				v.axi.rdatax := dw;
 				v.axi.rvalid := '1'; -- (s5)
 			-- ------------------------------
