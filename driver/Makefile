@@ -13,13 +13,13 @@ linux-targets: ecc-test-linux-uio ecc-test-linux-devmem
 
 stdalone-target: ecc-test-stdalone
 
-ecc-test-linux-uio: $(C_FILES_LINUX)
+ecc-test-linux-uio: $(C_FILES_LINUX) linux/ecc-test-linux.h
 	$(ARM_CC) $(CFLAGS) -DWITH_EC_HW_ACCELERATOR -DWITH_EC_HW_UIO $(C_FILES_LINUX) -o ecc-test-linux-uio
 
-ecc-test-linux-devmem: $(C_FILES_LINUX)
+ecc-test-linux-devmem: $(C_FILES_LINUX) linux/ecc-test-linux.h
 	$(ARM_CC) $(CFLAGS) -DWITH_EC_HW_ACCELERATOR -DWITH_EC_HW_DEVMEM $(C_FILES_LINUX) -o ecc-test-linux-devmem
 
-ecc-test-stdalone: $(C_FILES_STDOL)
+ecc-test-stdalone: $(C_FILES_STDOL) stdalone/ecc-test-stdl.h
 	$(ARM_CC) $(CFLAGS) -DWITH_EC_HW_ACCELERATOR -DWITH_EC_HW_STANDALONE $(C_FILES_STDOL) -o ecc-test-stdalone
 
 clean:
