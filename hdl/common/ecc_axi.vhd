@@ -3119,7 +3119,9 @@ begin
 			--	or ((not debug) and s_axi_araddr(ADB + 1 downto 3) =
 			--		R_HW_VERSION(ADB - 2 downto 0))
 			then
-				-- version number, we use the first 32 bits of git commit checksum
+				-- 1st byte: major number
+				-- 2nd byte: minor number
+				-- 3rd byte: patch number
 				dw := (others => '0');
 				dw(31 downto 0) := x"01" & x"02" & x"0018"; -- version 1.2.24
 				v.axi.rdatax := dw;

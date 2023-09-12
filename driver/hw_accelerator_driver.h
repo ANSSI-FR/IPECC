@@ -50,6 +50,9 @@ int hw_driver_get_version_major(unsigned int*);
 /* Get minor version of the IP */
 int hw_driver_get_version_minor(unsigned int*);
 
+/* Get patch version of the IP */
+int hw_driver_get_version_patch(unsigned int*);
+
 /* Enable TRNG post-processing logic */
 int hw_driver_trng_post_proc_enable(void);
 

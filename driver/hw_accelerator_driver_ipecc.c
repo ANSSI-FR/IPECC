@@ -355,10 +355,12 @@ static volatile uint64_t *ipecc_pseudotrng_baddr = NULL;
 #define IPECC_R_CAPABILITIES_NNMAX_POS	(12)
 
 /* Fields for R_HW_VERSION */
-#define IPECC_R_HW_VERSION_MAJOR_POS    (16)
-#define IPECC_R_HW_VERSION_MAJOR_MSK    (0xffff)
-#define IPECC_R_HW_VERSION_MINOR_POS    (0)
-#define IPECC_R_HW_VERSION_MINOR_MSK    (0xffff)
+#define IPECC_R_HW_VERSION_MAJOR_POS    (24)
+#define IPECC_R_HW_VERSION_MAJOR_MSK    (0xff)
+#define IPECC_R_HW_VERSION_MINOR_POS    (16)
+#define IPECC_R_HW_VERSION_MINOR_MSK    (0xff)
+#define IPECC_R_HW_VERSION_PATCH_POS    (0)
+#define IPECC_R_HW_VERSION_PATCH_MSK    (0xffff)
 
 /* Fields for R_DBG_CAPABILITIES_0 */
 #define IPECC_R_DBG_CAPABILITIES_0_WW_POS    (0)
@@ -873,14 +875,18 @@ static volatile uint64_t *ipecc_pseudotrng_baddr = NULL;
  * ***********************************
  */
 
-/* This register exists in hardware only if the IP was synthesized in DEBUG (unsecure) mode
- * (as opposed to prodution (secure) mode. */
+/* For now register R_HW_VERSION exists both in debug (unsecure) and non-debug
+ * (secure, production) mode.
+ * It might become a debug-only feature in future releases. */
 #define IPECC_GET_MAJOR_VERSION() \
 	((IPECC_GET_REG(IPECC_R_HW_VERSION) >> IPECC_R_HW_VERSION_MAJOR_POS) \
 	 & IPECC_R_HW_VERSION_MAJOR_MSK)
 #define IPECC_GET_MINOR_VERSION() \
 	((IPECC_GET_REG(IPECC_R_HW_VERSION) >> IPECC_R_HW_VERSION_MINOR_POS) \
 	 & IPECC_R_HW_VERSION_MINOR_MSK)
+#define IPECC_GET_PATCH_VERSION() \
+	((IPECC_GET_REG(IPECC_R_HW_VERSION) >> IPECC_R_HW_VERSION_PATCH_POS) \
+	 & IPECC_R_HW_VERSION_PATCH_MSK)
 
 /* Actions involving register W_DBG_HALT
  * *************************************
@@ -2540,7 +2546,7 @@ static inline int ip_ecc_get_version_major(unsigned int* nb)
 	/* Wait until the IP is not busy */
 	IPECC_BUSY_WAIT();
 
-	/* Get both version numbers from IP register. */
+	/* Get all version numbers from IP register. */
 	*nb = IPECC_GET_MAJOR_VERSION();
 
 	/* Wait until the IP is not busy */
@@ -2555,8 +2561,23 @@ static inline int ip_ecc_get_version_minor(unsigned int* nb)
 	/* Wait until the IP is not busy */
 	IPECC_BUSY_WAIT();
 
-	/* Get both version numbers from IP register. */
+	/* Get all version numbers from IP register. */
 	*nb = IPECC_GET_MINOR_VERSION();
+
+	/* Wait until the IP is not busy */
+	IPECC_BUSY_WAIT();
+
+	return 0;
+}
+
+/* Get the patch version number of the IP */
+static inline int ip_ecc_get_version_patch(unsigned int* nb)
+{
+	/* Wait until the IP is not busy */
+	IPECC_BUSY_WAIT();
+
+	/* Get all version numbers from IP register. */
+	*nb = IPECC_GET_PATCH_VERSION();
 
 	/* Wait until the IP is not busy */
 	IPECC_BUSY_WAIT();
