@@ -154,7 +154,7 @@ int check_kp_result(ipecc_test_t* t, stats_t* st, bool* res)
 			 * Mismatch error (the hardware result is not the null point).
 			 */
 			printf("%sError: [k]P mistmatch between hardware result and expected one.\n\r"
-						 "         [k]P is not 0 however it should be.%s\n\r", KERR, KNRM);
+						 "       [k]P is not 0 however it should be.%s\n\r", KERR, KNRM);
 			*res = false;
 			(st->nok)++;
 			goto err;
@@ -168,7 +168,7 @@ int check_kp_result(ipecc_test_t* t, stats_t* st, bool* res)
 			 * Mismatch error (the hardware result is the null point).
 			 */
 			printf("%sError: [k]P mistmatch between hardware result and expected one.\n\r"
-						 "         [k]P is 0 however it should not be.%s\n\r", KERR, KNRM);
+						 "       [k]P is 0 however it should not be.%s\n\r", KERR, KNRM);
 			*res = false;
 			(st->nok)++;
 			goto err;

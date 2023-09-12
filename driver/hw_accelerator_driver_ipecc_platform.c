@@ -89,7 +89,7 @@ int hw_driver_setup(volatile unsigned char **base_addr_p, volatile unsigned char
 		 */
 		uio_fd0 = open(IPECC_DEV_UIO_IPECC, O_RDWR | O_SYNC);
 		if(uio_fd0 == -1){
-			printf("Error when opening %s\n\r", IPECC_DEV_UIO_PSEUDOTRNG);
+			printf("Error when opening %s\n\r", IPECC_DEV_UIO_IPECC);
 			perror("open uio");
 			ret = -1;
 			goto err;

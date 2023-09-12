@@ -1194,8 +1194,6 @@ begin
 			-- end the four-steps sequence of tests
 			v.ctrl.doblindsh := '0' & r.ctrl.doblindsh(0 to BLNDSHSZ - 2);
 			if r.ctrl.blindcheckaxiack = '1' then
-				-- (s207), see (s206) as to why these statements on AXI ready/valid
-				-- handshake signals were placed here
 				v.axi.wready := '1';
 				v.axi.awready := '1';
 				v.axi.arready := '1';

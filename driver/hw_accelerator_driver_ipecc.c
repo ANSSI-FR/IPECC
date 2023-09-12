@@ -2768,7 +2768,8 @@ static inline int driver_setup(void)
 	}
 	
 	/* Enable TRNG post-processing
-	 * (this is in case we're in DEBUG mode, and if not it doesn't change anything).
+	 *
+	 * This is for the case where the IP is in DEBUG mode (otherwise it won't do harm).
 	 *
 	 * NOTE: it is important to make this call AFTER setting hw_driver_setup_state to 1
 	 *       above, because ip_ecc_trng_postproc_enable() is going to call driver_setup()
