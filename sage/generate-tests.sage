@@ -232,7 +232,7 @@ def div(i, s):
 if nn_constant == 0:
     sys.stderr.write(KWHT + "Generating curves from nn = " + str(nnmin) + " to " + str(nnmax) + KNRM + "\n")
 else:
-    sys.stderr.write(KWHT + "Generating curves from nn = " + str(nn_constant) + KNRM + "\n")
+    sys.stderr.write(KWHT + "Generating curves for nn = " + str(nn_constant) + KNRM + "\n")
 
 # infinite loop
 while (nbcurv < NBCURV) or (NBCURV == 0):
