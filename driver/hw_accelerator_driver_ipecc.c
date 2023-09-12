@@ -2077,6 +2077,50 @@ err:
 	return -1;
 }
 
+/* Debug feature: disable the XY-shuffling countermeasure */
+static inline int ip_ecc_disable_xyshuf(void)
+{
+	/* Wait until the IP is not busy */
+	IPECC_BUSY_WAIT();
+
+	/* Disable the countermeasure */
+	IPECC_DBG_DISABLE_XYSHUF();
+
+	/* Wait until the IP is not busy */
+	IPECC_BUSY_WAIT();
+
+	/* Check for error */
+	if(ip_ecc_check_error(NULL)){
+		goto err;
+	}
+
+	return 0;
+err:
+	return -1;
+}
+
+/* Debug feature: enable the XY-shuffling countermeasure */
+static inline int ip_ecc_enable_xyshuf(void)
+{
+	/* Wait until the IP is not busy */
+	IPECC_BUSY_WAIT();
+
+	/* Disable the countermeasure */
+	IPECC_DBG_ENABLE_XYSHUF();
+
+	/* Wait until the IP is not busy */
+	IPECC_BUSY_WAIT();
+
+	/* Check for error */
+	if(ip_ecc_check_error(NULL)){
+		goto err;
+	}
+
+	return 0;
+err:
+	return -1;
+}
+
 /* Write a big number to the IP
  *
  *   The input big number is in big-endian format, and it is sent to the IP in the
@@ -3062,6 +3106,38 @@ int hw_driver_disable_zremask(void)
 	}
 
 	if(ip_ecc_disable_zremask()){
+		goto err;
+	}
+
+	return 0;
+err:
+	return -1;
+}
+
+/* Debug feature: disable XY-shuffling  */
+int hw_driver_disable_xyshuf(void)
+{
+	if(driver_setup()){
+		goto err;
+	}
+
+	if(ip_ecc_disable_xyshuf()){
+		goto err;
+	}
+
+	return 0;
+err:
+	return -1;
+}
+
+/* Debug feature: re-enable XY-shuffling  */
+int hw_driver_enable_xyshuf(void)
+{
+	if(driver_setup()){
+		goto err;
+	}
+
+	if(ip_ecc_enable_xyshuf()){
 		goto err;
 	}
 

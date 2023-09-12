@@ -95,7 +95,7 @@ err:
 	return -1;
 }
 
-int check_test_oncurve(ipecc_test_t* t, stats_t* st, bool* res)
+int check_test_oncurve(ipecc_test_t* t, /* stats_t* st, */ bool* res)
 {
 	/*
 	 * Sanity check.
@@ -112,7 +112,7 @@ int check_test_oncurve(ipecc_test_t* t, stats_t* st, bool* res)
 	if (t->sw_answer.answer == t->hw_answer.answer) {
 		PRINTF("HW & SW answers match for test \"is on curve?\" (both are %s)\n\r",
 				((t->hw_answer.answer == true) ? "true" : "false"));
-		(st->ok)++;
+		/* (st->ok)++; */
 	} else {
 		/*
 		 * Mismatch error (the hardware answer to the test is different
@@ -123,7 +123,7 @@ int check_test_oncurve(ipecc_test_t* t, stats_t* st, bool* res)
 					 (t->hw_answer.answer == true) ? "true" : "false",
 					 (t->sw_answer.answer == true) ? "true" : "false", KNRM);
 		*res = false;
-		(st->nok)++;
+		/* (st->nok)++; */
 		goto err;
 	}
 	return 0;
@@ -235,7 +235,7 @@ err:
 	return -1;
 }
 
-int check_test_equal(ipecc_test_t* t, stats_t* st, bool* res)
+int check_test_equal(ipecc_test_t* t, /* stats_t* st, */ bool* res)
 {
 	/*
 	 * Sanity check.
@@ -252,7 +252,7 @@ int check_test_equal(ipecc_test_t* t, stats_t* st, bool* res)
 	if (t->sw_answer.answer == t->hw_answer.answer) {
 		PRINTF("HW & SW answers match for test \"are pts equal?\" (both are %s)\n\r",
 				((t->hw_answer.answer == true) ? "true" : "false"));
-		(st->ok)++;
+		/* (st->ok)++; */
 	} else {
 		/*
 		 * Mismatch error (the hardware answer to the test is different
@@ -263,7 +263,7 @@ int check_test_equal(ipecc_test_t* t, stats_t* st, bool* res)
 					 (t->hw_answer.answer == true) ? "true" : "false",
 					 (t->sw_answer.answer == true) ? "true" : "false", KNRM);
 		*res = false;
-		(st->nok)++;
+		/* (st->nok)++; */
 		goto err;
 	}
 	return 0;
@@ -375,7 +375,7 @@ err:
 	return -1;
 }
 
-int check_test_oppos(ipecc_test_t* t, stats_t* st, bool* res)
+int check_test_oppos(ipecc_test_t* t, /* stats_t* st, */ bool* res)
 {
 	/*
 	 * Sanity check.
@@ -392,7 +392,7 @@ int check_test_oppos(ipecc_test_t* t, stats_t* st, bool* res)
 	if (t->sw_answer.answer == t->hw_answer.answer) {
 		PRINTF("HW & SW answers match for test \"are pts opposite?\" (both are %s)\n\r",
 				((t->hw_answer.answer == true) ? "true" : "false"));
-		(st->ok)++;
+		/* (st->ok)++; */
 	} else {
 		/*
 		 * Mismatch error (the hardware answer to the test is different
@@ -403,7 +403,7 @@ int check_test_oppos(ipecc_test_t* t, stats_t* st, bool* res)
 					 (t->hw_answer.answer == true) ? "true" : "false",
 					 (t->sw_answer.answer == true) ? "true" : "false", KNRM);
 		*res = false;
-		(st->nok)++;
+		/* (st->nok)++; */
 		goto err;
 	}
 	return 0;

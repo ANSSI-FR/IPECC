@@ -34,26 +34,26 @@ extern int ip_set_curve(curve_t*);
 /* Point operations helpers */
 /*   [k]P */
 extern int ip_set_pt_and_run_kp(ipecc_test_t*);
-extern int check_kp_result(ipecc_test_t*, stats_t*, bool*);
+extern int check_kp_result(ipecc_test_t*, bool*);
 /*   P + Q */
 extern int ip_set_pts_and_run_ptadd(ipecc_test_t*);
-extern int check_ptadd_result(ipecc_test_t*, stats_t*, bool*);
+extern int check_ptadd_result(ipecc_test_t*, bool*);
 /*   [2]P */
 extern int ip_set_pt_and_run_ptdbl(ipecc_test_t*);
-extern int check_ptdbl_result(ipecc_test_t*, stats_t*, bool*);
+extern int check_ptdbl_result(ipecc_test_t*, bool*);
 /*   (-P) */
 extern int ip_set_pt_and_run_ptneg(ipecc_test_t*);
-extern int check_ptneg_result(ipecc_test_t*, stats_t*, bool*);
+extern int check_ptneg_result(ipecc_test_t*, bool*);
 /* Point tests helpers */
 /*   is P on curve? */
 extern int ip_set_pt_and_check_on_curve(ipecc_test_t*);
-extern int check_test_oncurve(ipecc_test_t*, stats_t*, bool* res);
+extern int check_test_oncurve(ipecc_test_t*, bool* res);
 /*   are P & Q equal? */
 extern int ip_set_pts_and_test_equal(ipecc_test_t*);
-extern int check_test_equal(ipecc_test_t*, stats_t*, bool* res);
+extern int check_test_equal(ipecc_test_t*, bool* res);
 /*   are P & Q opposite? */
 extern int ip_set_pts_and_test_oppos(ipecc_test_t*);
-extern int check_test_oppos(ipecc_test_t*, stats_t*, bool* res);
+extern int check_test_oppos(ipecc_test_t*, bool* res);
 
 /*
  * Pointer 'line' will be allocated by getline, but freed by us
@@ -94,8 +94,8 @@ static void print_stats_regularly(stats_t* st)
 void print_stats_and_exit(ipecc_test_t* t, stats_t* s, const char* msg, unsigned int linenum)
 {
 	printf("Stopped on test %d.%d%s\n\r", t->curve->id, t->id, KNRM);
-	printf("OK = %d\n\r", s->ok);
-	printf("nOK = %d\n\r", s->nok);
+	printf("%sOK = %d%s\n\r", KGRN, s->ok, KNRM);
+	printf("%snOK = %d%s\n\r", KRED, s->nok, KNRM);
 	printf("total = %d\n\r", s->total);
 	printf("--\n\r");
 	if (line) {
@@ -314,6 +314,15 @@ int main(int argc, char *argv[])
 		printf("Production mode.\n\r");
 	}
 #endif
+
+	/*
+	 * Add here possible extra configuration of the IP
+	 *
+	 * (e.g if you want to disable shuffling or enable periodic Z-remask, etc)
+	 */
+	hw_driver_disable_xyshuf(); /* disable XY-shuffling */
+	hw_driver_disable_shuffling(); /* disable shuffling */
+
 
 	/* Main infinite loop, parsing lines from standard input to extract:
 	 *   - input vectors
@@ -872,20 +881,25 @@ int main(int argc, char *argv[])
 					 */
 					if (ip_set_pt_and_run_kp(&test))
 					{
+						stats.nok++;
+						stats.total++;
 						printf("%sError: Computation of scalar multiplication on hardware triggered an error.%s\n\r", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_KPX_OR_BLD')", __LINE__);
 					}
 					/*
 					 * Check IP result against the expected one (which is the point at infinity)
 					 */
-					if (check_kp_result(&test, &stats, &result_pts_are_equal))
+					if (check_kp_result(&test, &result_pts_are_equal))
 					{
+						stats.nok++;
+						stats.total++;
 						printf("%sError: Couldn't compare [k]P hardware result w/ the expected one.%s\n\r", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_KPX_OR_BLD')", __LINE__);
 					}
 					/*
 					 * Stats
 					 */
+					stats.ok++;
 					stats.total++;
 					line_type_expected = EXPECT_NONE;
 					print_stats_regularly(&stats);
@@ -926,20 +940,25 @@ int main(int argc, char *argv[])
 					 */
 					if (ip_set_pt_and_run_kp(&test))
 					{
+						stats.nok++;
+						stats.total++;
 						printf("%sError: Computation of scalar multiplication on hardware triggered an error.%s\n\r", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_KPY')", __LINE__);
 					}
 					/*
 					 * Check IP result against the expected one.
 					 */
-					if (check_kp_result(&test, &stats, &result_pts_are_equal))
+					if (check_kp_result(&test, &result_pts_are_equal))
 					{
+						stats.nok++;
+						stats.total++;
 						printf("%sError: Couldn't compare [k]P hardware result w/ the expected one.%s\n\r", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_KPY')", __LINE__);
 					}
 					/*
 					 * Stats
 					 */
+					stats.ok++;
 					stats.total++;
 					line_type_expected = EXPECT_NONE;
 					print_stats_regularly(&stats);
@@ -987,20 +1006,25 @@ int main(int argc, char *argv[])
 					 */
 					if (ip_set_pts_and_run_ptadd(&test))
 					{
+						stats.nok++;
+						stats.total++;
 						printf("%sError: Computation of P + Q on hardware triggered an error.%s\n\r", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_P_PLUS_QX')", __LINE__);
 					}
 					/*
 					 * Check IP result against the expected one.
 					 */
-					if (check_ptadd_result(&test, &stats, &result_pts_are_equal))
+					if (check_ptadd_result(&test, &result_pts_are_equal))
 					{
+						stats.nok++;
+						stats.total++;
 						printf("%sError: Couldn't compare P + Q hardware result w/ the expected one.%s\n\r", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_P_PLUS_QX')", __LINE__);
 					}
 					/*
 					 * Stats
 					 */
+					stats.ok++;
 					stats.total++;
 					line_type_expected = EXPECT_NONE;
 					print_stats_regularly(&stats);
@@ -1044,20 +1068,25 @@ int main(int argc, char *argv[])
 					 */
 					if (ip_set_pts_and_run_ptadd(&test))
 					{
+						stats.nok++;
+						stats.total++;
 						printf("%sError: Computation of P + Q on hardware triggered an error.%s\n\r", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_P_PLUS_QY')", __LINE__);
 					}
 					/*
 					 * Check IP result against the expected one.
 					 */
-					if (check_ptadd_result(&test, &stats, &result_pts_are_equal))
+					if (check_ptadd_result(&test, &result_pts_are_equal))
 					{
+						stats.nok++;
+						stats.total++;
 						printf("%sError: Couldn't compare P + Q hardware result w/ the expected one.%s\n\r", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_P_PLUS_QY')", __LINE__);
 					}
 					/*
 					 * Stats
 					 */
+					stats.ok++;
 					stats.total++;
 					line_type_expected = EXPECT_NONE;
 					print_stats_regularly(&stats);
@@ -1106,20 +1135,25 @@ int main(int argc, char *argv[])
 					 */
 					if (ip_set_pt_and_run_ptdbl(&test))
 					{
+						stats.nok++;
+						stats.total++;
 						printf("%sError: Computation of [2]P on hardware triggered an error.%s\n\r", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_TWOP_X')", __LINE__);
 					}
 					/*
 					 * Check IP result against the expected one.
 					 */
-					if (check_ptdbl_result(&test, &stats, &result_pts_are_equal))
+					if (check_ptdbl_result(&test, &result_pts_are_equal))
 					{
+						stats.nok++;
+						stats.total++;
 						printf("%sError: Couldn't compare [2]P hardware result w/ the expected one.%s\n\r", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_TWOP_X')", __LINE__);
 					}
 					/*
 					 * Stats
 					 */
+					stats.ok++;
 					stats.total++;
 					line_type_expected = EXPECT_NONE;
 					print_stats_regularly(&stats);
@@ -1163,20 +1197,25 @@ int main(int argc, char *argv[])
 					 */
 					if (ip_set_pt_and_run_ptdbl(&test))
 					{
+						stats.nok++;
+						stats.total++;
 						printf("%sError: Computation of [2]P on hardware triggered an error.%s\n\r", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_TWOP_Y')", __LINE__);
 					}
 					/*
 					 * Check IP result against the expected one.
 					 */
-					if (check_ptdbl_result(&test, &stats, &result_pts_are_equal))
+					if (check_ptdbl_result(&test, &result_pts_are_equal))
 					{
+						stats.nok++;
+						stats.total++;
 						printf("%sError: Couldn't compare [2]P hardware result w/ the expected one.%s\n\r", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_TWOP_Y')", __LINE__);
 					}
 					/*
 					 * Stats
 					 */
+					stats.ok++;
 					stats.total++;
 					line_type_expected = EXPECT_NONE;
 					print_stats_regularly(&stats);
@@ -1225,20 +1264,25 @@ int main(int argc, char *argv[])
 					 */
 					if (ip_set_pt_and_run_ptneg(&test))
 					{
+						stats.nok++;
+						stats.total++;
 						printf("%sError: Computation of -P on hardware triggered an error.%s\n\r", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_NEGP_X')", __LINE__);
 					}
 					/*
 					 * Check IP result against the expected one.
 					 */
-					if (check_ptneg_result(&test, &stats, &result_pts_are_equal))
+					if (check_ptneg_result(&test, &result_pts_are_equal))
 					{
+						stats.nok++;
+						stats.total++;
 						printf("%sError: Couldn't compare -P hardware result w/ the expected one.%s\n\r", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_NEGP_X')", __LINE__);
 					}
 					/*
 					 * Stats
 					 */
+					stats.ok++;
 					stats.total++;
 					line_type_expected = EXPECT_NONE;
 					print_stats_regularly(&stats);
@@ -1282,20 +1326,25 @@ int main(int argc, char *argv[])
 					 */
 					if (ip_set_pt_and_run_ptneg(&test))
 					{
+						stats.nok++;
+						stats.total++;
 						printf("%sError: Computation of -P on hardware triggered an error.%s\n\r", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_NEGP_Y')", __LINE__);
 					}
 					/*
 					 * Check IP result against the expected one.
 					 */
-					if (check_ptneg_result(&test, &stats, &result_pts_are_equal))
+					if (check_ptneg_result(&test, &result_pts_are_equal))
 					{
+						stats.nok++;
+						stats.total++;
 						printf("%sError: Couldn't compare -P hardware result w/ the expected one.%s\n\r", KERR, KNRM);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_NEGP_Y')", __LINE__);
 					}
 					/*
 					 * Stats
 					 */
+					stats.ok++;
 					stats.total++;
 					line_type_expected = EXPECT_NONE;
 					print_stats_regularly(&stats);
@@ -1362,6 +1411,8 @@ int main(int argc, char *argv[])
 					case OP_TST_CHK:{
 						if (ip_set_pt_and_check_on_curve(&test))
 						{
+							stats.nok++;
+							stats.total++;
 							printf("%sError: Point test \"is on curve?\" on hardware triggered an error.%s\n\r", KERR, KNRM);
 							print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_TRUE_OR_FALSE')", __LINE__);
 						}
@@ -1370,6 +1421,8 @@ int main(int argc, char *argv[])
 					case OP_TST_EQU:{
 						if (ip_set_pts_and_test_equal(&test))
 						{
+							stats.nok++;
+							stats.total++;
 							printf("%sError: Point test \"are pts equal?\" on hardware triggered an error.%s\n\r", KERR, KNRM);
 							print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_TRUE_OR_FALSE')", __LINE__);
 						}
@@ -1378,6 +1431,8 @@ int main(int argc, char *argv[])
 					case OP_TST_OPP:{
 						if (ip_set_pts_and_test_oppos(&test))
 						{
+							stats.nok++;
+							stats.total++;
 							printf("%sError: Point test \"are pts opposite?\" on hardware triggered an error.%s\n\r", KERR, KNRM);
 							print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_TRUE_OR_FALSE')", __LINE__);
 						}
@@ -1394,8 +1449,10 @@ int main(int argc, char *argv[])
 				 */
 				switch (test.op) {
 					case OP_TST_CHK:{
-						if (check_test_oncurve(&test, &stats, &result_tests_are_identical))
+						if (check_test_oncurve(&test, &result_tests_are_identical))
 						{
+							stats.nok++;
+							stats.total++;
 							printf("%sError: Couldn't compare hardware result to test \"is on curve?\" "
 									"w/ the expected one.%s\n\r", KERR, KNRM);
 							print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_TRUE_OR_FALSE')", __LINE__);
@@ -1403,8 +1460,10 @@ int main(int argc, char *argv[])
 						break;
 					}
 					case OP_TST_EQU:{
-						if (check_test_equal(&test, &stats, &result_tests_are_identical))
+						if (check_test_equal(&test, &result_tests_are_identical))
 						{
+							stats.nok++;
+							stats.total++;
 							printf("%sError: Couldn't compare hardware result to test \"are pts equal?\" "
 									"w/ the expected one.%s\n\r", KERR, KNRM);
 							print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_TRUE_OR_FALSE')", __LINE__);
@@ -1412,8 +1471,10 @@ int main(int argc, char *argv[])
 						break;
 					}
 					case OP_TST_OPP:{
-						if (check_test_oppos(&test, &stats, &result_tests_are_identical))
+						if (check_test_oppos(&test, &result_tests_are_identical))
 						{
+							stats.nok++;
+							stats.total++;
 							printf("%sError: Couldn't compare hardware result to test \"are pts opposite?\" "
 									"w/ the expected one.%s\n\r", KERR, KNRM);
 							print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_TRUE_OR_FALSE')", __LINE__);
@@ -1426,6 +1487,7 @@ int main(int argc, char *argv[])
 						break;
 					}
 				}
+				stats.ok++;
 				stats.total++;
 				line_type_expected = EXPECT_NONE;
 				print_stats_regularly(&stats);

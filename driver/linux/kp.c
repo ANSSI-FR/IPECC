@@ -123,7 +123,7 @@ err:
 	return -1;
 }
 
-int check_kp_result(ipecc_test_t* t, stats_t* st, bool* res)
+int check_kp_result(ipecc_test_t* t, /*stats_t* st, */ bool* res)
 {
 	/*
 	 * Sanity check.
@@ -148,7 +148,7 @@ int check_kp_result(ipecc_test_t* t, stats_t* st, bool* res)
 			 */
 			PRINTF("[k]P = 0 as expected\n\r");
 			*res = true;
-			(st->ok)++;
+			/* (st->ok)++; */
 		} else {
 			/*
 			 * Mismatch error (the hardware result is not the null point).
@@ -156,7 +156,7 @@ int check_kp_result(ipecc_test_t* t, stats_t* st, bool* res)
 			printf("%sError: [k]P mistmatch between hardware result and expected one.\n\r"
 						 "       [k]P is not 0 however it should be.%s\n\r", KERR, KNRM);
 			*res = false;
-			(st->nok)++;
+			/* (st->nok)++; */
 			goto err;
 		}
 	} else {
@@ -170,7 +170,7 @@ int check_kp_result(ipecc_test_t* t, stats_t* st, bool* res)
 			printf("%sError: [k]P mistmatch between hardware result and expected one.\n\r"
 						 "       [k]P is 0 however it should not be.%s\n\r", KERR, KNRM);
 			*res = false;
-			(st->nok)++;
+			/* (st->nok)++; */
 			goto err;
 		} else {
 			/*
@@ -184,13 +184,13 @@ int check_kp_result(ipecc_test_t* t, stats_t* st, bool* res)
 			}
 			if (*res == true) {
 				PRINTF("[k]P results match\n\r");
-				(st->ok)++;
+				/* (st->ok)++; */
 			} else {
 				/*
 				 * Mismatch error (hardware [k]P coords & expected ones differ).
 				 */
 				printf("%sError: [k]P mistmatch between hardware coordinates and those of the expected result.%s\n\r", KERR, KNRM);
-				(st->nok)++;
+				/* (st->nok)++; */
 				goto err;
 			}
 		}

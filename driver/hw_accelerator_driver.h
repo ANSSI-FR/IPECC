@@ -82,6 +82,12 @@ int hw_driver_set_zremask(unsigned int period);
 /* Disable the periodic Z-remasking countermeasure for scalar multiplication */
 int hw_driver_disable_zremask(void);
 
+/* Debug feature: disable the XY-shuffling countermeasure */
+int hw_driver_disable_xyshuf(void);
+
+/* Debug feature: re-enble the XY-shuffling countermeasure */
+int hw_driver_enable_xyshuf(void);
+
 /* Check if an affine point (x, y) is on the curve that has been previously set in the hardware */
 int hw_driver_is_on_curve(const unsigned char *x, unsigned int x_sz, const unsigned char *y, unsigned int y_sz,
 			  int *on_curve);

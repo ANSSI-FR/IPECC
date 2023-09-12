@@ -130,7 +130,7 @@ err:
 	return -1;
 }
 
-int check_ptadd_result(ipecc_test_t* t, stats_t* st, bool* res)
+int check_ptadd_result(ipecc_test_t* t, /* stats_t* st, */ bool* res)
 {
 	/*
 	 * Sanity check.
@@ -152,7 +152,7 @@ int check_ptadd_result(ipecc_test_t* t, stats_t* st, bool* res)
 			 */
 			PRINTF("P + Q = 0 as expected\n\r");
 			*res = true;
-			(st->ok)++;
+			/* (st->ok)++; */
 		} else {
 			/*
 			 * Mismatch error (the hardware result is not the null point).
@@ -160,7 +160,7 @@ int check_ptadd_result(ipecc_test_t* t, stats_t* st, bool* res)
 			printf("%sError: P + Q mismatch between hardware result and expected one.\n\r"
 						 "         P + Q is not 0 however it should be.%s\n\r", KERR, KNRM);
 			*res = false;
-			(st->nok)++;
+			/* (st->nok)++; */
 			goto err;
 		}
 	} else {
@@ -174,7 +174,7 @@ int check_ptadd_result(ipecc_test_t* t, stats_t* st, bool* res)
 			printf("%sError: P + Q mismatch between hardware result and expected one.\n\r"
 						 "         P + Q is 0 however it should not be.%s\n\r", KERR, KNRM);
 			*res = false;
-			(st->nok)++;
+			/* (st->nok)++; */
 			goto err;
 		} else {
 			/*
@@ -188,13 +188,13 @@ int check_ptadd_result(ipecc_test_t* t, stats_t* st, bool* res)
 			}
 			if (*res == true) {
 				PRINTF("P + Q results match\n\r");
-				(st->ok)++;
+				/* (st->ok)++; */
 			} else {
 				/*
 				 * Mismatch error (hardware P + Q coords & expected ones differ).
 				 */
 				printf("%sError: P + Q mismatch between hardware coordinates and those of the expected result.%s\n\r", KERR, KNRM);
-				(st->nok)++;
+				/* (st->nok)++; */
 				goto err;
 			}
 		}
@@ -283,7 +283,7 @@ err:
 	return -1;
 }
 
-int check_ptdbl_result(ipecc_test_t* t, stats_t* st, bool* res)
+int check_ptdbl_result(ipecc_test_t* t, /* stats_t* st, */ bool* res)
 {
 	/*
 	 * Sanity check.
@@ -305,7 +305,7 @@ int check_ptdbl_result(ipecc_test_t* t, stats_t* st, bool* res)
 			 */
 			PRINTF("[2]P = 0 as expected\n\r");
 			*res = true;
-			(st->ok)++;
+			/* (st->ok)++; */
 		} else {
 			/*
 			 * Mismatch error (the hardware result is not the null point).
@@ -313,7 +313,7 @@ int check_ptdbl_result(ipecc_test_t* t, stats_t* st, bool* res)
 			printf("%sError: [2]P mismatch between hardware result and expected one.\n\r"
 						 "         [2]P is not 0 however it should be.%s\n\r", KERR, KNRM);
 			*res = false;
-			(st->nok)++;
+			/* (st->nok)++; */
 			goto err;
 		}
 	} else {
@@ -327,7 +327,7 @@ int check_ptdbl_result(ipecc_test_t* t, stats_t* st, bool* res)
 			printf("%sError: [2]P mismatch between hardware result and expected one.\n\r"
 						 "         [2]P is 0 however it should not be.%s\n\r", KERR, KNRM);
 			*res = false;
-			(st->nok)++;
+			/* (st->nok)++; */
 			goto err;
 		} else {
 			/*
@@ -341,13 +341,13 @@ int check_ptdbl_result(ipecc_test_t* t, stats_t* st, bool* res)
 			}
 			if (*res == true) {
 				PRINTF("[2]P results match\n\r");
-				(st->ok)++;
+				/* (st->ok)++; */
 			} else {
 				/*
 				 * Mismatch error (hardware [2]P coords & expected ones differ).
 				 */
 				printf("%sError: [2]P mismatch between hardware coordinates and those of the expected result.%s\n\r", KERR, KNRM);
-				(st->nok)++;
+				/* (st->nok)++; */
 				goto err;
 			}
 		}
@@ -438,7 +438,7 @@ err:
 	return -1;
 }
 
-int check_ptneg_result(ipecc_test_t* t, stats_t* st, bool* res)
+int check_ptneg_result(ipecc_test_t* t, /* stats_t* st, */ bool* res)
 {
 	/*
 	 * Sanity check.
@@ -460,7 +460,7 @@ int check_ptneg_result(ipecc_test_t* t, stats_t* st, bool* res)
 			 */
 			PRINTF("(-P) = 0 as expected\n\r");
 			*res = true;
-			(st->ok)++;
+			/* (st->ok)++; */
 		} else {
 			/*
 			 * Mismatch error (the hardware result is not the null point).
@@ -468,7 +468,7 @@ int check_ptneg_result(ipecc_test_t* t, stats_t* st, bool* res)
 			printf("%sError: (-P) mismatch between hardware result and expected one.\n\r"
 						 "         (-P) is not 0 however it should be.%s\n\r", KERR, KNRM);
 			*res = false;
-			(st->nok)++;
+			/* (st->nok)++; */
 			goto err;
 		}
 	} else {
@@ -482,7 +482,7 @@ int check_ptneg_result(ipecc_test_t* t, stats_t* st, bool* res)
 			printf("%sError: (-P) mismatch between hardware result and expected one.\n\r"
 						 "         (-P) is 0 however it should not be.%s\n\r", KERR, KNRM);
 			*res = false;
-			(st->nok)++;
+			/* (st->nok)++; */
 			goto err;
 		} else {
 			/*
@@ -496,13 +496,13 @@ int check_ptneg_result(ipecc_test_t* t, stats_t* st, bool* res)
 			}
 			if (*res == true) {
 				PRINTF("(-P) results match\n\r");
-				(st->ok)++;
+				/* (st->ok)++; */
 			} else {
 				/*
 				 * Mismatch error (hardware (-P) coords & expected ones differ).
 				 */
 				printf("%sError: (-P) mismatch between hardware coordinates and those of the expected result.%s\n\r", KERR, KNRM);
-				(st->nok)++;
+				/* (st->nok)++; */
 				goto err;
 			}
 		}
