@@ -2859,6 +2859,20 @@ err:
 	return -1;
 }
 
+/* Get patch version of the IP */
+int hw_driver_get_version_patch(unsigned int* nb)
+{
+	if(driver_setup()){
+		goto err;
+	}
+	if (ip_ecc_get_version_patch(nb)){
+		goto err;
+	}
+	return 0;
+err:
+	return -1;
+}
+
 /* Enable TRNG post-processing logic */
 int hw_driver_trng_post_proc_enable()
 {

@@ -262,7 +262,7 @@ int main(int argc, char *argv[])
 	size_t len = 0;
 	ssize_t nread;
 	uint32_t debug_not_prod;
-	uint32_t version_major, version_minor;
+	uint32_t version_major, version_minor, version_patch;
 
 	(void)argc;
 	(void)argv;
@@ -296,7 +296,11 @@ int main(int argc, char *argv[])
 			printf("%sError: Probing minor number triggered an error.%s\n\r", KERR, KNRM);
 			exit(EXIT_FAILURE);
 		}
-		log_print("Debug mode (HW version %d.%d)\n\r", version_major, version_minor);
+		if (hw_driver_get_version_patch(&version_patch)){
+			printf("%sError: Probing patch number triggered an error.%s\n\r", KERR, KNRM);
+			exit(EXIT_FAILURE);
+		}
+		log_print("Debug mode (HW version %d.%d.%d)\n\r", version_major, version_minor, version_patch);
 		/*
 		 * We must activate, in the TRNG, the pulling of raw random bytes by the
 		 * post-processing function (because in debug mode it is disabled upon
