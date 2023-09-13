@@ -42,7 +42,6 @@ asm: $(OUT_VHD)
 $(OUT_VHD): $(OUT_ASM) $(ECCPKG_VHD) $(CUSTOM_VHD) $(ASM_VAR_DEFINITIONS)
 	@# Assemble file
 	@python3 ipecc_assembler.py -a $^
-	@mv $(OUT_VHD_ADDR_TMP) $(OUT_ADDR_VHD)
 
 # Disassemble if asked to
 disass: $(OUT_DISASS)

@@ -15,6 +15,7 @@ hdl/common/ecc_curve_iram/latex/all-progs.tex.pre.0
 hdl/common/ecc_curve_iram/latex/assembly.awk.vardefs
 hdl/common/ecc_curve_iram/latex/texify.awk
 hdl/common/ecc_curve_iram/ecc_vars.vhd
+hdl/common/ecc_curve_iram/ecc_addr.h
 sim/sage/ecc_tb.sage.py
 *.part
 *.aux
