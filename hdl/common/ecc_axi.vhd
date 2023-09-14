@@ -3146,7 +3146,7 @@ begin
 				-- 2nd byte: minor number
 				-- 3rd byte: patch number
 				dw := (others => '0');
-				dw(31 downto 0) := x"01" & x"02" & x"0018"; -- version 1.2.24
+				dw(31 downto 0) := x"01" & x"02" & x"0019"; -- version 1.2.25
 				v.axi.rdatax := dw;
 				v.axi.rvalid := '1'; -- (s5)
 			-- ------------------------------
