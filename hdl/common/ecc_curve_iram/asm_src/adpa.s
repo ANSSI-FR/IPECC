@@ -23,11 +23,12 @@
 .random_phiL_export:
 	NNRND			phi0
 	NNRND			phi1
-.savekb0L:
 # *******************************************************************
 # save kb0 (LSB of kb) as it will be required in the end to condition-
 # naly subtract P to the result
 # *******************************************************************
+.savekb0L:
+.random_phi01L_dbg:
 	TESTPAR	kb0		%kb0
 .phimskL:
 # *******************************************************************

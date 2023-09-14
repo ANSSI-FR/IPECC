@@ -14,6 +14,7 @@
 #####################################################################
 .znegcL:
 .znegcL_export:
+.znegc_op1L_dbg:
 # simply copy from current address to new ones the coordinates
 # that are not to change
 	BARRIER
@@ -29,4 +30,6 @@
 	NNMOV,p55	Ykeep		patchme
 	NNMOV,p20	Xkeep		XR0
 	NNMOV,p21	Xkeep		XR1
+.znegc_oplastL_dbg:
+	NOP
 	STOP

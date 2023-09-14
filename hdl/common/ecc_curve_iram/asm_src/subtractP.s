@@ -14,6 +14,7 @@
 #####################################################################
 .subtractPL:
 .subtractPL_export:
+.subtractP_op1L_dbg:
 	BARRIER
 # *****************************************************************
 # conditional patch based on the last (MSB) bit of phi

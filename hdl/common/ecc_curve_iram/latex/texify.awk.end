@@ -16,6 +16,8 @@
 		printf " & & \\br{%s} & & & & \\\\\n", $1
 	} else if ( $1 ~ /^\.[^ ]+L\\char`_export:/) {
 		printf " & & \\br{%s} & & & & \\\\\n", $1
+	} else if ( $1 ~ /^\.[^ ]+L\\char`_dbg:/) {
+		printf " & & \\br{%s} & & & & \\\\\n", $1
 	} else if ( $2 ~ /NOP/ || $2 ~ /NNADD/ || $2 ~ /NNSUB/ || $2 ~ /NNSRL/ || $2 ~ /NNSLL/ || $2 ~ /NNRND/ || $2 ~ /NNXOR/ || $2 ~ /FPREDC/ || $2 ~ /TESTPAR/ || $2 ~ /NNDIV2/) {
 		# opc
 		if ($5 == "%mu0") {$5 = "\\%mu0"}

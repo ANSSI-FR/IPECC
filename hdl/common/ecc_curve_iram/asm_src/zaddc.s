@@ -27,6 +27,7 @@
 #####################################################################
 .pre_zaddcL:
 .pre_zaddcL_export:
+.pre_zaddc_op1L_dbg:
 	BARRIER
 # Compute difference of X coords & detect possible equality
 	NNSUB,p29	XR1	XR0	XmXC
@@ -44,11 +45,14 @@
 	NNADD,p31	YR0	YR1	G
 	NNSUB	G	twop	red
 	NNADD,p5	red	patchme	G
+.pre_zaddc_oplastL_dbg:
+	NOP
 	STOP
 
 .zaddcL:
 .zaddcL_export:
 	BARRIER
+.zaddc_op1L_dbg:
 	FPREDC	XmXC	XmXC	AZ
 	FPREDC	YmY	YmY	D
 	BARRIER
@@ -84,4 +88,6 @@
 	NNSUB	J	Ec	YSUB
 	NNADD,p5	YSUB	patchme	YSUB
 	NNMOV,p1	YSUB		YR1
+.zaddc_oplastL_dbg:
+	NOP
 	STOP

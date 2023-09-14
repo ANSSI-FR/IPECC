@@ -14,6 +14,7 @@
 #####################################################################
 .itohL:
 .itohL_export:
+.itohL_dbg:
 # *****************************************************************
 # test LSbit of kap and kapP (resp.) and save them into %kap and
 # %kapP (resp.)

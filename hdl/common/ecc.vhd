@@ -172,6 +172,24 @@ architecture struct of ecc is
 			--   token
 			gentoken : out std_logic;
 			tokendone : in std_logic;
+			--   /debug only
+			laststep : in std_logic;
+			firstzdbl : in std_logic;
+			firstzaddu : in std_logic;
+			first2pz : in std_logic;
+			first3pz : in std_logic;
+			torsion2 : in std_logic;
+			kap : in std_logic;
+			kapp : in std_logic;
+			zu : in std_logic;
+			zc : in std_logic;
+			r0z : in std_logic;
+			r1z : in std_logic;
+			pts_are_equal : in std_logic;
+			pts_are_oppos : in std_logic;
+			phimsb : in std_logic;
+			kb0end : in std_logic;
+			--   debug only/
 			-- interface with ecc_curve
 			masklsb : out std_logic;
 			-- interface with ecc_fp (access to ecc_fp_dram)
@@ -212,6 +230,7 @@ architecture struct of ecc is
 			-- debug features (interface with ecc_scalar shared w/ ecc_curve)
 			dbgpgmstate : in std_logic_vector(3 downto 0);
 			dbgnbbits : in std_logic_vector(15 downto 0);
+			dbgjoyebit : in std_logic_vector(log2(2*nn - 1) - 1 downto 0);
 			dbgnbstarvrndxyshuf : in std_logic_vector(15 downto 0);
 			-- debug features (interface with ecc_curve)
 			dbgbreakpoints : out breakpoints_type;
@@ -353,6 +372,7 @@ architecture struct of ecc is
 			-- debug features
 			dbgpgmstate : out std_logic_vector(3 downto 0);
 			dbgnbbits : out std_logic_vector(15 downto 0);
+			dbgjoyebit : out std_logic_vector(log2(2*nn - 1) - 1 downto 0);
 			dbgnbstarvrndxyshuf : out std_logic_vector(15 downto 0)
 			-- pragma translate_off
 			-- interface with ecc_fp (simu only)
@@ -931,6 +951,7 @@ architecture struct of ecc is
 	-- debug features (signals between ecc_axi & ecc_scalar)
 	signal dbgpgmstate : std_logic_vector(3 downto 0);
 	signal dbgnbbits : std_logic_vector(15 downto 0);
+	signal dbgjoyebit : std_logic_vector(log2(2*nn - 1) - 1 downto 0);
 	signal dbgnbstarvrndxyshuf : std_logic_vector(15 downto 0);
 	signal dbghalted_s : std_logic;
 	-- debug features (signals between ecc_axi & ecc_curve_iram)
@@ -1091,6 +1112,24 @@ begin
 			--   token
 			gentoken => gentoken,
 			tokendone => tokendone,
+			--   /debug only
+			laststep => laststep,
+			firstzdbl => firstzdbl,
+			firstzaddu => firstzaddu,
+			first2pz => first2pz,
+			first3pz => first3pz,
+			torsion2 => torsion2,
+			kap => kap,
+			kapp => kapp,
+			zu => zu,
+			zc => zc,
+			r0z => r0z,
+			r1z => r1z,
+			pts_are_equal => pts_are_equal,
+			pts_are_oppos => pts_are_oppos,
+			phimsb => phimsb,
+			kb0end => kb0end,
+			--   debug only/
 			-- interface with ecc_curve
 			masklsb => masklsb,
 			-- interface with ecc_fp (access to ecc_fp_dram)
@@ -1131,6 +1170,7 @@ begin
 			-- debug features (interface with ecc_scalar)
 			dbgpgmstate => dbgpgmstate,
 			dbgnbbits => dbgnbbits,
+			dbgjoyebit => dbgjoyebit,
 			dbgnbstarvrndxyshuf => dbgnbstarvrndxyshuf,
 			-- debug features (interface with ecc_curve)
 			dbgbreakpoints => dbgbreakpoints,
@@ -1270,6 +1310,7 @@ begin
 			-- debug features (interface with ecc_axi)
 			dbgpgmstate => dbgpgmstate,
 			dbgnbbits => dbgnbbits,
+			dbgjoyebit => dbgjoyebit,
 			dbgnbstarvrndxyshuf => dbgnbstarvrndxyshuf
 			-- pragma translate_off
 			-- interface with ecc_fp (simu only)

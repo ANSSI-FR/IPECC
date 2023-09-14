@@ -14,8 +14,10 @@
 #####################################################################
 .chkcurveL:
 .chkcurveL_export:
+.chkcurve_op1L_dbg:
 	BARRIER
 	JL	.dochkcurveL
+.chkcurve_oplastL_dbg:
 	NOP
 	STOP
 # ****************************************************************
@@ -45,6 +47,7 @@
 # modulo p)
 # ****************************************************************
 .dochkcurveL:
+.chkcurve_op2L_dbg:
 	BARRIER
 	FPREDC	XR1	XR1	XX
 	FPREDC	YR1	YR1	YY

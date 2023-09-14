@@ -38,12 +38,16 @@
 # we need to test if YR0 == YR1 (i.e YmY == 0) so reduce YmY in [0, p-1[
 	NNSUB	YmY	p	red
 	NNADD,p49	red	patchme	YmY
+.pre_zaddu_lastL_dbg:
+	NOP
 	STOP
 
 .zadduL:
 .zadduL_export:
 	BARRIER
+.zaddu_op1L_dbg:
 	JL	.dozadduL
+.zaddu_oplastL_dbg:
 	NOP
 	STOP
 

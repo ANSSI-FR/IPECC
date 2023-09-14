@@ -14,8 +14,10 @@
 #####################################################################
 .zdblL:
 .zdblL_export:
+.zdbl_op1L_dbg:
   BARRIER
   JL .dozdblL
+.zdbl_oplastL_dbg:
   NOP
   STOP
 

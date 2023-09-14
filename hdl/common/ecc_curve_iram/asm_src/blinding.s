@@ -22,6 +22,7 @@
 .random_alphaL:
 .random_alphaL_export:
 	NNRND			alf
+.random_alphaL_dbg:
 	NNMOV	q		qsh0
 	NNCLR			qsh1
 	NNRNDf		0	alfmsk

@@ -109,7 +109,23 @@ entity ecc_axi is
 		gentoken : out std_logic;
 		tokendone : in std_logic;
 		--   /debug only
-		--   end of debug only/
+		laststep : in std_logic;
+		firstzdbl : in std_logic;
+		firstzaddu : in std_logic;
+		first2pz : in std_logic;
+		first3pz : in std_logic;
+		torsion2 : in std_logic;
+		kap : in std_logic;
+		kapp : in std_logic;
+		zu : in std_logic;
+		zc : in std_logic;
+		r0z : in std_logic;
+		r1z : in std_logic;
+		pts_are_equal : in std_logic;
+		pts_are_oppos : in std_logic;
+		phimsb : in std_logic;
+		kb0end : in std_logic;
+		--   debug only/
 		-- interface with ecc_curve
 		masklsb : out std_logic;
 		-- interface with ecc_fp (access to ecc_fp_dram)
@@ -150,6 +166,7 @@ entity ecc_axi is
 		-- debug features (interface with ecc_scalar)
 		dbgpgmstate : in std_logic_vector(3 downto 0);
 		dbgnbbits : in std_logic_vector(15 downto 0);
+		dbgjoyebit : in std_logic_vector(log2(2*nn - 1) - 1 downto 0);
 		dbgnbstarvrndxyshuf : in std_logic_vector(15 downto 0);
 		-- debug features (interface with ecc_curve)
 		dbgbreakpoints : out breakpoints_type;
@@ -661,7 +678,13 @@ begin
 	              nndyn_nnm3_s, nndyn_nnp1_s,
 	              small_k_sz_en_ack, small_k_sz_kpdone,
 	              dbgtrngaxirdy, dbgtrngaxivalid, dbgtrngfprdy, dbgtrngfpvalid,
-	              dbgtrngcrvrdy, dbgtrngcrvvalid, dbgtrngshrdy, dbgtrngshvalid)
+	              dbgtrngcrvrdy, dbgtrngcrvvalid, dbgtrngshrdy, dbgtrngshvalid
+								-- /debug only
+	              , laststep, firstzdbl, firstzaddu, first2pz, first3pz, 
+	              torsion2, kap, kapp, zu, zc, r0z, r1z, dbgjoyebit,
+	              pts_are_equal, pts_are_oppos, phimsb, kb0end
+								-- debug only/
+							)
 		variable v : reg_type;
 		variable vbk : natural range 0 to 3;
 		variable v_nn_mod_ww_sub : unsigned(log2(ww) downto 0); -- log2(ww) + 1 bits
@@ -3325,6 +3348,32 @@ begin
 				--v.axi.rdatax(31 downto 1) := (others => '0');
 				v.axi.rdatax(31 downto 0) :=
 					(DBG_FP_RDATA_IS_RDY => r.debug.readrdy, others => '0');
+				v.axi.rvalid := '1'; -- (s5)
+			-- -----------------------------------------
+			-- decoding read of R_DBG_EXP_FLAGS register
+			-- -----------------------------------------
+			elsif debug -- statically resolved by synthesizer
+			  and s_axi_araddr(ADB + 2 downto 3) = R_DBG_EXP_FLAGS
+			then
+				dw := (others => '0');
+				dw(0) := r0z;
+				dw(1) := r1z;
+				dw(2) := kap;
+				dw(3) := kapp;
+				dw(4) := zu;
+				dw(5) := zc;
+				dw(6) := laststep;
+				dw(7) := firstzdbl;
+				dw(8) := firstzaddu;
+				dw(9) := first2pz;
+				dw(10) := first3pz;
+				dw(11) := torsion2;
+				dw(12) := pts_are_equal;
+				dw(13) := pts_are_oppos;
+				dw(14) := phimsb;
+				dw(15) := kb0end;
+				dw(31 downto 16) := std_logic_vector(resize(unsigned(dbgjoyebit), 16));
+				v.axi.rdatax := dw;
 				v.axi.rvalid := '1'; -- (s5)
 			-- -------------------------------------------
 			-- decoding read of R_DBG_TRNG_DIAG_0 register

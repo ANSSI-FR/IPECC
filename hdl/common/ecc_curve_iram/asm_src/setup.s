@@ -23,6 +23,8 @@
 	NNRNDm			lambda
 	NNSUB	lambda	p	red
 	NNADD,p4	red	patchme	lambda
+.random_lambdaL_dbg:
+	NOP
 	STOP
 
 .setupL:

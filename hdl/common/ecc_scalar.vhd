@@ -120,6 +120,7 @@ entity ecc_scalar is
 		-- debug features
 		dbgpgmstate : out std_logic_vector(3 downto 0);
 		dbgnbbits : out std_logic_vector(15 downto 0);
+		dbgjoyebit : out std_logic_vector(log2(2*nn - 1) - 1 downto 0);
 		dbgnbstarvrndxyshuf : out std_logic_vector(15 downto 0)
 		-- pragma translate_off
 		-- interface with ecc_fp (simu only)
@@ -2144,6 +2145,7 @@ begin
 	simbit <= r.sim.simbit;
 	-- pragma translate_on
 	-- debug features
+	dbgjoyebit <= r.dbg.joyebit;
 	dbgnbstarvrndxyshuf <= r.dbg.nbstarvrndxyshuf;
 	-- TODO: many multicycles can be set on paths r.ctrl.state -> dbg*
 	-- TODO: many multicycles can be set on paths r.kp.substate -> dbg*
