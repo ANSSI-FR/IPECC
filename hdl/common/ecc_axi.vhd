@@ -3144,7 +3144,7 @@ begin
 			then
 				-- 1st byte: major number
 				-- 2nd byte: minor number
-				-- 3rd byte: patch number
+				-- 3rd & 4th bytes: patch number
 				dw := (others => '0');
 				dw(31 downto 0) := x"01" & x"02" & x"0019"; -- version 1.2.25
 				v.axi.rdatax := dw;
