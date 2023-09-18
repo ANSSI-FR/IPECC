@@ -1,6 +1,10 @@
 ARM_CC ?= arm-linux-gnueabihf-gcc
-CFLAGS = -Wall -Wextra -Wpedantic -O3 -g3 -mcpu=cortex-a9 -mfpu=vfpv3 -mfloat-abi=hard -static
+#CFLAGS = -Wall -Wextra -Wpedantic -O3 -g3 -mcpu=cortex-a9 -mfpu=vfpv3 -mfloat-abi=hard -static
+CFLAGS = -Wall -Wextra -Wpedantic -g3 -mcpu=cortex-a9 -mfpu=vfpv3 -mfloat-abi=hard -static
 CFLAGS += -DWITH_EC_HW_DEBUG
+
+# Uncomment the following line to get [k]P trace debug feature
+CFLAGS += -DKP_TRACE
 
 C_FILES = hw_accelerator_driver_ipecc_platform.c hw_accelerator_driver_ipecc.c
 C_FILES_LINUX = $(C_FILES) linux/ecc-test-linux.c linux/curve.c linux/kp.c linux/ptops.c linux/pttests.c
