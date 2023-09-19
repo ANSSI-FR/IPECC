@@ -95,6 +95,9 @@ $(DBG_STATES_H): $(ECCPKG_VHD)
 	@grep "constant DEBUG_STATE_" $< | sed -e \
 		's/[ \t]*constant DEBUG_STATE_\([^ ]\+\) *: *std_logic4 *:= *std_nat(\([0-9]\+\), 4);/#define IPECC_DEBUG_STATE_\1    \2/'>> $@
 	@echo >> $@
+	@echo "/* Below are macros allowing to get some character" >> $@
+	@echo " * string identifying back each of the IDs above." >> $@
+	@echo " */" >> $@
 	@grep "constant DEBUG_STATE_" $< | sed -e \
 		's/[ \t]*constant DEBUG_STATE_\([^ ]\+\) *: *std_logic4 *:= *std_nat(\([0-9]\+\), 4);/#define STR_IPECC_STATE_\2   \"STATE_\1\"/'>> $@
 	@echo >>$@
