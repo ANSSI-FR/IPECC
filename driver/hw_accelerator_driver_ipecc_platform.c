@@ -15,6 +15,8 @@
 
 #include "hw_accelerator_driver_ipecc_platform.h"
 
+#include <stdint.h>
+
 #if defined(WITH_EC_HW_ACCELERATOR) && !defined(WITH_EC_HW_SOCKET_EMUL)
 
 /* The IP "physical" address in RAM.
@@ -54,7 +56,7 @@
  * parameter 'pseudotrng_base_addr_p' is not NULL, then *pseudotrng_base_addr_p
  * will be set with value NULL.
  */
-int hw_driver_setup(volatile unsigned char **base_addr_p, volatile unsigned char **pseudotrng_base_addr_p)
+int hw_driver_setup(volatile uint8_t **base_addr_p, volatile uint8_t **pseudotrng_base_addr_p)
 {
 	int ret = -1;
 
@@ -68,15 +70,15 @@ int hw_driver_setup(volatile unsigned char **base_addr_p, volatile unsigned char
 		/* In standalone mode, the base address
 		 * is the physical one.
 		 */
-		(*base_addr_p)	     = (volatile unsigned char*)IPECC_PHYS_BADDR;
+		(*base_addr_p)	     = (volatile uint8_t*)IPECC_PHYS_BADDR;
 		if (pseudotrng_base_addr_p != NULL) {
-			(*pseudotrng_base_addr_p) = (volatile unsigned char*)IPECC_PHYS_PSEUDO_TRNG_BADDR;
+			(*pseudotrng_base_addr_p) = (volatile uint8_t*)IPECC_PHYS_PSEUDO_TRNG_BADDR;
 		}
 	}							
 #elif defined(WITH_EC_HW_UIO)
 	{						
 		int uio_fd0, uio_fd1;
-		unsigned int uio_size;
+		uint32_t uio_size;
 		void *base_address;
 		log_print("Driver in UIO mode\n\r");
 
@@ -133,7 +135,7 @@ int hw_driver_setup(volatile unsigned char **base_addr_p, volatile unsigned char
 #elif defined(WITH_EC_HW_DEVMEM)
 	{
 		int devmem_fd;
-		unsigned int devmem_size;
+		uint32_t devmem_size;
 		void *base_address;
 		log_print("Driver in /dev/mem mode\n\r");
 		/* Open our /dev/mem device

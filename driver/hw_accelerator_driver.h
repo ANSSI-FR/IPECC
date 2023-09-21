@@ -48,7 +48,7 @@ typedef enum {
 int hw_driver_reset(void);
 
 /* To know if the IP is in 'debug' or 'production' mode */
-int hw_driver_is_debug(unsigned int*);
+int hw_driver_is_debug(uint32_t*);
 
 /* Get all three version nbs of the IP (major, minor & patch) */
 int hw_driver_get_version_tags(uint32_t*, uint32_t*, uint32_t*);
@@ -61,11 +61,11 @@ int hw_driver_trng_post_proc_enable(void);
 int hw_driver_trng_post_proc_disable(void);
 
 /* Set the curve parameters a, b, p and q */
-int hw_driver_set_curve(const unsigned char *a, unsigned int a_sz, const unsigned char *b, unsigned int b_sz,
-			const unsigned char *p, unsigned int p_sz, const unsigned char *q, unsigned int q_sz);
+int hw_driver_set_curve(const uint8_t *a, uint32_t a_sz, const uint8_t *b, uint32_t b_sz,
+			const uint8_t *p, uint32_t p_sz, const uint8_t *q, uint32_t q_sz);
 
 /* Activate the blinding for scalar multiplication */
-int hw_driver_set_blinding(unsigned int blinding_size);
+int hw_driver_set_blinding(uint32_t blinding_size);
 
 /* Disable the blinding for scalar multiplication */
 int hw_driver_disable_blinding(void);
@@ -78,7 +78,7 @@ int hw_driver_disable_shuffling(void);
 
 /* Activate and configure the periodic Z-remasking countermeasure
  * (the 'period' arguement is expressed in number of bits of the scalar */
-int hw_driver_set_zremask(unsigned int period);
+int hw_driver_set_zremask(uint32_t period);
 
 /* Disable the periodic Z-remasking countermeasure for scalar multiplication */
 int hw_driver_disable_zremask(void);
@@ -90,59 +90,59 @@ int hw_driver_disable_xyshuf(void);
 int hw_driver_enable_xyshuf(void);
 
 /* Check if an affine point (x, y) is on the curve that has been previously set in the hardware */
-int hw_driver_is_on_curve(const unsigned char *x, unsigned int x_sz, const unsigned char *y, unsigned int y_sz,
+int hw_driver_is_on_curve(const uint8_t *x, uint32_t x_sz, const uint8_t *y, uint32_t y_sz,
 			  int *on_curve);
 
 /* Check if affine points (x1, y1) and (x2, y2) are equal */
-int hw_driver_eq(const unsigned char *x1, unsigned int x1_sz, const unsigned char *y1, unsigned int y1_sz,
-		 const unsigned char *x2, unsigned int x2_sz, const unsigned char *y2, unsigned int y2_sz,
+int hw_driver_eq(const uint8_t *x1, uint32_t x1_sz, const uint8_t *y1, uint32_t y1_sz,
+		 const uint8_t *x2, uint32_t x2_sz, const uint8_t *y2, uint32_t y2_sz,
 		 int *is_eq);
 
 /* Check if affine points (x1, y1) and (x2, y2) are opposite */
-int hw_driver_opp(const unsigned char *x1, unsigned int x1_sz, const unsigned char *y1, unsigned int y1_sz,
-		  const unsigned char *x2, unsigned int x2_sz, const unsigned char *y2, unsigned int y2_sz,
+int hw_driver_opp(const uint8_t *x1, uint32_t x1_sz, const uint8_t *y1, uint32_t y1_sz,
+		  const uint8_t *x2, uint32_t x2_sz, const uint8_t *y2, uint32_t y2_sz,
 		  int *is_opp);
 
 /* Check if the infinity point flag is set in the hardware for
  * point at index idx
  */
-int hw_driver_point_iszero(unsigned char idx, int *iszero);
+int hw_driver_point_iszero(uint8_t idx, int *iszero);
 
 /* Set the infinity point flag in the hardware for
  * point at index idx
  */
-int hw_driver_point_zero(unsigned char idx);
+int hw_driver_point_zero(uint8_t idx);
 
 /* Unset the infinity point flag in the hardware for
  * point at index idx
  */
-int hw_driver_point_unzero(unsigned char idx);
+int hw_driver_point_unzero(uint8_t idx);
 
 /* Return (out_x, out_y) = -(x, y) */
-int hw_driver_neg(const unsigned char *x, unsigned int x_sz, const unsigned char *y, unsigned int y_sz,
-		  unsigned char *out_x, unsigned int *out_x_sz, unsigned char *out_y, unsigned int *out_y_sz);
+int hw_driver_neg(const uint8_t *x, uint32_t x_sz, const uint8_t *y, uint32_t y_sz,
+		  uint8_t *out_x, uint32_t *out_x_sz, uint8_t *out_y, uint32_t *out_y_sz);
 
 /* Return (out_x, out_y) = 2 * (x, y) */
-int hw_driver_dbl(const unsigned char *x, unsigned int x_sz, const unsigned char *y, unsigned int y_sz,
-                  unsigned char *out_x, unsigned int *out_x_sz, unsigned char *out_y, unsigned int *out_y_sz);
+int hw_driver_dbl(const uint8_t *x, uint32_t x_sz, const uint8_t *y, uint32_t y_sz,
+                  uint8_t *out_x, uint32_t *out_x_sz, uint8_t *out_y, uint32_t *out_y_sz);
 
 
 /* Return (out_x, out_y) = (x1, y1) + (x2, y2) */
-int hw_driver_add(const unsigned char *x1, unsigned int x1_sz, const unsigned char *y1, unsigned int y1_sz,
-		  const unsigned char *x2, unsigned int x2_sz, const unsigned char *y2, unsigned int y2_sz,
-                  unsigned char *out_x, unsigned int *out_x_sz, unsigned char *out_y, unsigned int *out_y_sz);
+int hw_driver_add(const uint8_t *x1, uint32_t x1_sz, const uint8_t *y1, uint32_t y1_sz,
+		  const uint8_t *x2, uint32_t x2_sz, const uint8_t *y2, uint32_t y2_sz,
+                  uint8_t *out_x, uint32_t *out_x_sz, uint8_t *out_y, uint32_t *out_y_sz);
 
 
 #ifdef KP_TRACE
 
 typedef struct {
-	unsigned int r0z;
-	unsigned int r1z;
-	unsigned int kap;
-	unsigned int kapp;
-	unsigned int zu;
-	unsigned int zc;
-	unsigned int jnbbit;
+	uint32_t r0z;
+	uint32_t r1z;
+	uint32_t kap;
+	uint32_t kapp;
+	uint32_t zu;
+	uint32_t zc;
+	uint32_t jnbbit;
 } kp_exp_flags_t;
 
 /* The following 'kp_trace_info' structure allows any calling program (stat. linked with
@@ -152,24 +152,24 @@ typedef struct {
  */
 typedef struct {
 	/* Main security parameter nn */
-	unsigned int nn;
+	uint32_t nn;
 	/* Random values (along with a valig flag for each) */
-	unsigned int* lambda;
+	uint32_t* lambda;
 	bool lambda_valid;
-	unsigned int* phi0;
+	uint32_t* phi0;
 	bool phi0_valid;
-	unsigned int* phi1;
+	uint32_t* phi1;
 	bool phi1_valid;
-	unsigned int* alpha;
+	uint32_t* alpha;
 	bool alpha_valid;
 	/* Nb of trace steps (roughly the nb of opcodes for this [k]P run) */
-	unsigned int nb_steps;
+	uint32_t nb_steps;
 	/* Temporary value of XR0, YR0, XR1 and YR1 */
-	unsigned int* nb_xr0;
-	unsigned int* nb_yr0;
-	unsigned int* nb_xr1;
-	unsigned int* nb_yr1;
-	unsigned int* nb_zr01;
+	uint32_t* nb_xr0;
+	uint32_t* nb_yr0;
+	uint32_t* nb_xr1;
+	uint32_t* nb_yr1;
+	uint32_t* nb_zr01;
 	/* A huge char buffer to printf all required infos. */
 	char* msg;
 	uint32_t msgsz;
@@ -183,17 +183,17 @@ typedef struct {
 #define KP_TRACE_PRINTF_SZ   (16*1024*1024)    /* 16 MB */
 
 /* Return (out_x, out_y) = scalar * (x, y) */
-int hw_driver_mul(const unsigned char *x, unsigned int x_sz, const unsigned char *y, unsigned int y_sz,
-		  const unsigned char *scalar, unsigned int scalar_sz,
-		  unsigned char *out_x, unsigned int *out_x_sz, unsigned char *out_y, unsigned int *out_y_sz,
+int hw_driver_mul(const uint8_t *x, uint32_t x_sz, const uint8_t *y, uint32_t y_sz,
+		  const uint8_t *scalar, uint32_t scalar_sz,
+		  uint8_t *out_x, uint32_t *out_x_sz, uint8_t *out_y, uint32_t *out_y_sz,
 			kp_trace_info_t* ktrc);
 
 /* Set the small scalar size in the hardware */
-int hw_driver_set_small_scalar_size(unsigned int bit_sz);
+int hw_driver_set_small_scalar_size(uint32_t bit_sz);
 
 /* Complete bypass the TRNG function (both entropy source,
  * post-processing, and server) */
-int hw_driver_bypass_full_trng_DBG(unsigned int bit);
+int hw_driver_bypass_full_trng_DBG(uint32_t bit);
 
 /* Disable token feature */
 int hw_driver_disable_token_DBG(void);

@@ -16,6 +16,8 @@
 #ifndef __HW_ACCELERATOR_DRIVER_PLATFORM_H__
 #define __HW_ACCELERATOR_DRIVER_PLATFORM_H__
 
+#include <stdint.h>
+
 #if defined(WITH_EC_HW_ACCELERATOR) && !defined(WITH_EC_HW_SOCKET_EMUL)
 
 /* Hardware accelerator driver platform specific stuff.
@@ -69,7 +71,7 @@
 /* Setup the driver depending on the environment,
  * and set the base address of the driver mapping.
  */
-int hw_driver_setup(volatile unsigned char **base_addr_p, volatile unsigned char **pseudotrng_base_addr_p);
+int hw_driver_setup(volatile uint8_t **base_addr_p, volatile uint8_t **pseudotrng_base_addr_p);
 
 #endif /* WITH_EC_HW_ACCELERATOR */
 

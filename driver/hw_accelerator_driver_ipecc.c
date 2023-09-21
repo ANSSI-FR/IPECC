@@ -1372,7 +1372,7 @@ static volatile uint64_t *ipecc_baddr = NULL;
 /* Dynamic value of parameter 'w' can be obtained using those of
  * 'nn' and 'ww' as we simply have: w = ceil( (nn + 4) /ww ).
  */
-#define IPECC_GET_W()    DIV( ((unsigned int)((IPECC_GET_NN()) + 4)) , (unsigned int)(IPECC_GET_WW()))
+#define IPECC_GET_W()    DIV( ((uint32_t)((IPECC_GET_NN()) + 4)) , (uint32_t)(IPECC_GET_WW()))
 
 /* Actions involving register R_DBG_CAPABILITIES_1
  * ***********************************************
@@ -1722,7 +1722,7 @@ static const char *ip_ecc_error_strings[] = {
 
 static inline void ip_ecc_errors_print(ip_ecc_error err)
 {
-	unsigned int i;
+	uint32_t i;
 
 	if(err){
 		for(i = 0; i < 15; i++){
@@ -1757,9 +1757,9 @@ static inline void ip_ecc_log(const char *s)
 
 /* Helper function to compute the size, in nb of words, of a big number, given its size in bytes.
  */
-static inline unsigned int ip_ecc_nn_words_from_bytes_sz(unsigned int sz)
+static inline uint32_t ip_ecc_nn_words_from_bytes_sz(uint32_t sz)
 {
-	unsigned int curr_word_sz = (sz / sizeof(ip_ecc_word));
+	uint32_t curr_word_sz = (sz / sizeof(ip_ecc_word));
 	curr_word_sz = ((sz % sizeof(ip_ecc_word)) == 0) ? (curr_word_sz) : (curr_word_sz + 1);
 
 	return curr_word_sz;
@@ -1767,9 +1767,9 @@ static inline unsigned int ip_ecc_nn_words_from_bytes_sz(unsigned int sz)
 
 /* Helper function to compute the size in bytes of a big number, given its size in bits.
  */
-static inline unsigned int ip_ecc_nn_bytes_from_bits_sz(unsigned int sz)
+static inline uint32_t ip_ecc_nn_bytes_from_bits_sz(uint32_t sz)
 {
-	unsigned int curr_bytes_sz = (sz / 8);
+	uint32_t curr_bytes_sz = (sz / 8);
 	curr_bytes_sz = ((sz % 8) == 0) ? (curr_bytes_sz) : (curr_bytes_sz + 1);
 
 	return curr_bytes_sz;
@@ -1959,7 +1959,7 @@ err:
 }
 
 /* Set the NN size provided in bits */
-static inline int ip_ecc_set_nn_bit_size(unsigned int bit_sz)
+static inline int ip_ecc_set_nn_bit_size(uint32_t bit_sz)
 {
 	/* Get the maximum NN size and check the asked size */
 	if(bit_sz > IPECC_GET_NN_MAX()){
@@ -1991,14 +1991,14 @@ err:
 }
 
 /* Get the current dynamic NN size in bits */
-static inline unsigned int ip_ecc_get_nn_bit_size(void)
+static inline uint32_t ip_ecc_get_nn_bit_size(void)
 {
 	/* Size is in bits */
 	if(IPECC_IS_DYNAMIC_NN_SUPPORTED()){
-		return (unsigned int)IPECC_GET_NN();
+		return (uint32_t)IPECC_GET_NN();
 	}
 	else{
-		return (unsigned int)IPECC_GET_NN_MAX();
+		return (uint32_t)IPECC_GET_NN_MAX();
 	}
 	/*
 	 * Note: a sole use of IPECC_GET_NN() could also work as this
@@ -2012,7 +2012,7 @@ static inline unsigned int ip_ecc_get_nn_bit_size(void)
  * A value of 0 for input argument 'blinding_size' means disabling
  * the blinding countermeasure.
  */
-static inline int ip_ecc_set_blinding_size(unsigned int blinding_size)
+static inline int ip_ecc_set_blinding_size(uint32_t blinding_size)
 {
 	/* Wait until the IP is not busy */
 	IPECC_BUSY_WAIT();
@@ -2112,7 +2112,7 @@ err:
  *
  * A value of 0 for input argument 'period' means disabling the countermeasure.
  */
-static inline int ip_ecc_set_zremask(unsigned int period)
+static inline int ip_ecc_set_zremask(uint32_t period)
 {
 	/* Wait until the IP is not busy */
 	IPECC_BUSY_WAIT();
@@ -2213,10 +2213,10 @@ err:
  *   or 64 bits) and big-endian for the bytes inside words as well as for the bits
  *   inside bytes.
  */
-static inline int ip_ecc_write_bignum(const unsigned char *a, unsigned int a_sz, ip_ecc_register reg)
+static inline int ip_ecc_write_bignum(const uint8_t *a, uint32_t a_sz, ip_ecc_register reg)
 {
-	unsigned int nn_size, curr_word_sz, words_sent, bytes_idx, j;
-	unsigned char end;
+	uint32_t nn_size, curr_word_sz, words_sent, bytes_idx, j;
+	uint8_t end;
 
 	ip_ecc_word w;
 
@@ -2291,10 +2291,10 @@ err:
  *   or 64 bits) and big-endian for the bytes inside words as well as for the bits
  *   inside bytes.
  */
-static inline int ip_ecc_read_bignum(unsigned char *a, unsigned int a_sz, ip_ecc_register reg)
+static inline int ip_ecc_read_bignum(uint8_t *a, uint32_t a_sz, ip_ecc_register reg)
 {
-	unsigned int nn_size, curr_word_sz, words_received, bytes_idx, j;
-	unsigned char end;
+	uint32_t nn_size, curr_word_sz, words_received, bytes_idx, j;
+	uint8_t end;
 
 	ip_ecc_word w;
 
@@ -2398,7 +2398,7 @@ err:
  * '(ceil(nn / 8)' in bytes. The call to ip_ecc_read_bignum() will
  * enforce that the value of argument 't_sz' follows this rule.
  */
-int ip_ecc_get_token(unsigned char* out_tok, unsigned int t_sz)
+int ip_ecc_get_token(uint8_t* out_tok, uint32_t t_sz)
 {
 	/* Wait until the IP is not busy */
 	IPECC_BUSY_WAIT();
@@ -2430,10 +2430,10 @@ err:
  * Unmask (XOR) the provided 'in_a' large number with the provided
  * 'in_tok' large number. 
  */
-int ip_ecc_unmask_with_token(const unsigned char* in_a, unsigned int a_sz, const unsigned char* in_tok,
-		                         unsigned int t_sz, unsigned char* out_b, unsigned int* out_b_sz)
+int ip_ecc_unmask_with_token(const uint8_t* in_a, uint32_t a_sz, const uint8_t* in_tok,
+		                         uint32_t t_sz, uint8_t* out_b, uint32_t* out_b_sz)
 {
-	unsigned int i;
+	uint32_t i;
 
 	/* It doesn't make sense that input sizes not match. */
 	if (a_sz != t_sz) {
@@ -2455,9 +2455,9 @@ err:
 /*
  * Clear the local copy of the token
  */
-int ip_ecc_clear_token(unsigned char* tok, unsigned int t_sz)
+int ip_ecc_clear_token(uint8_t* tok, uint32_t t_sz)
 {
-	unsigned int i;
+	uint32_t i;
 
 	for (i = 0; i < t_sz; i++){
 		tok[i] = 0;
@@ -2706,7 +2706,7 @@ err:
 /* An implicit (hence dirty) limitation of ip_debug_read_one_limb()
  * is that limbs are assumed to be of size 32-bit at most.
  */
-unsigned int ip_debug_read_one_limb(unsigned int lgnb, unsigned int limb)
+uint32_t ip_debug_read_one_limb(uint32_t lgnb, uint32_t limb)
 {
 	uint32_t w, n;
 
@@ -2728,9 +2728,9 @@ unsigned int ip_debug_read_one_limb(unsigned int lgnb, unsigned int limb)
 	return IPECC_DBG_GET_FP_READ_DATA();
 }
 
-void ip_debug_read_all_limbs(unsigned int lgnb, unsigned int* nbbuf)
+void ip_debug_read_all_limbs(uint32_t lgnb, uint32_t* nbbuf)
 {
-	unsigned int i;
+	uint32_t i;
 	for (i = 0; i < IPECC_GET_W(); i++) {
 		nbbuf[i] = ip_debug_read_one_limb(lgnb, i);
 	}
@@ -2793,7 +2793,7 @@ static void kp_trace_msg_append(kp_trace_info_t* ktrc, const char* fmt, ...)
 	}
 }
 
-void print_all_limbs_of_number(kp_trace_info_t* ktrc, const char* msg, unsigned int *nb)
+void print_all_limbs_of_number(kp_trace_info_t* ktrc, const char* msg, uint32_t *nb)
 {
   int32_t i;
   kp_trace_msg_append(ktrc, "%s", msg);
@@ -3200,7 +3200,7 @@ err:
 }
 
 /* Is the IP in 'debug' or 'production' mode? */
-static inline int ip_ecc_is_debug(unsigned int* answer)
+static inline int ip_ecc_is_debug(uint32_t* answer)
 {
 	/* Wait until the IP is not busy */
 	IPECC_BUSY_WAIT();
@@ -3397,17 +3397,17 @@ int ip_ecc_enable_token(void)
 
 #if 0
 /* Function to get the random output of the RAW FIFO */
-static inline int ip_ecc_get_random(unsigned char *out, unsigned int out_sz)
+static inline int ip_ecc_get_random(uint8_t *out, uint32_t out_sz)
 {
-	unsigned int read = 0, addr;
-	unsigned char bit;
+	uint32_t read = 0, addr;
+	uint8_t bit;
 
 	/* Wait until the IP is not busy */
 	IPECC_BUSY_WAIT();
 
 	/* Read in a loop the asked size */
 	while(read != (8 * out_sz)){
-		unsigned int i;
+		uint32_t i;
 		/* Wait until our FIFO is full */
 		IPECC_TRNG_RAW_FIFO_FULL_BUSY_WAIT();
 		/* Read all our data */
@@ -3432,13 +3432,13 @@ err:
 }
 #endif
 
-static volatile unsigned char hw_driver_setup_state = 0;
+static volatile uint8_t hw_driver_setup_state = 0;
 
 static inline int driver_setup(void)
 {
 	if(!hw_driver_setup_state){
 		/* Ask the lower layer for a setup */
-		if(hw_driver_setup((volatile unsigned char**)&ipecc_baddr, NULL /*(volatile unsigned char**)&ipecc_pseudotrng_baddr)*/)) {
+		if(hw_driver_setup((volatile uint8_t**)&ipecc_baddr, NULL /*(volatile uint8_t**)&ipecc_pseudotrng_baddr)*/)) {
 			goto err;
 		}
 		/* Reset the IP for a clean state */
@@ -3484,7 +3484,7 @@ int hw_driver_reset(void)
 }
 
 /* To know if the IP is in 'debug' or 'production' mode */
-int hw_driver_is_debug(unsigned int* answer)
+int hw_driver_is_debug(uint32_t* answer)
 {
 	if(driver_setup()){
 		goto err;
@@ -3619,8 +3619,8 @@ err:
  * multiplication will be run by the IP with active blinding, 'q'
  * and 'q_sz' arguments should be rigorously set.
  */
-int hw_driver_set_curve(const unsigned char *a, unsigned int a_sz, const unsigned char *b, unsigned int b_sz,
-       		        const unsigned char *p, unsigned int p_sz, const unsigned char *q, unsigned int q_sz)
+int hw_driver_set_curve(const uint8_t *a, uint32_t a_sz, const uint8_t *b, uint32_t b_sz,
+       		        const uint8_t *p, uint32_t p_sz, const uint8_t *q, uint32_t q_sz)
 {
 	if(driver_setup()){
 		goto err;
@@ -3671,7 +3671,7 @@ err:
  * countermeasure (consider using instead  explicit function
  * hw_driver_disable_blinding()).
  */
-int hw_driver_set_blinding(unsigned int blinding_size)
+int hw_driver_set_blinding(uint32_t blinding_size)
 {
 	if(driver_setup()){
 		goto err;
@@ -3737,7 +3737,7 @@ err:
 
 /* Activate and configure the periodic Z-remasking countermeasure
  * (the 'period' arguement is expressed in number of bits of the scalar */
-int hw_driver_set_zremask(unsigned int period)
+int hw_driver_set_zremask(uint32_t period)
 {
 	if(driver_setup()){
 		goto err;
@@ -3810,7 +3810,7 @@ err:
  * at the top of the prototype file <hw_accelerator_driver.h>
  * about the formatting and size of large numbers.
  */
-int hw_driver_is_on_curve(const unsigned char *x, unsigned int x_sz, const unsigned char *y, unsigned int y_sz,
+int hw_driver_is_on_curve(const uint8_t *x, uint32_t x_sz, const uint8_t *y, uint32_t y_sz,
                      	  int *on_curve)
 {
 	int inf_r0, inf_r1;
@@ -3861,8 +3861,8 @@ err:
  * at the top of the prototype file <hw_accelerator_driver.h>
  * about the formatting and size of large numbers.
  */
-int hw_driver_eq(const unsigned char *x1, unsigned int x1_sz, const unsigned char *y1, unsigned int y1_sz,
-       	    	 const unsigned char *x2, unsigned int x2_sz, const unsigned char *y2, unsigned int y2_sz,
+int hw_driver_eq(const uint8_t *x1, uint32_t x1_sz, const uint8_t *y1, uint32_t y1_sz,
+       	    	 const uint8_t *x2, uint32_t x2_sz, const uint8_t *y2, uint32_t y2_sz,
                  int *is_eq)
 {
 	int inf_r0, inf_r1;
@@ -3920,8 +3920,8 @@ err:
  * at the top of the prototype file <hw_accelerator_driver.h>
  * about the formatting and size of large numbers.
  */
-int hw_driver_opp(const unsigned char *x1, unsigned int x1_sz, const unsigned char *y1, unsigned int y1_sz,
-                  const unsigned char *x2, unsigned int x2_sz, const unsigned char *y2, unsigned int y2_sz,
+int hw_driver_opp(const uint8_t *x1, uint32_t x1_sz, const uint8_t *y1, uint32_t y1_sz,
+                  const uint8_t *x2, uint32_t x2_sz, const uint8_t *y2, uint32_t y2_sz,
                	  int *is_opp)
 {
 	int inf_r0, inf_r1;
@@ -3978,7 +3978,7 @@ err:
  * Argument 'index' must be either 0, identifying point R0, or 1,
  * identifying point R1.
  */
-int hw_driver_point_iszero(unsigned char idx, int *iszero)
+int hw_driver_point_iszero(uint8_t idx, int *iszero)
 {
 	if(driver_setup()){
 		goto err;
@@ -4021,7 +4021,7 @@ err:
  * Argument 'index' must be either 0, identifying point R0, or 1,
  * identifying point R1.
  */
-int hw_driver_point_zero(unsigned char idx)
+int hw_driver_point_zero(uint8_t idx)
 {
 	if(driver_setup()){
 		goto err;
@@ -4069,7 +4069,7 @@ err:
  * Argument 'index' must be either 0, identifying point R0, or 1,
  * identifying point R1.
  */
-int hw_driver_point_unzero(unsigned char idx)
+int hw_driver_point_unzero(uint8_t idx)
 {
 	if(driver_setup()){
 		goto err;
@@ -4110,11 +4110,11 @@ err:
  * at the top of the prototype file <hw_accelerator_driver.h>
  * about the formatting and size of large numbers.
  */
-int hw_driver_neg(const unsigned char *x, unsigned int x_sz, const unsigned char *y, unsigned int y_sz,
-                  unsigned char *out_x, unsigned int *out_x_sz, unsigned char *out_y, unsigned int *out_y_sz)
+int hw_driver_neg(const uint8_t *x, uint32_t x_sz, const uint8_t *y, uint32_t y_sz,
+                  uint8_t *out_x, uint32_t *out_x_sz, uint8_t *out_y, uint32_t *out_y_sz)
 {
 	int inf_r0, inf_r1;
-	unsigned int nn_sz;
+	uint32_t nn_sz;
 
 	if(driver_setup()){
 		goto err;
@@ -4176,11 +4176,11 @@ err:
  * at the top of the prototype file <hw_accelerator_driver.h>
  * about the formatting and size of large numbers.
  */
-int hw_driver_dbl(const unsigned char *x, unsigned int x_sz, const unsigned char *y, unsigned int y_sz,
-                  unsigned char *out_x, unsigned int *out_x_sz, unsigned char *out_y, unsigned int *out_y_sz)
+int hw_driver_dbl(const uint8_t *x, uint32_t x_sz, const uint8_t *y, uint32_t y_sz,
+                  uint8_t *out_x, uint32_t *out_x_sz, uint8_t *out_y, uint32_t *out_y_sz)
 {
 	int inf_r0, inf_r1;
-	unsigned int nn_sz;
+	uint32_t nn_sz;
 
 	if(driver_setup()){
 		goto err;
@@ -4243,12 +4243,12 @@ err:
  * at the top of the prototype file <hw_accelerator_driver.h>
  * about the formatting and size of large numbers.
  */
-int hw_driver_add(const unsigned char *x1, unsigned int x1_sz, const unsigned char *y1, unsigned int y1_sz,
-                  const unsigned char *x2, unsigned int x2_sz, const unsigned char *y2, unsigned int y2_sz,
-                  unsigned char *out_x, unsigned int *out_x_sz, unsigned char *out_y, unsigned int *out_y_sz)
+int hw_driver_add(const uint8_t *x1, uint32_t x1_sz, const uint8_t *y1, uint32_t y1_sz,
+                  const uint8_t *x2, uint32_t x2_sz, const uint8_t *y2, uint32_t y2_sz,
+                  uint8_t *out_x, uint32_t *out_x_sz, uint8_t *out_y, uint32_t *out_y_sz)
 {
 	int inf_r0, inf_r1;
-	unsigned int nn_sz;
+	uint32_t nn_sz;
 
 	if(driver_setup()){
 		goto err;
@@ -4317,18 +4317,18 @@ err:
  * at the top of the prototype file <hw_accelerator_driver.h>
  * about the formatting and size of large numbers.
  */
-int hw_driver_mul(const unsigned char *x, unsigned int x_sz, const unsigned char *y, unsigned int y_sz,
-                  const unsigned char *scalar, unsigned int scalar_sz,
-                  unsigned char *out_x, unsigned int *out_x_sz, unsigned char *out_y, unsigned int *out_y_sz,
+int hw_driver_mul(const uint8_t *x, uint32_t x_sz, const uint8_t *y, uint32_t y_sz,
+                  const uint8_t *scalar, uint32_t scalar_sz,
+                  uint8_t *out_x, uint32_t *out_x_sz, uint8_t *out_y, uint32_t *out_y_sz,
 									kp_trace_info_t* ktrc)
 {
 	int inf_r0, inf_r1;
-	unsigned int nn_sz;
+	uint32_t nn_sz;
 
 	/* 32768 bits are more than enough for any practical
 	 * use of elliptic curve cryptography.
 	 */
-	unsigned char token[4096] = {0, }; /* Heck, a whole page? Yes indeed. */
+	uint8_t token[4096] = {0, }; /* Heck, a whole page? Yes indeed. */
 
 	if(driver_setup()){
 		log_print("In hw_driver_mul(): Error in driver_setup()\n\r");
@@ -4445,7 +4445,7 @@ err:
  *
  * Obviously this feature only concerns the scalar multiplication.
  * */
-int hw_driver_set_small_scalar_size(unsigned int bit_sz)
+int hw_driver_set_small_scalar_size(uint32_t bit_sz)
 {
 	if(driver_setup()){
 		goto err;
