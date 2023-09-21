@@ -116,6 +116,10 @@ int ip_set_pt_and_run_kp(ipecc_test_t* t)
 	t->ktrc->nb_steps = 0;
 	t->ktrc->msgsz = 0;
 	t->ktrc->msgsz_max = KP_TRACE_PRINTF_SZ;
+#if 0
+	/* Clear [k]P trace log buffer (hoping a DMA will do this...) */
+	bzero(t->ktrc->msg, KP_TRACE_PRINTF_SZ);
+#endif
 	t->ktrc->nn = t->curve->nn;
 
 	/* Run [k]P command */
@@ -240,7 +244,7 @@ void print_large_number(const char* msg, large_number_t* lg)
 int kp_error_log(ipecc_test_t* t)
 {
 	printf("%sERROR ON TEST %d.%d%s\n\r", KRED, t->curve->id, t->id, KNRM);
-	printf("%sCurve definition:\n\r", KCYN);
+	printf("%sCurve and point definition:\n\r", KCYN);
 	printf("nn=%d%s\n\r", t->curve->nn, KNRM);
 	print_large_number("p=0x", &(t->curve->p));
 	print_large_number("a=0x", &(t->curve->a));
@@ -248,6 +252,11 @@ int kp_error_log(ipecc_test_t* t)
 	if (t->curve->q.valid == true) {
 		print_large_number("q=0x", &(t->curve->q));
 	}
+	print_large_number("Px=0x", &(t->ptp.x));
+	print_large_number("Py=0x", &(t->ptp.y));
+	print_large_number("k=0x", &(t->k));
+	print_large_number("Expected kPx=0x", &(t->pt_sw_res.x));
+	print_large_number("Expected kPy=0x", &(t->pt_sw_res.y));
 	printf("%s<DEBUG LOG TRACE OF [k]P:%s\n\r", KRED, KNRM);
 	printf("%s%s%s", KWHT, t->ktrc->msg, KNRM);
 	printf("%sEND OF DEBUG LOG TRACE>%s\n\r", KRED, KNRM);

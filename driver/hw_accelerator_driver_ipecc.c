@@ -2903,7 +2903,7 @@ static int kp_debug_trace(kp_trace_info_t* ktrc)
 
 			case DEBUG_ECC_IRAM_RANDOM_ALPHA_ADDR:
 				kp_trace_msg_append(ktrc, "PC=%s0x%03x%s (%s%s%s)\n\r", KGRN, dbgpc, KNRM, KYEL, str_ipecc_state(dbgstate), KNRM);
-				kp_trace_msg_append(ktrc, "Getting alpha\n\r");
+				kp_trace_msg_append(ktrc, "%sGetting alpha%s\n\r", KUNK, KNRM);
 				ip_debug_read_all_limbs(IPECC_LARGE_NB_ALF_ADDR, ktrc->alpha);
 				ktrc->alpha_valid = true;
 				kp_trace_msg_append(ktrc, "%s", KUNK);
@@ -2913,7 +2913,7 @@ static int kp_debug_trace(kp_trace_info_t* ktrc)
 
 			case DEBUG_ECC_IRAM_RANDOM_PHI01_ADDR:
 				kp_trace_msg_append(ktrc, "PC=%s0x%03x%s (%s%s%s)\n\r", KGRN, dbgpc, KNRM, KYEL, str_ipecc_state(dbgstate), KNRM);
-				kp_trace_msg_append(ktrc, "Getting phi0 & phi1\n\r");
+				kp_trace_msg_append(ktrc, "%sGetting phi0 & phi1%s\n\r", KUNK, KNRM);
 				ip_debug_read_all_limbs(IPECC_LARGE_NB_PHI0_ADDR, ktrc->phi0);
 				ktrc->phi0_valid = true;
 				kp_trace_msg_append(ktrc, "%s", KUNK);
@@ -2928,11 +2928,19 @@ static int kp_debug_trace(kp_trace_info_t* ktrc)
 
 			case DEBUG_ECC_IRAM_RANDOM_LAMBDA_ADDR:
 				kp_trace_msg_append(ktrc, "PC=%s0x%03x%s (%s%s%s)\n\r", KGRN, dbgpc, KNRM, KYEL, str_ipecc_state(dbgstate), KNRM);
-				kp_trace_msg_append(ktrc, "Getting lambda\n\r");
+				if (flags.jnbbit == 1) {
+					kp_trace_msg_append(ktrc, "%sGetting lambda (aka first Z-mask)%s\n\r", KUNK, KNRM);
+				} else {
+					kp_trace_msg_append(ktrc, "%sGetting periodic Z-remask%s\n\r", KUNK, KNRM);
+				}
 				ip_debug_read_all_limbs(IPECC_LARGE_NB_LAMBDA_ADDR, ktrc->lambda);
 				ktrc->lambda_valid = true;
 				kp_trace_msg_append(ktrc, "%s", KUNK);
-				print_all_limbs_of_number(ktrc, "lambda = 0x", ktrc->lambda);
+				if (flags.jnbbit == 1) {
+					print_all_limbs_of_number(ktrc, "lambda = 0x", ktrc->lambda);
+				} else {
+					print_all_limbs_of_number(ktrc, "Z-remask = 0x", ktrc->lambda);
+				}
 				kp_trace_msg_append(ktrc, "%s\n\r", KNRM);
 				break;
 
