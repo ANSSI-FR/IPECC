@@ -819,7 +819,7 @@ int main(int argc, char *argv[])
 	bool result_pts_are_equal;
 	bool result_tests_are_identical;
 
-	/* Move the claptrap below rather in --help it it exists onye day. */
+	/* Move the claptrap below rather in --help it it exists one day. */
 #if 0
 	printf("Reads test-vectors from standard-input, has them computed by hardware,\n\r");
 	printf("then checks that result matches what was expected.\n\r");
@@ -860,40 +860,37 @@ int main(int argc, char *argv[])
 	 * (e.g if you want to disable shuffling or enable periodic Z-remask
 	 *  when in debug mode, etc)
 	 */
-#if 1
+#if 0
 	/* Disabling XY-shuffling */
 	if (hw_driver_disable_xyshuf()) {
 		printf("Error: hw_driver_disable_xyshuf() returned exception\n\r");
-		goto err;
+		exit(EXIT_FAILURE);
 	}
 	printf("%sXY-shuffling disabled%s\n\r", KWHT, KNRM);
-#endif
 
 	/* Disabling shuffling */
 	if (hw_driver_disable_shuffling()) {
 		printf("Error: hw_driver_disable_shuffling() returned exception\n\r");
-		goto err;
+		exit(EXIT_FAILURE);
 	}
 	printf("%sShuffling disabled%s\n\r", KWHT, KNRM);
 
 	/* Disabling shuffling */
 	if (hw_driver_disable_zremask()) {
 		printf("Error: hw_driver_disable_zremask() returned exception\n\r");
-		goto err;
+		exit(EXIT_FAILURE);
 	}
 	printf("%sZ-remask disabled%s\n\r", KWHT, KNRM);
-
 	//hw_driver_bypass_full_trng_DBG(0);
 	//hw_driver_disable_token_DBG();
-
-#if 0
+	
+	/* Example of a microcode patch */
 	if (hw_driver_patch_microcode_DBG(microcode, 499, 1)) {
 		printf("Error: hw_driver_patch_microcode_DBG() returned exception\n\r");
-		goto err;
+		exit(EXIT_FAILURE);
 	}
 	printf("%sMicrocode was patched%s\n\r", KWHT, KNRM);
 #endif
-
 
 	/* Main infinite loop, parsing lines from standard input to extract:
 	 *   - input vectors
@@ -2117,6 +2114,4 @@ int main(int argc, char *argv[])
 	printf("total = %d\n\r", stats.total);
 
 	return EXIT_SUCCESS;
-err:
-	return EXIT_FAILURE;
 }
