@@ -16,6 +16,8 @@
 #ifndef __HW_ACCELERATOR_DRIVER_H__
 #define __HW_ACCELERATOR_DRIVER_H__
 
+#include <stdint.h>
+
 #if defined(WITH_EC_HW_ACCELERATOR)
 
 /* Hardware/external accelerator driver abstraction
@@ -26,6 +28,10 @@
  * For instance, the representation of the big number 0xabcdef can be either { 0xab, 0xcd, 0xef } on three
  * bytes, or {0x00, 0x00, 0xab, 0xcd, 0xef } on five bytes.
  */
+
+#ifdef KP_TRACE
+#include <stdbool.h>
+#endif
 
 /* Supported command types */
 typedef enum {  
@@ -44,16 +50,11 @@ int hw_driver_reset(void);
 /* To know if the IP is in 'debug' or 'production' mode */
 int hw_driver_is_debug(unsigned int*);
 
-/* Get major version of the IP */
-int hw_driver_get_version_major(unsigned int*);
+/* Get all three version nbs of the IP (major, minor & patch) */
+int hw_driver_get_version_tags(uint32_t*, uint32_t*, uint32_t*);
 
-/* Get minor version of the IP */
-int hw_driver_get_version_minor(unsigned int*);
-
-/* Get patch version of the IP */
-int hw_driver_get_version_patch(unsigned int*);
-
-/* Enable TRNG post-processing logic */
+/* Enable TRNG post-processing logic (a call upon is required in Debug mode
+ * or the TRNG won't ever provide a single byte). */
 int hw_driver_trng_post_proc_enable(void);
 
 /* Enable TRNG post-processing logic */
@@ -131,17 +132,106 @@ int hw_driver_add(const unsigned char *x1, unsigned int x1_sz, const unsigned ch
 		  const unsigned char *x2, unsigned int x2_sz, const unsigned char *y2, unsigned int y2_sz,
                   unsigned char *out_x, unsigned int *out_x_sz, unsigned char *out_y, unsigned int *out_y_sz);
 
+
+#ifdef KP_TRACE
+
+typedef struct {
+	unsigned int r0z;
+	unsigned int r1z;
+	unsigned int kap;
+	unsigned int kapp;
+	unsigned int zu;
+	unsigned int zc;
+	unsigned int jnbbit;
+} kp_exp_flags_t;
+
+/* The following 'kp_trace_info' structure allows any calling program (stat. linked with
+ * the driver) to get a certain number of IP internal states/infos collected during a [k]P
+ * computation through breakpoints and step-by-step execution (this includes e.g values of
+ * a few random numbers/masks, coordinates of intermiediate points, etc).
+ */
+typedef struct {
+	/* Main security parameter nn */
+	unsigned int nn;
+	/* Random values (along with a valig flag for each) */
+	unsigned int* lambda;
+	bool lambda_valid;
+	unsigned int* phi0;
+	bool phi0_valid;
+	unsigned int* phi1;
+	bool phi1_valid;
+	unsigned int* alpha;
+	bool alpha_valid;
+	/* Nb of trace steps (roughly the nb of opcodes for this [k]P run) */
+	unsigned int nb_steps;
+	/* Temporary value of XR0, YR0, XR1 and YR1 */
+	unsigned int* nb_xr0;
+	unsigned int* nb_yr0;
+	unsigned int* nb_xr1;
+	unsigned int* nb_yr1;
+	unsigned int* nb_zr01;
+	/* A huge char buffer to printf all required infos. */
+	char* msg;
+	uint32_t msgsz;
+	uint32_t msgsz_max;
+} kp_trace_info_t;
+#endif
+
+/* The size of the statically allocated buffer that field
+ * 'msgsz_max' of struct 'kp_trace_info_t' above should not
+ * exceed. */
+#define KP_TRACE_PRINTF_SZ   (16*1024*1024)    /* 16 MB */
+
 /* Return (out_x, out_y) = scalar * (x, y) */
 int hw_driver_mul(const unsigned char *x, unsigned int x_sz, const unsigned char *y, unsigned int y_sz,
 		  const unsigned char *scalar, unsigned int scalar_sz,
-		  unsigned char *out_x, unsigned int *out_x_sz, unsigned char *out_y, unsigned int *out_y_sz);
+		  unsigned char *out_x, unsigned int *out_x_sz, unsigned char *out_y, unsigned int *out_y_sz,
+			kp_trace_info_t* ktrc);
 
 /* Set the small scalar size in the hardware */
 int hw_driver_set_small_scalar_size(unsigned int bit_sz);
 
-/* Enable TRNG post-processing (a call upon is required in Debug mode
- * or the TRNG won't ever provide a single byte). */
-int hw_driver_trng_post_proc_enable(void);
+/* Complete bypass the TRNG function (both entropy source,
+ * post-processing, and server) */
+int hw_driver_bypass_full_trng_DBG(unsigned int bit);
+
+/* Disable token feature */
+int hw_driver_disable_token_DBG(void);
+
+/* (Re-)enable token feature */
+int hw_driver_enable_token_DBG(void);
+
+/* Patching microcode in the IP */
+int hw_driver_patch_microcode_DBG(uint32_t*, uint32_t, uint32_t);
+
+/*
+ * Error/printf formating
+ */
+#define TERM_COLORS
+
+#ifdef TERM_COLORS
+#define KNRM  "\x1B[0m"
+#define KRED  "\x1B[31m"
+#define KGRN  "\x1B[32m"
+#define KYEL  "\x1B[33m"
+#define KBLU  "\x1B[34m"
+#define KMAG  "\x1B[35m"
+#define KCYN  "\x1B[36m"
+#define KWHT  "\x1B[37m"
+#define KORA  "\033[93m"
+#define KUNK  "\033[91m"
+#else
+#define KNRM  ""
+#define KRED  ""
+#define KGRN  ""
+#define KYEL  ""
+#define KBLU  ""
+#define KMAG  ""
+#define KCYN  ""
+#define KWHT  ""
+#define KORA  ""
+#define KUNK  ""
+#endif /* TERM_COLORS */
 
 #endif /* !WITH_EC_HW_ACCELERATOR */
 

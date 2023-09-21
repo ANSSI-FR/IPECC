@@ -28,13 +28,517 @@
 #include <error.h>
 #endif
 
+#if 0
+static uint32_t microcode[499] = {
+0x91007bfd,
+0x9400741d,
+0x11000018,
+0x110003fb,
+0x110077fc,
+0x26000111,
+0x1200f2b5,
+0x58007bdb,
+0x58006fdb,
+0x510003fc,
+0x26000111,
+0x110057f3,
+0x12004f16,
+0x11455ab3,
+0x1200771d,
+0x1200771d,
+0x12007716,
+0x91455abd,
+0x58000661,
+0xc0000000,
+0x66000016,
+0x80000000,
+0x580018d1,
+0x18001cf0,
+0x580004cf,
+0x18004e74,
+0x580044d1,
+0x18004270,
+0x12003f16,
+0x11455aaf,
+0x58004691,
+0x11003c4f,
+0x12003f16,
+0x11455aaf,
+0x12004316,
+0x11455ab0,
+0x52004716,
+0x11455ab1,
+0x11003e2f,
+0x12003f16,
+0x11455aaf,
+0x12004016,
+0x11445ab0,
+0x12003c16,
+0x11445aaf,
+0x120041f5,
+0x28000000,
+0x510013e4,
+0x110017e5,
+0x1500000c,
+0x11000fe8,
+0x11007fe9,
+0x1d00000f,
+0x170031ec,
+0x91007fef,
+0x56003004,
+0x11502095,
+0x11d124b5,
+0x1e00300c,
+0x14002008,
+0x94802409,
+0x52001144,
+0x12801565,
+0x11007fea,
+0x11007feb,
+0x1500001a,
+0x19006810,
+0x1500001b,
+0x17001344,
+0x97001765,
+0x51007fec,
+0x1500000a,
+0x1500000b,
+0x19001008,
+0x13001405,
+0x13801004,
+0x1700114c,
+0x1700156d,
+0x1400280a,
+0x14802c0b,
+0x1700114e,
+0x1700156f,
+0x13002c0b,
+0x1380280a,
+0x13006c1b,
+0x1380681a,
+0x1700334c,
+0x1700376d,
+0x17003b4e,
+0x17003f6f,
+0x1c000028,
+0x1d000029,
+0x1700310c,
+0x1700352d,
+0x11007fe8,
+0x11007fe9,
+0x1c000050,
+0x1d000051,
+0x17003a0e,
+0x17003e2f,
+0x11007ff0,
+0x11007ff1,
+0x1c000074,
+0x1d000075,
+0x17002a8a,
+0x17002eab,
+0x11007ff4,
+0x11007ff5,
+0x11007ffa,
+0x11007ffb,
+0x16003022,
+0x11007fe4,
+0x91007fe5,
+0x5a000015,
+0x12005416,
+0x11445ab5,
+0x80000000,
+0x58001a66,
+0x18001e67,
+0x51001bfb,
+0x11001ffc,
+0x58007a7a,
+0x2600007f,
+0x11001be4,
+0x51001fe5,
+0x26000195,
+0x2100009c,
+0x18005675,
+0x58006aba,
+0x180056b6,
+0x586c1ac6,
+0x18005ab7,
+0x586d1ee7,
+0x28000000,
+0x510013ee,
+0x110017ef,
+0x18001266,
+0x18001667,
+0x18007a7a,
+0x66000195,
+0x51006bfb,
+0x2600014e,
+0x110013e6,
+0x110017e7,
+0x66000103,
+0x6600010a,
+0x11003be4,
+0x91003fe5,
+0x5e00342d,
+0x1380300c,
+0x1e003c4f,
+0x1380380e,
+0x16003022,
+0x16003841,
+0x1e002c6b,
+0x9380280a,
+0x524710c8,
+0x114522a8,
+0x12002016,
+0x11705aa8,
+0x124814f0,
+0x114542b0,
+0x12004016,
+0x11715ab0,
+0x80000000,
+0x660000a7,
+0x80000000,
+0x187f235a,
+0x18002108,
+0x18004211,
+0x584a1109,
+0x11641bf4,
+0x11631ff5,
+0x184b5106,
+0x526544d1,
+0x114546b1,
+0x12584524,
+0x116612a4,
+0x125924c9,
+0x114526a9,
+0x184c5527,
+0x125a1888,
+0x114522a8,
+0x185b4105,
+0x525c14e5,
+0x516716a5,
+0x28000000,
+0x525d1895,
+0x114556b5,
+0x12005416,
+0x11705ab5,
+0x125e1cb0,
+0x114542b0,
+0x12004016,
+0x11715ab0,
+0x115f14f4,
+0x12005316,
+0x11455ab4,
+0x80000000,
+0x580056a8,
+0x18004211,
+0x58601117,
+0x18611909,
+0x520026f9,
+0x114566b9,
+0x18621739,
+0x11005d29,
+0x12002716,
+0x11455aa9,
+0x12004531,
+0x114546b1,
+0x114d47e4,
+0x124e5c88,
+0x114522a8,
+0x18004110,
+0x58005288,
+0x12004330,
+0x114542b0,
+0x114f43e5,
+0x52002128,
+0x114522a8,
+0x114023e6,
+0x120022e9,
+0x114526a9,
+0x18005129,
+0x1842575a,
+0x52002730,
+0x114542b0,
+0x114143e7,
+0x80000000,
+0x56002864,
+0x18007a76,
+0x58006ad9,
+0x18005ace,
+0x586811d0,
+0x18003ace,
+0x586915d1,
+0x18006b55,
+0x58006eb6,
+0x18005755,
+0x580072b4,
+0x110067fa,
+0x110043e4,
+0x110047e5,
+0x11005be6,
+0x510053e7,
+0x610000bb,
+0x51007fea,
+0x11007feb,
+0x11007fec,
+0x11007fed,
+0x11007fee,
+0x11007fef,
+0x11006bfb,
+0x2600014e,
+0x66000103,
+0x6600010a,
+0x66000014,
+0x80000000,
+0x52005416,
+0x11445ab5,
+0x180056aa,
+0x58001946,
+0x18002aab,
+0x58001d67,
+0x28000000,
+0x58001bc6,
+0x18001fc7,
+0x52001816,
+0x11445aa6,
+0x12001c16,
+0x11445aa7,
+0x28000000,
+0x51006ff9,
+0x110073fa,
+0x11007bf7,
+0x11007ff1,
+0x11007fef,
+0x11007bf0,
+0x120067d4,
+0x2200013f,
+0x12006bd4,
+0x2200013f,
+0x19006404,
+0x24000128,
+0x1b006419,
+0x19005c04,
+0x24000125,
+0x19003c04,
+0x24000125,
+0x1b005c17,
+0x1b003c0f,
+0x2100011b,
+0x11005f97,
+0x12003f6f,
+0x21000122,
+0x19006804,
+0x24000135,
+0x1b00681a,
+0x19004404,
+0x24000132,
+0x19004004,
+0x24000132,
+0x1b004411,
+0x1b004010,
+0x21000128,
+0x11004791,
+0x12004370,
+0x2100012f,
+0x12006754,
+0x2300013b,
+0x110053f9,
+0x12005e37,
+0x12003e0f,
+0x21000117,
+0x12006b3a,
+0x120046f1,
+0x120041f0,
+0x21000117,
+0x120067d4,
+0x2200014c,
+0x120047f4,
+0x23000148,
+0x12004794,
+0x2300014a,
+0x12004791,
+0x23000148,
+0x21000145,
+0x11004791,
+0x23000148,
+0x110047f5,
+0x28000000,
+0x11005ff1,
+0x21000141,
+0x51007bd7,
+0x120002f1,
+0x11007bf9,
+0x18006679,
+0x51006ffa,
+0x19004404,
+0x24000156,
+0x21000157,
+0x18006759,
+0x18006b5a,
+0x53004411,
+0x2200015b,
+0x21000153,
+0x110067f5,
+0x28000000,
+0x510013ee,
+0x110017ef,
+0x11001bfc,
+0x11001fec,
+0x18003a64,
+0x18003e65,
+0x18007266,
+0x18003267,
+0x18007a7a,
+0x6100009c,
+0x11006bfb,
+0x2600014e,
+0x66000103,
+0x6600010a,
+0x51003be4,
+0x11003fe5,
+0x116a73e6,
+0x916b33e7,
+0x66000195,
+0x11001bfc,
+0x11001fec,
+0x110013e6,
+0x110017e7,
+0x110073e4,
+0x910033e5,
+0x510013e6,
+0x120000a7,
+0x12001c16,
+0x91445aa7,
+0x52001016,
+0x11445aa4,
+0x12001816,
+0x11445aa6,
+0x920010d4,
+0x52001416,
+0x11445aa5,
+0x12001c16,
+0x11445aa7,
+0x92001cb5,
+0x52001416,
+0x11445aa5,
+0x12001c16,
+0x11445aa7,
+0x110014f5,
+0x12005416,
+0x91445ab5,
+0x51001bfc,
+0x11001fec,
+0x110013e6,
+0x110017e7,
+0x26000016,
+0x110073e6,
+0x110033e7,
+0x910057f5,
+0x66000195,
+0x80000000,
+0x51751be8,
+0x11761fe9,
+0x110023e6,
+0x110027e7,
+0x12001f16,
+0x11455aa7,
+0x12001c16,
+0x11785aa7,
+0x58006b48,
+0x18001ce9,
+0x58002117,
+0x18002530,
+0x11002519,
+0x51005fe8,
+0x180018d7,
+0x11001934,
+0x12005316,
+0x11455ab4,
+0x51005e11,
+0x12004716,
+0x11455ab1,
+0x18005294,
+0x11005ef5,
+0x12005716,
+0x11455ab5,
+0x110056f7,
+0x12005f16,
+0x11455ab7,
+0x12006716,
+0x11455ab9,
+0x11001f55,
+0x12005716,
+0x11455ab5,
+0x180056b5,
+0x58000508,
+0x11004210,
+0x12004316,
+0x11455ab0,
+0x11004210,
+0x12004316,
+0x11455ab0,
+0x11564207,
+0x12001f16,
+0x11455aa7,
+0x52005234,
+0x114552b4,
+0x11005291,
+0x12004716,
+0x11455ab1,
+0x115747e6,
+0x52005739,
+0x114566b9,
+0x117d67fa,
+0x11005d08,
+0x12002316,
+0x11455aa8,
+0x18002115,
+0x11004637,
+0x12005f16,
+0x11455ab7,
+0x527356e4,
+0x114512a4,
+0x52004491,
+0x114546b1,
+0x18004511,
+0x527444e5,
+0x114516a5,
+0x110013f0,
+0x110017f1,
+0x11001bf6,
+0x11001ff4,
+0x11795be6,
+0x117a53e7,
+0x117b43e4,
+0x117c47e5,
+0x28000000,
+0x514657f0,
+0x114957f4,
+0x12000215,
+0x114556b5,
+0x115257f5,
+0x115343f5,
+0x117743f5,
+0x115453e4,
+0x115553e6,
+0x80000000,
+0xd5000012,
+0x57001a46,
+0x17001e47,
+0x91007ff2,
+0x6600007f,
+0x186e12c4,
+0x186f16e5,
+0xc0000000
+};
+#endif
 
 /* Helper for curve set */
 extern int ip_set_curve(curve_t*);
 /* Point operations helpers */
 /*   [k]P */
-extern int ip_set_pt_and_run_kp(ipecc_test_t*);
-extern int check_kp_result(ipecc_test_t*, bool*);
+extern int ip_set_pt_and_run_kp(ipecc_test_t*, kp_trace_info_t*);
+extern int check_kp_result(ipecc_test_t*, bool*, kp_trace_info_t*);
+extern int kp_error_log(ipecc_test_t*);
 /*   P + Q */
 extern int ip_set_pts_and_run_ptadd(ipecc_test_t*);
 extern int check_ptadd_result(ipecc_test_t*, bool*);
@@ -54,6 +558,46 @@ extern int check_test_equal(ipecc_test_t*, bool* res);
 /*   are P & Q opposite? */
 extern int ip_set_pts_and_test_oppos(ipecc_test_t*);
 extern int check_test_oppos(ipecc_test_t*, bool* res);
+
+#ifdef KP_TRACE
+/* Definition of NBMAXSZ (in ecc-test-linux.h) is done in bytes,
+ * here we use int, shence the divisions by 4 below.
+ */
+unsigned int debug_lambda[NBMAXSZ/4];
+unsigned int debug_phi0[NBMAXSZ/4];
+unsigned int debug_phi1[NBMAXSZ/4];
+unsigned int debug_alpha[NBMAXSZ/4];
+unsigned int debug_xr0[NBMAXSZ/4];
+unsigned int debug_yr0[NBMAXSZ/4];
+unsigned int debug_xr1[NBMAXSZ/4];
+unsigned int debug_yr1[NBMAXSZ/4];
+unsigned int debug_zr01[NBMAXSZ/4];
+char debug_msg[KP_TRACE_PRINTF_SZ];
+#endif
+
+/*
+ * struct to debug [k]P computation
+ */
+kp_trace_info_t kp_trace_info =
+{
+	.lambda = debug_lambda,
+	.lambda_valid = false,
+	.phi0 = debug_phi0,
+	.phi0_valid = false,
+	.phi1 = debug_phi1,
+	.phi1_valid = false,
+	.alpha = debug_alpha,
+	.alpha_valid = false,
+	.nb_steps = 0,
+	.nb_xr0 = debug_xr0,
+	.nb_yr0 = debug_yr0,
+	.nb_xr1 = debug_xr1,
+	.nb_yr1 = debug_yr1,
+	.nb_zr01 = debug_zr01,
+	.msg = debug_msg,
+	.msgsz = 0,
+	.msgsz_max = KP_TRACE_PRINTF_SZ
+};
 
 /*
  * Pointer 'line' will be allocated by getline, but freed by us
@@ -221,6 +765,10 @@ int cmp_two_pts_coords(point_t* p0, point_t* p1, bool* res)
 	/* Compare the X & Y coordinates one byte after the other. */
 	*res = true;
 	for (i = 0; i < p0->x.sz; i++) {
+#if 0
+		printf("%sp0->x.val[%d] = 0x%02x, p1->x.val[%d] = 0x%02x%s\n\r", KRED, i, p0->x.val[i], i, p1->x.val[i], KNRM);
+		printf("%sp0->y.val[%d] = 0x%02x, p1->y.val[%d] = 0x%02x%s\n\r", KCYN, i, p0->y.val[i], i, p1->y.val[i], KNRM);
+#endif
 		if ((p0->x.val[i] != p1->x.val[i]) || (p0->y.val[i] != p1->y.val[i])) {
 			*res = false;
 			break;
@@ -231,9 +779,9 @@ err:
 	return -1;
 }
 
-
 /* Curve definition */
 static curve_t curve = INIT_CURVE();
+
 /* Main test structure */
 static ipecc_test_t test = {
 	.curve = &curve,
@@ -247,7 +795,8 @@ static ipecc_test_t test = {
 	.hw_answer = INIT_PTTEST(),
 	.op = OP_NONE,
 	.is_an_exception = false,
-	.id = 0
+	.id = 0,
+	.ktrc = &kp_trace_info
 };
 
 /* Statistics */
@@ -258,11 +807,11 @@ static stats_t stats = {
 int main(int argc, char *argv[])
 {
 	uint32_t i;
-	line_t line_type_expected;
+	line_t line_type_expected = EXPECT_NONE;
 	size_t len = 0;
 	ssize_t nread;
 	uint32_t debug_not_prod;
-	uint32_t version_major, version_minor, version_patch;
+	uint32_t vmajor, vminor, vpatch;
 
 	(void)argc;
 	(void)argv;
@@ -270,9 +819,7 @@ int main(int argc, char *argv[])
 	bool result_pts_are_equal;
 	bool result_tests_are_identical;
 
-	printf("%sWelcome to the IPECC test applet.\n\r", KWHT);
-
-	/* Move the claptrap below rather in --help. */
+	/* Move the claptrap below rather in --help it it exists onye day. */
 #if 0
 	printf("Reads test-vectors from standard-input, has them computed by hardware,\n\r");
 	printf("then checks that result matches what was expected.\n\r");
@@ -288,19 +835,11 @@ int main(int argc, char *argv[])
 	}
 
 	if (debug_not_prod){
-		if (hw_driver_get_version_major(&version_major)){
-			printf("%sError: Probing major number triggered an error.%s\n\r", KERR, KNRM);
+		if (hw_driver_get_version_tags(&vmajor, &vminor, &vpatch)){
+			printf("%sError: Probing revision numbers triggered an error.%s\n\r", KERR, KNRM);
 			exit(EXIT_FAILURE);
 		}
-		if (hw_driver_get_version_minor(&version_minor)){
-			printf("%sError: Probing minor number triggered an error.%s\n\r", KERR, KNRM);
-			exit(EXIT_FAILURE);
-		}
-		if (hw_driver_get_version_patch(&version_patch)){
-			printf("%sError: Probing patch number triggered an error.%s\n\r", KERR, KNRM);
-			exit(EXIT_FAILURE);
-		}
-		log_print("Debug mode (HW version %d.%d.%d)\n\r", version_major, version_minor, version_patch);
+		log_print("IP in debug mode (HW version %d.%d.%d)\n\r", vmajor, vminor, vpatch);
 		/*
 		 * We must activate, in the TRNG, the pulling of raw random bytes by the
 		 * post-processing function (because in debug mode it is disabled upon
@@ -315,23 +854,55 @@ int main(int argc, char *argv[])
 	}
 #endif
 
-	/*
-	 * Add here possible extra configuration of the IP
+	/* Add here possible extra configuration for the IP
+	 * ************************************************
 	 *
-	 * (e.g if you want to disable shuffling or enable periodic Z-remask, etc)
+	 * (e.g if you want to disable shuffling or enable periodic Z-remask
+	 *  when in debug mode, etc)
 	 */
-	hw_driver_disable_xyshuf(); /* disable XY-shuffling */
-	hw_driver_disable_shuffling(); /* disable shuffling */
+#if 1
+	/* Disabling XY-shuffling */
+	if (hw_driver_disable_xyshuf()) {
+		printf("Error: hw_driver_disable_xyshuf() returned exception\n\r");
+		goto err;
+	}
+	printf("%sXY-shuffling disabled%s\n\r", KWHT, KNRM);
+#endif
+
+	/* Disabling shuffling */
+	if (hw_driver_disable_shuffling()) {
+		printf("Error: hw_driver_disable_shuffling() returned exception\n\r");
+		goto err;
+	}
+	printf("%sShuffling disabled%s\n\r", KWHT, KNRM);
+
+	/* Disabling shuffling */
+	if (hw_driver_disable_zremask()) {
+		printf("Error: hw_driver_disable_zremask() returned exception\n\r");
+		goto err;
+	}
+	printf("%sZ-remask disabled%s\n\r", KWHT, KNRM);
+
+	//hw_driver_bypass_full_trng_DBG(0);
+	//hw_driver_disable_token_DBG();
+
+#if 0
+	if (hw_driver_patch_microcode_DBG(microcode, 499, 1)) {
+		printf("Error: hw_driver_patch_microcode_DBG() returned exception\n\r");
+		goto err;
+	}
+	printf("%sMicrocode was patched%s\n\r", KWHT, KNRM);
+#endif
 
 
 	/* Main infinite loop, parsing lines from standard input to extract:
 	 *   - input vectors
 	 *   - type of operation
 	 *   - expected result,
-	 * then have the same computation done by hardware, and then check
-	 * the result of hardware against the expected one.
+	 * then having the same computation done by hardware, and then
+	 * checking the result of hardware against the expected one.
 	 */
-	line_type_expected = EXPECT_NONE;
+
 	while (((nread = getline(&line, &len, stdin))) != -1) {
 		/*
 		 * Allow comment lines starting with #
@@ -879,18 +1450,23 @@ int main(int argc, char *argv[])
 					/*
 					 * Set and execute a [k]P computation test on hardware.
 					 */
-					if (ip_set_pt_and_run_kp(&test))
+					if (ip_set_pt_and_run_kp(&test, &kp_trace_info))
 					{
 						stats.nok++;
 						stats.total++;
 						printf("%sError: Computation of scalar multiplication on hardware triggered an error.%s\n\r", KERR, KNRM);
+						kp_error_log(&test);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_KPX_OR_BLD')", __LINE__);
 					}
 					/*
 					 * Check IP result against the expected one (which is the point at infinity)
 					 */
-					if (check_kp_result(&test, &result_pts_are_equal))
+					if (check_kp_result(&test, &result_pts_are_equal, &kp_trace_info))
 					{
+						/*
+						 * Dump [k]P trace log.
+						 */
+						kp_error_log(&test);
 						stats.nok++;
 						stats.total++;
 						printf("%sError: Couldn't compare [k]P hardware result w/ the expected one.%s\n\r", KERR, KNRM);
@@ -938,18 +1514,23 @@ int main(int argc, char *argv[])
 					/*
 					 * Set and execute a [k]P computation test on harware.
 					 */
-					if (ip_set_pt_and_run_kp(&test))
+					if (ip_set_pt_and_run_kp(&test, &kp_trace_info))
 					{
 						stats.nok++;
 						stats.total++;
 						printf("%sError: Computation of scalar multiplication on hardware triggered an error.%s\n\r", KERR, KNRM);
+						kp_error_log(&test);
 						print_stats_and_exit(&test, &stats, "(debug info: in state 'EXPECT_KPY')", __LINE__);
 					}
 					/*
 					 * Check IP result against the expected one.
 					 */
-					if (check_kp_result(&test, &result_pts_are_equal))
+					if (check_kp_result(&test, &result_pts_are_equal, &kp_trace_info))
 					{
+						/*
+						 * Dump [k]P trace log.
+						 */
+						kp_error_log(&test);
 						stats.nok++;
 						stats.total++;
 						printf("%sError: Couldn't compare [k]P hardware result w/ the expected one.%s\n\r", KERR, KNRM);
@@ -1525,5 +2106,17 @@ int main(int argc, char *argv[])
 
 	} /* while nread */
 
+	/* End of main inf. loop
+	 * (e.g TCP socket shutdown by 'nc -N' or Ctrl-C, or std input simply was closed).
+	 *
+	 * Print stats before exiting.
+	 */
+	printf("--\n\r");
+	printf("%sOK = %d%s\n\r", KGRN, stats.ok, KNRM);
+	printf("%snOK = %d%s\n\r", KRED, stats.nok, KNRM);
+	printf("total = %d\n\r", stats.total);
+
 	return EXIT_SUCCESS;
+err:
+	return EXIT_FAILURE;
 }

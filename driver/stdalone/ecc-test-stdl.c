@@ -232,10 +232,10 @@ hexdump("q=0x", END_OF_BUF(t.q, new_sz), new_sz);
 hexdump("k=0x", END_OF_BUF(t.k, new_sz), new_sz);
 hexdump("Px=0x", END_OF_BUF(t.Px, new_sz), new_sz);
 hexdump("Py=0x", END_OF_BUF(t.Py, new_sz), new_sz);
-					ret = hw_driver_mul(END_OF_BUF(t.Px, new_sz), SIZE_OF_BUF(t.Px, new_sz), END_OF_BUF(t.Py, new_sz), SIZE_OF_BUF(t.Py, new_sz), END_OF_BUF(t.k, new_sz), SIZE_OF_BUF(t.k, new_sz), Poutx, &szx, Pouty, &szy); EG(ret, "driver_mul");
+					ret = hw_driver_mul(END_OF_BUF(t.Px, new_sz), SIZE_OF_BUF(t.Px, new_sz), END_OF_BUF(t.Py, new_sz), SIZE_OF_BUF(t.Py, new_sz), END_OF_BUF(t.k, new_sz), SIZE_OF_BUF(t.k, new_sz), Poutx, &szx, Pouty, &szy, NULL); EG(ret, "driver_mul");
 				}
 				else{
-					ret = hw_driver_mul(t.Px, t.Px_sz, t.Py, t.Py_sz, t.k, t.k_sz, Poutx, &szx, Pouty, &szy); EG(ret, "driver_mul");
+					ret = hw_driver_mul(t.Px, t.Px_sz, t.Py, t.Py_sz, t.k, t.k_sz, Poutx, &szx, Pouty, &szy, NULL); EG(ret, "driver_mul");
 				}
 				/* Print the result */
 				ret = print_point("Pout", Poutx, szx, Pouty, szy); EG(ret, "print_point");

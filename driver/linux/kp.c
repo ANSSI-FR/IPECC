@@ -25,6 +25,9 @@ extern int cmp_two_pts_coords(point_t*, point_t*, bool*);
 int ip_set_pt_and_run_kp(ipecc_test_t* t)
 {
 	int is_null;
+#ifdef KP_TRACE
+	unsigned int i;
+#endif
 	/*
 	 * Sanity check.
 	 * Verify that curve is is set.
@@ -97,9 +100,27 @@ int ip_set_pt_and_run_kp(ipecc_test_t* t)
 
 	t->pt_hw_res.x.sz = t->pt_hw_res.y.sz = t->ptp.x.sz;
 
+	/* (RE-)initialize struct kp_trace_info_t fields
+	 * before calling driver API.
+	 */
+	for (i=0;i<DIV(t->ktrc->nn, 32); i++) {
+		t->ktrc->lambda[i] = 0;
+		t->ktrc->lambda_valid = false;
+		t->ktrc->phi0[i] = 0;
+		t->ktrc->phi0_valid = false;
+		t->ktrc->phi1[i] = 0;
+		t->ktrc->phi1_valid = false;
+		t->ktrc->alpha[i] = 0;
+		t->ktrc->alpha_valid = false;
+	}
+	t->ktrc->nb_steps = 0;
+	t->ktrc->msgsz = 0;
+	t->ktrc->msgsz_max = KP_TRACE_PRINTF_SZ;
+	t->ktrc->nn = t->curve->nn;
+
 	/* Run [k]P command */
 	if (hw_driver_mul(t->ptp.x.val, t->ptp.x.sz, t->ptp.y.val, t->ptp.y.sz, t->k.val, t->k.sz,
-			t->pt_hw_res.x.val, &(t->pt_hw_res.x.sz), t->pt_hw_res.y.val, &(t->pt_hw_res.y.sz)))
+			t->pt_hw_res.x.val, &(t->pt_hw_res.x.sz), t->pt_hw_res.y.val, &(t->pt_hw_res.y.sz), t->ktrc))
 	{
 		printf("%sError: [k]P computation by hardware triggered an error.%s\n\r", KERR, KNRM);
 		goto err;
@@ -123,7 +144,7 @@ err:
 	return -1;
 }
 
-int check_kp_result(ipecc_test_t* t, /*stats_t* st, */ bool* res)
+int check_kp_result(ipecc_test_t* t, bool* res)
 {
 	/*
 	 * Sanity check.
@@ -161,7 +182,7 @@ int check_kp_result(ipecc_test_t* t, /*stats_t* st, */ bool* res)
 		}
 	} else {
 		/*
-		 * Expected result it that [k]P is different from the point at infinity.
+		 * Expected result is that [k]P is different from the point at infinity.
 		 */
 		if (t->pt_hw_res.is_null == true) {
 			/*
@@ -182,8 +203,12 @@ int check_kp_result(ipecc_test_t* t, /*stats_t* st, */ bool* res)
 				printf("%sError when comparing coordinates of hardware [k]P result with the expected ones.%s\n\r", KERR, KNRM);
 				goto err;
 			}
+#if 0
+			printf("t->pt_hw_res.x = 0x%02x%02x\n\r", (t->pt_hw_res).x.val[0], (t->pt_hw_res).x.val[1]);
+			printf("t->pt_hw_res.y = 0x%02x%02x\n\r", (t->pt_hw_res).y.val[0], (t->pt_hw_res).y.val[1]);
+#endif
 			if (*res == true) {
-				PRINTF("[k]P results match\n\r");
+				PRINTF("[k]P results match\n\r");	
 				/* (st->ok)++; */
 			} else {
 				/*
@@ -201,3 +226,31 @@ err:
 	return -1;
 }
 
+void print_large_number(const char* msg, large_number_t* lg)
+{
+	uint32_t i;
+
+	printf("%s%s", KCYN, msg);
+	for(i=0; i<lg->sz; i++) {
+		printf("%02x", lg->val[i]);
+	}
+	printf("%s\n\r", KNRM);
+}
+
+int kp_error_log(ipecc_test_t* t)
+{
+	printf("%sERROR ON TEST %d.%d%s\n\r", KRED, t->curve->id, t->id, KNRM);
+	printf("%sCurve definition:\n\r", KCYN);
+	printf("nn=%d%s\n\r", t->curve->nn, KNRM);
+	print_large_number("p=0x", &(t->curve->p));
+	print_large_number("a=0x", &(t->curve->a));
+	print_large_number("b=0x", &(t->curve->b));
+	if (t->curve->q.valid == true) {
+		print_large_number("q=0x", &(t->curve->q));
+	}
+	printf("%s<DEBUG LOG TRACE OF [k]P:%s\n\r", KRED, KNRM);
+	printf("%s%s%s", KWHT, t->ktrc->msg, KNRM);
+	printf("%sEND OF DEBUG LOG TRACE>%s\n\r", KRED, KNRM);
+
+	return 0;
+}

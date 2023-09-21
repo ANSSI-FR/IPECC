@@ -58,9 +58,6 @@ int hw_driver_setup(volatile unsigned char **base_addr_p, volatile unsigned char
 {
 	int ret = -1;
 
-	log_print("Entering in hw_driver_setup.\n\r");
-
-
 	if (base_addr_p == NULL) {
 		ret = -1;
 		goto err;
@@ -81,7 +78,7 @@ int hw_driver_setup(volatile unsigned char **base_addr_p, volatile unsigned char
 		int uio_fd0, uio_fd1;
 		unsigned int uio_size;
 		void *base_address;
-		log_print("hw_driver_setup in UIO mode\n\r");
+		log_print("Driver in UIO mode\n\r");
 
 		/* Handle the main ECC IP */
 		/* Open our UIO device
@@ -138,7 +135,7 @@ int hw_driver_setup(volatile unsigned char **base_addr_p, volatile unsigned char
 		int devmem_fd;
 		unsigned int devmem_size;
 		void *base_address;
-		log_print("hw_driver_setup in /dev/mem mode\n\r");
+		log_print("Driver in /dev/mem mode\n\r");
 		/* Open our /dev/mem device
 		 * NOTE: O_SYNC here to avoid caching
 		 */

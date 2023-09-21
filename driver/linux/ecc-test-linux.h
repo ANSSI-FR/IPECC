@@ -13,6 +13,8 @@
  *  See LICENSE file at the root folder of the project.
  */
 
+#include "../hw_accelerator_driver.h"
+
 #ifndef __TEST_DRIVER_H__
 #define __TEST_DRIVER_H__
 
@@ -146,6 +148,7 @@ typedef struct {
 	operation_t op;
 	bool is_an_exception;
 	uint32_t id;
+	kp_trace_info_t *ktrc;
 } ipecc_test_t;
 
 /*

@@ -16,6 +16,14 @@
 /* The low level driver for the HW accelerator */
 #include "hw_accelerator_driver.h"
 
+#ifdef KP_TRACE
+#include "ecc_addr.h"
+#include "ecc_vars.h"
+#include "ecc_states.h"
+#include <string.h>
+#include <stdarg.h>
+#endif
+
 #if defined(WITH_EC_HW_ACCELERATOR) && !defined(WITH_EC_HW_SOCKET_EMUL)
 /**************************************************************************/
 /******************************* IPECC ************************************/
@@ -44,7 +52,36 @@ typedef volatile uint64_t ip_ecc_word;
 #define IPECC_WORD_FMT "%016x"
 #endif
 
+/*
+ * DIV(i, s) returns the number of s-bit limbs required to encode
+ * an i-bit number.
+ *
+ * Obviously this is also equal to the ceil() function applied to
+ * integer quotient i / s.
+ */
+#define DIV(i, s) \
+	( ((i) % (s)) ? ((i) / (s)) + 1 : (i) / (s))
 
+/*
+ * ge_pow_of_2(i) returns the power-of-2 which is either equal to
+ * or directly greater than i.
+ */
+static inline int ge_pow_of_2(uint32_t i, uint32_t* pw)
+{
+	*pw = 1;
+
+	if (i > (0x1UL<<31)) {
+		printf("Error: out-of-range input in call to function ge_pow_of_2().\n\r");
+		goto err;
+	}
+	while (*pw < i)
+	{
+		(*pw) *= 2;
+	}
+	return 0;
+err:
+	return -1;
+}
 
 /****************************/
 /* IPECC register addresses */
@@ -75,7 +112,10 @@ typedef volatile uint64_t ip_ecc_word;
  * specific routines.
  */
 static volatile uint64_t *ipecc_baddr = NULL;
-static volatile uint64_t *ipecc_pseudotrng_baddr = NULL;
+/* Uncomment line below to use the Pseudo TRNG feature
+ * (not yet officially released on the IPECC repo).
+ */
+/* static volatile uint64_t *ipecc_pseudotrng_baddr = NULL; */
 
 /* NOTE: addresses in the IP are 64-bit aligned */
 #define IPECC_ALIGNED(a) ((a) / sizeof(uint64_t))
@@ -138,16 +178,17 @@ static volatile uint64_t *ipecc_pseudotrng_baddr = NULL;
 #define IPECC_R_DBG_IRN_CNT_CRV  		(ipecc_baddr + IPECC_ALIGNED(0x160))
 #define IPECC_R_DBG_IRN_CNT_SHF  		(ipecc_baddr + IPECC_ALIGNED(0x168))
 #define IPECC_R_DBG_FP_RDATA_RDY    (ipecc_baddr + IPECC_ALIGNED(0x170))
-#define IPECC_R_DBG_TRNG_DIAG_0  		(ipecc_baddr + IPECC_ALIGNED(0x178))
-#define IPECC_R_DBG_TRNG_DIAG_1  		(ipecc_baddr + IPECC_ALIGNED(0x180))
-#define IPECC_R_DBG_TRNG_DIAG_2  		(ipecc_baddr + IPECC_ALIGNED(0x188))
-#define IPECC_R_DBG_TRNG_DIAG_3  		(ipecc_baddr + IPECC_ALIGNED(0x190))
-#define IPECC_R_DBG_TRNG_DIAG_4  		(ipecc_baddr + IPECC_ALIGNED(0x198))
-#define IPECC_R_DBG_TRNG_DIAG_5  		(ipecc_baddr + IPECC_ALIGNED(0x1a0))
-#define IPECC_R_DBG_TRNG_DIAG_6  		(ipecc_baddr + IPECC_ALIGNED(0x1a8))
-#define IPECC_R_DBG_TRNG_DIAG_7  		(ipecc_baddr + IPECC_ALIGNED(0x1b0))
-#define IPECC_R_DBG_TRNG_DIAG_8  		(ipecc_baddr + IPECC_ALIGNED(0x1b8))
-/*	-- Reserved                               0x1c0...0x1f8 */
+#define IPECC_R_DBG_EXP_FLAGS       (ipecc_baddr + IPECC_ALIGNED(0x178))
+#define IPECC_R_DBG_TRNG_DIAG_0  		(ipecc_baddr + IPECC_ALIGNED(0x180))
+#define IPECC_R_DBG_TRNG_DIAG_1  		(ipecc_baddr + IPECC_ALIGNED(0x188))
+#define IPECC_R_DBG_TRNG_DIAG_2  		(ipecc_baddr + IPECC_ALIGNED(0x190))
+#define IPECC_R_DBG_TRNG_DIAG_3  		(ipecc_baddr + IPECC_ALIGNED(0x198))
+#define IPECC_R_DBG_TRNG_DIAG_4  		(ipecc_baddr + IPECC_ALIGNED(0x1a0))
+#define IPECC_R_DBG_TRNG_DIAG_5  		(ipecc_baddr + IPECC_ALIGNED(0x1a8))
+#define IPECC_R_DBG_TRNG_DIAG_6  		(ipecc_baddr + IPECC_ALIGNED(0x1b0))
+#define IPECC_R_DBG_TRNG_DIAG_7  		(ipecc_baddr + IPECC_ALIGNED(0x1b8))
+#define IPECC_R_DBG_TRNG_DIAG_8  		(ipecc_baddr + IPECC_ALIGNED(0x1c0))
+/*	-- Reserved                               0x1c8...0x1f8 */
 
 /* Optional device acting as "pseudo TRNG" device, which software can push
  * some byte stream/file to.
@@ -173,44 +214,44 @@ static volatile uint64_t *ipecc_pseudotrng_baddr = NULL;
  *************************************/
 
 /* Fields for W_CTRL */
-#define IPECC_W_CTRL_PT_KP		((uint32_t)0x1 << 0)
-#define IPECC_W_CTRL_PT_ADD		((uint32_t)0x1 << 1)
-#define IPECC_W_CTRL_PT_DBL		((uint32_t)0x1 << 2)
-#define IPECC_W_CTRL_PT_CHK		((uint32_t)0x1 << 3)
-#define IPECC_W_CTRL_PT_NEG		((uint32_t)0x1 << 4)
-#define IPECC_W_CTRL_PT_EQU		((uint32_t)0x1 << 5)
-#define IPECC_W_CTRL_PT_OPP		((uint32_t)0x1 << 6)
+#define IPECC_W_CTRL_PT_KP		(((uint32_t)0x1) << 0)
+#define IPECC_W_CTRL_PT_ADD		(((uint32_t)0x1) << 1)
+#define IPECC_W_CTRL_PT_DBL		(((uint32_t)0x1) << 2)
+#define IPECC_W_CTRL_PT_CHK		(((uint32_t)0x1) << 3)
+#define IPECC_W_CTRL_PT_NEG		(((uint32_t)0x1) << 4)
+#define IPECC_W_CTRL_PT_EQU		(((uint32_t)0x1) << 5)
+#define IPECC_W_CTRL_PT_OPP		(((uint32_t)0x1) << 6)
 /* bits 7-11 reserved */
-#define IPECC_W_CTRL_RD_TOKEN   ((uint32_t)0x1 << 12)
-#define IPECC_W_CTRL_WRITE_NB		((uint32_t)0x1 << 16)
-#define IPECC_W_CTRL_READ_NB		((uint32_t)0x1 << 17)
-#define IPECC_W_CTRL_WRITE_K		((uint32_t)0x1 << 18)
+#define IPECC_W_CTRL_RD_TOKEN   (((uint32_t)0x1) << 12)
+#define IPECC_W_CTRL_WRITE_NB		(((uint32_t)0x1) << 16)
+#define IPECC_W_CTRL_READ_NB		(((uint32_t)0x1) << 17)
+#define IPECC_W_CTRL_WRITE_K		(((uint32_t)0x1) << 18)
 #define IPECC_W_CTRL_NBADDR_MSK		(0xfff)
 #define IPECC_W_CTRL_NBADDR_POS		(20)
 
 /* Fields for W_R0_NULL & W_R1_NULL */
-#define IPECC_W_POINT_IS_NULL      ((uint32_t)0x1 << 0)
-#define IPECC_W_POINT_IS_NOT_NULL      ((uint32_t)0x0 << 0)
+#define IPECC_W_POINT_IS_NULL      (((uint32_t)0x1) << 0)
+#define IPECC_W_POINT_IS_NOT_NULL      (((uint32_t)0x0) << 0)
 
 /* Fields for W_PRIME_SIZE & R_PRIME_SIZE */
 #define IPECC_W_PRIME_SIZE_POS   (0)
 #define IPECC_W_PRIME_SIZE_MSK   (0xffff)
 
 /* Fields for W_BLINDING */
-#define IPECC_W_BLINDING_EN		((uint32_t)0x1 << 0)
+#define IPECC_W_BLINDING_EN		(((uint32_t)0x1) << 0)
 #define IPECC_W_BLINDING_BITS_MSK	(0xfffffff)
 #define IPECC_W_BLINDING_BITS_POS	(4)
-#define IPECC_W_BLINDING_DIS		((uint32_t)0x0 << 0)
+#define IPECC_W_BLINDING_DIS		(((uint32_t)0x0) << 0)
 
 /* Fields for W_SHUFFLE */
-#define IPECC_W_SHUFFLE_EN    ((uint32_t)0x1 << 0)
-#define IPECC_W_SHUFFLE_DIS    ((uint32_t)0x0 << 0)
+#define IPECC_W_SHUFFLE_EN    (((uint32_t)0x1) << 0)
+#define IPECC_W_SHUFFLE_DIS    (((uint32_t)0x0) << 0)
 
 /* Fields for W_ZREMASK */
-#define IPECC_W_ZREMASK_EN    ((uint32_t)0x1 << 0)
+#define IPECC_W_ZREMASK_EN    (((uint32_t)0x1) << 0)
 #define IPECC_W_ZREMASK_BITS_MSK	(0xffff)
 #define IPECC_W_ZREMASK_BITS_POS	(16)
-#define IPECC_W_ZREMASK_DIS    ((uint32_t)0x0 << 0)
+#define IPECC_W_ZREMASK_DIS    (((uint32_t)0x0) << 0)
 
 /* Fields for W_TOKEN */
 /* no field here: action is performed simply by writing to the
@@ -218,7 +259,7 @@ static volatile uint64_t *ipecc_pseudotrng_baddr = NULL;
 
 /* Fields for W_IRQ */
 /* enable IRQ (1) or disable (0) */
-#define IPECC_W_IRQ_EN    ((uint32_t)0x1 << 0)
+#define IPECC_W_IRQ_EN    (((uint32_t)0x1) << 0)
 
 /* Fields for W_ERR_ACK */
 /* These are the same as for the ERR_ bits in R_STATUS (see below) */
@@ -232,10 +273,11 @@ static volatile uint64_t *ipecc_pseudotrng_baddr = NULL;
    register address, whatever the value written */
 
 /* Fields for W_DBG_HALT */
-#define IPECC_W_DBG_HALT_DO_HALT   ((uint32_t)0x1 << 0)
+#define IPECC_W_DBG_HALT_DO_HALT   (((uint32_t)0x1) << 0)
 
 /* Fields for W_DBG_BKPT */
-#define IPECC_W_DBG_BKPT_EN     ((uint32_t)0x1 << 0)
+#define IPECC_W_DBG_BKPT_EN     (((uint32_t)0x1) << 0)
+#define IPECC_W_DBG_BKPT_DIS    (((uint32_t)0x0) << 0)
 #define IPECC_W_DBG_BKPT_ID_POS    (1)
 #define IPECC_W_DBG_BKPT_ID_MSK    (0x3)
 #define IPECC_W_DBG_BKPT_ADDR_POS   (4)
@@ -246,14 +288,14 @@ static volatile uint64_t *ipecc_pseudotrng_baddr = NULL;
 #define IPECC_W_DBG_BKPT_STATE_MSK     (0xf)
 
 /* Fields for W_DBG_STEPS */
-#define IPECC_W_DBG_STEPS_RUN_NB_OP    ((uint32_t)0x1 << 0)
+#define IPECC_W_DBG_STEPS_RUN_NB_OP    (((uint32_t)0x1) << 0)
 #define IPECC_W_DBG_STEPS_NB_OP_POS    (8)
 #define IPECC_W_DBG_STEPS_NB_OP_MSK    (0xffff)
-#define IPECC_W_DBG_STEPS_RESUME     ((uint32_t)0x1 << 28)
+#define IPECC_W_DBG_STEPS_RESUME     (((uint32_t)0x1) << 28)
 
 /* Fields for W_DBG_TRIG_ACT */
 /* enable trig (1) or disable it (0) */
-#define IPECC_W_DBG_TRIG_ACT_EN     ((uint32_t)0x1 << 0)
+#define IPECC_W_DBG_TRIG_ACT_EN     (((uint32_t)0x1) << 0)
 
 /* Fields for W_DBG_TRIG_UP & W_DBG_TRIG_DOWN */
 #define IPECC_W_DBG_TRIG_POS    (0)
@@ -272,11 +314,11 @@ static volatile uint64_t *ipecc_pseudotrng_baddr = NULL;
  * from the raw random source */
 #define IPECC_W_DBG_TRNG_CTRL_POSTPROC_DISABLE  (0)
 /* Reset the raw FIFO */
-#define IPECC_W_DBG_TRNG_CTRL_RESET_FIFO_RAW		((uint32_t)0x1 << 1)
+#define IPECC_W_DBG_TRNG_CTRL_RESET_FIFO_RAW		(((uint32_t)0x1) << 1)
 /* Reset the internal random numbers FIFOs */
-#define IPECC_W_DBG_TRNG_CTRL_RESET_FIFO_IRN		((uint32_t)0x1 << 2)
+#define IPECC_W_DBG_TRNG_CTRL_RESET_FIFO_IRN		(((uint32_t)0x1) << 2)
 /* Read one bit from raw FIFO */
-#define IPECC_W_DBG_TRNG_CTRL_READ_FIFO_RAW		((uint32_t)0x1 << 4)
+#define IPECC_W_DBG_TRNG_CTRL_READ_FIFO_RAW		(((uint32_t)0x1) << 4)
 /* Reading offset in bits inside the FIFO on 20 bits */
 #define IPECC_W_DBG_TRNG_CTRL_FIFO_ADDR_MSK		(0xfffff)
 #define IPECC_W_DBG_TRNG_CTRL_FIFO_ADDR_POS		(8)
@@ -285,14 +327,14 @@ static volatile uint64_t *ipecc_pseudotrng_baddr = NULL;
  * the raw random bits). */
 #define IPECC_W_DBG_TRNG_CTRL_RAW_DISABLE_FIFO_READ_PORT_POS   (28)
 /* Complete bypass of the TRNG (1) or not (0) */
-#define IPECC_W_DBG_TRNG_CTRL_TRNG_BYPASS			((uint32_t)0x1 << 29)
+#define IPECC_W_DBG_TRNG_CTRL_TRNG_BYPASS			(((uint32_t)0x1) << 29)
 /* Deterministic bit value produced when complete bypass is on */
 #define IPECC_W_DBG_TRNG_CTRL_TRNG_BYPASS_VAL_POS		(30)
 #define IPECC_W_DBG_TRNG_CTRL_NNRND_DETERMINISTIC   (31)
 
 /* Fields for W_DBG_TRNG_CFG */
 /* Von Neumann debiaser activate */
-#define IPECC_W_DBG_TRNG_CFG_ACTIVE_DEBIAS		((uint32_t)0x1 << 0)
+#define IPECC_W_DBG_TRNG_CFG_ACTIVE_DEBIAS		(((uint32_t)0x1) << 0)
 /* TA value (in nb of system clock cycles) */
 #define IPECC_W_DBG_TRNG_CFG_TA_POS			(4)
 #define IPECC_W_DBG_TRNG_CFG_TA_MSK			(0xffff)
@@ -300,7 +342,7 @@ static volatile uint64_t *ipecc_pseudotrng_baddr = NULL;
    one-bit generation in the TRNG */
 #define IPECC_W_DBG_TRNG_CFG_TRNG_IDLE_POS		(20)
 #define IPECC_W_DBG_TRNG_CFG_TRNG_IDLE_MSK		(0xf)
-#define IPECC_W_DBG_TRNG_CFG_USE_PSEUDO   ((uint32_t)0x1 << 31)
+#define IPECC_W_DBG_TRNG_CFG_USE_PSEUDO   (((uint32_t)0x1) << 31)
 
 /* Fields for IPECC_W_DBG_FP_WADDR */
 #define IPECC_W_DBG_FP_WADDR_POS     (0)
@@ -315,42 +357,42 @@ static volatile uint64_t *ipecc_pseudotrng_baddr = NULL;
 #define IPECC_W_DBG_FP_RADDR_MSK     (0xffffffff)
 
 /* Fields for IPECC_W_DBG_CFG_NOXYSHUF */
-#define IPECC_W_DBG_CFG_XYSHUF_EN    ((uint32_t)0x1 << 0)
-#define IPECC_W_DBG_CFG_XYSHUF_DIS    ((uint32_t)0x0 << 0)
+#define IPECC_W_DBG_CFG_XYSHUF_EN    (((uint32_t)0x1) << 0)
+#define IPECC_W_DBG_CFG_XYSHUF_DIS    (((uint32_t)0x0) << 0)
 
 /* Fields for IPECC_W_DBG_CFG_AXIMSK */
-#define IPECC_W_DBG_CFG_AXIMSK_EN    ((uint32_t)0x1 << 0)
-#define IPECC_W_DBG_CFG_AXIMSK_DIS    ((uint32_t)0x0 << 0)
+#define IPECC_W_DBG_CFG_AXIMSK_EN    (((uint32_t)0x1) << 0)
+#define IPECC_W_DBG_CFG_AXIMSK_DIS    (((uint32_t)0x0) << 0)
 
 /* Fields for IPECC_W_DBG_CFG_TOKEN */
-#define IPECC_W_DBG_CFG_TOKEN_EN    ((uint32_t)0x1 << 0)
-#define IPECC_W_DBG_CFG_TOKEN_DIS    ((uint32_t)0x0 << 0)
+#define IPECC_W_DBG_CFG_TOKEN_EN    (((uint32_t)0x1) << 0)
+#define IPECC_W_DBG_CFG_TOKEN_DIS    (((uint32_t)0x0) << 0)
 
 /* Fields for IPECC_W_DBG_RESET_TRNG_CNT */
 /* no field here: action is performed simply by writing to the
    register address, whatever the value written */
 
 /* Fields for R_STATUS */
-#define IPECC_R_STATUS_BUSY		((uint32_t)0x1 << 0)
-#define IPECC_R_STATUS_KP		((uint32_t)0x1 << 4)
-#define IPECC_R_STATUS_MTY		((uint32_t)0x1 << 5)
-#define IPECC_R_STATUS_POP		((uint32_t)0x1 << 6)
-#define IPECC_R_STATUS_R_OR_W		((uint32_t)0x1 << 7)
-#define IPECC_R_STATUS_INIT   ((uint32_t)0x1 << 8)
-#define IPECC_R_STATUS_NNDYNACT		((uint32_t)0x1 << 9)
-#define IPECC_R_STATUS_ENOUGH_RND_WK	((uint32_t)0x1 << 10)
-#define IPECC_R_STATUS_YES		((uint32_t)0x1 << 11)
-#define IPECC_R_STATUS_R0_IS_NULL	((uint32_t)0x1 << 12)
-#define IPECC_R_STATUS_R1_IS_NULL	((uint32_t)0x1 << 13)
-#define IPECC_R_STATUS_TOKEN_GEN    ((uint32_t)0x1 << 14)
+#define IPECC_R_STATUS_BUSY	   (((uint32_t)0x1) << 0)
+#define IPECC_R_STATUS_KP	   (((uint32_t)0x1) << 4)
+#define IPECC_R_STATUS_MTY	   (((uint32_t)0x1) << 5)
+#define IPECC_R_STATUS_POP	   (((uint32_t)0x1) << 6)
+#define IPECC_R_STATUS_R_OR_W	   (((uint32_t)0x1) << 7)
+#define IPECC_R_STATUS_INIT     (((uint32_t)0x1) << 8)
+#define IPECC_R_STATUS_NNDYNACT	   (((uint32_t)0x1) << 9)
+#define IPECC_R_STATUS_ENOUGH_RND_WK   (((uint32_t)0x1) << 10)
+#define IPECC_R_STATUS_YES	   (((uint32_t)0x1) << 11)
+#define IPECC_R_STATUS_R0_IS_NULL   (((uint32_t)0x1) << 12)
+#define IPECC_R_STATUS_R1_IS_NULL   (((uint32_t)0x1) << 13)
+#define IPECC_R_STATUS_TOKEN_GEN      (((uint32_t)0x1) << 14)
 #define IPECC_R_STATUS_ERRID_MSK	(0xffff)
 #define IPECC_R_STATUS_ERRID_POS	(16)
 
 /* Fields for R_CAPABILITIES */
-#define IPECC_R_CAPABILITIES_DBG_N_PROD	((uint32_t)0x1 << 0)
-#define IPECC_R_CAPABILITIES_SHF	((uint32_t)0x1 << 4)
-#define IPECC_R_CAPABILITIES_NNDYN	((uint32_t)0x1 << 8)
-#define IPECC_R_CAPABILITIES_W64	((uint32_t)0x1 << 9)
+#define IPECC_R_CAPABILITIES_DBG_N_PROD   (((uint32_t)0x1) << 0)
+#define IPECC_R_CAPABILITIES_SHF   (((uint32_t)0x1) << 4)
+#define IPECC_R_CAPABILITIES_NNDYN   (((uint32_t)0x1) << 8)
+#define IPECC_R_CAPABILITIES_W64   (((uint32_t)0x1) << 9)
 #define IPECC_R_CAPABILITIES_NNMAX_MSK	(0xfffff)
 #define IPECC_R_CAPABILITIES_NNMAX_POS	(12)
 
@@ -364,7 +406,7 @@ static volatile uint64_t *ipecc_pseudotrng_baddr = NULL;
 
 /* Fields for R_DBG_CAPABILITIES_0 */
 #define IPECC_R_DBG_CAPABILITIES_0_WW_POS    (0)
-#define IPECC_R_DBG_CAPABILITIES_0_WW_MSK    (32)
+#define IPECC_R_DBG_CAPABILITIES_0_WW_MSK    (0xffffffff)
 
 /* Fields for R_DBG_CAPABILITIES_1 */
 #define IPECC_R_DBG_CAPABILITIES_1_NBOPCODES_POS    (0)
@@ -379,10 +421,10 @@ static volatile uint64_t *ipecc_pseudotrng_baddr = NULL;
 #define IPECC_R_DBG_CAPABILITIES_2_IRN_SHF_WIDTH_MSK    (0xffff)
 
 /* Fields for R_DBG_STATUS */
-#define IPECC_R_DBG_STATUS_HALTED    (((uint32_t)0x1 << 0)
+#define IPECC_R_DBG_STATUS_HALTED    (((uint32_t)0x1) << 0)
 #define IPECC_R_DBG_STATUS_BKID_POS     (1)
 #define IPECC_R_DBG_STATUS_BKID_MSK     (0x3)
-#define IPECC_R_DBG_STATUS_BK_HIT     (((uint32_t)0x1 << 3)
+#define IPECC_R_DBG_STATUS_BK_HIT     (((uint32_t)0x1) << 3)
 #define IPECC_R_DBG_STATUS_PC_POS     (4)
 #define IPECC_R_DBG_STATUS_PC_MSK     (0xfff)
 #define IPECC_R_DBG_STATUS_STATE_POS     (28)
@@ -397,17 +439,17 @@ static volatile uint64_t *ipecc_pseudotrng_baddr = NULL;
 #define IPECC_R_DBG_RAWDUR_MSK     (0xffffffff)
 
 /* Fields for R_DBG_FLAGS */  /* Obsolete, will be removed */
-#define IPECC_R_DBG_FLAGS_P_NOT_SET		((uint32_t)0x1 << 0)
-#define IPECC_R_DBG_FLAGS_P_NOT_SET_MTY	((uint32_t)0x1 << 1)
-#define IPECC_R_DBG_FLAGS_A_NOT_SET		((uint32_t)0x1 << 2)
-#define IPECC_R_DBG_FLAGS_A_NOT_SET_MTY	((uint32_t)0x1 << 3)
-#define IPECC_R_DBG_FLAGS_B_NOT_SET		((uint32_t)0x1 << 4)
-#define IPECC_R_DBG_FLAGS_K_NOT_SET		((uint32_t)0x1 << 5)
-#define IPECC_R_DBG_FLAGS_NNDYN_NOERR		((uint32_t)0x1 << 6)
-#define IPECC_R_DBG_FLAGS_NOT_BLN_OR_Q_NOT_SET	((uint32_t)0x1 << 7)
+#define IPECC_R_DBG_FLAGS_P_NOT_SET		(((uint32_t)0x1) << 0)
+#define IPECC_R_DBG_FLAGS_P_NOT_SET_MTY	(((uint32_t)0x1) << 1)
+#define IPECC_R_DBG_FLAGS_A_NOT_SET		(((uint32_t)0x1) << 2)
+#define IPECC_R_DBG_FLAGS_A_NOT_SET_MTY	(((uint32_t)0x1) << 3)
+#define IPECC_R_DBG_FLAGS_B_NOT_SET		(((uint32_t)0x1) << 4)
+#define IPECC_R_DBG_FLAGS_K_NOT_SET		(((uint32_t)0x1) << 5)
+#define IPECC_R_DBG_FLAGS_NNDYN_NOERR		(((uint32_t)0x1) << 6)
+#define IPECC_R_DBG_FLAGS_NOT_BLN_OR_Q_NOT_SET	(((uint32_t)0x1) << 7)
 
 /* Fields for R_DBG_TRNG_STATUS */
-#define IPECC_R_DBG_TRNG_STATUS_RAW_FIFO_FULL		((uint32_t)0x1 << 0)
+#define IPECC_R_DBG_TRNG_STATUS_RAW_FIFO_FULL		(((uint32_t)0x1) << 0)
 #define IPECC_R_DBG_TRNG_STATUS_RAW_FIFO_OFFSET_MSK	(0xffffff)
 #define IPECC_R_DBG_TRNG_STATUS_RAW_FIFO_OFFSET_POS	(8)
 
@@ -421,7 +463,27 @@ static volatile uint64_t *ipecc_pseudotrng_baddr = NULL;
 #define  IPECC_R_DBG_IRN_CNT_COUNT_MSK    (0xffffffff)
 
 /* Fields for R_DBG_FP_RDATA_RDY */
-#define IPECC_R_DBG_FP_RDATA_RDY_IS_READY     ((uint32_t)0x1 << 0)
+#define IPECC_R_DBG_FP_RDATA_RDY_IS_READY     (((uint32_t)0x1) << 0)
+
+/* Fields for R_DBG_EXP_FLAGS */
+#define IPECC_R_DBG_EXP_FLAGS_R0Z_POS   0
+#define IPECC_R_DBG_EXP_FLAGS_R1Z_POS   1
+#define IPECC_R_DBG_EXP_FLAGS_KAP_POS   2
+#define IPECC_R_DBG_EXP_FLAGS_KAPP_POS   3
+#define IPECC_R_DBG_EXP_FLAGS_ZU_POS   4
+#define IPECC_R_DBG_EXP_FLAGS_ZC_POS   5
+#define IPECC_R_DBG_EXP_FLAGS_LASTSTEP_POS   6
+#define IPECC_R_DBG_EXP_FLAGS_FIRSTZDBL_POS   7
+#define IPECC_R_DBG_EXP_FLAGS_FIRSTZADDU_POS  8
+#define IPECC_R_DBG_EXP_FLAGS_FIRST2PZ_POS   9
+#define IPECC_R_DBG_EXP_FLAGS_FIRST3PZ_POS   10
+#define IPECC_R_DBG_EXP_FLAGS_TORSION2_POS   11
+#define IPECC_R_DBG_EXP_FLAGS_PTS_ARE_EQUAL_POS   12
+#define IPECC_R_DBG_EXP_FLAGS_PTS_ARE_OPPOS_POS   13
+#define IPECC_R_DBG_EXP_FLAGS_PHIMSB_POS    14
+#define IPECC_R_DBG_EXP_FLAGS_KB0END_POS    15
+#define IPECC_R_DBG_EXP_FLAGS_JNBBIT_POS   16
+#define IPECC_R_DBG_EXP_FLAGS_JNBBIT_MSK   (0xffff)
 
 /* Fields for R_DBG_TRNG_DIAG_0 */
 #define IPECC_R_DBG_TRNG_DIAG_0_STARV_POS     (0)
@@ -612,7 +674,7 @@ static volatile uint64_t *ipecc_pseudotrng_baddr = NULL;
  * (or the static value if hardware was not synthesized
  * with the 'nn modifiable at runtime' option).
  */
-#define IPECC_GET_NN_SIZE() \
+#define IPECC_GET_NN() \
 	(((IPECC_GET_REG(IPECC_R_PRIME_SIZE)) >> IPECC_W_PRIME_SIZE_POS) \
 	 & IPECC_W_PRIME_SIZE_MSK)
 
@@ -861,7 +923,7 @@ static volatile uint64_t *ipecc_pseudotrng_baddr = NULL;
  * synthesized with the 'nn modifiable at runtime' option) or simply the static,
  * unique value of 'nn' the IP supports (otherwise).
  */
-#define IPECC_GET_NN_MAX_SIZE() \
+#define IPECC_GET_NN_MAX() \
 	((IPECC_GET_REG(IPECC_R_CAPABILITIES) >> IPECC_R_CAPABILITIES_NNMAX_POS) \
 	 & IPECC_R_CAPABILITIES_NNMAX_MSK)
 
@@ -900,6 +962,12 @@ static volatile uint64_t *ipecc_pseudotrng_baddr = NULL;
 /* Actions involving register W_DBG_BKPT
  * *************************************
  */
+/* Symbols below defining states of the main FSM of the IP
+ * have been removed from here and replaced by the ones in
+ * file ecc_states.h, which is automatically generated by
+ * the Makefile in ecc_curve_iram/.
+ */
+#if 0
 /* IP main FSM state is accessible in debug mode,
  * below are defined the corresponding state codes
  *
@@ -920,29 +988,30 @@ static volatile uint64_t *ipecc_pseudotrng_baddr = NULL;
 #define IPECC_DEBUG_STATE_ZADDC  12
 #define IPECC_DEBUG_STATE_SUBTRACTP  13
 #define IPECC_DEBUG_STATE_EXIT  14
+#endif
 
 /*
  * Set a breakpoint, valid in a specific state & for a specific bit-
  * position of the scalar.
  */
 #define IPECC_SET_BKPT(id, addr, nbbit, state) do { \
-	IPECC_SET_REG(IPECC_W_DBG_BKPT_EN \
+	IPECC_SET_REG(IPECC_W_DBG_BKPT, IPECC_W_DBG_BKPT_EN \
 			| (((id) & IPECC_W_DBG_BKPT_ID_MSK) << IPECC_W_DBG_BKPT_ID_POS ) \
 	    | (((addr) & IPECC_W_DBG_BKPT_ADDR_MSK) << IPECC_W_DBG_BKPT_ADDR_POS ) \
-	    | (((nbbit) & IPECC_W_DBG_BKPT_NBIT_MSK ) << IPECC_W_DBG_BKPT_NBBIT_POS ) \
+	    | (((nbbit) & IPECC_W_DBG_BKPT_NBIT_MSK ) << IPECC_W_DBG_BKPT_NBIT_POS ) \
 	    | (((state) & IPECC_W_DBG_BKPT_STATE_MSK) << IPECC_W_DBG_BKPT_STATE_POS )); \
 } while (0)
 
 /*
  * Set a breakpoint, valid for any state & for any bit of the scalar.
  */
-#define IPECC_SET_BREAKPOINT(id, addr, nbbit, state) do { \
-	IPECC_SET_BKT((id), (addr), 0, IPECC_DEBUG_STATE_ANY_OR_IDLE); \
+#define IPECC_SET_BREAKPOINT(id, addr) do { \
+	IPECC_SET_BKPT((id), (addr), 0, IPECC_DEBUG_STATE_ANY_OR_IDLE); \
 } while (0)
 
 /* Remove a breakpoint */
 #define IPECC_REMOVE_BREAKPOINT(id) do { \
-	IPECC_SET_REG(IPECC_W_DBG_BKPT_DIS \
+	IPECC_SET_REG(IPECC_W_DBG_BKPT, IPECC_W_DBG_BKPT_DIS \
 			| (((id) & IPECC_W_DBG_BKPT_ID_MSK) << IPECC_W_DBG_BKPT_ID_POS )); \
 } while (0)
 
@@ -954,12 +1023,16 @@ static volatile uint64_t *ipecc_pseudotrng_baddr = NULL;
  * or resuming execution.
  */
 #define IPECC_RUN_OPCODES(nb) do { \
-	IPECC_SET_REG(IPECC_W_DBG_STEPS_RUN_NB_OP \
+	IPECC_SET_REG(IPECC_W_DBG_STEPS, IPECC_W_DBG_STEPS_RUN_NB_OP \
 			| (((nb) & IPECC_W_DBG_STEPS_NB_OP_MSK) << IPECC_W_DBG_STEPS_NB_OP_POS )); \
 } while (0)
 
+#define IPECC_SINGLE_STEP() do { \
+	IPECC_RUN_OPCODES(1); \
+} while (0)
+
 #define IPECC_RESUME() do { \
-	IPECC_SET_REG(IPECC_W_DBG_STEPS_RESUME); \
+	IPECC_SET_REG(IPECC_W_DBG_STEPS, IPECC_W_DBG_STEPS_RESUME); \
 } while (0)
 
 /* Actions involving register W_DBG_TRIG_ACT
@@ -998,7 +1071,7 @@ static volatile uint64_t *ipecc_pseudotrng_baddr = NULL;
 /* Actions involving register W_DBG_OP_WADDR
  * *****************************************
  */
-#define IPECC_SET_OPCODE_WRITE_ADDRES(addr) do { \
+#define IPECC_SET_OPCODE_WRITE_ADDRESS(addr) do { \
 	IPECC_SET_REG(IPECC_W_DBG_OP_WADDR, ((addr) & IPECC_W_DBG_OP_WADDR_MSK) \
 			<< IPECC_W_DBG_OP_WADDR_POS); \
 } while (0)
@@ -1007,7 +1080,7 @@ static volatile uint64_t *ipecc_pseudotrng_baddr = NULL;
  * ***************************************
  */
 #define IPECC_SET_OPCODE_TO_WRITE(opcode) do { \
-	IPECC_SET_REG(IPECC_W_DBG_OPCODE, ((addr) & IPECC_W_DBG_OPCODE_MSK) \
+	IPECC_SET_REG(IPECC_W_DBG_OPCODE, ((opcode) & IPECC_W_DBG_OPCODE_MSK) \
 			<< IPECC_W_DBG_OPCODE_POS); \
 } while (0)
 
@@ -1034,7 +1107,7 @@ static volatile uint64_t *ipecc_pseudotrng_baddr = NULL;
 			((uint32_t)0x1 << IPECC_W_DBG_TRNG_CTRL_POSTPROC_DISABLE)); \
 } while (0)
 
-/* (Re)enable the TRNG post-processing logic that pulls bytes from the
+/* (Re-)enable the TRNG post-processing logic that pulls bytes from the
  * raw random source - in the IP debug mode, that logic is disabled upon reset
  * and needs to be explicitly enabled by sofware by calling this macro.
  *
@@ -1066,7 +1139,7 @@ static volatile uint64_t *ipecc_pseudotrng_baddr = NULL;
 			((uint32_t)0x1 << IPECC_W_DBG_TRNG_CTRL_RAW_DISABLE_FIFO_READ_PORT_POS)); \
 } while (0)
 
-/* (Re)enable the read port of the TRNG raw random FIFO.
+/* (Re-)enable the read port of the TRNG raw random FIFO.
  * Watchout: implicitly remove a possibly pending complet bypass of the TRNG
  * by deasserting the 'complete bypass' bit in the same register.
  */
@@ -1204,8 +1277,8 @@ static volatile uint64_t *ipecc_pseudotrng_baddr = NULL;
  * was previously set using IPECC_DBG_SET_FP_READ_ADDR().
  */
 #define IPECC_DBG_GET_FP_READ_DATA() \
-	(((IPECC_GET_REG(IPECC_R_DBG_FP_RDATA)) >> IPECC_W_DBG_FP_DATA_MSK) \
-	 & IPECC_W_DBG_FP_DATA_POS)
+	(((IPECC_GET_REG(IPECC_R_DBG_FP_RDATA)) >> IPECC_W_DBG_FP_DATA_POS) \
+	 & IPECC_W_DBG_FP_DATA_MSK)
 
 /* Actions involving register W_DBG_CFG_XYSHUF
  * *******************************************
@@ -1291,7 +1364,15 @@ static volatile uint64_t *ipecc_pseudotrng_baddr = NULL;
  * & IPECC_DBG_GET_FP_READ_DATA.
  * (see these macros).
  */
-#define IPECC_GET_WW()  (IPECC_GET_REG(IPECC_R_DBG_CAPABILITIES_0))
+#define IPECC_GET_WW() \
+	(((IPECC_GET_REG(IPECC_R_DBG_CAPABILITIES_0)) \
+		>> IPECC_R_DBG_CAPABILITIES_0_WW_POS) \
+		& IPECC_R_DBG_CAPABILITIES_0_WW_MSK)
+
+/* Dynamic value of parameter 'w' can be obtained using those of
+ * 'nn' and 'ww' as we simply have: w = ceil( (nn + 4) /ww ).
+ */
+#define IPECC_GET_W()    DIV( ((unsigned int)((IPECC_GET_NN()) + 4)) , (unsigned int)(IPECC_GET_WW()))
 
 /* Actions involving register R_DBG_CAPABILITIES_1
  * ***********************************************
@@ -1335,19 +1416,24 @@ static volatile uint64_t *ipecc_pseudotrng_baddr = NULL;
 /* Actions involving register R_DBG_STATUS
  * ***************************************
  */
-
 /* Is IP currently halted? (on a breakpoint hit, or after having
  * been asked to run a certain nb of microcode opcodes).
  */
-#define IPECC_IS_IP_HALTED() \
+#define IPECC_IS_IP_DEBUG_HALTED() \
 	(!!(IPECC_GET_REG(IPECC_R_DBG_STATUS) & IPECC_R_DBG_STATUS_HALTED))
 
+/* To poll the IP until its debug state shows it is halted.
+ */
+#define IPECC_POLL_UNTIL_DEBUG_HALTED() do { \
+	while (!(IPECC_IS_IP_DEBUG_HALTED())) {}; \
+} while(0)
+
 /* Did IP was halted on a breakpoint hit? */
-#define IPECC_IS_IP_HALTED_ON_BKPT_HIT() \
+#define IPECC_IS_IP_DEBUG_HALTED_ON_BKPT_HIT() \
 	(!!(IPECC_GET_REG(IPECC_R_DBG_STATUS) & IPECC_R_DBG_STATUS_BK_HIT))
 
 /* Get the 'breakpoint ID' field in R_DBG_STATUS register.
- * If IPECC_IS_IP_HALTED_ON_BKPT_HIT() confirms that the IP
+ * If IPECC_IS_IP_DEBUG_HALTED_ON_BKPT_HIT() confirms that the IP
  * is halted due to a breakpoint hit, then this field gives
  * the ID of that breakpoint.
  */
@@ -1575,7 +1661,6 @@ static volatile uint64_t *ipecc_pseudotrng_baddr = NULL;
 #define IPECC_PSEUDOTRNG_PUSH_DATA(data) do { \
 	(IPECC_SET_REG(IPECC_PSEUDOTRNG_W_WRITE_DATA, (data))); \
 } while (0)
-
 
 
 /************************************************
@@ -1877,7 +1962,7 @@ err:
 static inline int ip_ecc_set_nn_bit_size(unsigned int bit_sz)
 {
 	/* Get the maximum NN size and check the asked size */
-	if(bit_sz > IPECC_GET_NN_MAX_SIZE()){
+	if(bit_sz > IPECC_GET_NN_MAX()){
 		/* If we overflow, this is an error */
 		goto err;
 	}
@@ -1910,13 +1995,13 @@ static inline unsigned int ip_ecc_get_nn_bit_size(void)
 {
 	/* Size is in bits */
 	if(IPECC_IS_DYNAMIC_NN_SUPPORTED()){
-		return (unsigned int)IPECC_GET_NN_SIZE();
+		return (unsigned int)IPECC_GET_NN();
 	}
 	else{
-		return (unsigned int)IPECC_GET_NN_MAX_SIZE();
+		return (unsigned int)IPECC_GET_NN_MAX();
 	}
 	/*
-	 * Note: a sole use of IPECC_GET_NN_SIZE() could also work as this
+	 * Note: a sole use of IPECC_GET_NN() could also work as this
 	 * macro also returns the NN_MAX size when the 'dynamic nn' feature is
 	 * not supported.
 	 */
@@ -2492,10 +2577,542 @@ err:
 	return -1;
 }
 
+/* Set a breakpoint in the microcode. */
+int ip_ecc_set_breakpoint_DBG(uint32_t addr, uint32_t id)
+{
+	/* we DON'T busy wait as we assume the IP might be debug stopped
+	 * in the course of a computation (hence with the busy BIT on,
+	 * in which case it would create dead lock.
+	 */
+
+	/* Transmit action to low-level routine */
+	IPECC_SET_BREAKPOINT(id, addr);
+
+	return 0;
+}
+
+/* Patch microcode memory.
+ *   'buf' should point to the buffer, 'nbops' is the nb of opcodes
+ *   in the buffer, 'opsz' is a flag to tell if the size of opcode
+ *   words is larger than 32 bit (given that the max supported is
+ *   64 bits).
+ */
+int ip_ecc_patch_microcode(uint32_t* buf, uint32_t nbops, uint32_t opsz)
+{
+	uint32_t i;
+	uint32_t nbopcodes_max;
+
+	/* Sanity checks.
+	 *
+	 * Opcodes are expected to be given in buffer 'buf' starting from
+	 * address 0x0.
+	 *
+	 * The only allowed values for parameter 'opsz' are 1 and 2.
+	 *
+	 *   * 'opsz' = 1 means that opcode size is less than or equal to
+	 *     32 bits.
+	 *     In this case opcodes are expected to be encoded in buffer
+	 *     'buf' using only one 32-bit data word for each.
+	 *
+	 *   * 'opsz' = 2 means that the opcode size is in the range
+	 *     33 to 64 (these values included).
+	 *     In this case opcodes are expected to be encoded in buffer
+	 *     'buf' using exactly two 32-bit data words for each, and
+	 *     the most significant 32-bit part of the opcode must be
+	 *     stored first in 'buf' (hence the order is big-endian at
+	 *     the 32-bit word level).
+	 *
+	 * Inside each 32-bit word, the expected order is also big-endian
+	 * (meaning the most significant byte of each 32-bit word is the
+	 * lowest address).
+	 *
+	 * Example: Assuming opsz = 2 with opcodes of size 33-bit - heck why not?)
+	 *          and assuming the first opcodes of the microcode are:
+	 *
+	 *                0x 1 9100 7bfd
+	 *                0x 1 9400 741d
+	 *                0x 2 1100 0018
+	 *                ...
+	 *
+	 *          then the expected content for 'buf' is:
+	 *
+	 *                0x00000001
+	 *                0x91007bfd
+	 *                0x00000001
+	 *                0x9400741d
+	 *                0x00000002
+	 *                0x11000018
+	 *                ...
+	 *
+	 * Parameter 'bufsz' must be given in number of instruction opcodes,
+	 * (not in number of 32-bit words) so depending on the value of parameter
+	 * 'opsz' it should be equal to either the actual size of the buffer
+	 * given in 32-bit words, or to half of it.
+	 *
+	 * Code below will enforce verifying that 'nbops' is in accordance
+	 * with value read from live-hardware (through macro IPECC_GET_NBOPCODES())
+	 * meaning that it cannot exceed the power-of-2 directly superior
+	 * (or equal) to the hardware memory size expressed in number of
+	 * instruction opcodes.
+	 */
+	if ((opsz != 1) && (opsz != 2)) {
+		printf("Error: Illegal opcode size (%d) in ip_ecc_patch_microcode "
+				"(should be 1 or 2)\n\r", opsz);
+		goto err;
+	}
+
+	if (ge_pow_of_2(IPECC_GET_NBOPCODES(), &nbopcodes_max)) {
+		printf("Error: ge_pow_of_2() returned exception\n\r");
+		goto err;
+	}
+
+	if (nbops > nbopcodes_max) {
+		printf("Error: Illegal microcode size (%d) in call to ip_ecc_patch_microcode "
+				"(max allowed: %d). \n\r", nbops, nbopcodes_max);
+		goto err;
+	}
+
+	for (i=0; i<nbops; i++)
+	{
+		/*
+		 * Set opcode address in register W_DBG_OP_WADDR.
+		 */
+		IPECC_SET_OPCODE_WRITE_ADDRESS(i);
+		printf("%smcode[0x%04x|%05d] = ", KORA, i, i);
+		/*
+		 * Set opcode word in register W_DBG_OPCODE.
+		 */
+		if (opsz == 2) {
+			/* If opcodes are larger than 32 bits, the least
+			 * significant 32-bit half must be transmitted first.
+			 */
+			IPECC_SET_OPCODE_TO_WRITE(buf[i + 1]);
+		}
+		IPECC_SET_OPCODE_TO_WRITE(buf[i]);
+		printf("0x%08x", buf[i]);
+		if (opsz == 2) {
+			printf("%08x", buf[i+1]);
+		}
+		printf("%s\n\r", KNRM);
+	}
+
+	return 0;
+err:
+	return -1;
+}
+
+#ifdef KP_TRACE
+
+/* An implicit (hence dirty) limitation of ip_debug_read_one_limb()
+ * is that limbs are assumed to be of size 32-bit at most.
+ */
+unsigned int ip_debug_read_one_limb(unsigned int lgnb, unsigned int limb)
+{
+	uint32_t w, n;
+
+	w = DIV(IPECC_GET_NN_MAX() + 4, IPECC_GET_WW());
+
+	/* Ignore possible error return case for ge_pow_of_2 here. */
+	ge_pow_of_2(w, &n);
+	/*
+	 * Write large nb address into register W_DBG_FP_RADDR.
+	 */
+	IPECC_SET_REG(IPECC_W_DBG_FP_RADDR, (lgnb * n) + limb);
+	/*
+	 * Poll register R_DBG_FP_RDATA_RDY until it shows data ready.
+	 */
+	while (!(IPECC_DBG_IS_FP_READ_DATA_AVAIL())) {}
+	/*
+	 * Read back value from register R_DBG_FP_RDATA.
+	 */
+	return IPECC_DBG_GET_FP_READ_DATA();
+}
+
+void ip_debug_read_all_limbs(unsigned int lgnb, unsigned int* nbbuf)
+{
+	unsigned int i;
+	for (i = 0; i < IPECC_GET_W(); i++) {
+		nbbuf[i] = ip_debug_read_one_limb(lgnb, i);
+	}
+}
+
+static void get_exp_flags(kp_exp_flags_t* flg)
+{
+	uint32_t dbg_exp_flags;
+
+	/* read register R_DBG_EXP_FLAGS */
+	dbg_exp_flags = IPECC_GET_REG(IPECC_R_DBG_EXP_FLAGS);
+	/* copy flags to pointer */
+	flg->r0z = (dbg_exp_flags >> IPECC_R_DBG_EXP_FLAGS_R0Z_POS) & 0x1;
+	flg->r1z = (dbg_exp_flags >> IPECC_R_DBG_EXP_FLAGS_R1Z_POS) & 0x1;
+	flg->kap = (dbg_exp_flags >> IPECC_R_DBG_EXP_FLAGS_KAP_POS) & 0x1;
+	flg->kapp = (dbg_exp_flags >> IPECC_R_DBG_EXP_FLAGS_KAPP_POS) & 0x1;
+	flg->zu = (dbg_exp_flags >> IPECC_R_DBG_EXP_FLAGS_ZU_POS) & 0x1;
+	flg->zc = (dbg_exp_flags >> IPECC_R_DBG_EXP_FLAGS_ZC_POS) & 0x1;
+	flg->jnbbit = (dbg_exp_flags >> IPECC_R_DBG_EXP_FLAGS_JNBBIT_POS) & IPECC_R_DBG_EXP_FLAGS_JNBBIT_MSK;
+}
+
+static void kp_trace_msg_append(kp_trace_info_t* ktrc, const char* fmt, ...)
+{
+#if 0
+	uint32_t msglen;
+#endif
+	static bool overflow = false;
+	va_list ap;
+
+#if 0
+	msglen = strlen(msg);
+	if (overflow) {
+		return;
+	}
+	if ( (ktrc->msgsz + msglen) > ktrc->msgsz_max ) {
+		if (overflow == false) {
+			printf("Warning: reached max size of [k]P trace buffer\n\r");
+			overflow = true;
+		}
+		return;
+	}
+#endif
+
+	if (overflow) {
+		return;
+	}
+	/* We can sprintf now that we know we won't overflow the statically
+	 * allocated trace log buffer.
+	 */
+	va_start(ap, fmt);
+	ktrc->msgsz += vsprintf(ktrc->msg + ktrc->msgsz, fmt, ap);
+	va_end(ap);
+	if (ktrc->msgsz > ktrc->msgsz_max - 32) {
+		if (overflow == false) {
+			printf("%sWarning! About to reach max allocated size for [k]P trace buffer!..."
+					" Losing subsequent trace logs%s\n\r", KUNK, KNRM);
+			overflow = true;
+		}
+		return;
+	}
+}
+
+void print_all_limbs_of_number(kp_trace_info_t* ktrc, const char* msg, unsigned int *nb)
+{
+  int32_t i;
+  kp_trace_msg_append(ktrc, "%s", msg);
+  for (i = IPECC_GET_W() - 1; i >= 0; i--) {
+    kp_trace_msg_append(ktrc, "%0*x", DIV(IPECC_GET_WW(), 4), nb[i]);
+  }
+}
+
+static inline void ip_read_and_print_xyr0(kp_trace_info_t* ktrc, kp_exp_flags_t* flg)
+{
+	ip_debug_read_all_limbs(IPECC_LARGE_NB_XR0_ADDR, ktrc->nb_xr0);
+	ip_debug_read_all_limbs(IPECC_LARGE_NB_YR0_ADDR, ktrc->nb_yr0);
+	print_all_limbs_of_number(ktrc, "[VHD-CMP-SAGE]     @ 4   XR0 = 0x", ktrc->nb_xr0);
+	if (flg->r0z) { kp_trace_msg_append(ktrc, " but R0 = 0"); } kp_trace_msg_append(ktrc, "\n\r");
+	print_all_limbs_of_number(ktrc, "[VHD-CMP-SAGE]     @ 5   YR0 = 0x", ktrc->nb_yr0);
+	if (flg->r0z) { kp_trace_msg_append(ktrc, " but R0 = 0"); } kp_trace_msg_append(ktrc, "\n\r");
+}
+
+static inline void ip_read_and_print_xyr1(kp_trace_info_t* ktrc, kp_exp_flags_t* flg)
+{
+	ip_debug_read_all_limbs(IPECC_LARGE_NB_XR1_ADDR, ktrc->nb_xr1);
+	ip_debug_read_all_limbs(IPECC_LARGE_NB_YR1_ADDR, ktrc->nb_yr1);
+	print_all_limbs_of_number(ktrc, "[VHD-CMP-SAGE]     @ 6   XR1 = 0x", ktrc->nb_xr1);
+	if (flg->r1z) { kp_trace_msg_append(ktrc, " but R1 = 0"); } kp_trace_msg_append(ktrc, "\n\r");
+	print_all_limbs_of_number(ktrc, "[VHD-CMP-SAGE]     @ 7   YR1 = 0x", ktrc->nb_yr1);
+	if (flg->r1z) { kp_trace_msg_append(ktrc, " but R1 = 0"); } kp_trace_msg_append(ktrc, "\n\r");
+}
+
+static inline void ip_read_and_print_zr01(kp_trace_info_t* ktrc)
+{
+	ip_debug_read_all_limbs(IPECC_LARGE_NB_ZR01_ADDR, ktrc->nb_zr01);
+	print_all_limbs_of_number(ktrc, "[VHD-CMP-SAGE]     @ 26 ZR01 = 0x", ktrc->nb_zr01);
+	kp_trace_msg_append(ktrc, "\n");
+}
+
+static int kp_debug_trace(kp_trace_info_t* ktrc)
+{
+	uint32_t dbgpc, dbgstate;
+	kp_exp_flags_t flags;
+
+	if (ktrc == NULL) {
+		printf("Error: calling kp_debug_trace() with a null kp_trace_info_t pointer!\n\r");
+		goto err;
+	}
+
+	/* Set first breakpoint on the first instruction
+	 * of routine .checkoncurveL of the microcode.
+	 */
+	kp_trace_msg_append(ktrc, "Setting breakpoint\n\r");
+	ip_ecc_set_breakpoint_DBG(DEBUG_ECC_IRAM_CHKCURVE_OP1_ADDR, 0);
+
+	/* Transmit the [k]P run command to the IP. */
+	kp_trace_msg_append(ktrc, "Running [k]P\n\r");
+	IPECC_EXEC_PT_KP();
+
+	/* Poll register R_DBG_STATUS until it shows IP is halted
+	 * in debug mode.
+	 */
+	kp_trace_msg_append(ktrc, "Polling until debug halt\n\r");
+	IPECC_POLL_UNTIL_DEBUG_HALTED();
+
+	kp_trace_msg_append(ktrc, "IP is halted\n\r");
+	/* IPECC IS HALTED */
+	/* Get the PC & state from IPECC_R_DBG_STATUS */
+	dbgpc = IPECC_GET_PC();
+	dbgstate = IPECC_GET_FSM_STATE();
+	
+	/* Check that PC matchs 1st opcode of .checkoncurveL */
+	if (dbgpc != DEBUG_ECC_IRAM_CHKCURVE_OP1_ADDR) {
+		printf("Error in kp_debug_trace(): breakpoint was expected on 1st opcode "
+				"of .checkoncurveL (0x%03x)\n\r", DEBUG_ECC_IRAM_CHKCURVE_OP1_ADDR);
+		printf("      and instead it is on 0x%03x\n\r", dbgpc);
+		goto err;
+	}
+	if (dbgstate != IPECC_DEBUG_STATE_CHECKONCURVE) {
+		printf("Error in kp_debug_trace(): should be in state %d\n\r", IPECC_DEBUG_STATE_CHECKONCURVE);
+		printf("      and instead in state (%d)\n\r", dbgstate);
+		goto err;
+	}
+
+	kp_trace_msg_append(ktrc, "Starting step-by-step execution\n\r");
+	/*
+	 * Step-by-step loop
+	 */
+	do {
+		/*
+		 * Iterate an instruction
+		 */
+		IPECC_SINGLE_STEP();
+		/*
+		 * Poll register R_DBG_STATUS until it shows IP is halted
+		 * in debug mode.
+		 */
+		IPECC_POLL_UNTIL_DEBUG_HALTED();
+		ktrc->nb_steps++;
+		/*
+		 * Get current value of PC & state.
+		 */
+		dbgpc = IPECC_GET_PC();
+		dbgstate = IPECC_GET_FSM_STATE();
+		/*
+		 * Get exception flags from register R_DBG_EXP_FLAGS
+		 */
+		get_exp_flags(&flags);
+
+		switch (dbgpc) {
+
+			case DEBUG_ECC_IRAM_RANDOM_ALPHA_ADDR:
+				kp_trace_msg_append(ktrc, "PC=%s0x%03x%s (%s%s%s)\n\r", KGRN, dbgpc, KNRM, KYEL, str_ipecc_state(dbgstate), KNRM);
+				kp_trace_msg_append(ktrc, "Getting alpha\n\r");
+				ip_debug_read_all_limbs(IPECC_LARGE_NB_ALF_ADDR, ktrc->alpha);
+				ktrc->alpha_valid = true;
+				kp_trace_msg_append(ktrc, "%s", KUNK);
+				print_all_limbs_of_number(ktrc, "alf = 0x", ktrc->alpha);
+				kp_trace_msg_append(ktrc, "%s\n\r", KNRM);
+				break;
+
+			case DEBUG_ECC_IRAM_RANDOM_PHI01_ADDR:
+				kp_trace_msg_append(ktrc, "PC=%s0x%03x%s (%s%s%s)\n\r", KGRN, dbgpc, KNRM, KYEL, str_ipecc_state(dbgstate), KNRM);
+				kp_trace_msg_append(ktrc, "Getting phi0 & phi1\n\r");
+				ip_debug_read_all_limbs(IPECC_LARGE_NB_PHI0_ADDR, ktrc->phi0);
+				ktrc->phi0_valid = true;
+				kp_trace_msg_append(ktrc, "%s", KUNK);
+				print_all_limbs_of_number(ktrc, "phi0 = 0x", ktrc->phi0);
+				kp_trace_msg_append(ktrc, "%s\n\r", KNRM);
+				ip_debug_read_all_limbs(IPECC_LARGE_NB_PHI1_ADDR, ktrc->phi1);
+				ktrc->phi1_valid = true;
+				kp_trace_msg_append(ktrc, "%s", KUNK);
+				print_all_limbs_of_number(ktrc, "phi1 = 0x", ktrc->phi1);
+				kp_trace_msg_append(ktrc, "%s\n\r", KNRM);
+				break;
+
+			case DEBUG_ECC_IRAM_RANDOM_LAMBDA_ADDR:
+				kp_trace_msg_append(ktrc, "PC=%s0x%03x%s (%s%s%s)\n\r", KGRN, dbgpc, KNRM, KYEL, str_ipecc_state(dbgstate), KNRM);
+				kp_trace_msg_append(ktrc, "Getting lambda\n\r");
+				ip_debug_read_all_limbs(IPECC_LARGE_NB_LAMBDA_ADDR, ktrc->lambda);
+				ktrc->lambda_valid = true;
+				kp_trace_msg_append(ktrc, "%s", KUNK);
+				print_all_limbs_of_number(ktrc, "lambda = 0x", ktrc->lambda);
+				kp_trace_msg_append(ktrc, "%s\n\r", KNRM);
+				break;
+
+			case DEBUG_ECC_IRAM_ZADDU_OP1_ADDR:
+				/* 1st instruction of .zadduL
+				 */
+				if (dbgstate == IPECC_DEBUG_STATE_SETUP)
+				{
+					/* We're still in setup (so we're about to compute
+					 * (2P,P) -> (3P,P) using a call to ZADDU operator.
+					 */
+					kp_trace_msg_append(ktrc, "PC=%s0x%03x%s (%s%s%s)\n\r", KGRN, dbgpc, KNRM, KYEL, str_ipecc_state(dbgstate), KNRM);
+					kp_trace_msg_append(ktrc, "[VHD-CMP-SAGE] R0/R1 coordinates (first part of setup, "
+							"R0 <- [2]P), R1 <- [P])\n");
+					/* Read values of [XY]R[01] and flags r0z and r1z.
+					 */
+					ip_read_and_print_xyr0(ktrc, &flags);
+					ip_read_and_print_xyr1(ktrc, &flags);
+					ip_read_and_print_zr01(ktrc);
+				}
+				break;
+
+			case DEBUG_ECC_IRAM_ITOH_ADDR: /* PC_ITOH_FIRST */
+				/* 1st instruction of .itohL
+				 */
+				if (dbgstate == IPECC_DEBUG_STATE_ITOH) {
+					if (flags.jnbbit == 1) {
+						kp_trace_msg_append(ktrc, "PC=%s0x%03x%s (%s%s%s)\n\r", KGRN, dbgpc, KNRM, KYEL, str_ipecc_state(dbgstate), KNRM);
+						kp_trace_msg_append(ktrc, "[VHD-CMP-SAGE] R0/R1 coordinates (second part of setup, "
+								"[3]P <- [2]P + P by ZADDU completed)\n");
+						/* read values of [XY]R[01] and flags r0z and r1z */
+						ip_read_and_print_xyr0(ktrc, &flags);
+						ip_read_and_print_xyr1(ktrc, &flags);
+						ip_read_and_print_zr01(ktrc);
+					} else {
+						kp_trace_msg_append(ktrc, "PC=%s0x%03x%s (%s%s%s)\n\r", KGRN, dbgpc, KNRM, KYEL, str_ipecc_state(dbgstate), KNRM);
+						kp_trace_msg_append(ktrc, "[VHD-CMP-SAGE] R0/R1 coordinates after ZADDC of BIT %d "
+								"(kap%d = %d,  kap'%d = %d)\n",
+								flags.jnbbit, flags.jnbbit, flags.kap, flags.jnbbit, flags.kapp);
+						/* read values of [XY]R[01] and flags r0z and r1z */
+						ip_read_and_print_xyr0(ktrc, &flags);
+						ip_read_and_print_xyr1(ktrc, &flags);
+						ip_read_and_print_zr01(ktrc);
+					}
+				}
+				break;
+
+			case DEBUG_ECC_IRAM_PRE_ZADDC_OP1_ADDR: /* PC_PREZADDC_FIRST */
+				/* 1st instruction of .pre_zaddcL
+				 */
+				if (dbgstate == IPECC_DEBUG_STATE_ZADDC) {
+					kp_trace_msg_append(ktrc, "PC=%s0x%03x%s (%s%s%s)\n\r", KGRN, dbgpc, KNRM, KYEL, str_ipecc_state(dbgstate), KNRM);
+					kp_trace_msg_append(ktrc, "[VHD-CMP-SAGE] R0/R1 coordinates after ZADDU of BIT %d "
+							"(kap%d = %d,  kap'%d = %d)\n",
+							flags.jnbbit, flags.jnbbit, flags.kap, flags.jnbbit, flags.kapp);
+					/* read values of [XY]R[01] and flags r0z and r1z */
+					ip_read_and_print_xyr0(ktrc, &flags);
+					ip_read_and_print_xyr1(ktrc, &flags);
+					ip_read_and_print_zr01(ktrc);
+				}
+				break;
+
+			case DEBUG_ECC_IRAM_SUBTRACTP_OP1_ADDR: /* PC_SUBTRACTP_FIRST */
+				/* 1st instruction of .subtractPL
+				 */
+				if (dbgstate == IPECC_DEBUG_STATE_SUBTRACTP) {
+					kp_trace_msg_append(ktrc, "PC=%s0x%03x%s (%s%s%s)\n\r", KGRN, dbgpc, KNRM, KYEL, str_ipecc_state(dbgstate), KNRM);
+					kp_trace_msg_append(ktrc, "[VHD-CMP-SAGE] R0/R1 coordinates after ZADDC of BIT %d "
+							"(kap%d = %d,  kap'%d = %d)\n",
+							flags.jnbbit, flags.jnbbit, flags.kap, flags.jnbbit, flags.kapp);
+					/* read values of [XY]R[01] and flags r0z and r1z */
+					ip_read_and_print_xyr0(ktrc, &flags);
+					ip_read_and_print_xyr1(ktrc, &flags);
+					ip_read_and_print_zr01(ktrc);
+				}
+				break;
+
+			case DEBUG_ECC_IRAM_ZADDC_OP1_ADDR: /* PC_ZADDC_FIRST */
+				/* 1st instruction of .zaddcL
+				 */
+				if (dbgstate == IPECC_DEBUG_STATE_SUBTRACTP) {
+					kp_trace_msg_append(ktrc, "PC=%s0x%03x%s (%s%s%s)\n\r", KGRN, dbgpc, KNRM, KYEL, str_ipecc_state(dbgstate), KNRM);
+					kp_trace_msg_append(ktrc, "[VHD-CMP-SAGE] R0/R1 coordinates (first part of subtractP, "
+							"[k + 1 - (k mod 2)]P & P made Co-Z)\n");
+					/* read values of [XY]R[01] and flags r0z and r1z */
+					ip_read_and_print_xyr0(ktrc, &flags);
+					ip_read_and_print_xyr1(ktrc, &flags);
+					ip_read_and_print_zr01(ktrc);
+				}
+				break;
+
+			case DEBUG_ECC_IRAM_ZDBL_OP1_ADDR: /* PC_ZDBL_FIRST */
+				/* 1st instruction of .zdblL
+				 */
+				if (dbgstate == IPECC_DEBUG_STATE_SUBTRACTP) {
+					kp_trace_msg_append(ktrc, "PC=%s0x%03x%s (%s%s%s)\n\r", KGRN, dbgpc, KNRM, KYEL, str_ipecc_state(dbgstate), KNRM);
+					kp_trace_msg_append(ktrc, "[VHD-CMP-SAGE] R0/R1 coordinates (first part of subtractP, "
+							"[k + 1 - (k mod 2)]P & P made Co-Z)\n");
+					/* read values of [XY]R[01] and flags r0z and r1z */
+					ip_read_and_print_xyr0(ktrc, &flags);
+					ip_read_and_print_xyr1(ktrc, &flags);
+					ip_read_and_print_zr01(ktrc);
+				}
+				break;
+
+			case DEBUG_ECC_IRAM_ZNEGC_OP1_ADDR: /* PC_ZNEGC_FIRST */
+				/* 1st instruction of .znegcL
+				 */
+				if (dbgstate == IPECC_DEBUG_STATE_SUBTRACTP) {
+					kp_trace_msg_append(ktrc, "PC=%s0x%03x%s (%s%s%s)\n\r", KGRN, dbgpc, KNRM, KYEL, str_ipecc_state(dbgstate), KNRM);
+					kp_trace_msg_append(ktrc, "[VHD-CMP-SAGE] R0/R1 coordinates (first part of subtractP, "
+							"[k + 1 - (k mod 2)]P & P made Co-Z)\n");
+					/* read values of [XY]R[01] and flags r0z and r1z */
+					ip_read_and_print_xyr0(ktrc, &flags);
+					ip_read_and_print_xyr1(ktrc, &flags);
+					ip_read_and_print_zr01(ktrc);
+				}
+				break;
+
+			case DEBUG_ECC_IRAM_EXIT_OP1_ADDR: /* PC_EXIT_FIRST */
+				/* 1st instruction of .exitL
+				 */
+				if (dbgstate == IPECC_DEBUG_STATE_EXIT) {
+					kp_trace_msg_append(ktrc, "PC=%s0x%03x%s (%s%s%s)\n\r", KGRN, dbgpc, KNRM, KYEL, str_ipecc_state(dbgstate), KNRM);
+					kp_trace_msg_append(ktrc, "[VHD-CMP-SAGE] R1 coordinates (second part of subtractP, "
+							"cond. sub. [k + 1 - (k mod 2)]P - P completed)\n");
+					/* read values of [XY]R[01] and flags r0z and r1z */
+					ip_read_and_print_xyr1(ktrc, &flags);
+				}
+				break;
+
+			case DEBUG_ECC_IRAM_CHKCURVE_OPLAST_ADDR: /* PC_CHECK_CURVE_LAST */
+				/* 1st instruction of .chkcurveL
+				 */
+				if (dbgstate == IPECC_DEBUG_STATE_EXIT) {
+					kp_trace_msg_append(ktrc, "PC=%s0x%03x%s (%s%s%s)\n\r", KGRN, dbgpc, KNRM, KYEL, str_ipecc_state(dbgstate), KNRM);
+					kp_trace_msg_append(ktrc, "[VHD-CMP-SAGE] R1 coordinates (after exit routine, "
+							"end of computation, result is in R1 if not null)\n");
+					/* read values of [XY]R[01] and flags r0z and r1z */
+					ip_read_and_print_xyr1(ktrc, &flags);
+				}
+				break;
+
+			default:
+				break;
+		} /* switch-case on dbgpc */
+		/*
+		 * If IP is halted in state 'exits' and is about to
+		 * execute the last opcode of routine .chkcurveL
+		 * we exit the loop.
+		 */
+		if ( (dbgpc == DEBUG_ECC_IRAM_CHKCURVE_OPLAST_ADDR) && (dbgstate == IPECC_DEBUG_STATE_EXIT) ) {
+			break;
+		}
+
+	} while (1);
+
+	kp_trace_msg_append(ktrc, "%d steps\n", ktrc->nb_steps);
+
+	kp_trace_msg_append(ktrc, "Removing breakpoint\n\r");
+	IPECC_REMOVE_BREAKPOINT(0);
+
+	kp_trace_msg_append(ktrc, "Resuming\n\r");
+	IPECC_RESUME();
+
+	return 0;
+err:
+	return -1;
+}
+#endif /* KP_TRACE */
+
 /*
  * Commands execution (point operation)
+ *
+ * The default behaviour should be to call ip_ecc_exec_command() in 'blocking'
+ * mode (the software driver will poll the BUSY WAIT bit until it is cleared
+ * by the hardware). When in debug mode setting 'blocking' to 0 allowsa to
+ * debug monitor the operation, using e.g breakpoints.
  */
-static inline int ip_ecc_exec_command(ip_ecc_command cmd, int *flag)
+static inline int ip_ecc_exec_command(ip_ecc_command cmd, int *flag, kp_trace_info_t* ktrc)
 {
 	/* Wait until the IP is not busy */
 	IPECC_BUSY_WAIT();
@@ -2511,7 +3128,20 @@ static inline int ip_ecc_exec_command(ip_ecc_command cmd, int *flag)
 			break;
 		}
 		case PT_KP:{
-			IPECC_EXEC_PT_KP();
+			if (ktrc == NULL) {
+				/* If debug ptr is null, this means no debug trace is required,
+				 * so run the command immediately.
+				 */
+				IPECC_EXEC_PT_KP();
+			} else {
+				/* Since the ptr is not null, this means debug trace must happen,
+				 * and some config is required before running the [k]P command,
+				 * which is done by kp_debug_trace().
+				 */
+				if (kp_debug_trace(ktrc)) {
+					goto err;
+				};
+			}
 			break;
 		}
 		case PT_CHK:{
@@ -2585,43 +3215,15 @@ static inline int ip_ecc_is_debug(unsigned int* answer)
 }
 
 /* Get the major version number of the IP */
-static inline int ip_ecc_get_version_major(unsigned int* nb)
+static inline int ip_ecc_get_version_tags(uint32_t* maj, uint32_t* min, uint32_t* ptc)
 {
 	/* Wait until the IP is not busy */
 	IPECC_BUSY_WAIT();
 
 	/* Get all version numbers from IP register. */
-	*nb = IPECC_GET_MAJOR_VERSION();
-
-	/* Wait until the IP is not busy */
-	IPECC_BUSY_WAIT();
-
-	return 0;
-}
-
-/* Get the minor version number of the IP */
-static inline int ip_ecc_get_version_minor(unsigned int* nb)
-{
-	/* Wait until the IP is not busy */
-	IPECC_BUSY_WAIT();
-
-	/* Get all version numbers from IP register. */
-	*nb = IPECC_GET_MINOR_VERSION();
-
-	/* Wait until the IP is not busy */
-	IPECC_BUSY_WAIT();
-
-	return 0;
-}
-
-/* Get the patch version number of the IP */
-static inline int ip_ecc_get_version_patch(unsigned int* nb)
-{
-	/* Wait until the IP is not busy */
-	IPECC_BUSY_WAIT();
-
-	/* Get all version numbers from IP register. */
-	*nb = IPECC_GET_PATCH_VERSION();
+	*maj = IPECC_GET_MAJOR_VERSION();
+	*min = IPECC_GET_MINOR_VERSION();
+	*ptc = IPECC_GET_PATCH_VERSION();
 
 	/* Wait until the IP is not busy */
 	IPECC_BUSY_WAIT();
@@ -2705,7 +3307,7 @@ static inline int ip_ecc_trng_postproc_disable(void)
 	return 0;
 }
 
-/* (Re)enable the TRNG post-processing logic that pulls bytes from the
+/* (Re-)enable the TRNG post-processing logic that pulls bytes from the
  * raw random source - in the debug mode of the IP, that logic is disabled
  * upon reset and needs to be explicitly enabled by sofware by calling
  * this macro.
@@ -2745,7 +3347,7 @@ static inline int ip_ecc_disable_read_port_of_raw_fifo(void)
 	return 0;
 }
 
-/* (Re)nable the read port of the TRNG raw random FIFO.
+/* (Re-)enable the read port of the TRNG raw random FIFO.
  */
 static inline int ip_ecc_enable_read_port_of_raw_fifo()
 {
@@ -2754,6 +3356,37 @@ static inline int ip_ecc_enable_read_port_of_raw_fifo()
 
 	/* Enable the read port of the FIFO used by the post-processing. */
 	IPECC_TRNG_RAW_FIFO_READ_PORT_ENABLE();
+
+	/* Wait until the IP is not busy */
+	IPECC_BUSY_WAIT();
+
+	return 0;
+}
+
+/* Disable token feature. */
+int ip_ecc_disable_token(void)
+{
+	/* Wait until the IP is not busy */
+	IPECC_BUSY_WAIT();
+
+	/* Transmit action to low-level routine */
+	IPECC_DBG_DISABLE_TOKEN();
+
+	/* Wait until the IP is not busy */
+	IPECC_BUSY_WAIT();
+
+	return 0;
+}
+
+/* (Re-)enable token feature
+ * (this is a feature that is on by default).*/
+int ip_ecc_enable_token(void)
+{
+	/* Wait until the IP is not busy */
+	IPECC_BUSY_WAIT();
+
+	/* Transmit action to low-level routine */
+	IPECC_DBG_ENABLE_TOKEN();
 
 	/* Wait until the IP is not busy */
 	IPECC_BUSY_WAIT();
@@ -2808,24 +3441,12 @@ static inline int driver_setup(void)
 		if(hw_driver_setup((volatile unsigned char**)&ipecc_baddr, NULL /*(volatile unsigned char**)&ipecc_pseudotrng_baddr)*/)) {
 			goto err;
 		}
-#if 0
-		log_print("Waiting for 2s back from hw_driver_setup() & B4 soft reset...\n\r");
-		sleep(2);
-#endif
 		/* Reset the IP for a clean state */
 		IPECC_SOFT_RESET();
 
 #if 0
-		log_print("Waiting for 2s after soft reset...\n\r");
-		sleep(2);
-#endif
-
-#if 0
 		/* Reset the pseudo TRNG device to empty its FIFO of pseudo raw random bytes */
 		IPECC_PSEUDOTRNG_SOFT_RESET();
-
-		log_print("Waiting for 2s after soft pseudo TRNG reset...\n\r");
-		sleep(2);
 #endif
 
 		/* We are in the initialized state */
@@ -2834,12 +3455,13 @@ static inline int driver_setup(void)
 	
 	/* Enable TRNG post-processing
 	 *
-	 * This is for the case where the IP is in DEBUG mode (otherwise it won't do harm).
+	 * This is for the case where the IP is in DEBUG mode (otherwise it will do no harm).
 	 *
-	 * NOTE: it is important to make this call AFTER setting hw_driver_setup_state to 1
-	 *       above, because ip_ecc_trng_postproc_enable() is going to call driver_setup()
-	 *       which is us right now, and if hw_driver_setup_state was not set yet, we would
-	 *       call again hw_driver_setup() and it would be a recursive deadlock.
+	 * NOTE:
+	 *   It is important to make this call AFTER setting hw_driver_setup_state to 1
+	 *   above, because ip_ecc_trng_postproc_enable() is going to call driver_setup()
+	 *   which is us right now, and if hw_driver_setup_state was not set yet, we would
+	 *   call again hw_driver_setup() and it would be a recursive deadlock.
 	 */
 	ip_ecc_trng_postproc_enable();
 
@@ -2871,45 +3493,17 @@ int hw_driver_is_debug(unsigned int* answer)
 		goto err;
 	}
 	return 0;
-err: 
+err:
 	return -1;
 }
 
 /* Get major version of the IP */
-int hw_driver_get_version_major(unsigned int* nb)
+int hw_driver_get_version_tags(uint32_t* maj, uint32_t* min, uint32_t* patch)
 {
 	if(driver_setup()){
 		goto err;
 	}
-	if (ip_ecc_get_version_major(nb)){
-		goto err;
-	}
-	return 0;
-err: 
-	return -1;
-}
-
-/* Get minor version of the IP */
-int hw_driver_get_version_minor(unsigned int* nb)
-{
-	if(driver_setup()){
-		goto err;
-	}
-	if (ip_ecc_get_version_minor(nb)){
-		goto err;
-	}
-	return 0;
-err: 
-	return -1;
-}
-
-/* Get patch version of the IP */
-int hw_driver_get_version_patch(unsigned int* nb)
-{
-	if(driver_setup()){
-		goto err;
-	}
-	if (ip_ecc_get_version_patch(nb)){
+	if (ip_ecc_get_version_tags(maj, min, patch)){
 		goto err;
 	}
 	return 0;
@@ -2927,7 +3521,7 @@ int hw_driver_trng_post_proc_enable()
 		goto err;
 	}
 	return 0;
-err: 
+err:
 	return -1;
 }
 
@@ -2941,9 +3535,69 @@ int hw_driver_trng_post_proc_disable()
 		goto err;
 	}
 	return 0;
-err: 
+err:
 	return -1;
 }
+
+/* Complete bypass the TRNG function (both entropy source,
+ * post-processing, and server) */
+int hw_driver_bypass_full_trng_DBG(uint32_t instead_bit)
+{
+	if(driver_setup()){
+		goto err;
+	}
+	if (ip_ecc_bypass_full_trng(instead_bit)){
+		goto err;
+	}
+	return 0;
+err:
+	return -1;
+}
+
+/* Disable token feature */
+int hw_driver_disable_token_DBG()
+{
+	if(driver_setup()){
+		goto err;
+	}
+	if (ip_ecc_disable_token()){
+		goto err;
+	}
+	return 0;
+err:
+	return -1;
+}
+
+/* (Re-)enable token feature */
+int hw_driver_enable_token_DBG()
+{
+	if(driver_setup()){
+		goto err;
+	}
+	if (ip_ecc_enable_token()){
+		goto err;
+	}
+	return 0;
+err:
+	return -1;
+}
+
+/* Patching microcode in the IP */
+int hw_driver_patch_microcode_DBG(uint32_t* buf, uint32_t nbops, uint32_t opsz)
+{
+	if(driver_setup()){
+		goto err;
+	}
+	
+	if (ip_ecc_patch_microcode(buf, nbops, opsz)) {
+		goto err;
+	}
+
+	return 0;
+err:
+	return -1;
+}
+
 
 /* Set the curve parameters a, b, p and q.
  *
@@ -3190,7 +3844,7 @@ int hw_driver_is_on_curve(const unsigned char *x, unsigned int x_sz, const unsig
 	}
 
 	/* Check if it is on curve */
-	if(ip_ecc_exec_command(PT_CHK, on_curve)){
+	if(ip_ecc_exec_command(PT_CHK, on_curve, NULL)){
 		goto err;
 	}
 
@@ -3249,7 +3903,7 @@ int hw_driver_eq(const unsigned char *x1, unsigned int x1_sz, const unsigned cha
 	}
 
 	/* Check if it the points are equal */
-	if(ip_ecc_exec_command(PT_EQU, is_eq)){
+	if(ip_ecc_exec_command(PT_EQU, is_eq, NULL)){
 		goto err;
 	}
 
@@ -3309,7 +3963,7 @@ int hw_driver_opp(const unsigned char *x1, unsigned int x1_sz, const unsigned ch
 
 
 	/* Check if the points are opposite */
-	if(ip_ecc_exec_command(PT_OPP, is_opp)){
+	if(ip_ecc_exec_command(PT_OPP, is_opp, NULL)){
 		goto err;
 	}
 
@@ -3491,7 +4145,7 @@ int hw_driver_neg(const unsigned char *x, unsigned int x_sz, const unsigned char
 	}
 
 	/* Execute our NEG command */
-	if(ip_ecc_exec_command(PT_NEG, NULL)){
+	if(ip_ecc_exec_command(PT_NEG, NULL, NULL)){
 		goto err;
 	}
 
@@ -3557,7 +4211,7 @@ int hw_driver_dbl(const unsigned char *x, unsigned int x_sz, const unsigned char
 	}
 
 	/* Execute our DBL command */
-	if(ip_ecc_exec_command(PT_DBL, NULL)){
+	if(ip_ecc_exec_command(PT_DBL, NULL, NULL)){
 		goto err;
 	}
 
@@ -3632,7 +4286,7 @@ int hw_driver_add(const unsigned char *x1, unsigned int x1_sz, const unsigned ch
 	}
 
 	/* Execute our ADD command */
-	if(ip_ecc_exec_command(PT_ADD, NULL)){
+	if(ip_ecc_exec_command(PT_ADD, NULL, NULL)){
 		goto err;
 	}
 
@@ -3665,7 +4319,8 @@ err:
  */
 int hw_driver_mul(const unsigned char *x, unsigned int x_sz, const unsigned char *y, unsigned int y_sz,
                   const unsigned char *scalar, unsigned int scalar_sz,
-                  unsigned char *out_x, unsigned int *out_x_sz, unsigned char *out_y, unsigned int *out_y_sz)
+                  unsigned char *out_x, unsigned int *out_x_sz, unsigned char *out_y, unsigned int *out_y_sz,
+									kp_trace_info_t* ktrc)
 {
 	int inf_r0, inf_r1;
 	unsigned int nn_sz;
@@ -3734,7 +4389,7 @@ int hw_driver_mul(const unsigned char *x, unsigned int x_sz, const unsigned char
 	}
 
 	/* Execute our [k]P command */
-	if(ip_ecc_exec_command(PT_KP, NULL)){
+	if(ip_ecc_exec_command(PT_KP, NULL, ktrc)){
 		log_print("In hw_driver_mul(): Error in ip_ecc_exec_command()\n\r");
 		goto err;
 	}
