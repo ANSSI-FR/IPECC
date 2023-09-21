@@ -481,8 +481,17 @@ int main(int argc, char *argv[])
 	printf("%sMicrocode was patched%s\n\r", KWHT, KNRM);
 #endif
 
-	//hw_driver_bypass_full_trng_DBG(0);
-	//hw_driver_disable_token_DBG();
+#if 1
+	/* Example of how to completely disable TRNG and replace it with zeros
+	 * (this revealed a bu, needs a FIXME) - Indeed it should have all [k]P
+	 * computationbs wrong due to the Z-maksing, however they are still correct.
+	 */
+	if (hw_driver_bypass_full_trng_DBG(0)) {
+		printf("Error: hw_driver_bypass_full_trng_DBG() returned exception\n\r");
+		exit(EXIT_FAILURE);
+	}
+	printf("%sTRNG bypassed using all 0 values instead\n\r", KWHT, KNRM);
+#endif
 
 	/* Main infinite loop, parsing lines from standard input to extract:
 	 *   - input vectors
