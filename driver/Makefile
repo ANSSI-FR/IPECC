@@ -1,6 +1,7 @@
 # Variable VHD_SRC below must be set with the ABSOLUTE path
 # where IPECC microcode has been built (DO NOT use relative path!)
 VHD_DIR=
+
 ARM_CC ?= arm-linux-gnueabihf-gcc
 CFLAGS = -Wall -Wextra -Wpedantic -O3 -g3 -mcpu=cortex-a9 -mfpu=vfpv3 -mfloat-abi=hard -static
 CFLAGS += -DWITH_EC_HW_DEBUG
