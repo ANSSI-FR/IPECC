@@ -289,6 +289,7 @@ void print_stats_and_exit(ipecc_test_t* t, all_stats_t* s, const char* msg, unsi
  */
 void int_handler(int dummy)
 {
+	(void)(dummy); /* To avoid unused parameter warning from gcc */
 	print_stats_regularly(&stats, true);
 	printf("\x1B[0m\033[?25h\033[22m");
 	exit(EXIT_SUCCESS);
