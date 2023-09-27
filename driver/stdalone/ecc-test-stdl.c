@@ -81,7 +81,7 @@ int main(int argc, char *argv[])
 	/* The output */
 	unsigned char Poutx[1024], Pouty[1024];
 
-	printf("Welcome to the driver test!\n\r");
+	printf("Welcome to the standalone driver test!\n\r");
 
 	/* Parse all our tests and execute them */
 	for(i = 0; i < (sizeof(ipecc_all_tests) / sizeof(ipecc_test)); i++){
@@ -276,7 +276,7 @@ hexdump("Py=0x", END_OF_BUF(t.Py, new_sz), new_sz);
 	/* The output */
 	unsigned char Poutx[32], Pouty[32];
 
-	printf("Welcome to the driver test!\n\r");
+	printf("Welcome to the standalone driver test!\n\r");
 
 
        const unsigned char a[] = {

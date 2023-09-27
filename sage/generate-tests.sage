@@ -26,7 +26,7 @@ def toss_a_coin():
 	else:
 		return 0
 
-# to generate a safe prime
+# To generate a safe prime.
 def rdp(nbits=256):
 	while True:
 		p = random_prime(2^nbits-1, false, 2^(nbits-1))
@@ -38,7 +38,7 @@ def rdp(nbits=256):
 #                                                                              #
 #              (You should only edit parameters within this frame)             #
 #                                                                              #
-# Parameter: 'ww'                                                              #
+# Parameter: 'ww' ############################################################## 
 #                                                                              #
 ww = 16                                                                        #
 #                                                                              #
@@ -77,19 +77,35 @@ ww = 16                                                                        #
 #   On 7-series/Zynq Xilinx FPGAs, 'ww' is set to 16.                          #
 #                                                                              #
 #                                                                              #
-# Parameter: 'nnmin'                                                           #
+# Parameter: 'nnmin' ###########################################################
 #                                                                              #
-nnmin = ww - 4 + 1                                                             #
+#nnmin = ww - 3                                                                #
+nnmin = 32                                                                     #
 #                                                                              #
-#   See info on 'ww' above.                                                    #
+#   Also read above info on parameter 'ww'.                                    #
+#                                                                              #
 #   The smallest admissible value for 'nn' for any particular hardware imple-  #
 #   mentation of IPECC ensures that w >= 2 where w = ceil((nn + 4) / ww) which #
 #   is equivalent to ( (nn + 4) / ww ) > 1 and therefore nn > ww - 4 which     #
-#   gives the minimum ww - 4 + 1 below.                                        #
+#   gives the minimum ww - 3 set above.                                        #
+#                                                                              #
+#       HOWEVER: there's a known BUG in the [k]P computation of IPECC for very #
+#       small curve sizes. This bug's been characterized and should be fixed   #
+#       soon. It comes from the fact that driver rounds the value of 'nn' that #
+#       it sets in the hardware up to the next byte (e.g if a curve has nn=13, #
+#       then the driver will set 16). Now this creates the possibility that    #
+#       random masks generated for the "Z-remask" countermeasure happen to be  #
+#       a multiple of p, thus corrupting points coordinates (as these randoms  #
+#       are used for multiplicative masking). On Xilinx FPGAs, ww = 16  so     #
+#       ww - 3 makes it a very small 13, a value for which the bug will        #
+#       present itself very quick, within the first thousands of [k]P computa- #
+#       tions submitted to the IP.                                             #
+#                                                                              #
+#   This is why for now 'nnmin' is set to 32 instead of ww - 3 (=13 in Xilinx) #
 #                                                                              #
 #                                                                              #
 # Parameters: 'nnmax', 'nnminmax', 'nnmaxabsolute'                             #
-#             'NNMINMOD', 'NNMININCR', 'NNMAXMOD', 'NNMAXINCR'                 #
+#             'NNMINMOD', 'NNMININCR', 'NNMAXMOD', 'NNMAXINCR' #################
 #                                                                              #
 nnmax = nnmin + 16     # For start (will increase and plateau to absolute max) #
 nnmaxabsolute = 256    # Largest possible value of 'nn'.                       #
@@ -121,16 +137,22 @@ NNMAXINCR = 3                                                                  #
 #   is actually quite arbitrary.                                               #
 #                                                                              #
 #                                                                              #
-# Parameters: 'nn_constant', 'only_kp_and_no_blinding'                         #
+# Parameters: 'nn_constant', 'only_kp_and_no_blinding' #########################
 #                                                                              #
 nn_constant = 0  # Non-0 value will make it the constant unique value of 'nn'  #
-only_kp_and_no_blinding = False  # Well, option's name speaks for itself.      #
+#                # hence bypassing previous settings for nnmin, nnmax, etc.    #
 #                                                                              #
+only_kp_and_no_blinding = False  # Hope that option's name speaks for itself   #
+#                                # (if true, this script will generate test-   #
+#                                # vectors for [k]P operation only, discarding #
+#                                # point addition, point doubling, point equa- #
+#                                # lity/opposition tests, etc. Also blinding   #
+#                                # will be kept disabled).                     #
 #                                                                              #
 # Parameters: 'NBCURV'                                                         #
-#             'NB*' where * = KP|ADD|DBL|NEG|CHK|EQU|OPP                       #
+#             'NB*' where * = KP|ADD|DBL|NEG|CHK|EQU|OPP #######################
 #                                                                              #
-NBCURV = 0 # A value of 0 means don't stop or ever-lasting producing loop.     #
+NBCURV = 0 # A value of 0 means don't stop (ever-lasting producing loop).      #
 NBKP = 100 # Nb of [k]P tests that will be generated per curve.                #
 NBADD = 50 # Nb of P+Q tests that will be generated per curve.                 #
 NBDBL = 50 # Nb of [2]P tests that will be generated per curve.                #
@@ -167,9 +189,9 @@ NBOPP = 50 # Nb of 'are points opposite?" tests that'll be generated per curve #
 # The complete script will iterate on a total number of 'NBCURV' curves.       #
 # Setting 0 to 'NBCURV' means the loop shouldn't stop.                         #
 #                                                                              #
-# Parameter 'NN_LIMIT_COMPUTE_Q':                                              #
+# Parameter 'NN_LIMIT_COMPUTE_Q' ###############################################
 #                                                                              #
-NN_LIMIT_COMPUTE_Q = 192                                                       #
+NN_LIMIT_COMPUTE_Q = 192  # Limit of 'nn' above which blinding will be disabl. #
 #                                                                              #
 #   For [k]P tests, blinding may or may not be enabled (and if so, with a      #
 #   number of blinding bits randomly drawn in the range [1 : nn - 1]).         #
@@ -184,7 +206,7 @@ NN_LIMIT_COMPUTE_Q = 192                                                       #
 #   as 'q' only plays a role in IPECC when blinding countermeasure is          #
 #   enabled in a [k]P computation.                                             #
 #                                                                              #
-# Parameter: 'NO_EXCEPTIONS'                                                   #
+# Parameter: 'NO_EXCEPTIONS' ###################################################
 #                                                                              #
 NO_EXCEPTIONS = False                                                          #
 #                                                                              #
@@ -196,7 +218,7 @@ NO_EXCEPTIONS = False                                                          #
 #                                                                              #
 #   If set to True, no such test will be generated by the script.              #
 #                                                                              #
-# Note:                                                                        #
+# Note #########################################################################
 #                                                                              #
 #   Obviously what is interesting in cryptographic applications is to be       #
 #   able to perform computations on numbers of... cryptographic sizes.         #

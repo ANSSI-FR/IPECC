@@ -128,6 +128,20 @@ typedef struct {
 	uint32_t total;
 } stats_t;
 
+typedef struct {
+	stats_t kp;
+	stats_t ptadd;
+	stats_t ptdbl;
+	stats_t ptneg;
+	stats_t test_equ;
+	stats_t test_opp;
+	stats_t test_crv;
+	stats_t all;
+	uint32_t nn_min;
+	uint32_t nn_max;
+	uint32_t nbcurves;
+} all_stats_t;
+
 /*
  * Gereral type for tests passed to the driver.
  */
