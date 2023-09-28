@@ -16,13 +16,11 @@
 /* The low level driver for the HW accelerator */
 #include "hw_accelerator_driver.h"
 
-#ifdef KP_TRACE
 #include "ecc_addr.h"
 #include "ecc_vars.h"
 #include "ecc_states.h"
 #include <string.h>
 #include <stdarg.h>
-#endif
 
 #if defined(WITH_EC_HW_ACCELERATOR) && !defined(WITH_EC_HW_SOCKET_EMUL)
 /**************************************************************************/
@@ -3098,12 +3096,10 @@ static int kp_debug_trace(kp_trace_info_t* ktrc)
 
 	} while (1);
 
-	kp_trace_msg_append(ktrc, "%d steps\n", ktrc->nb_steps);
+	kp_trace_msg_append(ktrc, "%d debug steps fopr this [k]P computation.\n", ktrc->nb_steps);
 
-	kp_trace_msg_append(ktrc, "Removing breakpoint\n\r");
+	kp_trace_msg_append(ktrc, "Removing breakpoint & resuming.\n\r");
 	IPECC_REMOVE_BREAKPOINT(0);
-
-	kp_trace_msg_append(ktrc, "Resuming\n\r");
 	IPECC_RESUME();
 
 	return 0;
@@ -3136,6 +3132,7 @@ static inline int ip_ecc_exec_command(ip_ecc_command cmd, int *flag, kp_trace_in
 			break;
 		}
 		case PT_KP:{
+#ifdef KP_TRACE
 			if (ktrc == NULL) {
 				/* If debug ptr is null, this means no debug trace is required,
 				 * so run the command immediately.
@@ -3150,6 +3147,10 @@ static inline int ip_ecc_exec_command(ip_ecc_command cmd, int *flag, kp_trace_in
 					goto err;
 				};
 			}
+#else
+			IPECC_EXEC_PT_KP();
+			(void)ktrc; /* To avoid unused parameter warning from gcc */
+#endif
 			break;
 		}
 		case PT_CHK:{

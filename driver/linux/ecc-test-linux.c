@@ -137,7 +137,6 @@ extern int check_test_oppos(ipecc_test_t*, bool* res);
 /* Curve definition */
 static curve_t curve = INIT_CURVE();
 
-#ifdef KP_TRACE
 /* Definition of NBMAXSZ (in ecc-test-linux.h) is done in bytes,
  * here we use int, shence the divisions by 4 below.
  */
@@ -175,7 +174,6 @@ kp_trace_info_t kp_trace_info =
 	.msgsz = 0,
 	.msgsz_max = KP_TRACE_PRINTF_SZ
 };
-#endif
 
 /* Main test structure */
 static ipecc_test_t test = {
@@ -210,6 +208,7 @@ static all_stats_t stats = {
 	.all = { .ok = 0, .nok = 0, .total = 0 },
 	.nn_min = 0xffffffffUL,
 	.nn_max = 0,
+	.nn_avr = 0,
 	.nbcurves = 0
 };
 
@@ -251,25 +250,38 @@ static void print_stats_regularly(all_stats_t* st, bool force)
 			once = false;
 		}
 		/* nn min, max */
-		printf("\033[2K\033[1A\033[2K\033[1A\033[2K\033[1A\033[2K\033[1A\033[2K\033[1A\033[2K"
-				"\033[1m"
-				"nn min|max: %s%u%s\033[1m|%s%u%s\033[22m\n", KORA, st->nn_min, KNRM, KORA, st->nn_max, KNRM);
+		printf("%s%s%s%s%s%s%s%s%s%s%s%s",
+				KERASELINE, KMVUP1LINE, KERASELINE, KMVUP1LINE, KERASELINE, KMVUP1LINE,
+				KERASELINE, KMVUP1LINE, KERASELINE, KMVUP1LINE, KERASELINE, KBOLD);
+		if (st->nbcurves)  {
+			printf("nn min|average|max: %s%u%s%s|%s%u%s%s|%s%u%s%s\n",
+					KORA, st->nn_min, KNRM, KBOLD, KVIO, (st->nn_avr)/(st->nbcurves),
+					KNRM, KBOLD, KORA, st->nn_max, KNRM, KNOBOLD);
+		} else {
+			printf("nn min|average|max: %s%u%s%s|%s%s%s%s|%s%u%s%s\n",
+					KORA, st->nn_min, KNRM, KBOLD, KVIO, ".", KNRM, KBOLD, KORA, st->nn_max, KNRM, KNOBOLD);
+		}
 		/* Label line */
-		printf("\033[1m         %s[k]P     P+Q    [2]P      -P"
-				"    P==Q    P==-Q   PonC   %sTotal%s\033[22m\n", KWHT, KCYN, KNRM);
+		printf("%s         %s[k]P     P+Q    [2]P      -P"
+				"    P==Q    P==-Q   PonC   %sTotal%s%s\n", KBOLD, KWHT, KCYN, KNRM, KNOBOLD);
 		/* OK line */
-		printf("\033[1m%s   ok: %*d  %*d  %*d  %*d  %*d  %*d  %*d  %s%*d%s\033[22m\n",
+		printf("%s%s   ok: %*d  %*d  %*d  %*d  %*d  %*d  %*d  %s%*d%s%s\n",
+				KBOLD,
 				KGRN, 6, st->kp.ok, 6, st->ptadd.ok, 6, st->ptdbl.ok, 6, st->ptneg.ok,
-				6, st->test_equ.ok, 6, st->test_opp.ok, 6, st->test_crv.ok, KCYN, 6, st->all.ok, KNRM);
+				6, st->test_equ.ok, 6, st->test_opp.ok, 6, st->test_crv.ok, KCYN, 6, st->all.ok,
+				KNRM, KNOBOLD);
 		/* NOK line */
-		printf("\033[1m%s  nok: %*d  %*d  %*d  %*d  %*d  %*d  %*d  %s%*d%s\033[22m\n",
-				KRED,
+		printf("%s%s  nok: %*d  %*d  %*d  %*d  %*d  %*d  %*d  %s%*d%s%s\n",
+				KBOLD, KRED,
 				6, st->kp.nok, 6, st->ptadd.nok, 6, st->ptdbl.nok, 6, st->ptneg.nok,
-				6, st->test_equ.nok, 6, st->test_opp.nok, 6, st->test_crv.nok, KCYN, 6, st->all.nok, KNRM);
+				6, st->test_equ.nok, 6, st->test_opp.nok, 6, st->test_crv.nok, KCYN,
+				6, st->all.nok, KNRM, KNOBOLD);
 		/* Total line */
-		printf("\033[1mtotal: %*d  %*d  %*d  %*d  %*d  %*d  %*d  %s%*d%s\033[22m\n",
+		printf("%stotal: %*d  %*d  %*d  %*d  %*d  %*d  %*d  %s%*d%s%s\n",
+				KBOLD,
 				6, st->kp.total, 6, st->ptadd.total, 6, st->ptdbl.total, 6, st->ptneg.total,
-				6, st->test_equ.total, 6, st->test_opp.total, 6, st->test_crv.total, KCYN, 6, st->all.total, KNRM);
+				6, st->test_equ.total, 6, st->test_opp.total, 6, st->test_crv.total, KCYN,
+				6, st->all.total, KNRM, KNOBOLD);
 	}
 }
 
@@ -277,10 +289,16 @@ void print_stats_and_exit(ipecc_test_t* t, all_stats_t* s, const char* msg, unsi
 {
 	print_stats_regularly(s, true);
 	printf("Stopped on test %d.%d%s\n\r", t->curve->id, t->id, KNRM);
+#ifndef KP_TRACE
+	printf("You can compile with -DKP_TRACE to get debug info from [k]P tracing log (see Makefile).\n");
+#endif
 	if (line) {
 		free(line);
 	}
-	printf("\x1B[0m\033[?25h");
+	/* Remove color on terminal, make the cursor visible again
+	 * and set normal (no bold) font
+	 */
+	printf("%s%s%s", KNRM, KCURSORVIS, KNOBOLD);
 	error_at_line(-1, EXIT_FAILURE, __FILE__, linenum, "%s", msg);
 }
 
@@ -293,7 +311,10 @@ void int_handler(int dummy)
 	if (stats.all.total > 0) {
 		print_stats_regularly(&stats, true);
 	}
-	printf("\x1B[0m\033[?25h\033[22m");
+	/* Remove color on terminal, make the cursor visible again
+	 * and set normal (no bold) font
+	 */
+	printf("%s%s%s", KNRM, KCURSORVIS, KNOBOLD);
 	exit(EXIT_SUCCESS);
 }
 
@@ -511,9 +532,9 @@ int main(int argc, char *argv[])
 	 */
 	signal(SIGINT, int_handler);
 
-	/* Erase cursor from the terminal window.
+	/* Make cursor invisible from the terminal window.
 	 */
-	printf("\033[?25l");
+	printf("%s", KCURSORINVIS);
 
 	/* Main infinite loop, parsing lines from standard input to extract:
 	 *   - input vectors
@@ -710,6 +731,7 @@ int main(int argc, char *argv[])
 					if (curve.nn < stats.nn_min) {
 						stats.nn_min = curve.nn;
 					}
+					stats.nn_avr += curve.nn;
 				} else {
 					printf("%sError: Could not find the expected token \"nn=\" "
 							"from input file/stream.\n\r", KERR);

@@ -100,6 +100,7 @@ int ip_set_pt_and_run_kp(ipecc_test_t* t)
 
 	t->pt_hw_res.x.sz = t->pt_hw_res.y.sz = t->ptp.x.sz;
 
+#ifdef KP_TRACE
 	/* (RE-)initialize struct kp_trace_info_t fields
 	 * before calling driver API.
 	 */
@@ -121,6 +122,7 @@ int ip_set_pt_and_run_kp(ipecc_test_t* t)
 	bzero(t->ktrc->msg, KP_TRACE_PRINTF_SZ);
 #endif
 	t->ktrc->nn = t->curve->nn;
+#endif /* KP_TRACE */
 
 	/* Run [k]P command */
 	if (hw_driver_mul(t->ptp.x.val, t->ptp.x.sz, t->ptp.y.val, t->ptp.y.sz, t->k.val, t->k.sz,
@@ -257,9 +259,12 @@ int kp_error_log(ipecc_test_t* t)
 	print_large_number("k=0x", &(t->k));
 	print_large_number("Expected kPx=0x", &(t->pt_sw_res.x));
 	print_large_number("Expected kPy=0x", &(t->pt_sw_res.y));
-	printf("%s<DEBUG LOG TRACE OF [k]P:%s\n\r", KRED, KNRM);
+#ifdef KP_TRACE
+	printf("%s<DEBUG START [k]P TRACE LOG:%s\n\r", KRED, KNRM);
 	printf("%s%s%s", KWHT, t->ktrc->msg, KNRM);
-	printf("%sEND OF DEBUG LOG TRACE>%s\n\r", KRED, KNRM);
+	printf("%sDEBUG END [k]P TRACE LOG>%s\n\r", KRED, KNRM);
+#endif
+	printf("\n\n\n\n\n\n");
 
 	return 0;
 }

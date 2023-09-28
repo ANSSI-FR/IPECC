@@ -38,7 +38,7 @@ def rdp(nbits=256):
 #                                                                              #
 #              (You should only edit parameters within this frame)             #
 #                                                                              #
-# Parameter: 'ww' ############################################################## 
+# Parameter: 'ww' ##############################################################
 #                                                                              #
 ww = 16                                                                        #
 #                                                                              #
@@ -109,11 +109,11 @@ nnmin = 32                                                                     #
 #                                                                              #
 nnmax = nnmin + 16     # For start (will increase and plateau to absolute max) #
 nnmaxabsolute = 256    # Largest possible value of 'nn'.                       #
-nnminmax = nnmin + 64  # Quite arbitrary too.                                  #
-NNMINMOD = 100                                                                 #
-NNMININCR = 1                                                                  #
-NNMAXMOD = 300                                                                 #
-NNMAXINCR = 3                                                                  #
+nnminmax = 256         # Largest possible value of 'nnmin'.                    #
+NNMINMOD = 10          # 'nnmin' will increase every 'NNMINMOD' curves,        #
+NNMININCR = 32         #  and it will be increased by 'NNMININCR'.             #
+NNMAXMOD = 5           # 'nnmax' will increase every 'NNMAXMOD' curves,        #
+NNMAXINCR = 32         #  and it will be increased by 'NNMAXINCR'.             #
 #                                                                              #
 #   This script generates test-vectors by gradually increasing the range from  #
 #   which the random values of 'nn' are withdrawn for each new curve, this     #
@@ -136,30 +136,31 @@ NNMAXINCR = 3                                                                  #
 #   will neither ever exceed, while 'nnmax' being initially set at nnmin + 16  #
 #   is actually quite arbitrary.                                               #
 #                                                                              #
+#   Warning: keep NNMAXMOD < NNMINMOD to avoid range inversion error!          #
 #                                                                              #
 # Parameters: 'nn_constant', 'only_kp_and_no_blinding' #########################
 #                                                                              #
-nn_constant = 0  # Non-0 value will make it the constant unique value of 'nn'  #
+nn_constant = 0  # Non-0 value will make it the constant unique value of 'nn', #
 #                # hence bypassing previous settings for nnmin, nnmax, etc.    #
 #                                                                              #
 only_kp_and_no_blinding = False  # Hope that option's name speaks for itself   #
 #                                # (if true, this script will generate test-   #
 #                                # vectors for [k]P operation only, discarding #
 #                                # point addition, point doubling, point equa- #
-#                                # lity/opposition tests, etc. Also blinding   #
+#                                # lity/opposition tests, etc. also blinding   #
 #                                # will be kept disabled).                     #
 #                                                                              #
 # Parameters: 'NBCURV'                                                         #
 #             'NB*' where * = KP|ADD|DBL|NEG|CHK|EQU|OPP #######################
 #                                                                              #
 NBCURV = 0 # A value of 0 means don't stop (ever-lasting producing loop).      #
-NBKP = 100 # Nb of [k]P tests that will be generated per curve.                #
-NBADD = 50 # Nb of P+Q tests that will be generated per curve.                 #
-NBDBL = 50 # Nb of [2]P tests that will be generated per curve.                #
-NBNEG = 50 # Nb of (-P) tests that will be generated per curve.                #
-NBCHK = 50 # Nb of 'is point on curve?' tests that will be generated per curve #
-NBEQU = 50 # Nb of 'are points equal?' tests that will be generated per curve. #
-NBOPP = 50 # Nb of 'are points opposite?" tests that'll be generated per curve #
+NBKP = 100  # Nb of [k]P tests that will be generated per curve.               #
+NBADD = 10 # Nb of P+Q tests that will be generated per curve.                 #
+NBDBL = 10 # Nb of [2]P tests that will be generated per curve.                #
+NBNEG = 10 # Nb of (-P) tests that will be generated per curve.                #
+NBCHK = 10 # Nb of 'is point on curve?' tests that will be generated per curve #
+NBEQU = 10 # Nb of 'are points equal?' tests that will be generated per curve. #
+NBOPP = 10 # Nb of 'are points opposite?" tests that'll be generated per curve #
 #                                                                              #
 #   For any new curve, a random value is drawn from the current range          #
 #   [nnmin : nnmax], and then 6 six types of tests are generated for that      #
@@ -191,13 +192,13 @@ NBOPP = 50 # Nb of 'are points opposite?" tests that'll be generated per curve #
 #                                                                              #
 # Parameter 'NN_LIMIT_COMPUTE_Q' ###############################################
 #                                                                              #
-NN_LIMIT_COMPUTE_Q = 192  # Limit of 'nn' above which blinding will be disabl. #
+NN_LIMIT_COMPUTE_Q = 64  # Limit of 'nn' above which blinding will be disabl.  #
 #                                                                              #
 #   For [k]P tests, blinding may or may not be enabled (and if so, with a      #
 #   number of blinding bits randomly drawn in the range [1 : nn - 1]).         #
 #   Generating a test with blinding enabled requires first to compute the      #
 #   order of the curve, which can become insupportably long as value of 'nn'   #
-#   exceeds some threeshold. Such a threeshold is difficult to estimate,       #
+#   exceeds some threeshold. Such a threeshold is difficult to assess,         #
 #   however that's the reason for parameter 'NN_LIMIT_COMPUTE_Q'.              #
 #   By definition, any random curve generated for a value of 'nn' exceeding    #
 #   'NN_LIMIT_COMPUTE_Q' will involve no blinding in their [k]P tests          #
@@ -230,7 +231,7 @@ NO_EXCEPTIONS = False                                                          #
 #   verification of pure control aspects of the computations carried           #
 #   inside the IP.                                                             #
 #                                                                              #
-#   This also the reason for the [nnmin : nnmax] range described above:        #
+#   This is also the reason for the [nnmin : nnmax] range described above:     #
 #   tests will start quite fast at the begining of one test campaign,          #
 #   then become much slower as values of nnmin & nnmax increase.               #
 #                                                                              #
@@ -238,7 +239,6 @@ NO_EXCEPTIONS = False                                                          #
 
 nbcurv = 0
 nbtest = 0
-
 
 KNRM="\x1B[0m"
 KRED="\x1B[31m"
@@ -262,17 +262,19 @@ while (nbcurv < NBCURV) or (NBCURV == 0):
         nn = nn_constant
     else:
         new_min_or_max = False
-        if (nbcurv % NNMAXMOD) == 99:
+        if (nbcurv % NNMAXMOD) == NNMAXMOD - 1:
+            prev_max = nnmax
             nnmax = nnmax + NNMAXINCR;
             if nnmax > nnmaxabsolute:
                 nnmax = nnmaxabsolute
             new_min_or_max = True
-        if (nbcurv % NNMINMOD) == 199:
+        if (nbcurv % NNMINMOD) == NNMINMOD - 1:
+            prev_min = nnmin
             nnmin = nnmin + NNMININCR;
             if nnmin > nnminmax:
                 nnmin = nnminmax
             new_min_or_max = True
-        if new_min_or_max:
+        if new_min_or_max and (nnmax != prev_max or nnmin != prev_min):
             sys.stderr.write(KWHT + "Generating curves from nn = "
                     + str(nnmin) + " to " + str(nnmax) + KNRM + "\n")
         # generate a random prime size (nn)

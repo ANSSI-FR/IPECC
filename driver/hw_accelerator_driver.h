@@ -17,6 +17,7 @@
 #define __HW_ACCELERATOR_DRIVER_H__
 
 #include <stdint.h>
+#include <stdbool.h>
 
 #if defined(WITH_EC_HW_ACCELERATOR)
 
@@ -132,9 +133,6 @@ int hw_driver_add(const uint8_t *x1, uint32_t x1_sz, const uint8_t *y1, uint32_t
 		  const uint8_t *x2, uint32_t x2_sz, const uint8_t *y2, uint32_t y2_sz,
                   uint8_t *out_x, uint32_t *out_x_sz, uint8_t *out_y, uint32_t *out_y_sz);
 
-
-#ifdef KP_TRACE
-
 typedef struct {
 	uint32_t r0z;
 	uint32_t r1z;
@@ -175,7 +173,6 @@ typedef struct {
 	uint32_t msgsz;
 	uint32_t msgsz_max;
 } kp_trace_info_t;
-#endif
 
 /* The size of the statically allocated buffer that field
  * 'msgsz_max' of struct 'kp_trace_info_t' above should not
@@ -207,9 +204,7 @@ int hw_driver_patch_microcode_DBG(uint32_t*, uint32_t, uint32_t);
 /*
  * Error/printf formating
  */
-#define TERM_COLORS
-
-#ifdef TERM_COLORS
+#ifdef TERM_CTRL_AND_COLORS
 #define KNRM  "\x1B[0m"
 #define KRED  "\x1B[31m"
 #define KGRN  "\x1B[32m"
@@ -220,6 +215,13 @@ int hw_driver_patch_microcode_DBG(uint32_t*, uint32_t, uint32_t);
 #define KWHT  "\x1B[37m"
 #define KORA  "\033[93m"
 #define KUNK  "\033[91m"
+#define KVIO  "\033[38;5;199m"
+#define KERASELINE "\033[2K"
+#define KMVUP1LINE "\033[1A"
+#define KBOLD "\033[1m"
+#define KNOBOLD "\033[22m"
+#define KCURSORVIS "\033[?25h"
+#define KCURSORINVIS "\033[?25l"
 #else
 #define KNRM  ""
 #define KRED  ""
@@ -230,8 +232,18 @@ int hw_driver_patch_microcode_DBG(uint32_t*, uint32_t, uint32_t);
 #define KCYN  ""
 #define KWHT  ""
 #define KORA  ""
-#define KUNK  ""
+#define KUNK  "\033[91m"
+#define KVIO  ""
+#define KERASELINE ""
+#define KMVUP1LINE ""
+#define KBOLD ""
+#define KNOBOLD ""
+#define KCURSORVIS ""
+#define KCURSORINVIS ""
 #endif /* TERM_COLORS */
+
+#define KERR  KUNK
+#define KINF  KORA
 
 #endif /* !WITH_EC_HW_ACCELERATOR */
 

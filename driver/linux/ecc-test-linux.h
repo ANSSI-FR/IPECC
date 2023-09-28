@@ -13,10 +13,10 @@
  *  See LICENSE file at the root folder of the project.
  */
 
-#include "../hw_accelerator_driver.h"
-
 #ifndef __TEST_DRIVER_H__
 #define __TEST_DRIVER_H__
+
+#include "../hw_accelerator_driver.h"
 
 #include <stdio.h>
 #include <stdint.h>
@@ -139,6 +139,7 @@ typedef struct {
 	stats_t all;
 	uint32_t nn_min;
 	uint32_t nn_max;
+	uint32_t nn_avr;
 	uint32_t nbcurves;
 } all_stats_t;
 
@@ -221,38 +222,6 @@ typedef struct {
 } while (0)
 
 #define INT_TO_BOOLEAN(i)   ((i) ? true : false)
-
-/*
- * Error/printf formating
- */
-#define TERM_COLORS
-
-#ifdef TERM_COLORS
-#define KNRM  "\x1B[0m"
-#define KRED  "\x1B[31m"
-#define KGRN  "\x1B[32m"
-#define KYEL  "\x1B[33m"
-#define KBLU  "\x1B[34m"
-#define KMAG  "\x1B[35m"
-#define KCYN  "\x1B[36m"
-#define KWHT  "\x1B[37m"
-#define KORA  "\033[93m"
-#define KUNK  "\033[91m"
-#else
-#define KNRM  ""
-#define KRED  ""
-#define KGRN  ""
-#define KYEL  ""
-#define KBLU  ""
-#define KMAG  ""
-#define KCYN  ""
-#define KWHT  ""
-#define KORA  ""
-#define KUNK  ""
-#endif /* TERM_COLORS */
-
-#define KERR  KUNK
-#define KINF  KORA
 
 #define DISPLAY_MODULO  10
 
