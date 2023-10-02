@@ -82,7 +82,7 @@ ww = 16                                                                        #
 #nnmin = ww - 3                                                                #
 nnmin = 32                                                                     #
 #                                                                              #
-#   Also read above info on parameter 'ww'.                                    #
+#   Also read info on parameter 'ww' above.                                    #
 #                                                                              #
 #   The smallest admissible value for 'nn' for any particular hardware imple-  #
 #   mentation of IPECC ensures that w >= 2 where w = ceil((nn + 4) / ww) which #
