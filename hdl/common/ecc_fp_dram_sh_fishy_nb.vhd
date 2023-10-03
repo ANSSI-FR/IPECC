@@ -192,9 +192,9 @@ architecture syn of ecc_fp_dram_sh_fishy_nb is
 begin
 
 	-- pragma translate_off
-	r_fp_waddr_msb <= r.fp.waddr(FP_ADDR - 1 downto FP_ADDR_MSB);
+	r_fp_waddr_msb <= r.fp.waddr(FP_ADDR - 1 downto FP_ADDR_LSB);
 	r_fp_waddr_lsb <= r.fp.waddr(FP_ADDR_LSB - 1 downto 0);
-	r_fp_raddr_msb <= r.fp.raddr(FP_ADDR - 1 downto FP_ADDR_MSB);
+	r_fp_raddr_msb <= r.fp.raddr(FP_ADDR - 1 downto FP_ADDR_LSB);
 	r_fp_raddr_lsb <= r.fp.raddr(FP_ADDR_LSB - 1 downto 0);
 	r_fp_re <= r.fp.resh(rdlat);
 	-- pragma translate_on
