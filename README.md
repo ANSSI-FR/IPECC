@@ -78,10 +78,13 @@ The main features of IPECC are:
 For now the documentation on hardware is reduced to a tutorial targeting the Xilinx Zynq-7000 FPGAs
 (Digilent's board Arty Z7-10 is used as a hardware support of the tutorial but everything described
 can be directly carried to Zynq-UltraScale+ circuits).
+
 The tutorial includes customization of the IP, RTL simulation and synthesis in Vivado, and driving
 the IP through bare-metal software as well as a testing application on top of embedded Linux.
+
 This tutorial is also a good starting point to discover the different features and
 side-channel countermeasures of the IP.
+
 Look for file <ipecc.pdf> in folder doc/.
 
 ## Software
