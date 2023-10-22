@@ -1,6 +1,6 @@
-# VHD_SRC must be set with the ABSOLUTE path where IPECC microcode
+# VHD_DIR must be set with the ABSOLUTE path where IPECC microcode
 # has been built (DO NOT use relative path!)
-VHD_DIR=
+VHD_DIR=/home/karim/work/github/ANSSI-FR/IPECC/hdl/common/ecc_curve_iram
 
 # CONFIG #############
 ARM_CC ?= arm-linux-gnueabihf-gcc
@@ -21,6 +21,7 @@ C_FILES_STDOL = $(C_FILES) stdalone/ecc-test-stdl.c
 # TARGETS ############
 all: ecc-test-linux-uio ecc-test-linux-devmem ecc-test-stdalone
 
+
 .PHONY: headers
 headers:
 	@if [ -z "$(VHD_DIR)" ] ; then \
@@ -38,12 +39,7 @@ headers:
 		fi
 	@for h in ecc_addr.h ecc_vars.h ecc_states.h ; do \
 		if [ ! -r $(VHD_DIR)/$${h} ] ; then \
-		  echo -e "\033[93m *Error*: can't access header file '$${h}'. No file of this name\033[0m" ; \
-		  echo -e "\033[93m          found in the folder pointed to by makefile variable VHD_DIR.\033[0m" ; \
-		  echo -e "\033[92m\033[4mSolution\033[24m: Change dir to that folder and run 'make', which will generate\033[0m" ; \
-		  echo -e "\033[92m          the IPECC microcode along with the C header files which are\033[0m" ; \
-			echo -e "\033[92m          automatically generated from it.\033[0m" ; \
-		  exit -1; \
+			cd $(VHD_DIR) && $(MAKE) -C ./ && cd -; \
 		fi \
 	done
 
