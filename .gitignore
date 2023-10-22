@@ -23,7 +23,7 @@ sim/sage/ecc_tb.sage.py
 *.aux
 *.log
 *.html
-*.pdf
+*.pdf -diff
 *.swp
 test_devmem
 test_standalone
