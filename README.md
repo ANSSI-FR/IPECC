@@ -85,7 +85,7 @@ the IP through bare-metal software as well as a testing application on top of em
 This tutorial is also a good starting point to discover the different features and
 side-channel countermeasures of the IP.
 
-Look for file <ipecc.pdf> in folder doc/.
+Look for file [doc/ipecc.pdf](ipecc.pdf) in folder doc/.
 
 ## Software
 
