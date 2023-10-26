@@ -611,8 +611,8 @@ begin
 			severity FAILURE;
 
 	-- (s150), see (s151)
-	assert (log2(raw_ram_size) <= DBG_CAP_SPLIT)
-		report "In debug mode bit-width of parameter raw_ram_size must not "
+	assert (log2(trng_ramsz_raw) <= DBG_CAP_SPLIT)
+		report "In debug mode bit-width of parameter trng_ramsz_raw must not "
 		     & "exceed " & integer'image(DBG_CAP_SPLIT) & "."
 			severity FAILURE;
 
@@ -3146,7 +3146,10 @@ begin
 				-- 2nd byte: minor number
 				-- 3rd & 4th bytes: patch number
 				dw := (others => '0');
-				dw(31 downto 0) := x"01" & x"02" & x"0019"; -- version 1.2.25
+				-- version 1.2.26
+				dw(HWV_MAJ_MSB downto HWV_MAJ_LSB) := x"01"; -- major
+				dw(HWV_MIN_MSB downto HWV_MIN_LSB) := x"02"; -- minor
+				dw(HWV_PATCH_MSB downto HWV_PATCH_LSB) := x"001a"; -- patch
 				v.axi.rdatax := dw;
 				v.axi.rvalid := '1'; -- (s5)
 			-- ------------------------------
@@ -3190,8 +3193,8 @@ begin
 			  and s_axi_araddr(ADB + 2 downto 3) = R_DBG_CAPABILITIES_2
 			then
 				dw := (others => '0');
-				dw(log2(raw_ram_size) - 1 downto 0) := -- (s151), see (s150)
-					std_logic_vector(to_unsigned(raw_ram_size, log2(raw_ram_size)));
+				dw(log2(trng_ramsz_raw) - 1 downto 0) := -- (s151), see (s150)
+					std_logic_vector(to_unsigned(trng_ramsz_raw, log2(trng_ramsz_raw)));
 				dw(DBG_CAP_SPLIT + log2(irn_width_sh) - 1 downto DBG_CAP_SPLIT) :=
 					-- (s263), see (s264)
 					std_logic_vector(to_unsigned(irn_width_sh, log2(irn_width_sh)));

@@ -26,7 +26,7 @@ package ecc_trng_pkg is
 	--
 	-- This is the size in bits of TRNG memory in which all raw random bits are
 	-- buffered (this memory can be accessible by software in debug mode only,
-	-- to allow for statistical analysis of TRNG and the entropy assessment).
+	-- to allow for statistical analysis of TRNG and entropy assessment).
 	--
 	-- Parameter 'trng_ramsz_raw' is defined in ecc_customize.
 	constant raw_ram_size : positive := ge_pow_of_2(trng_ramsz_raw * 1024 * 8);

@@ -272,6 +272,14 @@ package ecc_software is
 	-- bit positions in R_PRIME_SIZE
 	--   (same definitions as for W_PRIME_SIZE register, see above)
 
+	-- bit positions in R_HW_VERSION
+	constant HW_VERSION_MAJ_LSB : natural := 24;
+	constant HW_VERSION_MAJ_MSB : natural := 31;
+	constant HW_VERSION_MIN_LSB : natural := 16;
+	constant HW_VERSION_MIN_MSB : natural := 23;
+	constant HW_VERSION_PATCH_LSB : natural := 0;
+	constant HW_VERSION_PATCH_MSB : natural := 15;
+
 	-- bit positions in R_DBG_CAPABILITIES_1 & R_DBG_CAPABILITIES_2
 	constant DBG_CAP_SPLIT : natural := 16;
 
