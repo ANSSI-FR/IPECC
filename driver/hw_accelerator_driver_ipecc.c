@@ -156,8 +156,8 @@ static volatile uint64_t *ipecc_baddr = NULL;
 #define IPECC_R_STATUS  		(ipecc_baddr + IPECC_ALIGNED(0x000))
 #define IPECC_R_READ_DATA  		(ipecc_baddr + IPECC_ALIGNED(0x008))
 #define IPECC_R_CAPABILITIES  		(ipecc_baddr + IPECC_ALIGNED(0x010))
-#define IPECC_R_PRIME_SIZE  		(ipecc_baddr + IPECC_ALIGNED(0x018))
-#define IPECC_R_HW_VERSION      (ipecc_baddr + IPECC_ALIGNED(0x020))
+#define IPECC_R_HW_VERSION      (ipecc_baddr + IPECC_ALIGNED(0x018))
+#define IPECC_R_PRIME_SIZE  		(ipecc_baddr + IPECC_ALIGNED(0x020))
 /*	-- Reserved                               0x028...0x0f8 */
 #define IPECC_R_DBG_CAPABILITIES_0	(ipecc_baddr + IPECC_ALIGNED(0x100))
 #define IPECC_R_DBG_CAPABILITIES_1	(ipecc_baddr + IPECC_ALIGNED(0x108))

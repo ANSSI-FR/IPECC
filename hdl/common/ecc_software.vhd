@@ -77,8 +77,8 @@ package ecc_software is
 	constant R_STATUS : rat := std_nat(0, ADB);              -- 0x000
 	constant R_READ_DATA : rat := std_nat(1, ADB);           -- 0x008
 	constant R_CAPABILITIES : rat := std_nat(2, ADB);        -- 0x010
-	constant R_PRIME_SIZE : rat := std_nat(3, ADB);          -- 0x018
-	constant R_HW_VERSION : rat := std_nat(4, ADB);          -- 0x020
+	constant R_HW_VERSION : rat := std_nat(3, ADB);          -- 0x018
+	constant R_PRIME_SIZE : rat := std_nat(4, ADB);          -- 0x020
 	-- reserved                                              -- 0x028...0x0f8
 	-- (0x100: start of read DEBUG registers)
 	constant R_DBG_CAPABILITIES_0 : rat := std_nat(32, ADB); -- 0x100

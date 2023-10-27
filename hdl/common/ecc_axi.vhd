@@ -3122,19 +3122,6 @@ begin
 				v.axi.rdatax := dw;
 				v.axi.rvalid := '1'; -- (s5)
 			-- --------------------------------------
-			-- decoding read of R_PRIME_SIZE register
-			-- --------------------------------------
-			elsif s_axi_araddr(ADB + 2 downto 3) = R_PRIME_SIZE
-			--elsif (debug and s_axi_araddr(ADB + 2 downto 3) = R_PRIME_SIZE)
-			--	or ((not debug) and s_axi_araddr(ADB + 1 downto 3) =
-			--		R_PRIME_SIZE(ADB - 2 downto 0))
-			then
-				dw --(PMSZ_VALNN_MSB downto PMSZ_VALNN_LSB)
-					:= std_logic_vector(
-					resize(r.nndyn.valnn, C_S_AXI_DATA_WIDTH));
-				v.axi.rdatax := dw;
-				v.axi.rvalid := '1'; -- (s5)
-			-- --------------------------------------
 			-- decoding read of R_HW_VERSION register
 			-- --------------------------------------
 			elsif s_axi_araddr(ADB + 2 downto 3) = R_HW_VERSION
@@ -3150,6 +3137,19 @@ begin
 				dw(HWV_MAJ_MSB downto HWV_MAJ_LSB) := x"01"; -- major
 				dw(HWV_MIN_MSB downto HWV_MIN_LSB) := x"02"; -- minor
 				dw(HWV_PATCH_MSB downto HWV_PATCH_LSB) := x"001a"; -- patch
+				v.axi.rdatax := dw;
+				v.axi.rvalid := '1'; -- (s5)
+			-- --------------------------------------
+			-- decoding read of R_PRIME_SIZE register
+			-- --------------------------------------
+			elsif s_axi_araddr(ADB + 2 downto 3) = R_PRIME_SIZE
+			--elsif (debug and s_axi_araddr(ADB + 2 downto 3) = R_PRIME_SIZE)
+			--	or ((not debug) and s_axi_araddr(ADB + 1 downto 3) =
+			--		R_PRIME_SIZE(ADB - 2 downto 0))
+			then
+				dw --(PMSZ_VALNN_MSB downto PMSZ_VALNN_LSB)
+					:= std_logic_vector(
+					resize(r.nndyn.valnn, C_S_AXI_DATA_WIDTH));
 				v.axi.rdatax := dw;
 				v.axi.rvalid := '1'; -- (s5)
 			-- ------------------------------
