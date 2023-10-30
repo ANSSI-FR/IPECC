@@ -456,7 +456,7 @@ package ecc_pkg is
 	--                               register W_DBG_FP_WDATA (search
 	--                                this character string in file
 	--                               ecc_software.vhd) in write-mode
-	--                               and register R_DBG_IRN_CNT_AXI
+	--                               and register R_DBG_IRN_CNT_EFP
 	--                                        in read mode.
 	--
 	-- Note that address decoding is not the same depending on the value of
@@ -468,8 +468,8 @@ package ecc_pkg is
 	--                     with address offsets 0x000-0x0f8) and the debug
 	--                     upper half, the one with address offsets 0x100-0x1f8 
 	--
-	--   if debug = FALSE: only the lower halt of the bank made of the first
-	--                     32 registers can be accessed by the software driver
+	--   if debug = FALSE: only the lower half of the bank made of the first
+	--                     32 registers can be accessed by the software driver.
 	--
 	-- Hence both in write & read spaces, the nominal (i.e not debug)
 	-- 32 registers, some of which are reserved, are mapped in address
