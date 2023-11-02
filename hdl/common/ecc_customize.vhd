@@ -24,10 +24,10 @@ package ecc_customize is
 	-- Please refer to the in-file documentation of parameters below (after the
 	-- package specification), where parameters are described in the same order
 	-- as they appear hereafter.
-	constant nn : positive := 512;
+	constant nn : positive := 521;
 	constant nn_dynamic : boolean := TRUE;
 	type techno_type is (spartan6, virtex6, series7, ultrascale, ialtera, asic);
-	constant techno : techno_type := ultrascale; -- set a 'techno_type' value
+	constant techno : techno_type := series7; -- set a 'techno_type' value
 	-- ------------------------------
 	-- Performance related parameters
 	-- ------------------------------
@@ -1210,8 +1210,8 @@ end package ecc_customize;
 --
 -- DEFINITION
 --       Defines the width of the data buses of the AXI interfaces of the IP.
---       These are: the WDATA signal bus of the AXI write-data channel, and
---       the RDATA signal bus of the AXI read-data channel.
+--       These are: the WDATA signal bus of the AXI-lite write-data channel,
+--       and the RDATA signal bus of the AXI-lite read-data channel.
 --
 -- TYPE/VALUE
 --       Integer, with only values 32 or 64 allowed.
@@ -1223,7 +1223,7 @@ end package ecc_customize;
 --
 --         - are all 32-bit long (as if data buses were that of a 32-bit
 --           system), WITH THE EXCEPTION OF THE TWO REGISTERS W_WRITE_DATA
---           and R_READ_DATA
+--           and R_READ_DATA;
 --
 --         - have address aligned on 8 bytes (as if address buses were that
 --           of a 64-bit system).
@@ -1270,14 +1270,14 @@ end package ecc_customize;
 --       when the IP was connected to an AXI 64-bit interface (and despite
 --       the fact that Cortex-A53 used for these tests were 64-bit cores)
 --       bus transactions issued from the CPU were still 32-bit ones, thus
---       incurring errors with an IP configured in mode 'axi32or64' = 64.
+--       incurring data errors with an IP configured in mode 'axi32or64' = 64.
 --
 --       In any case, set 'axi32or64' = 64  *ONLY IF*  you are absolutely
 --       sure and have characterized, in your own hardware application, the
 --       property that AXI transactions emitted by the CPU when writing
 --       (resp. reading) to register W_WRITE_DATA (resp. from register
---       R_READ_DATA) are 64-bit transactions, which will never be split
---       in 32-bit transactions during their complete path through the
+--       R_READ_DATA) are 64-bit transactions and that they will never be
+--       split in 32-bit transactions during their complete path through the
 --       interconnect from the CPU to the IP (resp. from the IP to the CPU).
 --
 --       The restriction descrived above probably narrows down the utility

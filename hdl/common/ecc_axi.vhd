@@ -927,7 +927,7 @@ begin
 		         or r.write.busy = '1' or r.read.busy = '1'
 		         or (nn_dynamic and r.nndyn.active = '1')
 		         or r.read.trngreading = '1'
-		         or r.ctrl.tokpending = '1'
+		         or r.ctrl.tokpending = '1' or r.ctrl.gentoken = '1'
 		         or r.ctrl.lockaxi = '1';
 		-- (s161) - Compared to v_busy, v_wlock adds the condition that the last
 		-- prime size set by software did not incur an error - thus preventing
@@ -1006,6 +1006,7 @@ begin
 			vtmp12 := vtmp11 - vtmp8;
 			-- now test that the results of both subtractions are positive or null
 			if vtmp10(log2(nn)) = '0' and vtmp12(log2(nn)) = '0' then
+				-- means 'small_k_sz' >= 3  &&  "nn_dynamic" >= 'small_k_sz'
 				v.ctrl.small_k_sz := unsigned(r.axi.wdatax(log2(nn) - 1 downto 0));
 				v.ctrl.small_k_sz_en := '1';
 				v.ctrl.small_k_sz_en_en := '1';
@@ -1084,7 +1085,7 @@ begin
 			end if;
 			vtmp7 := -- (s130), see (s129)
 				resize(r.ctrl.blindbitstest, BLD_BITS_MSB - BLD_BITS_LSB + 2);
-			-- compute "nn" - "nb of blinding bits"
+			-- Compute "nn" - "nb of blinding bits"
 			v_blindiff := vtmp6 - vtmp7;
 			if v_blindiff(BLD_BITS_MSB - BLD_BITS_LSB + 1) = '1' then
 				-- This means blindbits > nn - 1. This is an error, which can only be
@@ -2959,9 +2960,9 @@ begin
 			v.ctrl.read_forbidden := '0';
 		end if;
 		
-		-- -------------------------------------------
-		-- token generation (handshake with ecc_scalar
-		-- -------------------------------------------
+		-- --------------------------------------------
+		-- token generation (handshake with ecc_scalar)
+		-- --------------------------------------------
 		if r.ctrl.gentoken = '1' and ardy = '1' then
 			v.ctrl.gentoken := '0';
 			v.ctrl.lockaxi := '0'; -- (s225), deassertion of (s224)
@@ -3133,10 +3134,10 @@ begin
 				-- 2nd byte: minor number
 				-- 3rd & 4th bytes: patch number
 				dw := (others => '0');
-				-- version 1.2.26
+				-- version 1.2.27
 				dw(HWV_MAJ_MSB downto HWV_MAJ_LSB) := x"01"; -- major
 				dw(HWV_MIN_MSB downto HWV_MIN_LSB) := x"02"; -- minor
-				dw(HWV_PATCH_MSB downto HWV_PATCH_LSB) := x"001a"; -- patch
+				dw(HWV_PATCH_MSB downto HWV_PATCH_LSB) := x"001b"; -- patch
 				v.axi.rdatax := dw;
 				v.axi.rvalid := '1'; -- (s5)
 			-- --------------------------------------
@@ -3731,11 +3732,11 @@ begin
 				-- a default value for r.ctrl.blindbits and reassert .doblindcheck so as
 				-- to compute a correct functional value for r.ctrl.nn_extrabits, see
 				-- (s238) & (s239).
-				if (blinding > 0) then -- debug mode or not
+				if (blinding > 0) then -- whatever mode (debug or not)
 					if r.nndyn.valnn = to_unsigned(nn, log2(nn)) then
-						-- when nn_dynamic feature is present, we must enforce that
-						-- the size of the blinding random stays as required at synthesis
-						-- time (meaning in ecc_customize.vhd) so that software driver
+						-- When nn_dynamic feature is present, we must enforce that
+						-- the size of the blinding random stays as required by static
+						-- config (meaning in ecc_customize.vhd) so that software driver
 						-- cannot reduce it simply by reducing the dynamic value of nn
 						-- below the static one (i.e the one set in ecc_customize.vhd
 						-- which is the maximum allowed value for nn) and setting it
@@ -3783,7 +3784,7 @@ begin
 						v.ctrl.blindcheckaxiack := '0';
 					else
 						-- There is nothing to do: since the hardware design choice was not
-						-- to impose blinding, nor it was not currently activated by software,
+						-- to impose blinding, nor it was currently activated by software,
 						-- we keep everything as is.
 						-- If it wishes to, software driver can still enable blinding by
 						-- writing into register W_BLINDING - see (s241).

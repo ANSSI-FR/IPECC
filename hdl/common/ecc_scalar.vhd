@@ -1651,7 +1651,7 @@ begin
 								v.int.faddr := EXEC_ADDR(ITOH_ROUTINE); -- (s118) byp. by (s119)
 								-- If needed, decrement the Z-remasking counter, and possibly
 								-- switch to program state 'zrmsk' if underflow is detected
-								if zremaskact = '1' then -- statically resolved by synthesizer
+								if zremaskact = '1' then
 									v.kp.zrmcnt := r.kp.zrmcnt - 1;
 									if r.kp.zrmcnt = (r.kp.zrmcnt'range => '0') then
 										v.kp.zrmcnt := zremaskbits;
