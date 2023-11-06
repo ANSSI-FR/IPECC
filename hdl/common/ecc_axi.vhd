@@ -1885,32 +1885,36 @@ begin
 				v.axi.awready := '1';
 				v.axi.arready := '1';
 				v.axi.bvalid := '1';
-				if debug then -- (s166), see (s161)
+				if debug then -- (s166), see (s161) (+ stat. resolved by synthesizer)
 					if r.axi.wdatax(SHUF_EN) = '1' then
-						if shuffle_type = none then
+						if shuffle_type = none then -- statically resolved by synthesizer
+							-- Software wants to enable shuffling but none was synthesized.
 							v.ctrl.ierrid(STATUS_ERR_I_WREG_FBD) := '1';
 						else
 							v.ctrl.doshuffle := '1';
 						end if;
 					elsif r.axi.wdatax(SHUF_EN) = '0' then
 						-- Software driver wants to disable shuffling, it's ok because
-						-- we are in debug (unsecure-)mode
+						-- we are in debug (unsecure-)mode.
 						v.ctrl.doshuffle := '0';
 					end if;
 				else -- debug = FALSE, we are in production (secure-)mode
 					if r.axi.wdatax(SHUF_EN) = '1' then
-						if shuffle_type = none then
+						if shuffle_type = none then -- statically resolved by synthesizer
+							-- Software wants to enable shuffling but none was synthesized.
 							v.ctrl.ierrid(STATUS_ERR_I_WREG_FBD) := '1';
 						else
 							v.ctrl.doshuffle := '1';
 						end if;
 					elsif r.axi.wdatax(SHUF_EN) = '0' then
-						if shuffle then
+						if shuffle then -- statically resolved by synthesizer
 							-- Software driver wants to disable shuffling, it's NOK because
 							-- we are in production (secure-)mode and the static config
 							-- enforces usage of shuffling
 							v.ctrl.ierrid(STATUS_ERR_I_WREG_FBD) := '1'; -- (s221)
 						else -- shuffle = FALSE in ecc_customize.vhd
+							-- Software driver wants to disable shuffling, permission
+							-- is granted because it wasn't enforced statically.
 							v.ctrl.doshuffle := '0';
 						end if;
 					end if;

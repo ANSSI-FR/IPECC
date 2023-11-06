@@ -100,13 +100,13 @@ end package ecc_customize;
 --       Defines the size in bit of large numbers implied in cryptographic
 --       computations: the prime number p of course which defines the field
 --       on which the elliptic curve is based on, the curve parameters a, b,
---       q of the curve, the point coordiantes XP & YP of the base point, and
+--       q of the curve, the point coordinates XP & YP of the base point, and
 --       all intermediate variables used during computations.
 --       Note: the order q of the curve can be greater than p (by a quantity
 --       that, according to Hasse theorem, may be up to twice the square root
 --       of p) therefore the value of 'nn' should be chosen as max(size of p,
 --       size of q). Refer for instance to [Hankerson, Menezes, Vanstone,
---       "Elliptic Curve Cryptography", Springer 2004, p. 82, thereom 3.7],
+--       "Elliptic Curve Cryptography", Springer 2004, p. 82, theorem 3.7],
 --       or the Wikipedia article "Hasse's theorem on elliptic curves"
 --       https://en.wikipedia.org/wiki/Hasse%27s_theorem_on_elliptic_curves.
 --
@@ -669,15 +669,16 @@ end package ecc_customize;
 --       Set to TRUE if you want the shuffling of large numbers' memory to be
 --       activated at each [k]P computation (memory is shuffled inbetween the
 --       processing of two consecutive bits of the scalar). The method used to
---       to shuffle the memory is defined as per parameter 'shuffle_type'.
+--       to shuffle the memory is then defined as per parameter 'shuffle_type'.
 --
 --       Setting FALSE instead to 'shuffle' parameter will keep the counter-
---       measure available but solely as an option that software can decide
+--       measure available (if parameter 'shuffle_type' is different than
+--       'none', see below) but solely as an option that software can decide
 --       to use or not to use at each [k]P computation.
 --
 --       In any case, the choice of the shuffling method is static as only one
---       will be implemented at synthesis time, among 'linear', 'permute_lgnb'
---       and 'permute_limbs'.
+--       can be implemented at synthesis time, among 'linear', 'permute_lgnb'
+--       and 'permute_limbs' (see parameter 'shuffle_type' below).
 --
 --       Setting 'shuffle' to TRUE only makes sense if you also set 'debug' to
 --       FALSE. If you set 'debug' to TRUE, the value set for 'shuffle' won't
@@ -693,11 +694,20 @@ end package ecc_customize;
 --       'shuffle_type'
 --
 -- DEFINITION
---       Only relevant if 'shuffle' = TRUE.
 --       Defines the way large numbers' memory is shuffled.
+--       This parameter is relevant even if 'shuffle' = FALSE, because
+--       it defines what will be synthesized (and hence instanciated) in
+--       the hardware.
+--       For instance setting:
+--          - 'shuffle' = FALSE
+--       together with:
+--          - 'shuffle_type' = linear
+--       means that a linear shuffling method will be synthesized, however
+--       shuffling won't be forced; instead it will be applied only if
+--       software driver enables shuffling (with register W_SHUFFLE).
 --
 -- TYPE/VALUE
---       One of 'linear', 'permute_lgnb', 'permute_limbs'
+--       One of 'linear', 'permute_lgnb', 'permute_limbs' or 'none'.
 --       Default is 'permute_lgnb'.
 --
 -- DESCRIPTION
