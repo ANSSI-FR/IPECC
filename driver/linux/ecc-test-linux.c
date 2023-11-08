@@ -469,7 +469,11 @@ int main(int argc, char *argv[])
 			exit(EXIT_FAILURE);
 		}
 	} else {
-		printf("Production mode.\n\r");
+		if (hw_driver_get_version_tags(&vmajor, &vminor, &vpatch)){
+			printf("%sError: Probing revision numbers triggered an error.%s\n\r", KERR, KNRM);
+			exit(EXIT_FAILURE);
+		}
+		log_print("IP in production mode (HW version %d.%d.%d)\n\r", vmajor, vminor, vpatch);
 	}
 #endif
 
