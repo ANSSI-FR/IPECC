@@ -831,25 +831,25 @@ begin
 			-- pragma translate_off
 			if (to_integer(r.debug.trngaxistarv) + to_integer(r.debug.trngaxiok)) /= 0
 			then
-				v.debug.trngaxi100 := integer(100 *
+				v.debug.trngaxi100 := integer(100.0 *
 					real(to_integer(r.debug.trngaxistarv)) / real(
 						to_integer(r.debug.trngaxistarv) + to_integer(r.debug.trngaxiok)));
 			end if;
 			if (to_integer(r.debug.trngfpstarv) + to_integer(r.debug.trngfpok)) /= 0
 			then
-				v.debug.trngfp100 := integer(100 *
+				v.debug.trngfp100 := integer(100.0 *
 					real(to_integer(r.debug.trngfpstarv)) / real(
 						to_integer(r.debug.trngfpstarv) + to_integer(r.debug.trngfpok)));
 			end if;
 			if (to_integer(r.debug.trngcrvstarv) + to_integer(r.debug.trngcrvok)) /= 0
 			then
-				v.debug.trngcrv100 := integer(100 *
+				v.debug.trngcrv100 := integer(100.0 *
 					real(to_integer(r.debug.trngcrvstarv)) / real(
 						to_integer(r.debug.trngcrvstarv) + to_integer(r.debug.trngcrvok)));
 			end if;
 			if (to_integer(r.debug.trngshstarv) + to_integer(r.debug.trngshok)) /= 0
 			then
-				v.debug.trngsh100 := integer(100 *
+				v.debug.trngsh100 := integer(100.0 *
 					real(to_integer(r.debug.trngshstarv)) / real(
 						to_integer(r.debug.trngshstarv) + to_integer(r.debug.trngshok)));
 			end if;
@@ -1090,7 +1090,7 @@ begin
 			if v_blindiff(BLD_BITS_MSB - BLD_BITS_LSB + 1) = '1' then
 				-- This means blindbits > nn - 1. This is an error, which can only be
 				-- provoked by (s241), not by (s243), hence we don't need to recompute
-				--.nn_extrabits here. Nothing changes, we just signal back the error
+				-- .nn_extrabits here. Nothing changes, we just signal back the error
 				-- to software driver with bit STATUS_ERR_I_BLN of R_STATUS register.
 				v.ctrl.ierrid(STATUS_ERR_I_BLN) := '1'; -- (s249)
 				if r.ctrl.blindcheckaxiack = '1' then

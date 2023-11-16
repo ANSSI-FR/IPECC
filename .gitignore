@@ -39,3 +39,5 @@ driver/ecc-test-linux-devmem
 driver/ecc-test-linux-uio
 driver/ecc-test-stdalone
 vivado
+*.o
+sim/ecc_tb

@@ -24,7 +24,7 @@ package ecc_customize is
 	-- Please refer to the in-file documentation of parameters below (after the
 	-- package specification), where parameters are described in the same order
 	-- as they appear hereafter.
-	constant nn : positive := 521;
+	constant nn : positive := 528;
 	constant nn_dynamic : boolean := TRUE;
 	type techno_type is (spartan6, virtex6, series7, ultrascale, ialtera, asic);
 	constant techno : techno_type := series7; -- set a 'techno_type' value
@@ -47,7 +47,7 @@ package ecc_customize is
 	constant shuffle : boolean := TRUE; -- memory shuffling
 	type shuftype is (none, linear, permute_lgnb, permute_limbs);
 	constant shuffle_type : shuftype := permute_lgnb; -- set a 'shuftype' value
-	constant zremask : integer := 4; -- quite arbitrary but quite often too
+	constant zremask : integer := 4; -- quite arbitrary
 	-- -----------------------
 	-- TRNG related parameters
 	-- -----------------------
@@ -943,7 +943,7 @@ end package ecc_customize;
 --
 --         - when you're simulating, parameter 'notrng' must be set to TRUE.
 --           All the ES-TRNG instances are then removed from the HDL model, as
---           well as the binary tree gathering their outputs (see above discus-
+--           well as the binary tree gathering their outputs (see below discus-
 --           sion of parameter 'nbtrng'). Instead a simulation-only process is
 --           instanciated that will read "random" data from the file specified
 --           in parameter 'simtrngfile' (see below this parameter).
@@ -953,7 +953,7 @@ end package ecc_customize;
 --           tional loop describing the ring oscillator.
 --
 --       If you provided the IP with a random post-processor (again refer to
---       discussion for paramater 'nbtrng' above) it will still be part of
+--       discussion for parameter 'nbtrng' below) it will still be part of
 --       the simulation model when 'notrng' = TRUE.
 --
 -- WARNING
@@ -1367,6 +1367,44 @@ end package ecc_customize;
 --
 -- ============================================================================
 -- NAME
+--       'simvecfile'
+--
+-- DEFINITION
+--       Only used in simulation.
+--       Name of the input file providing input test-vector files to the
+--       simulation testbench (we name this file the "input test-vector file").
+--
+-- TYPE/VALUE
+--       Character string indicating a file path which should be accessible
+--       in read mode.
+--
+-- DESCRIPTION
+--       The format expected for the file pointed to by 'simvecfile' is the
+--       exact same format as the one of the input test-vector file expected
+--       by the program 'ecc-test-linux-uio' (or 'ecc-test-linux-devmem')
+--       aimied at testing the real hardware (see sources in folder 'driver/').
+--       Please refer to the Appendix of main documentation PDF (doc/ipecc.pdf)
+--       titled "Simulating the IP".
+--
+--       IMPORTANT NOTE: The input test-vector file is not expected to provide
+--       only entry values for the tests (curve parameters and base point coor-
+--       dinates). What is meant here is that the file SHOULD ALSO contain the
+--       RESULT expected for each test (e.g the coordinates of [k]P, or the
+--       answer 'true' or 'false' of a boolean test). The simulation testbench
+--       (or the test program of the real hardware) will submit the test input
+--       data to the IP, run the expected command, then collect the result back
+--       from the IP and compare it with what is provided as the expected output
+--       in the input test-vector file.
+--
+--       Please refer to the script file <generate-tests.sage> (in folder 'sage/')
+--       for a quick and easy way to generate an input test vector file. This
+--       script contains a start section that includes the definition of all
+--       the parameters required for the generation of tests (that you can
+--       obviously customize to meet your requirements) including an online
+--       textual help on each of these parameters.
+--
+-- ============================================================================
+-- NAME
 --       'simkb'
 --
 -- DEFINITION
@@ -1399,13 +1437,13 @@ end package ecc_customize;
 --       'simlog'
 --
 -- DEFINITION
---       Only used in simulation. Path file for the simulation trace log.
+--       Only used in simulation. File path for the simulation trace log.
 --
 -- TYPE/VALUE
 --       Character string indicating a file path which should be accessible
 --       in write mode.
---       Default is "/tmp/ecc.log" which should be convenient at least for
---       Unix-like systems.
+--       Default is "/tmp/ecc.log" which should be convenient (at least for
+--       Unix-like systems).
 --
 -- DESCRIPTION
 --       This is the path of the file where simulation will dump the information
@@ -1414,7 +1452,9 @@ end package ecc_customize;
 --
 --       If you provide a relative path, the place where the file will actually
 --       be placed is dependent on your simulator (the default "/tmp/ecc.log"
---       was made an absolute path to avoid this).
+--       was made an absolute path to avoid this). If you provide a simple file,
+--       name, Vivado will likely create it in 'sim_1/behav/xsim/' in your local
+--       project folder.
 --
 -- ============================================================================
 -- NAME
