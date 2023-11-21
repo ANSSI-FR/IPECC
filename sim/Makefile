@@ -40,6 +40,10 @@ work/%.o :: ../hdl/common/ecc_trng/%.vhd
 	@echo "[GHDL-LLVM] $<"
 	@ghdl-llvm -a --std=93c -fsynopsys --warn-no-hide --workdir=work $<
 
+work/%.o :: ../hdl/common/ecc_curve_iram/%.vhd
+	@echo "[GHDL-LLVM] $<"
+	@ghdl-llvm -a --std=93c -fsynopsys --warn-no-hide --workdir=work $<
+
 work/%.o :: ../hdl/techno-specific/asic/%.vhd
 	@echo "[GHDL-LLVM] $<"
 	@ghdl-llvm -a --std=93c -fsynopsys --warn-no-hide --workdir=work $<
