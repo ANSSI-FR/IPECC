@@ -41,3 +41,4 @@ driver/ecc-test-stdalone
 vivado
 *.o
 sim/ecc_tb
+sim/work

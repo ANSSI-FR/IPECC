@@ -2366,9 +2366,9 @@ begin
 
 	-- pragma translate_off
 	-- (s142) simulation process to log all microcode execution in file which
-	-- pathname is given by constant 'simlog' of package ecc_customize.vhd
+	-- pathname is given by constant 'simlogfile' of package ecc_customize.vhd
 	fplog: process(clk)
-		file output : TEXT open write_mode is simlog;
+		file output : TEXT open write_mode is simlogfile;
 		variable lineout : line;
 		variable vres : std_logic_vector(2*w*ww - 1 downto 0);
 		variable vi : natural range 0 to 2*n - 1;
