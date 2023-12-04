@@ -51,7 +51,7 @@ package ecc_customize is
 	-- -----------------------
 	-- TRNG related parameters
 	-- -----------------------
-	constant notrng : boolean := FALSE; -- set to TRUE for simu, to FALSE for syn
+	constant notrng : boolean := TRUE; -- set to TRUE for simu, to FALSE for syn
 	constant nbtrng : positive := 4;
 	constant trngta : natural range 1 to 4095 := 32;
 	constant trng_ramsz_raw : positive := 4; -- in kB
@@ -64,13 +64,13 @@ package ecc_customize is
 	-- -------------
 	constant axi32or64 : natural := 32; -- 32 or 64 only allowed values
 	constant nblargenb : positive := 32;  -- Change these two parameters only if
-	constant nbopcodes : positive := 512; -- you really know what you're doing.
+	constant nbopcodes : positive := 512; -- [you really know what you're doing.
 	-- --------------------------
 	-- Simulation-only parameters
 	-- --------------------------
 	constant simvecfile : string := "/tmp/ecc_vec_in.txt";
 	constant simkb : natural range 0 to natural'high := 0; -- if 0 then ignored
-	constant simlog : string := "/tmp/ecc.log";
+	constant simlogfile : string := "/tmp/ecc.log";
 	constant simtrngfile : string := "/tmp/random.txt";
 	-- ********************************
 	-- End of: user-editable parameters
@@ -1434,7 +1434,7 @@ end package ecc_customize;
 --
 -- ============================================================================
 -- NAME
---       'simlog'
+--       'simlogfile'
 --
 -- DEFINITION
 --       Only used in simulation. File path for the simulation trace log.
