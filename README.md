@@ -10,7 +10,7 @@ Copyright (C) 2023
 
 IPECC is a hardware IP block performing the computation of scalar multiplication $[k]P$ over elliptic curves defined in short Weierstrass form on a finite field of charasteristic $p > 3$. IPECC has been developped mainly for SRAM-based FPGAs (both Xilinx and Intel-Altera) but it should also be usable as input to an ASIC flow without any kind of restriction.
 
-The size of prime $p$, denoted ``nn`` in the code and in the remainder of this document, defines the level of cryptographic security. By definition all large numbers used for cryptographic computations are ``nn``-bit long. Parameter ``nn`` is statically defined by the designer at synthesis time and can be chosen to be any integer value. All you need for that is to edit the value of a unique HDL constant. The limitation only comes from the logical and memory ressources of your target circuit/part, as the amount of logic and memory consumed by the IP will obviously increase with the value of ``nn``. An optional feature, named *dynamic prime size* feature, allows to dynamically set the size of big numbers, provided they stay below the value statically set to parameter ``nn`` (which in this case simply becomes the maximal size allowed).
+The size of prime $p$, denoted ``nn`` in the code and in the remainder of this document, defines the level of cryptographic security. By definition all large numbers used for cryptographic computations are ``nn``-bit long. Parameter ``nn`` is statically defined by the designer at synthesis time and can be chosen to be any integer value. All you need for that is to edit the value of a unique HDL constant. The limitation only comes from the logical and memory ressources of your target circuit/part, as the amount of logic and memory consumed by the IP will obviously increase with the value of ``nn``. An optional feature, named *dynamic prime size* feature, allows to dynamically set the size of large numbers, provided they stay below the value statically set to parameter ``nn`` (which in this case simply becomes the maximal size allowed).
 
 IPECC is intended for production purpose as well as academic research.
 
@@ -75,7 +75,7 @@ The main features of IPECC are:
 
 ## Hardware
 
-For now the documentation on hardware is reduced to a tutorial [doc/ipecc.pdf](doc/ipecc.pdf) targeting the Xilinx Zynq-7000 FPGAs
+The documentation on hardware is still in progress [doc/ipecc.pdf](doc/ipecc.pdf) but it includes a tutorial in appendix, targeting the Xilinx Zynq-7000 FPGAs
 (Digilent's board Arty Z7-10 is used as a hardware support of the tutorial but everything described
 can be directly carried to Zynq-UltraScale+ circuits).
 
