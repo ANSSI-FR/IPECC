@@ -75,7 +75,7 @@ The main features of IPECC are:
 
 ## Hardware
 
-The documentation on hardware is still in progress [doc/ipecc.pdf](doc/ipecc.pdf) but it includes a tutorial in appendix, targeting the Xilinx Zynq-7000 FPGAs
+The documentation on hardware [doc/ipecc.pdf](doc/ipecc.pdf) is still in progress but it includes a tutorial in appendix, targeting the Xilinx Zynq-7000 FPGAs
 (Digilent's board Arty Z7-10 is used as a hardware support of the tutorial but everything described
 can be directly carried to Zynq-UltraScale+ circuits).
 
