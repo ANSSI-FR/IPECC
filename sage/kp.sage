@@ -358,6 +358,7 @@ def main(nn, p, a, b, q, Px, Py, P_is_null, k, alpha0, nbblindbits,
         bits_of_kb = nn + nbblindbits
         print("  kb         = 0x", Integer(kb).hex())
         mu = mu0 + ((2**(ww*(ceil((nn+4)/ww)))) * mu1)
+        kb0 = (kb % 2)
         kb = kb.__xor__(Integer(mu))
         print("")
         print("  After boolean masking:")
@@ -366,13 +367,13 @@ def main(nn, p, a, b, q, Px, Py, P_is_null, k, alpha0, nbblindbits,
     else:
         kb = k
         bits_of_kb = nn;
+        kb0 = (kb % 2)
     # ###################################################
     #                         ADPA
     # ###################################################
     print("")
     print("#### ADPA")
     phi = phi0 + ((2**(ww*(ceil((nn+4)/ww)))) * phi1)
-    kb0 = (kb % 2)
     # compute 2 masked versions of kb: kappa and kappaprime
     kb = kb // 2
     kappa = kb.__xor__(Integer(phi))
