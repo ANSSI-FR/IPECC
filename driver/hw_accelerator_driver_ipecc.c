@@ -3445,6 +3445,8 @@ static volatile uint8_t hw_driver_setup_state = 0;
 
 static inline int driver_setup(void)
 {
+	uint32_t debug;
+
 	if(!hw_driver_setup_state){
 		/* Ask the lower layer for a setup */
 		if(hw_driver_setup((volatile uint8_t**)&ipecc_baddr, NULL /*(volatile uint8_t**)&ipecc_pseudotrng_baddr)*/)) {
@@ -3452,6 +3454,22 @@ static inline int driver_setup(void)
 		}
 		/* Reset the IP for a clean state */
 		IPECC_SOFT_RESET();
+
+		/* Enable TRNG post-processing
+		 *
+		 * This is for the case where the IP is in DEBUG mode (not to be done otherwise
+		 * as an error UNKNOWN_REG would be issued).
+		 *
+		 * NOTE:
+		 *   We can make this call even before setting 'hw_driver_setup_state' to 1
+		 *   below, because neither ip_ecc_is_debug() nor ip_ecc_trng_postproc_enable()
+		 *   call driver_setup()
+		 *   (so no risk of recursive deadlock).
+		 */
+		ip_ecc_is_debug(&debug);
+		if (debug) {
+			ip_ecc_trng_postproc_enable();
+		}
 
 #if 0
 		/* Reset the pseudo TRNG device to empty its FIFO of pseudo raw random bytes */
@@ -3461,18 +3479,6 @@ static inline int driver_setup(void)
 		/* We are in the initialized state */
 		hw_driver_setup_state = 1;
 	}
-	
-	/* Enable TRNG post-processing
-	 *
-	 * This is for the case where the IP is in DEBUG mode (otherwise it will do no harm).
-	 *
-	 * NOTE:
-	 *   It is important to make this call AFTER setting hw_driver_setup_state to 1
-	 *   above, because ip_ecc_trng_postproc_enable() is going to call driver_setup()
-	 *   which is us right now, and if hw_driver_setup_state was not set yet, we would
-	 *   call again hw_driver_setup() and it would be a recursive deadlock.
-	 */
-	ip_ecc_trng_postproc_enable();
 
 	return 0;
 err:
