@@ -169,6 +169,8 @@ Then, you can compile the library with hardware acceleration by selecting the un
 $ make clean && CC=arm-linux-gnueabihf-gcc \
 EXTRA_CFLAGS="-Wall -Wextra -O3 -g3 -mcpu=cortex-a9 -mfpu=vfpv3 -mfloat-abi=hard -static" \
 VERBOSE=1 USE_EC_HW=1 USE_EC_HW_DEVMEM=1 USE_EC_HW_LOCKING=1 BLINDING=1 make
+$ mv build/ec_self_tests build/ec_self_tests_hw
+$ mv build/ec_utils build/ec_utils_hw
 ```
 
 Please note that `USE_EC_HW=1` selects the hardware accelerator (this is mandatory to activate the hardware acceleration backend in libecc),
@@ -178,7 +180,17 @@ We also override the `CC` compiler to `arm-linux-gnueabihf-gcc` for the Zynq pla
 target), and add some necessary extra CFLAGS for the platform (as well as a `-static` binary compilation to avoid library dependency issues).
 Finally, `USE_EC_HW_LOCKING=1` is used here for thread safety during hardware access: this flag is necessary for multi-threading.
 
-You can then copy the produced binaries `build/ec_self_tests` and `build/ec_utils` on the target platform and execute them.
+You can compile the non-accelerated (pure software) library with removing all the hardware related toggles:
+
+```
+$ make clean && CC=arm-linux-gnueabihf-gcc \
+EXTRA_CFLAGS="-Wall -Wextra -O3 -g3 -mcpu=cortex-a9 -mfpu=vfpv3 -mfloat-abi=hard -static" \
+VERBOSE=1 BLINDING=1 make
+$ mv build/ec_self_tests build/ec_self_tests_sw
+$ mv build/ec_utils build/ec_utils_sw
+```
+
+You can then copy the produced binaries `build/ec_self_tests_(sw|hw)` and `build/ec_utils_(sw|hw)` on the target platform and execute them.
 
 As we can see below, the performance benchmark shows a **factor 6** on average between the pure software version
 and the hardware accelerated one. The benchmarks have been performed on a [Zynq Arty Z7](https://digilent.com/reference/programmable-logic/arty-z7/start) board.
