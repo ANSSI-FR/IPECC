@@ -193,7 +193,7 @@ $ mv build/ec_utils build/ec_utils_sw
 You can then copy the produced binaries `build/ec_self_tests_(sw|hw)` and `build/ec_utils_(sw|hw)` on the target platform and execute them.
 
 As we can see below, the performance benchmark shows a **factor 6** on average between the pure software version
-and the hardware accelerated one. The benchmarks have been performed on a [Zynq Arty Z7](https://digilent.com/reference/programmable-logic/arty-z7/start) board.
+and the hardware accelerated one. The benchmarks have been performed on a [Zynq Arty Z7](https://digilent.com/reference/programmable-logic/arty-z7/start) board (with the shuffling coutnermeasure disabled).
 
 ```
 az7-ecc-axi:/home/petalinux# ./ec_self_tests_sw perf
