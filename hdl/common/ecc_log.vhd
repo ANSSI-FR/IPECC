@@ -34,7 +34,8 @@ package ecc_log is
 	--
 	--   2. log2(2**n) = n + 1 and NOT n
 	--
-	--   3. log2(1) = 1 and NOT 0! (1 bit is required to binary-encode number 1)
+	--   3. log2(1) = 1 and NOT 0 ! (1 bit is required to binary-encode number 1)
+	--   4. log2(0) = 1  exists   ! (1 bit is required to binary-encode number 0)
 	function log2(i : natural) return positive;
 
 	-- ln2(i)
@@ -47,8 +48,10 @@ package ecc_log is
 	--
 	-- Examples:
 	--
-	--   1. ln2(2) = 1 as adding 2 terms requires one extra bit
-	--   2. ln2(3) = 2 as adding 3 terms requires two extra bits
+	--   1. ln2(1) = 0
+	--   2. ln2(2) = 1 as adding 2 terms together requires one extra bit
+	--   3. ln2(3) = 2 as adding 3 terms together requires two extra bits
+	--   4. ln2(0) has no meaning (hence the 'positive' restriction on input)
 	function ln2(i : positive) return natural;
 
 	-- log10(i)
@@ -67,9 +70,9 @@ package body ecc_log is
 	-- 'math_real', which we do not want to use) so we use instead a basic
 	-- iterative computation in order to compute log2.
 	-- Mind that with this definition log2(1) = 1 (1 bit is needed to represent
-	-- the integer number 1) and not 0
+	-- the integer number 1) and not 0, likewise log2(0) exists and is 1.
 	function log2(i : natural) return positive is
-		variable ret_val : positive := 1; -- log2(1)=1! (1 bit is needed to code 1)
+		variable ret_val : positive := 1;
 	begin
 		while i >= (2**ret_val) loop
 			ret_val := ret_val + 1;
