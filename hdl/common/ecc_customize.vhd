@@ -1452,7 +1452,7 @@ end package ecc_customize;
 --
 --       If you provide a relative path, the place where the file will actually
 --       be placed is dependent on your simulator (the default "/tmp/ecc.log"
---       was made an absolute path to avoid this). If you provide a simple file,
+--       was made an absolute path to avoid this). If you provide a simple file-
 --       name, Vivado will likely create it in 'sim_1/behav/xsim/' in your local
 --       project folder.
 --

@@ -2802,7 +2802,7 @@ begin
 			elsif r.shuffle.step = 1 then
 				-- in this step only 2-bit values 00 and 01 are acceptable
 				-- but we can avoid losing TRNG data by regrouping 00 and 10
-				-- as one single element and doing the same for 01 and 11
+				-- as one single element and doing the same for 10 and 11
 				-- values
 				v.shuffle.sw1 := '0' & r.shuffle.trng_data(0);
 				-- prepare next random draw from TRNG

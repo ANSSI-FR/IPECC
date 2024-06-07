@@ -125,7 +125,7 @@ entity ecc_axi is
 		pts_are_oppos : in std_logic;
 		phimsb : in std_logic;
 		kb0end : in std_logic;
-		--   debug only/
+		--   end of debug only/
 		-- interface with ecc_curve
 		masklsb : out std_logic;
 		-- interface with ecc_fp (access to ecc_fp_dram)
@@ -2460,7 +2460,7 @@ begin
 				if r.write.rnd.trailingzeros = '0' then
 					v.write.rnd.bitstotal := r.write.rnd.bitstotal - 1;
 				end if;
-				-- detect and handle completion of an ww-bit shifts cycle
+				-- detect and handle completion of a ww-bit shifts cycle
 				if r.write.rnd.bitsirn = (r.write.rnd.bitsirn'range => '0') then
 					v.write.rnd.doshift := '0';
 					v.write.rnd.irnempty := '1';
