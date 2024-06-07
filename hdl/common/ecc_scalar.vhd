@@ -325,7 +325,7 @@ architecture rtl of ecc_scalar is
 	-- string "_export":
 	--
 	--   1. this suffixe is removed, as long as the uppercase letter 'L'
-	--      preceeding it, as long as the initial dot prefixing the label name
+	--      preceeding it, as well as the initial dot prefixing the label name
 	--   2. the remaining identification string is switched to uppercase
 	--   3. it is prefixed with the string "ECC_IRAM_"
 	--
@@ -338,12 +338,12 @@ architecture rtl of ecc_scalar is
 	--
 	-- A note on synthesis of constant EXEC_ADDR: it will almost certainly
 	-- lead to inference of LUT-based logic only, because of the way EXEC_ADDR
-	-- is combinationaly (hence asynchronously) accessed in the remaining
+	-- is combinationaly accessed (hence asynchronously) in the remaining
 	-- of ecc_scalar code below (see e.g (s0)). This indeed will prevent
 	-- synthesizer from infering a blockRAM, as these blocks are always
 	-- purely synchronous in off-the-shelf FPGAs. However allowing EXEC_ADDR
-	-- to be synthesized as an SRAM memory (either for FPGA or ASIC target)
-	-- should not take a big effort in modifying the RTL below
+	-- to be synthesized as a synchronous SRAM memory (either for FPGA or
+	-- ASIC target) should not take a big effort in modifying the RTL below
 	subtype std_logic_pc is std_logic_vector(IRAM_ADDR_SZ - 1 downto 0);
 	type exec_addr_type is array(0 to 31) of std_logic_pc;
 	constant EXEC_ADDR : exec_addr_type := ( -- (s115)  --  matching routine:
@@ -1881,7 +1881,7 @@ begin
 						v.ctrl.r1z := '1'; -- (s64)
 					end if;
 					if tokenact = '1' then
-						-- it is the responsability of ecc_axi to enforce that if 'tokenact'
+						-- it is the responsibility of ecc_axi to enforce that if 'tokenact'
 						-- is high then token was generated and read back by the software
 						-- before [k]P computation was started (ecc_axi refuses to launch
 						-- computation as long as software has not done so, issuing error
