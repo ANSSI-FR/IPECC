@@ -845,7 +845,7 @@ end package ecc_customize;
 --       Integer.
 --       A value of 0 disables the countermeasure, yet software driver will
 --       still be able to activate it at rutime.
---       Default value is 16 but this is quite arbitrary. You should consider
+--       Default value is 4 but this is quite arbitrary. You should consider
 --       the performance penalty induced by the countermeasure when selecting
 --       the value for this parameter (and when doing so, keep in mind that
 --       the smaller the value, the bigger the performance loss) - see last
@@ -861,8 +861,9 @@ end package ecc_customize;
 --       at the beginning of the scalar loop, regardless of value set for
 --       'zremask'. What you can set with 'zremask' is to force that masking to
 --       happen again and periodically throughout the entire scalar loop.
---       If you set for instance 'zremask' = 4, then coordinates will be rando-
+--       With e.g default setting 'zremask' = 4, coordinates will be rando-
 --       mized with a new fresh random every one in four bits of the scalar.
+--
 --       There is a 1-1 correspondence between the set of affine points
 --
 --                               {(x, y) : x,y \in F_p}
@@ -901,8 +902,9 @@ end package ecc_customize;
 --       Note that when option 'nn_dynamic' is set to TRUE, the value set for
 --       'zremask' is independent of the runtime value 'nn' can take. If for
 --       instance 'zremask' = 4, re-randomization will happen every 4 bits of
---       the scalar whether 'nn' = 256 or 'nn' = 384, simply in the former
---       case it will happen 64 times, and in the latter 96 times.
+--       the scalar whether 'nn' = 256 or 'nn' = 384. But while in the former
+--       case it will happen 64 times throughout the whole [k]P computation,
+--       it will happen 96 times in the latter.
 --
 --       The cost of the countermeasure is 8 REDC (8 Montgomery multiplications)
 --       at each remasking, so you'd better consider the performance cost of
