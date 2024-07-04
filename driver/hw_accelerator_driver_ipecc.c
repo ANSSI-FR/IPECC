@@ -354,9 +354,9 @@ static volatile uint64_t *ipecc_baddr = NULL;
 #define IPECC_W_DBG_FP_RADDR_POS     (0)
 #define IPECC_W_DBG_FP_RADDR_MSK     (0xffffffff)
 
-/* Fields for IPECC_W_DBG_CFG_NOXYSHUF */
-#define IPECC_W_DBG_CFG_XYSHUF_EN    (((uint32_t)0x1) << 0)
-#define IPECC_W_DBG_CFG_XYSHUF_DIS    (((uint32_t)0x0) << 0)
+/* Fields for IPECC_W_DBG_CFG_XYSHUF */
+#define IPECC_W_DBG_CFG_XYSHUF_EN    (((uint32_t)0x0) << 0)
+#define IPECC_W_DBG_CFG_XYSHUF_DIS    (((uint32_t)0x1) << 0)
 
 /* Fields for IPECC_W_DBG_CFG_AXIMSK */
 #define IPECC_W_DBG_CFG_AXIMSK_EN    (((uint32_t)0x1) << 0)
@@ -1282,7 +1282,7 @@ static volatile uint64_t *ipecc_baddr = NULL;
  * *******************************************
  */
 
-/* Enable the XY-coords shuffling of R0 & R1 sensitivie points
+/* Enable the XY-coords shuffling of R0 & R1 sensitive points
  */
 #define IPECC_DBG_ENABLE_XYSHUF() do { \
 	IPECC_SET_REG(IPECC_W_DBG_CFG_XYSHUF, IPECC_W_DBG_CFG_XYSHUF_EN); \
