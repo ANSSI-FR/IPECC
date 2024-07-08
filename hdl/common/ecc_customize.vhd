@@ -64,7 +64,7 @@ package ecc_customize is
 	-- -------------
 	constant axi32or64 : natural := 32; -- 32 or 64 only allowed values
 	constant nblargenb : positive := 32;  -- Change these two parameters only if
-	constant nbopcodes : positive := 512; -- [you really know what you're doing.
+	constant nbopcodes : positive := 512; -- |you really know what you're doing.
 	-- --------------------------
 	-- Simulation-only parameters
 	-- --------------------------
@@ -1173,7 +1173,7 @@ end package ecc_customize;
 --       Each of the 5 parameters is translated (this is done in package
 --       ecc_trng_pkg) into an associated parameter expressing the size of
 --       the same FIFO, but this time in number of elements (or "words") of
---       the corresponding FIFO's memory array. Moreover, and ROUNDED UP
+--       the corresponding FIFO's memory array. Moreover, they are ROUNDED UP
 --       TO THE NEXT (OR EQUAL) POWER OF 2.
 --
 --         - 'trng_ramsz_raw' is translated into parameter 'raw_ram_size'.
