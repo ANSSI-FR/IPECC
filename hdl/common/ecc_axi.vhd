@@ -611,8 +611,8 @@ begin
 			severity FAILURE;
 
 	-- (s150), see (s151)
-	assert (log2(trng_ramsz_raw) <= DBG_CAP_SPLIT)
-		report "In debug mode bit-width of parameter trng_ramsz_raw must not "
+	assert (log2(raw_ram_size) <= DBG_CAP_SPLIT)
+		report "In debug mode bit-width of parameter raw_ram_size must not "
 		     & "exceed " & integer'image(DBG_CAP_SPLIT) & "."
 			severity FAILURE;
 
@@ -3198,8 +3198,8 @@ begin
 			  and s_axi_araddr(ADB + 2 downto 3) = R_DBG_CAPABILITIES_2
 			then
 				dw := (others => '0');
-				dw(log2(trng_ramsz_raw) - 1 downto 0) := -- (s151), see (s150)
-					std_logic_vector(to_unsigned(trng_ramsz_raw, log2(trng_ramsz_raw)));
+				dw(log2(raw_ram_size) - 1 downto 0) := -- (s151), see (s150)
+					std_logic_vector(to_unsigned(raw_ram_size, log2(raw_ram_size)));
 				dw(DBG_CAP_SPLIT + log2(irn_width_sh) - 1 downto DBG_CAP_SPLIT) :=
 					-- (s263), see (s264)
 					std_logic_vector(to_unsigned(irn_width_sh, log2(irn_width_sh)));
