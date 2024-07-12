@@ -21,10 +21,10 @@
 	NOP
 	STOP
 # ****************************************************************
-# we need to check equation Y^2 =  X^3 + a.X + b  (in affine coord.)
+# We need to check equation Y^2 =  X^3 + a.X + b  (in affine coord.)
 # with (X:Y) = (XR1:YR1) and using the only multiplication hardware
 # which is at our disposal, that is REDC(x,y) which does not compute
-# x-time-y, but x-times-y-divided-by-R instead.
+# x-times-y, but x-times-y-divided-by-R instead.
 #
 # Now, we have the following equivalences (with r(x,y) being an ab-
 # breviated notation for the REDC(x,y) operation):
