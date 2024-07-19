@@ -186,7 +186,6 @@ architecture rtl of ecc_scalar is
 		pts_are_oppos : std_logic;
 		ssetup_step : std_logic_vector(1 downto 0);
 		first3pz : std_logic;
-		--firstitoh : std_logic;
 		zrmcnt : unsigned(log2(nn - 1) - 1 downto 0);
 		zrmstep : std_logic;
 	end record;
@@ -1140,7 +1139,6 @@ begin
 						v.kp.ssetup_step := "00";
 						v.int.faddr := EXEC_ADDR(ITOH_ROUTINE); -- (s9)
 						v.kp.firstzaddu := '0';
-						--v.kp.firstitoh := '1';
 						v.kp.substate := joyecoz;
 						v.kp.joye.state := itoh;
 						v.int.fgo := '1'; -- (s89), see (s67)
@@ -1148,18 +1146,6 @@ begin
 						v.sim.logr0r1 := '1';
 						v.sim.logr0r1step := 1;
 						-- pragma translate_on
-						--if iterate_shuffle_rdy = '1' then
-						--	-- switch from 'ssetup' state to 'switch3p' state
-						--	v.kp.substate := switch3p;
-						--	v.int.fgo := '1'; -- (s90), see (s67)
-						--	-- pragma translate_off
-						--	v.sim.logr0r1 := '1';
-						--	v.sim.logr0r1step := 1;
-						--	-- pragma translate_on
-						--elsif iterate_shuffle_rdy = '0' then
-						--	v.kp.substate := wait_xyr01_permute;
-						--	v.kp.nextsubstate := switch3p;
-						--end if;
 						if kap = '0' then
 							-- R0 contains initial point P, so it is non null if P isn't
 							v.ctrl.r0z := r.ctrl.r1z_init;
@@ -1210,11 +1196,7 @@ begin
 							-- enter Joye FSM state 'prezaddu'
 							v.kp.joye.state := prezaddu; -- (s12)
 							v.int.fgo := '1'; -- (s91), see (s67)
-							--if r.kp.firstitoh = '1' then
-							--	v.kp.firstitoh := '0';
-							--elsif r.kp.firstitoh = '0' then
 							v.kp.iterate_shuffle_valid := '1';
-							--end if;
 							-- pragma translate_off
 							v.sim.simbit := r.sim.simbit + 1;
 							-- pragma translate_on

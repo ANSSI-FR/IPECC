@@ -86,6 +86,7 @@
 # Sample LSbit of Kappa, which is Kappa_1 (this bit will
 # be used later to possibly switch P and [3]P)
 	TESTPARs	kap0	1	%kap
+	NOP
 # Erase scalar (only Kappa & Kappa' masked versions remain)
 	NNCLR			kb0
 	NNCLR			kb1
