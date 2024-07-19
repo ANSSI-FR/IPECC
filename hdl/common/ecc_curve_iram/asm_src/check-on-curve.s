@@ -17,6 +17,17 @@
 .chkcurve_op1L_dbg:
 	BARRIER
 	JL	.dochkcurveL
+	Jz  .pt_is_on_curveL
+.pt_is_not_on_curveL:
+	NNSUB	zero	one      XR1
+	NNSUB zero	one      YR1
+	NNSUB zero	one      XR0
+# The last opcode in particular must be set to a non-zero value
+# to preserve the state of the icc flag Z (it was set by the
+# instruction "NNSUB left right mustbezero" which was the last
+# of routine .dochkcurveL)
+	NNSUB zero	one      YR0
+.pt_is_on_curveL:
 .chkcurve_oplastL_dbg:
 	NOP
 	STOP

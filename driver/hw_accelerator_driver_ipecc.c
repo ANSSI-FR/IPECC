@@ -355,8 +355,8 @@ static volatile uint64_t *ipecc_baddr = NULL;
 #define IPECC_W_DBG_FP_RADDR_MSK     (0xffffffff)
 
 /* Fields for IPECC_W_DBG_CFG_XYSHUF */
-#define IPECC_W_DBG_CFG_XYSHUF_EN    (((uint32_t)0x0) << 0)
-#define IPECC_W_DBG_CFG_XYSHUF_DIS    (((uint32_t)0x1) << 0)
+#define IPECC_W_DBG_CFG_XYSHUF_EN    (((uint32_t)0x1) << 0)
+#define IPECC_W_DBG_CFG_XYSHUF_DIS    (((uint32_t)0x0) << 0)
 
 /* Fields for IPECC_W_DBG_CFG_AXIMSK */
 #define IPECC_W_DBG_CFG_AXIMSK_EN    (((uint32_t)0x1) << 0)
@@ -2172,14 +2172,18 @@ static inline int ip_ecc_disable_xyshuf(void)
 	/* Wait until the IP is not busy */
 	IPECC_BUSY_WAIT();
 
+#if 0
 	/* Check for error */
 	if(ip_ecc_check_error(NULL)){
 		goto err;
 	}
+#endif
 
 	return 0;
+#if 0
 err:
 	return -1;
+#endif
 }
 
 /* Debug feature: enable the XY-shuffling countermeasure */
@@ -2194,14 +2198,48 @@ static inline int ip_ecc_enable_xyshuf(void)
 	/* Wait until the IP is not busy */
 	IPECC_BUSY_WAIT();
 
+#if 0
 	/* Check for error */
 	if(ip_ecc_check_error(NULL)){
 		goto err;
 	}
+#endif
 
 	return 0;
+#if 0
 err:
 	return -1;
+#endif
+}
+
+/* Debug feature: disable 'on-the-fly masking of the scalar by AXI interface' countermeasure */
+static inline int ip_ecc_disable_aximsk(void)
+{
+	/* Wait until the IP is not busy */
+	IPECC_BUSY_WAIT();
+
+	/* Disable the countermeasure */
+	IPECC_DBG_DISABLE_AXIMSK();
+
+	/* Wait until the IP is not busy */
+	IPECC_BUSY_WAIT();
+
+	return 0;
+}
+
+/* Debug feature: enable 'on-the-fly masking of the scalar by AXI interface' countermeasure */
+static inline int ip_ecc_enable_aximsk(void)
+{
+	/* Wait until the IP is not busy */
+	IPECC_BUSY_WAIT();
+
+	/* Disable the countermeasure */
+	IPECC_DBG_ENABLE_AXIMSK();
+
+	/* Wait until the IP is not busy */
+	IPECC_BUSY_WAIT();
+
+	return 0;
 }
 
 /* Write a big number to the IP
@@ -2642,7 +2680,7 @@ int ip_ecc_patch_microcode(uint32_t* buf, uint32_t nbops, uint32_t opsz)
 	 *                0x11000018
 	 *                ...
 	 *
-	 * Parameter 'bufsz' must be given in number of instruction opcodes,
+	 * Parameter 'nbops' must be given in number of instruction opcodes,
 	 * (not in number of 32-bit words) so depending on the value of parameter
 	 * 'opsz' it should be equal to either the actual size of the buffer
 	 * given in 32-bit words, or to half of it.
@@ -2650,7 +2688,7 @@ int ip_ecc_patch_microcode(uint32_t* buf, uint32_t nbops, uint32_t opsz)
 	 * Code below will enforce verifying that 'nbops' is in accordance
 	 * with value read from live-hardware (through macro IPECC_GET_NBOPCODES())
 	 * meaning that it cannot exceed the power-of-2 directly superior
-	 * (or equal) to the hardware memory size expressed in number of
+	 * (or equal) to the hardware memory size, expressed in number of
 	 * instruction opcodes.
 	 */
 	if ((opsz != 1) && (opsz != 2)) {
@@ -2672,11 +2710,17 @@ int ip_ecc_patch_microcode(uint32_t* buf, uint32_t nbops, uint32_t opsz)
 
 	for (i=0; i<nbops; i++)
 	{
+		/* Wait until the IP is not busy */
+		IPECC_BUSY_WAIT();
+
 		/*
 		 * Set opcode address in register W_DBG_OP_WADDR.
 		 */
 		IPECC_SET_OPCODE_WRITE_ADDRESS(i);
-		printf("%smcode[0x%04x|%05d] = ", KORA, i, i);
+
+		/* Wait until the IP is not busy */
+		IPECC_BUSY_WAIT();
+
 		/*
 		 * Set opcode word in register W_DBG_OPCODE.
 		 */
@@ -2684,20 +2728,97 @@ int ip_ecc_patch_microcode(uint32_t* buf, uint32_t nbops, uint32_t opsz)
 			/* If opcodes are larger than 32 bits, the least
 			 * significant 32-bit half must be transmitted first.
 			 */
-			IPECC_SET_OPCODE_TO_WRITE(buf[i + 1]);
+			IPECC_SET_OPCODE_TO_WRITE(buf[(2*i) + 1]);
+
+			/* Wait until the IP is not busy */
+			IPECC_BUSY_WAIT();
+
+			IPECC_SET_OPCODE_TO_WRITE(buf[2*i]);
+
+			/* Wait until the IP is not busy */
+			IPECC_BUSY_WAIT();
+		} else {
+			IPECC_SET_OPCODE_TO_WRITE(buf[i]);
+
+			/* Wait until the IP is not busy */
+			IPECC_BUSY_WAIT();
 		}
-		IPECC_SET_OPCODE_TO_WRITE(buf[i]);
-		printf("0x%08x", buf[i]);
-		if (opsz == 2) {
-			printf("%08x", buf[i+1]);
-		}
-		printf("%s\n\r", KNRM);
 	}
 
 	return 0;
 err:
 	return -1;
 }
+
+/* Patch a single opcode in the microcode.
+ * 
+ *   'opcode' should point to the buffer containing only one opcode 32-bit
+ *   word (if the hardware opcode size is less than 32-bit) or two opcode
+ *   32-bit words (if the hardware opcode size is larger than 32-bit).
+ *   Flag 'opsz' and the order in which the opcode is given are as with
+ *   function ip_ecc_patch_microcode() above - c.f)
+ */
+int ip_ecc_patch_one_opcode(uint32_t address, uint32_t opcode_msb, uint32_t opcode_lsb, uint32_t opsz)
+{
+	uint32_t nbopcodes_max;
+
+	/* Sanity check */
+	if ((opsz != 1) && (opsz != 2)) {
+		printf("Error: Illegal opcode size (%d) in ip_ecc_patch_one_opcode() "
+				"(should be 1 or 2)\n\r", opsz);
+		goto err;
+	}
+
+	if (ge_pow_of_2(IPECC_GET_NBOPCODES(), &nbopcodes_max)) {
+		printf("Error: ge_pow_of_2() returned exception\n\r");
+		goto err;
+	}
+
+	if (address > nbopcodes_max) {
+		printf("Error: Illegal microcode address (%d) in call to ip_ecc_patch_one_opcode"
+				"(top-address allowed: %d). \n\r", address, nbopcodes_max);
+		goto err;
+	}
+
+	/* Wait until the IP is not busy */
+	IPECC_BUSY_WAIT();
+
+	/*
+	 * Set opcode address in register W_DBG_OP_WADDR.
+	 */
+	IPECC_SET_OPCODE_WRITE_ADDRESS(address);
+
+	/* Wait until the IP is not busy */
+	IPECC_BUSY_WAIT();
+
+	/*
+	 * Set opcode word in register W_DBG_OPCODE.
+	 */
+	if (opsz == 2) {
+		/* If opcodes are larger than 32 bits, the least
+		 * significant 32-bit half must be transmitted first.
+		 */
+		IPECC_SET_OPCODE_TO_WRITE(opcode_lsb);
+
+		/* Wait until the IP is not busy */
+		IPECC_BUSY_WAIT();
+
+		IPECC_SET_OPCODE_TO_WRITE(opcode_msb);
+
+		/* Wait until the IP is not busy */
+		IPECC_BUSY_WAIT();
+	} else {
+		IPECC_SET_OPCODE_TO_WRITE(opcode_lsb);
+
+		/* Wait until the IP is not busy */
+		IPECC_BUSY_WAIT();
+	}
+
+	return 0;
+err:
+	return -1;
+}
+
 
 #ifdef KP_TRACE
 
@@ -3096,7 +3217,7 @@ static int kp_debug_trace(kp_trace_info_t* ktrc)
 
 	} while (1);
 
-	kp_trace_msg_append(ktrc, "%d debug steps fopr this [k]P computation.\n", ktrc->nb_steps);
+	kp_trace_msg_append(ktrc, "%d debug steps for this [k]P computation.\n", ktrc->nb_steps);
 
 	kp_trace_msg_append(ktrc, "Removing breakpoint & resuming.\n\r");
 	IPECC_REMOVE_BREAKPOINT(0);

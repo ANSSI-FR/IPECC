@@ -23,6 +23,7 @@ workdir:
 
 clean:
 	rm -Rf work ./ecc_tb
+	rm -Rf e~ecc_tb.o
 
 ##############################################################
 # Dependencies of each object (%.o) as regard to its own %.vhd

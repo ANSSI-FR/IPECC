@@ -281,35 +281,36 @@ architecture rtl of ecc_scalar is
 	constant CONSTMTY0_ROUTINE : natural := 0;
 	constant CONSTMTY1_ROUTINE : natural := 1;
 	constant CONSTMTY2_ROUTINE : natural := 2;
-	constant CHKCURVE_ROUTINE : natural := 3;
-	constant BLINDSTART_ROUTINE : natural := 4;
-	constant BLNBIT_ROUTINE : natural := 5;
-	constant BLINDSTOP_ROUTINE : natural := 6;
-	constant ADPA_ROUTINE : natural := 7;
-	constant DRAWZ_ROUTINE : natural := 8;
-	constant ITOH_ROUTINE : natural := 9;
-	constant ZADDU_ROUTINE : natural := 10;
-	constant ZADDC_ROUTINE : natural := 11;
-	constant SUBTRACTP_ROUTINE : natural := 12;
-	constant EXIT_ROUTINE : natural := 13;
-	constant ADDITION_BEGIN_ROUTINE : natural := 14;
-	constant DOUBLE_ROUTINE : natural := 15;
-	constant NEGATIVE_ROUTINE : natural := 16;
-	constant EQUALX_ROUTINE : natural := 17;
-	constant EQUALY_ROUTINE : natural := 18;
-	constant OPPOSITEY_ROUTINE : natural := 19;
-	constant IS_ON_CURVE_ROUTINE : natural := 20;
-	constant ZREMASK_ROUTINE : natural := 21;
-	constant AMONTY_ROUTINE : natural := 22;
-	constant PRE_ZADDU_ROUTINE : natural := 23;
-	constant PRE_ZADDC_ROUTINE : natural := 24;
-	constant ZDBL_ROUTINE : natural := 25;
-	constant ZNEGC_ROUTINE : natural := 26;
-	constant ADDITION_END_ROUTINE : natural := 27;
-	constant ZDBLSW_ROUTINE : natural := 28;
-	constant SETUP_ROUTINE : natural := 29;
-	constant GET_TOKEN_ROUTINE : natural := 30;
-	constant MASK_TOKEN_ROUTINE : natural := 31;
+	constant AMONTY_ROUTINE : natural := 3;
+	constant GET_TOKEN_ROUTINE : natural := 4;
+	constant CHKCURVE_ROUTINE : natural := 5;
+	constant BLINDSTART_ROUTINE : natural := 6;
+	constant BLNBIT_ROUTINE : natural := 7;
+	constant BLINDSTOP_ROUTINE : natural := 8;
+	constant ADPA_ROUTINE : natural := 9;
+	constant DRAWZ_ROUTINE : natural := 10;
+	constant SETUP_ROUTINE : natural := 11;
+	constant ITOH_ROUTINE : natural := 12;
+	constant PRE_ZADDU_ROUTINE : natural := 13;
+	constant ZADDU_ROUTINE : natural := 14;
+	constant PRE_ZADDC_ROUTINE : natural := 15;
+	constant ZADDC_ROUTINE : natural := 16;
+	constant ZREMASK_ROUTINE : natural := 17;
+	constant ZDBL_ROUTINE : natural := 18;
+	constant ZNEGC_ROUTINE : natural := 19;
+	constant SUBTRACTP_ROUTINE : natural := 20;
+	constant EXIT_ROUTINE : natural := 21;
+	constant MASK_TOKEN_ROUTINE : natural := 22;
+	-- point ops
+	constant ADDITION_BEGIN_ROUTINE : natural := 23;
+	constant ADDITION_END_ROUTINE : natural := 24;
+	constant DOUBLE_ROUTINE : natural := 25;
+	constant NEGATIVE_ROUTINE : natural := 26;
+	constant EQUALX_ROUTINE : natural := 27;
+	constant EQUALY_ROUTINE : natural := 28;
+	constant OPPOSITEY_ROUTINE : natural := 29;
+	constant IS_ON_CURVE_ROUTINE : natural := 30;
+	constant ZDBLSW_ROUTINE : natural := 31;
 	--constant NOP_ROUTINE : natural := 32;
 
 	-- Address of the routines below (all constants whose name starts with
@@ -981,7 +982,7 @@ begin
 						v.int.faddr := EXEC_ADDR(ADPA_ROUTINE);
 						v.kp.substate := adpa;
 					end if;
-					v.int.fgo := '1'; -- (s80), see (s67)
+					v.int.fgo := '1'; -- (s80), see (s67) + bypassed by (s124)
 					if r.ctrl.r1z = '1' then
 						-- R1 being null from start of computation, the check-on-curve
 						-- test is assumed to be TRUE with no regards as to the result of
@@ -991,6 +992,13 @@ begin
 						if zero = '0' then -- input point is not null and is NOT on curve
 							-- error (= input point NOT on curve)
 							v.int.aerr_inpt_not_on_curve := '1';
+							v.ctrl.active := '0';
+							v.ctrl.state := idle;
+							v.kp.substate := idle;
+							v.int.ardy := '1';
+							v.kp.computing := '0';
+							v.kp.done := '1';
+							v.int.fgo := '0'; -- (s124), bypass of (s80)
 						elsif zero = '1' then
 							-- no error
 							v.int.aerr_inpt_not_on_curve := '0';
