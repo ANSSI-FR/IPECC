@@ -1929,33 +1929,6 @@ err:
 	return -1;
 }
 
-/* Activate the shuffling */
-static inline int ip_ecc_activate_shuffling(void)
-{
-	/* Wait until the IP is not busy */
-	IPECC_BUSY_WAIT();
-
-	/* We activate the shuffling only if it is supported */
-	if(IPECC_IS_SHUFFLING_SUPPORTED()){
-		IPECC_ENABLE_SHUFFLE();
-
-		/* Wait until the IP is not busy */
-		IPECC_BUSY_WAIT();
-
-		/* Check for error */
-		if(ip_ecc_check_error(NULL)){
-			goto err;
-		}
-	}
-	else{
-		goto err;
-	}
-
-	return 0;
-err:
-	return -1;
-}
-
 /* Set the NN size provided in bits */
 static inline int ip_ecc_set_nn_bit_size(uint32_t bit_sz)
 {
@@ -2010,7 +1983,7 @@ static inline uint32_t ip_ecc_get_nn_bit_size(void)
  * A value of 0 for input argument 'blinding_size' means disabling
  * the blinding countermeasure.
  */
-static inline int ip_ecc_set_blinding_size(uint32_t blinding_size)
+static inline int ip_ecc_enable_blinding_size(uint32_t blinding_size)
 {
 	/* Wait until the IP is not busy */
 	IPECC_BUSY_WAIT();
@@ -2062,19 +2035,25 @@ err:
 
 /* Activate the shuffling for scalar multiplication.
  */
-static inline int ip_ecc_set_shuffling(void)
+static inline int ip_ecc_enable_shuffling(void)
 {
 	/* Wait until the IP is not busy */
 	IPECC_BUSY_WAIT();
 
-	/* Enable shuffling */
-	IPECC_ENABLE_SHUFFLE();
+	/* Enable shuffling but only if it's supported (otherwise reaise an error) */
+	if(IPECC_IS_SHUFFLING_SUPPORTED()){
+		IPECC_ENABLE_SHUFFLE();
 
-	/* Wait until the IP is not busy */
-	IPECC_BUSY_WAIT();
+		/* Wait until the IP is not busy */
+		IPECC_BUSY_WAIT();
 
-	/* Check for error */
-	if(ip_ecc_check_error(NULL)){
+		/* Check for error */
+		if(ip_ecc_check_error(NULL)){
+			goto err;
+		}
+	} else {
+		log_print("ip_ecc_enable_shuffling(): could not enable shuffling - "
+				"(feature's not present in hardware)\n\r");
 		goto err;
 	}
 
@@ -2110,18 +2089,24 @@ err:
  *
  * A value of 0 for input argument 'period' means disabling the countermeasure.
  */
-static inline int ip_ecc_set_zremask(uint32_t period)
+static inline int ip_ecc_enable_zremask(uint32_t period)
 {
 	/* Wait until the IP is not busy */
 	IPECC_BUSY_WAIT();
 
 	if(period == 0){
-		/* Clear the Z-remask countermeasure */
-		IPECC_DISABLE_ZREMASK();
+		log_print("ip_ecc_enable_zremask(): error, a period of 0 is not supported - "
+				"use ip_ecc_disable_zremask() instead to disable the countermeare\n\r");
 	}
 	else{
-		/* Set the blinding size and enable the countermeasure. */
-		IPECC_ENABLE_ZREMASK(period);
+		/* Enable the Zremask countermeasure and set its period.
+		 * The low-level macro abides by the hardware API, which requires
+		 * that {period + 1} be written to ZREMASK register - that's why
+		 * we subtract 1 here (meaning for instance: a parameter of 1
+		 * given by our caller really means a period of 1, the hardware
+		 * being given the value 0 in this case which actually matches
+		 * a period of 1). */
+		IPECC_ENABLE_ZREMASK((period - 1));
 	}
 
 	/* Wait until the IP is not busy */
@@ -3807,13 +3792,13 @@ err:
  * countermeasure (consider using instead  explicit function
  * hw_driver_disable_blinding()).
  */
-int hw_driver_set_blinding(uint32_t blinding_size)
+int hw_driver_enable_blinding(uint32_t blinding_size)
 {
 	if(driver_setup()){
 		goto err;
 	}
 
-	if(ip_ecc_set_blinding_size(blinding_size)){
+	if(ip_ecc_enable_blinding_size(blinding_size)){
 		goto err;
 	}
 
@@ -3840,13 +3825,13 @@ err:
 }
 
 /* Activate the shuffling for scalar multiplication */
-int hw_driver_set_shuffling(void)
+int hw_driver_enable_shuffling(void)
 {
 	if(driver_setup()){
 		goto err;
 	}
 
-	if(ip_ecc_set_shuffling()){
+	if(ip_ecc_enable_shuffling()){
 		goto err;
 	}
 
@@ -3873,13 +3858,13 @@ err:
 
 /* Activate and configure the periodic Z-remasking countermeasure
  * (the 'period' arguement is expressed in number of bits of the scalar */
-int hw_driver_set_zremask(uint32_t period)
+int hw_driver_enable_zremask(uint32_t period)
 {
 	if(driver_setup()){
 		goto err;
 	}
 
-	if(ip_ecc_set_zremask(period)){
+	if(ip_ecc_enable_zremask(period)){
 		goto err;
 	}
 
