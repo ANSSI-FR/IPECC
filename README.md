@@ -6,6 +6,16 @@ Copyright (C) 2023
 
 **Contributors**: Adrian THILLARD, Emmanuel PROUFF
 
+<img src="https://www.sgdsn.gouv.fr/files/styles/ds_image_paragraphe/public/files/Notre_Organisation/logo_anssi.png" alt="ANSSI logo" width="30%">
+
+## French Cybersecurity Agency (ANSSI)
+
+[![badge_repo](https://img.shields.io/badge/ANSSI--FR-IPECC-white)](https://github.com/ANSSI-FR/template)
+[![category_badge_doctrinal](https://img.shields.io/badge/category-doctrinal-%23e9c7e7)](https://anssi-fr.github.io/README.en.html#project-categories)
+[![openess_badge_C](https://img.shields.io/badge/code.gouv.fr-published-orange)](https://documentation.ouvert.numerique.gouv.fr/les-parcours-de-documentation/ouvrir-un-projet-num%C3%A9rique/#niveau-ouverture)
+
+*This projet is managed by [ANSSI](https://cyber.gouv.fr/). To find out more, you can visit the [page](https://cyber.gouv.fr/enjeux-technologiques/open-source/) (in French) dedicated to ANSSI’s open-source strategy. You can also click on the badges above to learn more about their meaning.*
+
 ## Introduction
 
 IPECC is a hardware IP block performing the computation of scalar multiplication $[k]P$ over elliptic curves defined in short Weierstrass form on a finite field of charasteristic $p > 3$. IPECC has been developped mainly for SRAM-based FPGAs (both Xilinx and Intel-Altera) but it should also be usable as input to an ASIC flow without any kind of restriction.
